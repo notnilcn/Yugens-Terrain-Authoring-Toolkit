@@ -15,6 +15,7 @@ This project is an effort to create a simple to use and powerfull terrain author
 * Get debug information for selected cells
 * Change the internal marching squares algorithm vertex merge threshold value resulting in smoother or blockier terrain
 * Change global terrain settings like the default wall texture, texture blend mode, grass animation fps and more...
+* Bundled ports of **Cyclops Level Builder** and **TileMapLayer3D**, both with a shared **MST Grid Align** snapping mode (see below)
 
 ## Grid Modes
 
@@ -38,6 +39,16 @@ smooth, bridge, vertex paint, grass mask, quick paint) work on all three grid ty
   of the data directory is migrated into `square/` automatically.
 
 For more in-depth documentation, please refer to the _documentation_ folder in the addon.
+
+## Bundled Ports (Grid Align + Dual Grid)
+
+This repository also ships two vendored, renamed ports under `addons/`:
+
+* `addons/YugenCyclopsLevelBuilder/` — full port of [Cyclops Level Builder](https://github.com/blackears/cyclopsLevelBuilder) (MIT, Mark McKay). Adds a **Grid Align** snapping system that snaps block edits to an assigned `MarchingSquaresTerrain` lattice (vertices/cell centers, cell-size multiplier, optional Y snap).
+* `addons/YugenTileMapLayer3D/` — full port of [TileMapLayer3D](https://github.com/DanTrz/TileMapLayer3D) (MIT, DanTrz). Adds the same **MST Grid Align** placement snapping plus a **Dual Grid Auto Tile** mode that picks a tile's display variant from its XZ neighbours using the DualGrid / TileMapDual v5 peering rules (bespoke mixes and layer-order overrides included).
+
+Both ports depend on the `MSTGridSnap` helper that ships inside the MST addon, but load and behave like upstream when no terrain is assigned.
+See [`documentation/working_with_ports.md`](documentation/working_with_ports.md) for setup and controls.
 
 For community showcases, feature requests and bug reporting, please refer to the [discord](https://discord.gg/ZSeYkTCgft).
 A bug can also be reported by opening a new issue thread in the issues tab of this github project.

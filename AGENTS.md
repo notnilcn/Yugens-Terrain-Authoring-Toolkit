@@ -7,6 +7,9 @@ This repo is the development project for the [`addons/MarchingSquaresTerrain`](a
 | Path | Role |
 |---|---|
 | `addons/MarchingSquaresTerrain/` | The plugin. See its `AGENTS.md`. |
+| `addons/YugenCyclopsLevelBuilder/` | Vendored port of Cyclops Level Builder + MST Grid Align snapping (Tier-1 renames; see `PORT_RENAME_MAP.md`). |
+| `addons/YugenTileMapLayer3D/` | Vendored port of TileMapLayer3D + MST Grid Align + dual-grid auto tiling (`core/dual/`). |
+| `documentation/working_with_ports.md` | How to enable/use the two ports and their Grid Align / dual-grid features. |
 | `scenes/mst_demo_scene.tscn` | Main scene (`project.godot`), demo terrain. |
 | `scenes/mst_demo_presets.tscn` | Texture-preset demo. |
 | `scenes/*_TerrainData/` | Committed demo terrain data (`chunk_<x>_<y>/metadata.res`, per grid-mode subfolder). |
