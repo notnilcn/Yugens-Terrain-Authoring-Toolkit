@@ -80,4 +80,11 @@ files were not copied; Godot regenerates them on first import.
 - `plugin.cfg` `version` keeps the upstream version with a `+yugen.1` suffix.
 - License files are kept in place (`LICENSE.md` / `LICENSE.txt`) and credits are extended in
   `addons/MarchingSquaresTerrain/documentation/credits.md`.
+- `gui/controls/vec4D1.tmp` (a dead upstream temp file) had its two ext_resource paths
+  rewritten to the new folder; it is not imported by Godot.
+- Binary demo assets under `YugenTileMapLayer3D/DemoScene/` (`demo_scene_v_2.scn`, its
+  `_SavedData/*.res` and `temp_tileset/Demo_TileSet_v03.res`) were loaded and re-saved through
+  Godot so their embedded `res://` paths point at the new addon folder. This follows the
+  plan's re-save/re-import remedy; the old paths cannot be rewritten at the byte level safely
+  because Godot's binary format length-prefixes strings.
 - Feature work (MST snapping system, `COORD_SCALE`, dual-grid resolver) is separate from this map.
