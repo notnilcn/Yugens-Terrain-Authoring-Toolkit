@@ -4,3 +4,6 @@
 addons/gut
 *.uid
 *.import
+square/
+triangle/
+hex/
