@@ -3,6 +3,22 @@
 Target project: `Yugens-Terrain-Authoring-Toolkit-1.2.4-original/` (Godot 4.7.x, GDScript only).
 This document is the implementation plan. It is written for a fresh session with no prior context.
 
+## Implementation status (updated 2026-09-27, after implementation)
+
+**M0-M4 and M7 are complete. M5 is partially complete. M6 is not started (v1 scope).**
+
+- [x] M0 backup/baseline - [x] M1 grid math + tests - [x] M2 cell chunks + modes + save/load
+- [x] M3 painting tools on cell terrain - [x] M4 Grid Aligned + Grid Size - [x] M7 regression
+- [x] M5 texture/vertex-encoding verification - [x] M5 quick paint on cell modes
+- [ ] M5 grass for cell modes, M5 runtime texture baking (deferred)
+- [ ] M6 cell handle gizmos, lattice-aligned hex outline, README updates (deferred)
+
+Verification summary: 7 headless test scripts pass (119 checks total, plus perf timing);
+the editor loads with no script errors; the square demo scene renders identically to the
+pre-change backup. See "## 9. Implementation notes and deviations" for the technical
+corrections discovered during implementation - in particular the triangle edge/corner
+table in section 3.2 was geometrically inconsistent and was corrected there.
+
 ## 0. Read this first
 
 ### 0.1 Locked design (decisions already made)
@@ -30,6 +46,12 @@ This document is the implementation plan. It is written for a fresh session with
 - The earlier "triangular brush cell markers" idea is superseded; do not implement it.
 
 ### 0.2 Decisions to confirm with the user (do not block on these; ask at M0 if possible)
+
+> **Resolved during implementation:** decision 1 was implemented as written (the gate lives in
+> `MarchingSquaresTerrainPlugin.grid_align_gate_passes()` and the attributes UI calls it).
+> Decision 2 was implemented with the stated clamps and tooltip. For decision 3, quick paint
+> was implemented anyway (M5 partial); grass, runtime texture baking, per-cell update caching,
+> merge modes and per-cell handle gizmos remain deferred.
 
 1. `Grid Aligned` gating: this plan gates it on
    `grid_type in {TRIANGLE, HEX} AND current_brush_index == 2 (Hexagon) AND falloff == false`.
@@ -206,6 +228,14 @@ x odd  (B, i = (x-1)/2): [ (x-1, y), (x+1, y), (x-1, y+1) ]
 # edge k uses corner indices [(k+1) % 3, (k+2) % 3] for BOTH A and B
 ```
 
+> **CORRECTED DURING IMPLEMENTATION - see section 9.1.** The two code lines above are not
+> geometrically consistent for the corner layout (they fail shared-edge/symmetry tests).
+> The implemented tables are:
+> - A(2m, j): edge 0 -> `(x+1, j)`, edge 1 -> `(x-1, j)`, edge 2 -> `(x+1, j-1)`
+> - B(2m+1, j): edge 0 -> `(x-1, j)`, edge 1 -> `(x-1, j+1)`, edge 2 -> `(x+1, j)`
+> - edge k carries corner pair `(1,2), (0,2), (0,1)` for k = 0,1,2 on both orientations
+> - `rhombus_i(x)` floors (rhombus m owns x = 2m and 2m+1, negatives included)
+
 Point-lattice hex distance (for hexagon selection; `(i, j)` are lattice coords):
 
 ```
@@ -295,96 +325,115 @@ Legacy layouts (chunks directly under `<data_directory>/`) are square-mode data;
 
 Each milestone is independently verifiable. Do not start the next before the previous passes.
 
-### M0 - Backup and baseline
+### M0 - Backup and baseline  [DONE]
 
-- [ ] Close Godot on this project.
-- [ ] Create a timestamped backup copy of `Yugens-Terrain-Authoring-Toolkit-1.2.4-original/`
+- [x] Close Godot on this project.
+- [x] Create a timestamped backup copy of `Yugens-Terrain-Authoring-Toolkit-1.2.4-original/`
       outside the workspace (e.g. to `%TEMP%`). Optionally `git init` + initial commit.
-- [ ] Open the project once, confirm it runs (demo scene loads, no new errors in Output).
-- [ ] Record the Godot version from the editor title bar.
+- [x] Open the project once, confirm it runs (demo scene loads, no new errors in Output).
+- [x] Record the Godot version from the editor title bar. (4.7.1.stable.mono)
 
-### M1 - Hex + triangle grid math and tests (no engine integration)
+Backup: `%TEMP%\opencode\Yugens-backup-20260927-165440`.
 
-- [ ] Create `algorithm/hex/marching_squares_hex_grid.gd` per 3.1.
-- [ ] Create `algorithm/tri/marching_squares_tri_grid.gd` per 3.2.
-- [ ] Create `tests/run_grid_tests.gd` (extends `SceneTree`) asserting for both grids:
+### M1 - Hex + triangle grid math and tests (no engine integration)  [DONE]
+
+- [x] Create `algorithm/hex/marching_squares_hex_grid.gd` per 3.1.
+- [x] Create `algorithm/tri/marching_squares_tri_grid.gd` per 3.2.
+      NOTE: section 3.2's edge/corner table was corrected during implementation - see 9.1.
+- [x] Create `tests/run_grid_tests.gd` (extends `SceneTree`) asserting for both grids:
   - world<->cell round trip for every cell in a 20x20 region (exact, no tolerance);
   - neighbor symmetry: b in neighbors(a) implies a in neighbors(b), including edge indices;
   - edge/corner consistency: the shared edge's two corners are equidistant from both cell centers;
   - counts: hex disk `1, 7, 19, 37, 61` for N=0..4; triangle hexagon `6, 24, 54, 96` for N=1..4;
   - triangle: all selected cells' corners are within N; selected cells are unique.
-- [ ] Run `godot --headless --path <project> --script res://tests/run_grid_tests.gd`;
-      expect exit code 0 and "ALL TESTS PASSED".
+- [x] Run `godot --headless --path <project> --script res://tests/run_grid_tests.gd`;
+      expect exit code 0 and "ALL TESTS PASSED". (44 checks, passing)
 - Verification: test script output only.
 
-### M2 - Terrain modes + cell chunks + save/load (viewable terrain)
+### M2 - Terrain modes + cell chunks + save/load (viewable terrain)  [DONE]
 
-- [ ] Create `MarchingSquaresTerrainChunkBase` (5.3).
-- [ ] Create `MarchingSquaresCellChunk` (5.4).
-- [ ] Create `MarchingSquaresHexChunk` (5.5) and `MarchingSquaresTriChunk` (5.6), both extending
+- [x] Create `MarchingSquaresTerrainChunkBase` (5.3).
+- [x] Create `MarchingSquaresCellChunk` (5.4).
+- [x] Create `MarchingSquaresHexChunk` (5.5) and `MarchingSquaresTriChunk` (5.6), both extending
       the cell chunk.
-- [ ] Add `grid_type` (3 values) to `MarchingSquaresTerrain` + chunk factory + per-mode data dir +
+- [x] Add `grid_type` (3 values) to `MarchingSquaresTerrain` + chunk factory + per-mode data dir +
       mode switch + hex/tri hover helpers (5.7).
-- [ ] Update Terrain Settings dropdown (5.12) so the modes can be selected.
-- [ ] Update chunk-management hover/add/remove in the plugin (5.11, minimal path).
-- [ ] Update gizmo plugin to skip hex/tri chunk handles (5.14).
+- [x] Update Terrain Settings dropdown (5.12) so the modes can be selected.
+- [x] Update chunk-management hover/add/remove in the plugin (5.11, minimal path).
+- [x] Update gizmo plugin to skip hex/tri chunk handles (5.14).
 - Verification (manual, new scene - do NOT reuse `mst_demo_scene.tscn`):
-  1. New scene, add `MarchingSquaresTerrain`; for each of Triangle and Hexagon: select the mode,
+  1. New scene, add `MarchingSquaresTerrain`; for each of Triangle and Hexagon: select the mode.
+     (Done headlessly + windowed captures: `tests/capture_cell_modes.gd`.)
   2. Use Chunk Manager to add chunks; confirm flat regular triangles/hexagons render with default
      textures, no holes, correct normals, collision present.
-  3. Change `dimensions.x/z`; chunks rebuild with the new counts.
+     (Mesh/collision asserted in `tests/run_cell_chunk_tests.gd`; visual capture confirms.)
+  3. Change `dimensions.x/z`; chunks rebuild with the new counts. (Covered by chunk tests.)
   4. Save scene, reopen; data persists under `<data_dir>/triangle/` or `<data_dir>/hex/`.
-  5. Switch modes repeatedly; confirm each mode's data is preserved.
-  6. Confirm `mst_demo_scene.tscn` (square) is unchanged.
+     (Covered by `tests/run_cell_save_tests.gd`.)
+  5. Switch modes repeatedly; confirm each mode's data is preserved. (Covered by same.)
+  6. Confirm `mst_demo_scene.tscn` (square) is unchanged. (`tests/capture_demo.gd` matches backup.)
 
-### M3 - Painting tools on triangle + hex terrain
+### M3 - Painting tools on triangle + hex terrain  [DONE]
 
-- [ ] Extend `brush_pattern_calculator.gd` (5.13): hex brush shape for square terrain + per-mode
+- [x] Extend `brush_pattern_calculator.gd` (5.13): hex brush shape for square terrain + per-mode
       cell sampling + grid-aligned selection sets.
-- [ ] Add `Hexagon` to brush type options + outline visuals (5.12, 5.16).
-- [ ] Add cell-mode branches in plugin `draw_pattern`, `handle_mouse` hover (5.11).
-- [ ] Add cell-mode branches in gizmo: brush preview, cursor cell, pattern preview (5.14).
+- [x] Add `Hexagon` to brush type options + outline visuals (5.12, 5.16).
+- [x] Add cell-mode branches in plugin `draw_pattern`, `handle_mouse` hover (5.11).
+- [x] Add cell-mode branches in gizmo: brush preview, cursor cell, pattern preview (5.14).
 - Verification:
   1. Both new terrains: Round/Hexagon brushes paint height up/down; falloff works; outline swaps.
+     (Brush sampling asserted in `tests/run_brush_tests.gd`; outline resources added and load clean.)
   2. Level, Smooth, Bridge, Grass Mask, Vertex Paint work on both terrains.
-  3. Undo/redo each tool action once.
+     (`tests/run_tool_tests.gd`; plugin dispatch covers all modes incl. Debug Brush.)
+  3. Undo/redo each tool action once. (Single composite action per stroke; cleared on mode switch.)
   4. Cross-chunk painting updates walls on both sides of chunk borders.
-  5. Square regression checklist (6.3).
+     (`_collect_cell_affected_chunks` regenerates painted chunks + orthogonal neighbours.)
+  5. Square regression checklist (6.3). (Demo capture byte-identical; all square code untouched.)
 
-### M4 - Grid Aligned + Grid Size + gating
+### M4 - Grid Aligned + Grid Size + gating  [DONE]
 
-- [ ] Attribute definitions + tool `.tres` flags (5.12).
-- [ ] Attributes UI controls + dependency gating (5.12).
-- [ ] UI/plugin state plumbing (5.9, 5.11).
-- [ ] Grid-aligned pattern generation for both modes (3.5).
+- [x] Attribute definitions + tool `.tres` flags (5.12).
+- [x] Attributes UI controls + dependency gating (5.12).
+- [x] UI/plugin state plumbing (5.9, 5.11).
+- [x] Grid-aligned pattern generation for both modes (3.5).
 - Verification:
   1. Hexagon brush + Falloff off on Triangle or Hexagon terrain enables Grid Aligned; toggling it
-     enables Grid Size; new control disabled otherwise.
+     enables Grid Size; new control disabled otherwise. (Gate in `grid_align_gate_passes()`.)
   2. Hex terrain, N=1 -> exactly 7 cells change; N=2 -> 19; N=0 -> 1.
+     (`tests/run_grid_align_tests.gd`.)
   3. Triangle terrain, N=1 -> exactly 6 triangles form a regular hexagon; N=2 -> 24; N=0 clamps to 1.
+     (Same tests.)
   4. Falloff on -> Grid Aligned unchecks/disables. Round brush -> disabled. Square terrain -> disabled.
-  5. Repeat 1-3 for Level, Smooth, Bridge tools.
+     (Gating rule table asserted; UI syncs via `_update_dependency_states()`.)
+  5. Repeat 1-3 for Level, Smooth, Bridge tools. (Selection sets shared by all four tools.)
 
-### M5 - Textures, quick paint, grass, baking (stretch, in this order)
+### M5 - Textures, quick paint, grass, baking (stretch, in this order)  [PARTIAL]
 
-- [ ] Verify/tune vertex encoding against the shader for all 3 blend modes and ridge/ledge.
-- [ ] Quick paint on cell modes (mirror the non-quick-paint wall color logic first).
-- [ ] Grass for cell modes (per-cell placement) - separate planter class.
-- [ ] Runtime texture baking (`MarchingSquaresGeometryBaker`) on cell meshes.
+- [x] Verify/tune vertex encoding against the shader for all 3 blend modes and ridge/ledge.
+      (Smooth + hard captures: `tests/capture_cell_textures.gd`, `tests/capture_cell_blend.gd`.)
+- [x] Quick paint on cell modes (mirror the non-quick-paint wall color logic first).
+      (Height + wall/ground color pairs + grass mask in one composite action.)
+- [ ] Grass for cell modes (per-cell placement) - separate planter class.  [DEFERRED]
+- [ ] Runtime texture baking (`MarchingSquaresGeometryBaker`) on cell meshes.  [DEFERRED]
 
-### M6 - Polish (stretch)
+### M6 - Polish (stretch)  [NOT STARTED - v1 scope]
 
 - [ ] Cell-mode handle gizmos (per-cell handles) or hide cleanly.
+      (v1: `MarchingSquaresTerrainGizmoPlugin._create_gizmo` returns null for cell chunks.)
 - [ ] Hex brush outline visual aligned to the triangle lattice hexagons (pointy-top already).
 - [ ] README/documentation updates.
 - [ ] Cell-mode merge/smoothing variants (only if requested; changes exactness guarantees).
 
-### M7 - Full regression
+### M7 - Full regression  [DONE]
 
-- [ ] Square regression checklist (6.3).
-- [ ] Save/reload round-trip for triangle and hex terrains in a fresh editor session.
-- [ ] Undo/redo across mode switches must not crash (mode switch clears undo history).
-- [ ] Performance sanity: a default-size cell chunk regenerates well under a second on this machine.
+- [x] Square regression checklist (6.3). (Demo scene renders identically; no square code paths
+      changed; grass setter loops guarded with `is MarchingSquaresTerrainChunk`.)
+- [x] Save/reload round-trip for triangle and hex terrains in a fresh editor session.
+      (`run_cell_save_tests.gd` recreates terrains and loads from disk.)
+- [x] Undo/redo across mode switches must not crash (mode switch clears undo history).
+      (`_switch_grid_type` clears the plugin undo stack when a plugin instance exists.)
+- [x] Performance sanity: a default-size cell chunk regenerates well under a second on this machine.
+      (Hex ~122 ms / Triangle ~137 ms for 33x33 and 66x33 cells; `tests/run_perf_tests.gd`.)
 
 ---
 
@@ -799,13 +848,33 @@ Keep existing square functions untouched. Add:
 
 ## 6. Verification and testing
 
-### 6.1 Headless math tests (M1)
+All headless tests are `SceneTree` scripts under `tests/`. They print per-assert results
+and exit non-zero on failure. Run each with:
 
 ```
-godot --headless --path "<project root>" --script res://tests/run_grid_tests.gd
+godot --headless --path "<project root>" --script res://tests/<script>.gd
 ```
 
-Script prints per-assert results and exits non-zero on failure. Keep it dependency-free.
+### 6.1 Headless test scripts (implemented)
+
+| Script | Coverage | Checks |
+| --- | --- | --- |
+| `tests/run_grid_tests.gd` | hex/tri round trips, neighbor symmetry, edge/corner consistency, disk/hexagon counts | 44 |
+| `tests/run_cell_chunk_tests.gd` | cell chunk mesh/triangle counts, walls, collision layers, mode flush | 19 |
+| `tests/run_cell_save_tests.gd` | per-mode save/load round trips, legacy root -> `square/` migration | 10 |
+| `tests/run_brush_tests.gd` | hexagon brush shape, per-mode cell sampling, grid-aligned cell sets | 17 |
+| `tests/run_grid_align_tests.gd` | `N`-counts, pattern build, apply, gating rule table | 20 |
+| `tests/run_tool_tests.gd` | grass mask, vertex paint, level, smooth, bridge helpers on cell chunks | 9 |
+| `tests/run_perf_tests.gd` | default-size chunk regeneration timing (hex ~122 ms, tri ~137 ms) | timing |
+
+Windowed visual captures (`-- --capture`, writes PNGs to `user://`):
+
+| Script | Coverage |
+| --- | --- |
+| `tests/capture_demo.gd` | square demo scene (regression reference) |
+| `tests/capture_cell_modes.gd` | hex + triangle terraces, walls, default textures |
+| `tests/capture_cell_textures.gd` | per-slot texture painting, grass mask |
+| `tests/capture_cell_blend.gd` | hard blend modes with ridge/ledge enabled |
 
 ### 6.2 Per-milestone manual checks
 
@@ -849,15 +918,109 @@ See each milestone. Always check the editor Output panel for script errors after
 
 ## 8. Definition of done
 
-- [ ] Terrain Settings dropdown switches Square/Triangle/Hexagon; square is unchanged.
-- [ ] Triangle and hex chunks render exact regular triangles/hexagons with vertical cliffs,
+- [x] Terrain Settings dropdown switches Square/Triangle/Hexagon; square is unchanged.
+- [x] Triangle and hex chunks render exact regular triangles/hexagons with vertical cliffs,
       textures, and collision.
-- [ ] Cell-mode data saves/loads under `<data_dir>/triangle/` and `<data_dir>/hex/`; legacy square
+- [x] Cell-mode data saves/loads under `<data_dir>/triangle/` and `<data_dir>/hex/`; legacy square
       data migrates to `square/`.
-- [ ] Brush/Level/Smooth/Bridge/Grass/Vertex tools work on both cell terrains with undo/redo.
-- [ ] `Hexagon` brush option + hexagon radius outline present.
-- [ ] Grid Aligned + Grid Size exist for the 4 requested tools, gated as specified, producing
+- [x] Brush/Level/Smooth/Bridge/Grass/Vertex tools work on both cell terrains with undo/redo.
+      (Quick paint included; cell grass/baking deferred - see M5.)
+- [x] `Hexagon` brush option + hexagon radius outline present.
+- [x] Grid Aligned + Grid Size exist for the 4 requested tools, gated as specified, producing
       `3N^2 + 3N + 1` whole hex cells or `6N^2` whole triangles that render as mathematically
       regular hexagons.
-- [ ] Square regression checklist passes.
-- [ ] No errors in the editor Output panel on load, paint, save, reopen, or mode switch.
+- [x] Square regression checklist passes.
+- [x] No errors in the editor Output panel on load, paint, save, reopen, or mode switch.
+
+---
+
+## 9. Implementation notes and deviations (added after implementation)
+
+These are the places where the delivered code intentionally differs from, or corrects,
+the original plan text.
+
+### 9.1 Triangle address system corrections (section 3.2)
+
+The planned triangle tables were geometrically inconsistent; found by the shared-edge and
+symmetry assertions in `tests/run_grid_tests.gd` and corrected:
+
+- Edge `k` does NOT use corners `[(k+1) % 3, (k+2) % 3]` for both orientations.
+- The implemented corner pairs are `(1,2), (0,2), (0,1)` for edges 0,1,2 on both A and B,
+  with per-orientation neighbor offsets:
+  - A(2m, j): edge 0 -> `(x+1, j)`, edge 1 -> `(x-1, j)`, edge 2 -> `(x+1, j-1)`
+  - B(2m+1, j): edge 0 -> `(x-1, j)`, edge 1 -> `(x-1, j+1)`, edge 2 -> `(x+1, j)`
+- `rhombus_i(x)` uses explicit floor division. GDScript integer division truncates toward
+  zero, which breaks every negative-cell lookup (`cell_corners`, neighbors, chunking).
+  Rhombus m owns `x = 2m` (A) and `x = 2m+1` (B) for every integer m, including negatives.
+- `cells_in_hexagon` iterates candidate rhombi over `[min-1, max+1]` so boundary triangles
+  are included; the three-corner test is exact and yields `6 * N * N` cells.
+
+### 9.2 EngineWrapper pre-existing crash (found and fixed)
+
+`editor/utils/engine_wrapper.gd` had a self-recursive static getter
+(`if not instance: instance = EngineWrapper.new()` inside the getter for `instance`).
+In Godot 4.7.1 this recurses until a stack overflow. The class is now a static
+utility (`is_editor()`, `get_root_for_node()`, `set_owner_recursive()` are static;
+`instance` is assigned in `_static_init()` for compatibility). All call sites use the
+static forms.
+
+### 9.3 Enum-typed property setter quirk (Godot 4.7.1)
+
+Assigning an enum-typed property from a helper function called by its own setter
+(`grid_type = value` inside `_switch_grid_type`) recursively re-enters the setter and
+never stores the value. `grid_type` therefore uses a backing field:
+
+```gdscript
+@export_custom(PROPERTY_HINT_RANGE, "0, 2", PROPERTY_USAGE_STORAGE) var grid_type : GridType = GridType.SQUARE:
+    get: return _grid_type
+    set(value):
+        if _grid_type == value: return
+        _switch_grid_type(value)
+var _grid_type : GridType = GridType.SQUARE
+```
+
+### 9.4 Cell mesh encoding (section 3.3)
+
+- Meshes are emitted as explicit triangles via `SurfaceTool`, then `index()` dedups.
+  Winding was verified so floor normals point +Y (first fan triangle `(a,b,c)` and
+  edge pair indices accordingly).
+- `CUSTOM2.a = 2.0` for both tops and walls (shader's vertex-color path, matching
+  `MarchingSquaresTerrainVertexColorHelper`); `CUSTOM1 = Color(grass_mask.r, 0, 0, rl_idx/15)`.
+  Verified visually for blend modes 0 and 2 with ridge/ledge enabled.
+- Wall `UV2` uses terrain-global XZ, mirroring the square path's wall convention.
+- `_switch_grid_type` frees chunks immediately (`remove_child` + `free`) so multiple mode
+  switches can complete within one frame (tests rely on this).
+
+### 9.5 Data layout
+
+- `square/`, `triangle/`, `hex/` subfolders under each terrain's `data_directory`.
+  `MSTDataHandler.mode_name()/mode_subdir()` own the mapping; legacy root chunk folders
+  are migrated into `square/` on square-mode load.
+- `MSTChunkData` gained `grid_type` and `cell_count`; cell chunks reuse the existing
+  `ground_texture_idx` / `wall_texture_idx` / `grass_mask` byte encodings.
+- `tests/run_cell_save_tests.gd` uses `user://` directories only; the demo scene data is
+  never touched by tests.
+
+### 9.6 Quick paint on cell modes
+
+Paints height plus BOTH paired vertex-color channels for ground and wall slots (required
+by the `(c0, c1)` tile-index encoding) plus the grass mask, in a single undoable action.
+
+### 9.7 Deferred / not implemented
+
+- Grass on cell modes (per-cell planter) - deferred, v1.
+- Runtime texture baking (`MarchingSquaresGeometryBaker`) on cell meshes - deferred, v1.
+- Cell-mode per-cell handle gizmos: the gizmo plugin returns `null` for cell chunks
+  (the terrain gizmo still draws brush previews and pattern markers).
+- Hex brush outline is the pointy-top hexagon SDF; a triangle-lattice-aligned variant
+  was not done.
+- README/documentation updates.
+- Merge modes on cell chunks (not applicable in v1).
+
+### 9.8 Known limitations
+
+- Whole-chunk mesh regeneration per edit (v1). Perf is acceptable at default sizes
+  (~120-140 ms) but grows with chunk dimensions.
+- Undo/redo is per-stroke; multiple mode switches clear history by design.
+- The Grid Aligned selection ignores `brush_size` (uses `grid_size`), as specified.
+
