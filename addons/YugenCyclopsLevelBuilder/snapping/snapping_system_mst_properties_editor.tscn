@@ -1,0 +1,107 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/snapping/snapping_system_mst_properties_editor.gd" id="1_mstprops"]
+
+[node name="snapping_system_mst_properties" type="PanelContainer"]
+offset_right = 400.0
+offset_bottom = 300.0
+size_flags_horizontal = 3
+script = ExtResource("1_mstprops")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="lbl_terrain" type="Label" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Terrain: none"
+autowrap_mode = 3
+
+[node name="lbl_status" type="Label" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Assign a MarchingSquaresTerrain to enable Grid Align."
+autowrap_mode = 3
+
+[node name="HBoxSelection" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="bn_use_selection" type="Button" parent="VBoxContainer/HBoxSelection"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Use Selected Terrain"
+
+[node name="bn_clear" type="Button" parent="VBoxContainer/HBoxSelection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Clear"
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="HBoxKind" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxKind"]
+layout_mode = 2
+text = "Align to:"
+
+[node name="option_align_kind" type="OptionButton" parent="VBoxContainer/HBoxKind"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+item_count = 3
+selected = 0
+popup/item_0/text = "Vertex and Center"
+popup/item_0/id = 0
+popup/item_1/text = "Vertex Only"
+popup/item_1/id = 1
+popup/item_2/text = "Center Only"
+popup/item_2/id = 2
+
+[node name="HBoxMultiplier" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxMultiplier"]
+layout_mode = 2
+text = "Cell multiplier:"
+
+[node name="spin_cell_multiplier" type="SpinBox" parent="VBoxContainer/HBoxMultiplier"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 64.0
+value = 1.0
+rounded = true
+allow_greater = true
+
+[node name="check_y_snap" type="CheckBox" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Snap Y"
+
+[node name="HBoxY" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxY"]
+layout_mode = 2
+text = "Y snap distance:"
+
+[node name="spin_y_distance" type="SpinBox" parent="VBoxContainer/HBoxY"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1000.0
+step = 0.01
+value = 1.0
+allow_greater = true
+
+[connection signal="pressed" from="VBoxContainer/HBoxSelection/bn_use_selection" to="." method="_on_bn_use_selection_pressed"]
+[connection signal="pressed" from="VBoxContainer/HBoxSelection/bn_clear" to="." method="_on_bn_clear_pressed"]
+[connection signal="item_selected" from="VBoxContainer/HBoxKind/option_align_kind" to="." method="_on_option_align_kind_item_selected"]
+[connection signal="value_changed" from="VBoxContainer/HBoxMultiplier/spin_cell_multiplier" to="." method="_on_spin_cell_multiplier_value_changed"]
+[connection signal="toggled" from="VBoxContainer/check_y_snap" to="." method="_on_check_y_snap_toggled"]
+[connection signal="value_changed" from="VBoxContainer/HBoxY/spin_y_distance" to="." method="_on_spin_y_distance_value_changed"]

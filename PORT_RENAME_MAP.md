@@ -67,6 +67,7 @@ disjoint.
 | `addons/TileMapLayer3D/` (EditorSettings keys) | `addons/YugenTileMapLayer3D/` |
 | `user://keymap.tres` | `user://yugen_keymap.tres` |
 | `user://cyclops_editor_cache.json` | `user://yugen_cyclops_editor_cache.json` |
+| `cyclops_settings.config` (relative → project root) | `user://yugen_cyclops_settings.config` |
 | `/root/CyclopsAutoload` | `/root/YugenCyclopsAutoload` |
 | `plugin.cfg` names | `Yūgen Cyclops Level Builder`, `Yūgen TileMapLayer3D` |
 

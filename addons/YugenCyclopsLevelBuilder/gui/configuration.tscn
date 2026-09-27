@@ -54,6 +54,8 @@
 [ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/snapping/snapping_system_grid.gd" id="51_i5uvs"]
 [ext_resource type="Texture2D" path="res://addons/YugenCyclopsLevelBuilder/art/icons/snap_vertex.svg" id="52_b6dcn"]
 [ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/snapping/snapping_system_vertex.gd" id="53_du7dj"]
+[ext_resource type="Texture2D" path="res://addons/YugenCyclopsLevelBuilder/art/icons/snap_mst.svg" id="54_mstico"]
+[ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/snapping/snapping_system_mst.gd" id="55_mstsys"]
 
 [node name="Configuration" type="Node" unique_id=15051854]
 
@@ -532,6 +534,9 @@ snapping_node = NodePath("../../../../Snapping/View3D/Snap Grid")
 [node name="snap vertex" parent="Views/View3D/Snapping" unique_id=1134652904 node_paths=PackedStringArray("snapping_node") instance=ExtResource("49_e5oe6")]
 snapping_node = NodePath("../../../../Snapping/View3D/Snap Vertex")
 
+[node name="snap mst" parent="Views/View3D/Snapping" unique_id=1704180654 node_paths=PackedStringArray("snapping_node") instance=ExtResource("49_e5oe6")]
+snapping_node = NodePath("../../../../Snapping/View3D/Snap MST")
+
 [node name="UvEditor" type="Node" parent="Views" unique_id=1749953956]
 
 [node name="Toolbar" type="Node" parent="Views/UvEditor" unique_id=2020351125]
@@ -565,3 +570,8 @@ tooltip = "Snap to grid points"
 script = ExtResource("53_du7dj")
 icon = ExtResource("52_b6dcn")
 tooltip = "Snap to vertices"
+
+[node name="Snap MST" type="Node" parent="Snapping/View3D" unique_id=1704180655]
+script = ExtResource("55_mstsys")
+icon = ExtResource("54_mstico")
+tooltip = "Snap to MST terrain vertices and cell centers"

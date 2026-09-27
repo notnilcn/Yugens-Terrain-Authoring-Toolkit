@@ -58,8 +58,14 @@ const SNAPPING_GRID_SUBDIVISIONS:String = "snapping/grid/subdivisions"
 const SNAPPING_GRID_POWER_OF_TWO_SCALE:String = "snapping/grid/power_of_two_scale"
 const SNAPPING_GRID_TRANSFORM:String = "snapping/grid/transform"
 const SNAPPING_GRID_ANGLE:String = "snapping/grid/angle"
+const SNAPPING_MST_TERRAIN_PATH:String = "snapping/mst/terrain_path"
+const SNAPPING_MST_ALIGN_KIND:String = "snapping/mst/align_kind"
+const SNAPPING_MST_CELL_MULTIPLIER:String = "snapping/mst/cell_multiplier"
+const SNAPPING_MST_SNAP_Y:String = "snapping/mst/snap_y"
+const SNAPPING_MST_Y_DISTANCE:String = "snapping/mst/y_snap_distance"
+const SNAPPING_MST_ANGLE:String = "snapping/mst/angle"
 
-@export_file("*.config") var settings_file:String = "cyclops_settings.config"
+@export_file("*.config") var settings_file:String = "user://yugen_cyclops_settings.config"
 var settings:CyclopsSettings = CyclopsSettings.new()
 
 #signal xray_mode_changed(value:bool)
@@ -96,6 +102,12 @@ func init_settings():
 	settings.add_setting(SNAPPING_GRID_SUBDIVISIONS, 10, TYPE_INT)
 	settings.add_setting(SNAPPING_GRID_TRANSFORM, Transform3D.IDENTITY, TYPE_TRANSFORM3D)
 	settings.add_setting(SNAPPING_GRID_ANGLE, 15, TYPE_FLOAT)
+	settings.add_setting(SNAPPING_MST_TERRAIN_PATH, NodePath(), TYPE_NODE_PATH)
+	settings.add_setting(SNAPPING_MST_ALIGN_KIND, 0, TYPE_INT)
+	settings.add_setting(SNAPPING_MST_CELL_MULTIPLIER, 1, TYPE_INT)
+	settings.add_setting(SNAPPING_MST_SNAP_Y, false, TYPE_BOOL)
+	settings.add_setting(SNAPPING_MST_Y_DISTANCE, 1.0, TYPE_FLOAT)
+	settings.add_setting(SNAPPING_MST_ANGLE, 15, TYPE_FLOAT)
 
 func save_settings():
 	#print("saving ", settings_file)
@@ -112,6 +124,17 @@ func calc_snap_to_grid_util():
 	snap_to_grid_util.grid_subdivisions = settings.get_property(SNAPPING_GRID_SUBDIVISIONS)
 	snap_to_grid_util.grid_transform = settings.get_property(SNAPPING_GRID_TRANSFORM)
 	return snap_to_grid_util
+
+#MST Grid Align options, mirroring calc_snap_to_grid_util().
+func calc_grid_snap()->Dictionary:
+	var grid_snap:Dictionary = {
+		"terrain_path": settings.get_property(SNAPPING_MST_TERRAIN_PATH),
+		"cell_multiplier": settings.get_property(SNAPPING_MST_CELL_MULTIPLIER),
+		"align_kind": settings.get_property(SNAPPING_MST_ALIGN_KIND),
+		"y_snap": settings.get_property(SNAPPING_MST_SNAP_Y),
+		"y_snap_distance": settings.get_property(SNAPPING_MST_Y_DISTANCE),
+	}
+	return grid_snap
 	
 #Called by YugenCyclopsLevelBuilder to draw 2D components
 func draw_over_viewport(overlay:Control):

@@ -189,7 +189,11 @@ func create_dock(child:Node, title:String, slot:EditorDock.DockSlot, layout:Edit
 	return dock
 
 func _enable_plugin() -> void:
-	add_autoload_singleton(AUTOLOAD_NAME, "res://addons/YugenCyclopsLevelBuilder/cyclops_autoload.tscn")
+	# _enable_plugin() only fires when the user toggles the plugin on; a plugin
+	# that is already enabled at startup gets _enter_tree() instead, so both
+	# paths register the autoload (guarded to avoid duplicates).
+	if !has_node("/root/" + AUTOLOAD_NAME):
+		add_autoload_singleton(AUTOLOAD_NAME, "res://addons/YugenCyclopsLevelBuilder/cyclops_autoload.tscn")
 	pass
 
 func _disable_plugin() -> void:
@@ -197,6 +201,11 @@ func _disable_plugin() -> void:
 	pass
 
 func _enter_tree():
+	# _enable_plugin() is not called for plugins already enabled at editor
+	# startup, so make sure the autoload is registered here too.
+	if !has_node("/root/" + AUTOLOAD_NAME):
+		add_autoload_singleton(AUTOLOAD_NAME, "res://addons/YugenCyclopsLevelBuilder/cyclops_autoload.tscn")
+
 	config_scene = preload(config_scene_path).instantiate()
 	add_child(config_scene)
 	
@@ -288,10 +297,11 @@ func _enter_tree():
 	#Wait until everything is loaded	
 	await get_tree().process_frame
 	
-	var global_scene:YugenCyclopsGlobalScene = get_node("/root/YugenCyclopsAutoload")
-	global_scene.builder = self
+	var global_scene:YugenCyclopsGlobalScene = get_node_or_null("/root/YugenCyclopsAutoload")
+	if global_scene:
+		global_scene.builder = self
 	
-	switch_to_snapping_system(YugenSnappingSystemGrid.new())
+	switch_to_default_snapping_system()
 	switch_to_tool(get_tool_by_id(ToolBlock.TOOL_ID))
 	
 	view_uv_editor_panel.activate()
@@ -304,6 +314,24 @@ func init_view3d_snapping_tools():
 			if child is SnapButtonRef && child.snapping_node:
 				var snap_node:CyclopsSnappingSystem = child.snapping_node
 				snap_node_list.append(snap_node)
+
+# Grid Align becomes the default when an MST square terrain is assigned and
+# supported; otherwise the numeric grid is used (upstream behavior).
+func switch_to_default_snapping_system():
+	for node in snap_node_list:
+		if node is YugenSnappingSystemMST:
+			node.load_from_cache(get_snapping_cache(node.SNAPPING_TOOL_ID))
+			if node.has_usable_terrain():
+				switch_to_snapping_system(node)
+				return
+
+	switch_to_snapping_system(YugenSnappingSystemGrid.new())
+
+func get_mst_snapping_system()->YugenSnappingSystemMST:
+	for node in snap_node_list:
+		if node is YugenSnappingSystemMST:
+			return node
+	return null
 	
 func calc_snap_to_grid_util()->YugenSnapToGridUtil:
 	for node in snap_node_list:
@@ -319,7 +347,8 @@ func _exit_tree():
 	file.store_string(JSON.stringify(editor_cache, "    "))
 	file.close()
 
-	remove_child(viewport_3d_manager)
+	if viewport_3d_manager:
+		remove_child(viewport_3d_manager)
 	
 	
 	# Clean-up of the plugin goes here.
@@ -330,38 +359,53 @@ func _exit_tree():
 	remove_custom_type("CyclopsConvexBlock")
 	remove_custom_type("CyclopsConvexBlockBody")
 	
-	remove_dock(cyclops_console_dock)
-	remove_dock(material_dock)
-	remove_dock(view_uv_editor_dock)
+	if cyclops_console_dock:
+		remove_dock(cyclops_console_dock)
+	if material_dock:
+		remove_dock(material_dock)
+	if view_uv_editor_dock:
+		remove_dock(view_uv_editor_dock)
 	
 	if activated:
 #		remove_dock(convex_face_editor_dock)
-		remove_dock(tool_properties_dock)
-		tool_properties_dock.queue_free()
+		if tool_properties_dock:
+			remove_dock(tool_properties_dock)
+			tool_properties_dock.queue_free()
 		
-		remove_dock(snapping_properties_dock)
-		snapping_properties_dock.queue_free()
+		if snapping_properties_dock:
+			remove_dock(snapping_properties_dock)
+			snapping_properties_dock.queue_free()
 		
-		remove_dock(overlays_dock)
-		overlays_dock.queue_free()
+		if overlays_dock:
+			remove_dock(overlays_dock)
+			overlays_dock.queue_free()
 		
 		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, editor_toolbar)
 
-	if upgrade_cyclops_blocks_toolbar.activated:
+	if upgrade_cyclops_blocks_toolbar && upgrade_cyclops_blocks_toolbar.activated:
 		remove_control_from_container(EditorPlugin.CONTAINER_SPATIAL_EDITOR_MENU, upgrade_cyclops_blocks_toolbar)
 
-	material_dock.queue_free()
-	view_uv_editor_dock.queue_free()
+	if material_dock:
+		material_dock.queue_free()
+	if view_uv_editor_dock:
+		view_uv_editor_dock.queue_free()
 #	convex_face_editor_dock.queue_free()
-	tool_properties_dock.queue_free()
-	overlays_dock.queue_free()
-	snapping_properties_dock.queue_free()
-	cyclops_console_dock.queue_free()
-	editor_toolbar.queue_free()
-	upgrade_cyclops_blocks_toolbar.queue_free()
+	if tool_properties_dock:
+		tool_properties_dock.queue_free()
+	if overlays_dock:
+		overlays_dock.queue_free()
+	if snapping_properties_dock:
+		snapping_properties_dock.queue_free()
+	if cyclops_console_dock:
+		cyclops_console_dock.queue_free()
+	if editor_toolbar:
+		editor_toolbar.queue_free()
+	if upgrade_cyclops_blocks_toolbar:
+		upgrade_cyclops_blocks_toolbar.queue_free()
 
-	remove_child(config_scene)
-	config_scene.queue_free()
+	if config_scene:
+		remove_child(config_scene)
+		config_scene.queue_free()
 
 
 func log(message:String, level:CyclopsLogger.LogLevel = CyclopsLogger.LogLevel.ERROR):
