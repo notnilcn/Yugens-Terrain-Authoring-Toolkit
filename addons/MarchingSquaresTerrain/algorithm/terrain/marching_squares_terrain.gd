@@ -631,13 +631,14 @@ func _switch_grid_type(value: GridType):
 	if EngineWrapper.instance.is_editor():
 		MSTDataHandler.save_all_chunks(self)
 	
-	# Free all chunks without re-saving them
+	# Free all chunks without re-saving them. remove_child + free is immediate so
+	# mode switches can save/load several modes within the same frame.
 	for child in get_children():
 		if child is MarchingSquaresTerrainChunkBase:
 			child._skip_save_on_exit = true
 			child.owner = null
 			remove_child(child)
-			child.queue_free()
+			child.free()
 	chunks.clear()
 	
 	_grid_type = value
