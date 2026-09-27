@@ -304,16 +304,6 @@ func _cell_sample(terrain_system: MarchingSquaresTerrain, brush_pos: Vector2, ce
 		MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size))
 
 
-func _can_grid_align(terrain_system: MarchingSquaresTerrain) -> bool:
-	if terrain_system == null:
-		return false
-	if terrain_system.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
-		return false
-	if terrain_plugin.current_brush_index != 2:
-		return false
-	return terrain_plugin.falloff == false
-
-
 func _marker_for(terrain_system: MarchingSquaresTerrain) -> Mesh:
 	if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
 		return terrain_plugin.CELL_TRI_VISUAL
