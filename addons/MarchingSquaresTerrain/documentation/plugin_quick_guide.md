@@ -11,9 +11,13 @@ For community showcases, feature requests and bug reporting, please refer to the
 
 ### Brush Tool
 * Used to elevate or lower terrain.
+  * The brush shape can be set to Round, Square or Hexagon.
   * Holding **[SHIFT]** and pressing **[LEFT MOUSE BUTTON]** with most brush tools selected will keep adding terrain to the selection even after letting go of the original mouse click.
   * In the same fashion as above, holding **[SHIFT]** and using the **[SCROLL WHEEL]** decreases and increases the current brush size.
   * You can also press **[ALT]**, **[ESC]** or **[RMB]** to deselect the current draw selection.
+  * On Triangle or Hexagon terrain, using the Hexagon brush with Falloff off enables
+    **Grid Aligned** painting: the brush selects whole cells (`Grid Size` hexagon
+    radius/side) instead of a soft round area.
 
 ### Level Tool
 * Used to level terrain to a certain height.
@@ -30,6 +34,8 @@ For community showcases, feature requests and bug reporting, please refer to the
 
 ### Grass Mask Tool
 * Used to control where grass gets placed.
+  * Works on all grid types. On Triangle/Hexagon terrain grass is scattered across
+    each cell's polygon and follows the cell's height and texture slot.
 
 ### Vertex Paint Tool
 * Used to paint textures onto the terrain.
@@ -56,9 +62,19 @@ For community showcases, feature requests and bug reporting, please refer to the
   * The selected chunk will show in the editor via a blue square ui element.
 * Individual chunk's vertex merge thresholds can be changed → making terrain _rounder_ or _blockier_.
   * The currently selected chunk's merge threshold can also be applied to all chunks at once via a button.
+  * On Triangle/Hexagon terrain merge modes turn small steps into 45-degree ramps
+    instead of cliffs (CUBIC keeps exact vertical columns).
+* Works for square, triangle and hexagon chunks. Selecting a chunk also shows its
+  per-cell height handles in the viewport (cell modes).
 
 ### Terrain Settings Tool
 * Used to tweak global terrain settings.
+  * The "Grid Type" dropdown switches the terrain between Square, Triangle and
+    Hexagon cells. Each mode keeps its own chunk data (`square/`, `triangle/`,
+    `hex/` folders under the terrain's data directory); switching modes reloads
+    the matching data set.
+  * Runtime texture baking (`Enable Runtime Texture Baking`) now also works on
+    Triangle and Hexagon terrain.
   * The "Blend Mode" dropdown menu allows you to set the terrain's texture blending mode to suit your liking.
   * Setting a "Noise Hmap" makes the base chunk height generation procedural instead of flat.
   * Setting the "Animation Fps" value to more than 0 makes the grass sprites move with limited fps.

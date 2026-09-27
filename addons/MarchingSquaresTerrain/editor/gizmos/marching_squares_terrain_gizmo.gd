@@ -132,6 +132,11 @@ func _redraw():
 				basis.z = Vector3.ZERO
 			brush_transform = Transform3D(basis, pos)
 		
+		# Grid aligned selections get an outline that exactly encloses the
+		# selected cells (lattice hexagon on triangle terrain).
+		if terrain_plugin.grid_aligned and terrain_plugin.grid_align_gate_passes():
+			brush_transform = _grid_aligned_brush_transform(terrain_system, pos)
+		
 		if terrain_plugin.mode == terrain_plugin.TerrainToolMode.VERTEX_PAINTING:
 			if terrain_plugin.paint_walls_mode:
 				add_mesh(terrain_plugin.BRUSH_RADIUS_VISUAL, null, brush_transform)
@@ -326,6 +331,20 @@ func _world_to_global_cell(terrain_system: MarchingSquaresTerrain, p: Vector2) -
 	if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
 		return MarchingSquaresTriGrid.world_to_cell(p, terrain_system.cell_size)
 	return MarchingSquaresHexGrid.world_to_cell(p, MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size))
+
+
+## Outline transform that exactly encloses a grid-aligned selection (M6).
+func _grid_aligned_brush_transform(terrain_system: MarchingSquaresTerrain, pos: Vector3) -> Transform3D:
+	var outline := BrushPatternCalculator.grid_aligned_outline(
+		terrain_system, Vector2(pos.x, pos.z), terrain_plugin.grid_size)
+	var radius : float = outline["radius"]
+	var rotation : float = outline["rotation"]
+	var center : Vector2 = outline["center"]
+	# The outline mesh is a 1x1 plane whose SDF boundary sits at half its
+	# scale (same convention as the round/square brush outlines).
+	var basis := Basis(Vector3.UP, rotation) * Basis(
+		Vector3.RIGHT * radius * 2.0, Vector3.UP, Vector3.BACK * radius * 2.0)
+	return Transform3D(basis, Vector3(center.x, pos.y, center.y))
 
 
 func _create_brush_basis(normal: Vector3, brush_size: float) -> Basis:

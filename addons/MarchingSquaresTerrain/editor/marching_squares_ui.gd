@@ -185,7 +185,7 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 				plugin.current_texture_preset = null
 			plugin.current_terrain_node.force_batch_update()
 			plugin.current_terrain_node.is_batch_updating = false
-			for chunk: MarchingSquaresTerrainChunk in plugin.current_terrain_node.chunks.values():
+			for chunk in plugin.current_terrain_node.chunks.values():
 				chunk.mark_dirty()
 			# Rebuild tool attributes to refresh Quick Paint dropdown
 			tool_attributes.show_tool_attributes(active_tool)

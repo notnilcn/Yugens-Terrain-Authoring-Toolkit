@@ -72,6 +72,21 @@ func get_grass_mask(_cc: Vector2i) -> Color:
 	return Color(0, 0, 0, 0)
 
 
+## Whether a cell's top surface is sloped to blend with its neighbours
+## (set by the bridge tool on cell-mode terrain).
+func get_smooth(_cc: Vector2i) -> bool:
+	return false
+
+
+## True when this chunk contains at least one smoothed cell (fast path).
+func has_smooth_cells() -> bool:
+	return false
+
+
+func draw_smooth(_x: int, _z: int, _smooth: bool) -> void:
+	pass
+
+
 func draw_color_0(_x: int, _z: int, _color: Color) -> void:
 	pass
 

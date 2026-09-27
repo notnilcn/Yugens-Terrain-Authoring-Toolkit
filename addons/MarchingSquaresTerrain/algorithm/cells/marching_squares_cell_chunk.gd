@@ -5,16 +5,58 @@ extends MarchingSquaresTerrainChunkBase
 ## Each cell renders as a flat regular polygon at its own height plus vertical
 ## wall quads where a neighbor is lower. Subclasses provide the coordinate and
 ## shape math by delegating to MarchingSquaresHexGrid / MarchingSquaresTriGrid.
+## Merge modes turn walls below a height threshold into 45-degree ramps (the
+## higher cell's edge connects to a lower line inside the neighbour cell).
+
+
+# Same values/order as MarchingSquaresTerrainChunk: the threshold is the
+# maximum height difference that is merged into a ramp instead of a wall.
+enum Mode {CUBIC, POLYHEDRON, ROUNDED_POLYHEDRON, SEMI_ROUND, SPHERICAL}
+
+const MERGE_MODE = {
+	Mode.CUBIC: 0.6,
+	Mode.POLYHEDRON: 1.3,
+	Mode.ROUNDED_POLYHEDRON: 2.1,
+	Mode.SEMI_ROUND: 5.0,
+	Mode.SPHERICAL: 20.0,
+}
+
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var merge_mode : Mode = Mode.CUBIC: # The max height distance between cells before a wall is created
+	set(mode):
+		merge_mode = mode
+		merge_threshold = MERGE_MODE[mode]
+		# Mesh generation reads every cell map, so do not rebuild while data
+		# import has not populated them yet; initialize_terrain regenerates.
+		if is_inside_tree() and terrain_system and _cell_maps_initialized():
+			regenerate_mesh()
+
+var merge_threshold : float = MERGE_MODE[Mode.CUBIC]
 
 
 # Terrain-side state is fetched through terrain_system (see the base class).
 var global_position_cached : Vector3 = Vector3.ZERO
 
+# Cells painted by the bridge tool (1 = top surface blends with smooth
+# neighbours so a bridge reads as a slanted plane instead of flat steps).
+var smooth_map : PackedByteArray
+var _has_smooth_cells : bool = false
+
+# Caches used while regenerating a mesh (cleared on every regeneration).
+var _corner_height_cache : Dictionary = {}
+var _corner_key_cache : Dictionary = {}
+const CORNER_KEY_SCALE : float = 1024.0
+
+var bake_material : ShaderMaterial = preload("uid://cbbvkbnwmr2em")
+
 #region temporary storage vars (mirrors the square chunk save hooks)
 var _temp_mesh : ArrayMesh
 var _temp_collision_shapes : Array[ConcavePolygonShape3D] = []
 var _temp_height_map : Array = []
+var _temp_grass_multimesh : MultiMesh
 #endregion
+
+# Grass-relevant cell changes since the last mesh regeneration (cell index keys).
+var _grass_dirty_cells : Dictionary = {}
 
 
 #region subclas responsibilities (virtuals)
@@ -63,6 +105,22 @@ func cell_index(cc: Vector2i) -> int:
 	return cc.y * cells_per_chunk().x + cc.x
 
 
+## True once every per-cell map matches the chunk's cell count. Mesh
+## generation reads all of them, so setters must not regenerate before data
+## import / initialize_terrain has sized them.
+func _cell_maps_initialized() -> bool:
+	var count := cells_per_chunk().x * cells_per_chunk().y
+	if count <= 0:
+		return false
+	return height_map.size() == count \
+			and color_map_0.size() == count \
+			and color_map_1.size() == count \
+			and wall_color_map_0.size() == count \
+			and wall_color_map_1.size() == count \
+			and grass_mask_map.size() == count \
+			and smooth_map.size() == count
+
+
 func global_cell(chunk: Vector2i, local: Vector2i, cells: Vector2i) -> Vector2i:
 	return chunk * cells + local
 
@@ -87,6 +145,11 @@ func initialize_terrain(should_regenerate_mesh: bool = true):
 		generate_wall_color_maps()
 	if not grass_mask_map or grass_mask_map.size() != count:
 		generate_grass_mask_map()
+	if not smooth_map or smooth_map.size() != count:
+		generate_smooth_map()
+	refresh_smooth_flag()
+	
+	_initialize_grass_planter()
 	
 	if not mesh and should_regenerate_mesh:
 		regenerate_mesh(false)
@@ -104,6 +167,50 @@ func initialize_terrain(should_regenerate_mesh: bool = true):
 	
 	if generated:
 		mark_dirty()
+	
+	if not EngineWrapper.is_editor() and terrain_system.enable_runtime_texture_baking:
+		var baker := MarchingSquaresGeometryBaker.new()
+		baker.polygon_texture_resolution = terrain_system.polygon_texture_resolution
+		baker.finished.connect(_on_bake_finished, CONNECT_ONE_SHOT)
+		baker.bake_geometry_texture(self, get_tree())
+
+
+## Applies the baked atlas to this chunk's mesh (runtime texture baking).
+func _on_bake_finished(baked_mesh: Mesh, _original: MeshInstance3D, img: Image) -> void:
+	mesh = baked_mesh
+	var mat : Material
+	if terrain_system.bake_material_override:
+		mat = terrain_system.bake_material_override.duplicate()
+	else:
+		mat = bake_material.duplicate()
+	
+	if mat is StandardMaterial3D:
+		mat.albedo_texture = ImageTexture.create_from_image(img)
+	elif mat is ShaderMaterial:
+		mat.set_shader_parameter("texture_albedo", ImageTexture.create_from_image(img))
+	mesh.surface_set_material(0, mat)
+
+
+## Create or rebind the per-cell grass planter (mirrors the square chunk).
+func _initialize_grass_planter() -> void:
+	grass_planter = get_node_or_null("GrassPlanter")
+	if not grass_planter:
+		grass_planter = MarchingSquaresCellGrassPlanter.new()
+		add_child(grass_planter)
+		EngineWrapper.set_owner_recursive(grass_planter)
+	
+	grass_planter.name = "GrassPlanter"
+	grass_planter._chunk = self
+	grass_planter.terrain_system = terrain_system
+	
+	if _temp_grass_multimesh:
+		grass_planter.multimesh = _temp_grass_multimesh
+		_temp_grass_multimesh = null
+	if not grass_planter.multimesh:
+		grass_planter.setup(self)
+		grass_planter.regenerate_all_cells()
+	if terrain_system:
+		grass_planter.multimesh.mesh = terrain_system.grass_mesh
 
 
 func _notification(what: int) -> void:
@@ -118,6 +225,11 @@ func _notification(what: int) -> void:
 			
 			_temp_mesh = mesh
 			mesh = null
+			
+			# Store grass multimesh and clear
+			if grass_planter and grass_planter.multimesh:
+				_temp_grass_multimesh = grass_planter.multimesh
+				grass_planter.multimesh = null
 			
 			_temp_collision_shapes.clear()
 			var bodies_to_free : Array[StaticBody3D] = []
@@ -143,6 +255,11 @@ func _notification(what: int) -> void:
 				mesh = _temp_mesh
 				_temp_mesh = null
 			
+			# Restore grass multimesh
+			if _temp_grass_multimesh and grass_planter:
+				grass_planter.multimesh = _temp_grass_multimesh
+				_temp_grass_multimesh = null
+			
 			if not _temp_collision_shapes.is_empty():
 				_recreate_collision_body.call_deferred()
 		
@@ -165,6 +282,7 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	_temp_height_map = []
 	_temp_mesh = null
+	_temp_grass_multimesh = null
 	_temp_collision_shapes.clear()
 	
 	if EngineWrapper.is_editor():
@@ -273,6 +391,22 @@ func generate_grass_mask_map():
 	for i in count:
 		grass_mask_map[i] = Color(1.0, 1.0, 1.0, 1.0)
 
+
+func generate_smooth_map():
+	var count := cells_per_chunk().x * cells_per_chunk().y
+	smooth_map = PackedByteArray()
+	smooth_map.resize(count)
+	_has_smooth_cells = false
+
+
+## Recomputes the fast-path flag from the current smooth map.
+func refresh_smooth_flag() -> void:
+	_has_smooth_cells = false
+	for value in smooth_map:
+		if value != 0:
+			_has_smooth_cells = true
+			return
+
 #endregion
 
 
@@ -301,6 +435,19 @@ func get_wall_color_1(cc: Vector2i) -> Color:
 func get_grass_mask(cc: Vector2i) -> Color:
 	return grass_mask_map[cell_index(cc)]
 
+
+func get_smooth(cc: Vector2i) -> bool:
+	if not _has_smooth_cells:
+		return false
+	if cc.x < 0 or cc.y < 0 or cc.x >= cells_per_chunk().x or cc.y >= cells_per_chunk().y:
+		return false
+	var idx := cell_index(cc)
+	return idx < smooth_map.size() and smooth_map[idx] != 0
+
+
+func has_smooth_cells() -> bool:
+	return _has_smooth_cells
+
 #endregion
 
 
@@ -308,16 +455,19 @@ func get_grass_mask(cc: Vector2i) -> Color:
 
 func draw_height(x: int, z: int, y: float):
 	height_map[cell_index(Vector2i(x, z))] = y
+	_grass_dirty_cells[cell_index(Vector2i(x, z))] = true
 	mark_dirty()
 
 
 func draw_color_0(x: int, z: int, color: Color):
 	color_map_0[cell_index(Vector2i(x, z))] = color
+	_grass_dirty_cells[cell_index(Vector2i(x, z))] = true
 	mark_dirty()
 
 
 func draw_color_1(x: int, z: int, color: Color):
 	color_map_1[cell_index(Vector2i(x, z))] = color
+	_grass_dirty_cells[cell_index(Vector2i(x, z))] = true
 	mark_dirty()
 
 
@@ -333,6 +483,16 @@ func draw_wall_color_1(x: int, z: int, color: Color):
 
 func draw_grass_mask(x: int, z: int, masked: Color):
 	grass_mask_map[cell_index(Vector2i(x, z))] = masked
+	_grass_dirty_cells[cell_index(Vector2i(x, z))] = true
+	mark_dirty()
+
+
+func draw_smooth(x: int, z: int, smooth: bool):
+	if smooth_map.size() != cells_per_chunk().x * cells_per_chunk().y:
+		generate_smooth_map()
+	smooth_map[cell_index(Vector2i(x, z))] = 1 if smooth else 0
+	if smooth:
+		_has_smooth_cells = true
 	mark_dirty()
 
 #endregion
@@ -345,6 +505,8 @@ func mark_dirty() -> void:
 #region mesh generation
 
 func regenerate_mesh(_use_threads: bool = false):
+	_corner_height_cache.clear()
+	_corner_key_cache.clear()
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_custom_format(0, SurfaceTool.CUSTOM_RGBA_FLOAT)
@@ -355,9 +517,17 @@ func regenerate_mesh(_use_threads: bool = false):
 	
 	var cells := cells_per_chunk()
 	var origin := get_chunk_origin_world()
+	var grass_dirty : Array = _grass_dirty_cells.keys()
+	_grass_dirty_cells.clear()
 	for r in range(cells.y):
 		for c in range(cells.x):
 			_emit_cell(st, Vector2i(c, r), origin)
+	
+	# Regenerate grass only for cells whose height/colors/mask changed.
+	if grass_planter:
+		for idx in grass_dirty:
+			var local := Vector2i(int(idx) % cells.x, int(idx) / cells.x)
+			grass_planter.generate_grass_on_cell(local)
 	
 	st.generate_normals()
 	st.index()
@@ -373,6 +543,104 @@ func regenerate_mesh(_use_threads: bool = false):
 	_setup_collision_layers()
 
 
+#region smooth-corner interpolation
+
+## Corner heights for a smooth cell's top surface. Each corner averages the
+## heights of the smooth cells around it, so neighbouring smooth cells share
+## identical corner heights and a bridge renders as one continuous slope.
+func cell_corner_heights(global: Vector2i) -> PackedFloat32Array:
+	if _corner_height_cache.has(global):
+		return _corner_height_cache[global]
+	var offsets := cell_corner_offsets(global)
+	var count := offsets.size()
+	var heights := PackedFloat32Array()
+	heights.resize(count)
+	var h_variant = terrain_system.get_cell_height(global) if terrain_system else null
+	var h : float = float(h_variant) if h_variant != null else 0.0
+	for i in range(count):
+		heights[i] = h
+	if terrain_system and terrain_system.get_cell_smooth(global):
+		var keys := _corner_keys(global)
+		for i in range(count):
+			var sum := 0.0
+			var n := 0
+			for cell in cells_around_corner(global, keys[i]):
+				if not terrain_system.get_cell_smooth(cell):
+					continue
+				var cell_h = terrain_system.get_cell_height(cell)
+				if cell_h == null:
+					continue
+				sum += float(cell_h)
+				n += 1
+			if n > 0:
+				heights[i] = sum / float(n)
+	_corner_height_cache[global] = heights
+	return heights
+
+
+## All existing cells sharing a lattice corner with `global` (which owns
+## `key`), walked through the edges that carry that corner.
+func cells_around_corner(global: Vector2i, key: Vector2i) -> Array[Vector2i]:
+	var result : Array[Vector2i] = []
+	var visited : Dictionary = {global: true}
+	var queue : Array[Vector2i] = [global]
+	while not queue.is_empty():
+		var cell : Vector2i = queue.pop_front()
+		var local_corner := _corner_index_for_key(cell, key)
+		if local_corner == -1:
+			continue
+		result.append(cell)
+		var neighbors := edge_neighbors(cell)
+		for edge in range(neighbors.size()):
+			var pair := edge_corner_indices(cell, edge)
+			if pair.x != local_corner and pair.y != local_corner:
+				continue
+			var nb : Vector2i = neighbors[edge]
+			if visited.has(nb):
+				continue
+			visited[nb] = true
+			if terrain_system and terrain_system.get_cell_height(nb) != null:
+				queue.append(nb)
+	return result
+
+
+## Snapped world-position keys for a cell's corners so the same lattice point
+## hashes equally from every incident cell.
+func _corner_keys(global: Vector2i) -> Array:
+	if _corner_key_cache.has(global):
+		return _corner_key_cache[global]
+	var offsets := cell_corner_offsets(global)
+	var center := cell_center_world(global)
+	var keys : Array = []
+	for offset in offsets:
+		var p := center + offset
+		keys.append(Vector2i(roundi(p.x * CORNER_KEY_SCALE), roundi(p.y * CORNER_KEY_SCALE)))
+	_corner_key_cache[global] = keys
+	return keys
+
+
+func _corner_index_for_key(cell: Vector2i, key: Vector2i) -> int:
+	return _index_of_key(_corner_keys(cell), key)
+
+
+## The neighbour's corner indices matching this cell's edge corner pair.
+func _shared_corner_indices(global: Vector2i, nb: Vector2i, pair: Vector2i) -> Vector2i:
+	var own_keys := _corner_keys(global)
+	var nb_keys := _corner_keys(nb)
+	return Vector2i(
+		_index_of_key(nb_keys, own_keys[pair.x]),
+		_index_of_key(nb_keys, own_keys[pair.y]))
+
+
+func _index_of_key(keys: Array, key: Vector2i) -> int:
+	for i in range(keys.size()):
+		if keys[i] == key:
+			return i
+	return -1
+
+#endregion
+
+
 func _emit_cell(st: SurfaceTool, local: Vector2i, origin: Vector2) -> void:
 	var global := _chunk_global_cell(local)
 	var idx := cell_index(local)
@@ -381,28 +649,141 @@ func _emit_cell(st: SurfaceTool, local: Vector2i, origin: Vector2) -> void:
 	var offsets := cell_corner_offsets(global)
 	var corner_count := offsets.size()
 	
-	# Top fan around the centroid as explicit triangles (center, i, i+1)
-	var center_3d := Vector3(center.x, h, center.y)
+	var own_smooth : bool = _has_smooth_cells and get_smooth(local)
+	var own_heights := PackedFloat32Array()
+	if own_smooth:
+		own_heights = cell_corner_heights(global)
+	
+	# Top fan around the centroid as explicit triangles (center, i, i+1). The
+	# corner order can differ per cell orientation (triangle B is wound opposite
+	# of A), so flip the fan when the polygon is clockwise to keep normals up.
+	var area := 0.0
 	for i in range(corner_count):
-		var p0 := center + offsets[i]
-		var p1 := center + offsets[(i + 1) % corner_count]
-		_emit_top_vertex(st, center_3d, idx)
-		_emit_top_vertex(st, Vector3(p0.x, h, p0.y), idx)
-		_emit_top_vertex(st, Vector3(p1.x, h, p1.y), idx)
+		var a := offsets[i]
+		var b := offsets[(i + 1) % corner_count]
+		area += a.x * b.y - b.x * a.y
+	var flip_fan := area < 0.0
+	var center_3d := Vector3(center.x, h, center.y)
+	if own_smooth:
+		for i in range(corner_count):
+			var next := (i + 1) % corner_count
+			var p0 := center + offsets[i]
+			var p1 := center + offsets[next]
+			var h0 := own_heights[i]
+			var h1 := own_heights[next]
+			if flip_fan:
+				var swap := p0
+				p0 = p1
+				p1 = swap
+				var swap_h := h0
+				h0 = h1
+				h1 = swap_h
+			_emit_top_vertex(st, center_3d, idx)
+			_emit_top_vertex(st, Vector3(p0.x, h0, p0.y), idx)
+			_emit_top_vertex(st, Vector3(p1.x, h1, p1.y), idx)
+	else:
+		for i in range(corner_count):
+			var p0 := center + offsets[i]
+			var p1 := center + offsets[(i + 1) % corner_count]
+			if flip_fan:
+				var swap := p0
+				p0 = p1
+				p1 = swap
+			_emit_top_vertex(st, center_3d, idx)
+			_emit_top_vertex(st, Vector3(p0.x, h, p0.y), idx)
+			_emit_top_vertex(st, Vector3(p1.x, h, p1.y), idx)
 	
 	# Walls on edges whose neighbor is lower.
 	var neighbors := edge_neighbors(global)
+	var terrain := terrain_system
 	for edge in range(corner_count):
 		var nb : Vector2i = neighbors[edge]
-		var h_nb = terrain_system.get_cell_height(nb) if terrain_system else null
-		if h_nb == null:
+		var nb_chunk = terrain.chunk_for_cell(nb) if terrain else null
+		if nb_chunk == null:
 			continue
-		if h - float(h_nb) <= 0.0001:
-			continue
+		var nb_local := MarchingSquaresHexGrid.local_cell(nb, cells_per_chunk())
+		var h_nb : float = nb_chunk.get_height(nb_local)
 		var pair := edge_corner_indices(global, edge)
 		var qa := center + offsets[pair.x]
 		var qb := center + offsets[pair.y]
-		_emit_wall(st, idx, qa, qb, h, float(h_nb), origin)
+		var nb_smooth : bool = nb_chunk.has_smooth_cells() and nb_chunk.get_smooth(nb_local)
+		
+		if own_smooth or nb_smooth:
+			# Both surfaces are planar; close the exact gap (if any) between
+			# the two tilted edge lines instead of stepping.
+			var own_a : float = own_heights[pair.x] if own_smooth else h
+			var own_b : float = own_heights[pair.y] if own_smooth else h
+			_emit_smooth_edge(st, idx, global, center, qa, qb, pair, own_a, own_b, nb, h_nb, origin)
+			continue
+		
+		if h - h_nb <= 0.0001:
+			continue
+		# Order the pair so the wall's geometric normal faces away from this
+		# (higher) cell on every edge orientation.
+		var edge_dir := qb - qa
+		var mid := (qa + qb) * 0.5
+		var outward := mid - center
+		if Vector2(edge_dir.y, -edge_dir.x).dot(outward) < 0.0:
+			var swap := qa
+			qa = qb
+			qb = swap
+			edge_dir = -edge_dir
+		var step : float = h - h_nb
+		var edge_distance := outward.length()
+		if step <= merge_threshold:
+			# Merged step: 45-degree ramp into the neighbour, capped so the
+			# ramp never reaches the neighbour's centre.
+			var run := minf(step, edge_distance)
+			var outward_dir := outward / edge_distance
+			var qa_low := qa + outward_dir * run
+			var qb_low := qb + outward_dir * run
+			_emit_ramp(st, idx, qa, qb, qa_low, qb_low, h, h_nb, origin)
+		else:
+			_emit_wall(st, idx, qa, qb, h, h_nb, origin)
+
+
+## Closes the gap between two planar cell tops along one edge, using the
+## corner heights of each side. Only the higher side emits, so each edge is
+## covered once.
+func _emit_smooth_edge(st: SurfaceTool, idx: int, global: Vector2i, own_center: Vector2, qa: Vector2, qb: Vector2, pair: Vector2i, top_a: float, top_b: float, nb: Vector2i, h_nb: float, origin: Vector2) -> void:
+	var bot_a := h_nb
+	var bot_b := h_nb
+	if terrain_system.get_cell_smooth(nb):
+		var nb_heights := cell_corner_heights(nb)
+		var nb_pair := _shared_corner_indices(global, nb, pair)
+		if nb_pair.x == -1 or nb_pair.y == -1:
+			return
+		bot_a = nb_heights[nb_pair.x]
+		bot_b = nb_heights[nb_pair.y]
+	if is_equal_approx(top_a, bot_a) and is_equal_approx(top_b, bot_b):
+		return
+	
+	# Emit from the higher side only.
+	var ref_center := own_center
+	if top_a + top_b < bot_a + bot_b:
+		# The neighbour is higher: swap roles and orient away from it.
+		var swap := top_a
+		top_a = bot_a
+		bot_a = swap
+		swap = top_b
+		top_b = bot_b
+		bot_b = swap
+		ref_center = cell_center_world(nb) - origin
+	
+	var edge_dir := qb - qa
+	var mid := (qa + qb) * 0.5
+	var outward := mid - ref_center
+	if Vector2(edge_dir.y, -edge_dir.x).dot(outward) < 0.0:
+		var swap_pos := qa
+		qa = qb
+		qb = swap_pos
+		var swap_h := top_a
+		top_a = top_b
+		top_b = swap_h
+		swap_h = bot_a
+		bot_a = bot_b
+		bot_b = swap_h
+	_emit_gap_quad(st, idx, qa, qb, top_a, top_b, bot_a, bot_b, origin)
 
 
 func _emit_top_vertex(st: SurfaceTool, vert: Vector3, idx: int) -> void:
@@ -418,10 +799,16 @@ func _emit_top_vertex(st: SurfaceTool, vert: Vector3, idx: int) -> void:
 
 
 func _emit_wall(st: SurfaceTool, idx: int, qa: Vector2, qb: Vector2, h_own: float, h_nb: float, origin: Vector2) -> void:
-	var a_low := Vector3(qa.x, h_nb, qa.y)
-	var b_low := Vector3(qb.x, h_nb, qb.y)
-	var a_high := Vector3(qa.x, h_own, qa.y)
-	var b_high := Vector3(qb.x, h_own, qb.y)
+	_emit_gap_quad(st, idx, qa, qb, h_own, h_own, h_nb, h_nb, origin)
+
+
+## Wall quad connecting two (possibly tilted) cell edge lines. The caller has
+## already ordered qa/qb so the winding faces away from the higher cell.
+func _emit_gap_quad(st: SurfaceTool, idx: int, qa: Vector2, qb: Vector2, a_top: float, b_top: float, a_bot: float, b_bot: float, origin: Vector2) -> void:
+	var a_low := Vector3(qa.x, a_bot, qa.y)
+	var b_low := Vector3(qb.x, b_bot, qb.y)
+	var a_high := Vector3(qa.x, a_top, qa.y)
+	var b_high := Vector3(qb.x, b_top, qb.y)
 	
 	# Quad (a_low, a_high, b_high, b_low) as two triangles. Winding faces away
 	# from the higher cell.
@@ -430,6 +817,22 @@ func _emit_wall(st: SurfaceTool, idx: int, qa: Vector2, qb: Vector2, h_own: floa
 	_emit_wall_vertex(st, idx, b_high, origin)
 	_emit_wall_vertex(st, idx, a_low, origin)
 	_emit_wall_vertex(st, idx, b_high, origin)
+	_emit_wall_vertex(st, idx, b_low, origin)
+
+
+## Merged step: connects the higher cell's edge to a line inside the lower
+## neighbour at the lower height. Uses the higher cell's wall maps.
+func _emit_ramp(st: SurfaceTool, idx: int, qa_top: Vector2, qb_top: Vector2, qa_low: Vector2, qb_low: Vector2, h_own: float, h_nb: float, origin: Vector2) -> void:
+	var a_top := Vector3(qa_top.x, h_own, qa_top.y)
+	var b_top := Vector3(qb_top.x, h_own, qb_top.y)
+	var a_low := Vector3(qa_low.x, h_nb, qa_low.y)
+	var b_low := Vector3(qb_low.x, h_nb, qb_low.y)
+	
+	_emit_wall_vertex(st, idx, a_low, origin)
+	_emit_wall_vertex(st, idx, a_top, origin)
+	_emit_wall_vertex(st, idx, b_top, origin)
+	_emit_wall_vertex(st, idx, a_low, origin)
+	_emit_wall_vertex(st, idx, b_top, origin)
 	_emit_wall_vertex(st, idx, b_low, origin)
 
 
@@ -484,3 +887,5 @@ static func _texture_index_from_colors(c0: Color, c1: Color) -> int:
 
 func regenerate_all_cells(_use_threads: bool = false) -> void:
 	regenerate_mesh(false)
+	if grass_planter:
+		grass_planter.regenerate_all_cells()

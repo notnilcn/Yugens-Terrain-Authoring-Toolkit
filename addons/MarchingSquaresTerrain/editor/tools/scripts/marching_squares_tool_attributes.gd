@@ -46,8 +46,8 @@ var settings : Dictionary = {}
 var settings_controls : Dictionary = {}
 
 var last_setting_type : SettingType = SettingType.ERROR
-var selected_chunk : MarchingSquaresTerrainChunk
-var current_available_chunks : Array[MarchingSquaresTerrainChunk] = []
+var selected_chunk : MarchingSquaresTerrainChunkBase
+var current_available_chunks : Array[MarchingSquaresTerrainChunkBase] = []
 
 var hbox_container
 
@@ -393,7 +393,7 @@ func add_setting(p_params: Dictionary) -> void:
 			var terrain_children : Array = plugin.current_terrain_node.get_children()
 			var chunk_button := OptionButton.new()
 			for child in terrain_children:
-				if child is MarchingSquaresTerrainChunk:
+				if child is MarchingSquaresTerrainChunkBase:
 					chunk_button.add_item("Chunk " + str(child.chunk_coords))
 					current_available_chunks.append(child)
 			chunk_button.selected = current_available_chunks.find(plugin.selected_chunk) if not current_available_chunks.is_empty() and plugin.selected_chunk else -1
@@ -405,7 +405,15 @@ func add_setting(p_params: Dictionary) -> void:
 			option_button.set_custom_minimum_size(Vector2(65, 35))
 			for mode in MarchingSquaresTerrainChunk.Mode:
 				option_button.add_item(_format_constant_string(mode))
-			option_button.selected = plugin.selected_chunk.merge_mode if not current_available_chunks.is_empty() and plugin.selected_chunk else -1
+			if not current_available_chunks.is_empty() and plugin.selected_chunk:
+				if plugin.selected_chunk is MarchingSquaresTerrainChunk:
+					option_button.selected = plugin.selected_chunk.merge_mode
+				elif plugin.selected_chunk is MarchingSquaresCellChunk:
+					option_button.selected = plugin.selected_chunk.merge_mode
+				else:
+					option_button.selected = -1
+			else:
+				option_button.selected = -1
 			option_button.item_selected.connect(_on_chunk_mode_changed)
 			
 			chunk_button.set_flat(true)
@@ -703,37 +711,41 @@ func _on_terrain_setting_changed(p_setting_name: String, p_value: Variant) -> vo
 
 func _on_chunk_selected(option_button: OptionButton, p_chunk: String) -> void:
 	var terrain := plugin.current_terrain_node
-	var chunk : MarchingSquaresTerrainChunk = terrain.find_child(p_chunk)
+	var chunk : MarchingSquaresTerrainChunkBase = terrain.find_child(p_chunk)
 	
-	option_button.selected = chunk.merge_mode
-	selected_chunk = plugin.current_terrain_node.find_child(p_chunk)
+	if chunk is MarchingSquaresTerrainChunk or chunk is MarchingSquaresCellChunk:
+		option_button.selected = chunk.merge_mode
+	else:
+		option_button.selected = -1
+	selected_chunk = chunk
 	plugin.selected_chunk = selected_chunk
 	
 	plugin.gizmo_plugin.trigger_redraw(terrain)
 
 
 func _apply_mode_to_all_chunks() -> void:
+	if selected_chunk == null:
+		return
+	var mode : int = 0
+	if selected_chunk is MarchingSquaresTerrainChunk:
+		mode = selected_chunk.merge_mode
+	elif selected_chunk is MarchingSquaresCellChunk:
+		mode = selected_chunk.merge_mode
 	for child in plugin.current_terrain_node.get_children():
-		if child is MarchingSquaresTerrainChunk:
-			_change_chunk_mode(child, selected_chunk.merge_mode)
+		if child is MarchingSquaresTerrainChunkBase:
+			_change_chunk_mode(child, mode)
 
 
 func _on_chunk_mode_changed(m_mode: int) -> void:
-	_change_chunk_mode(selected_chunk, m_mode)
+	if selected_chunk:
+		_change_chunk_mode(selected_chunk, m_mode)
 
 
-func _change_chunk_mode(_chunk: MarchingSquaresTerrainChunk, m_mode: int) -> void:
-	match MarchingSquaresTerrainChunk.Mode.find_key(m_mode):
-		"CUBIC":
-			_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.CUBIC
-		"POLYHEDRON":
-			_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.POLYHEDRON
-		"ROUNDED_POLYHEDRON":
-			_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.ROUNDED_POLYHEDRON
-		"SEMI_ROUND":
-			_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.SEMI_ROUND
-		"SPHERICAL":
-			_chunk.merge_mode = MarchingSquaresTerrainChunk.Mode.SPHERICAL
+func _change_chunk_mode(chunk: MarchingSquaresTerrainChunkBase, m_mode: int) -> void:
+	if chunk is MarchingSquaresTerrainChunk:
+		chunk.merge_mode = m_mode as MarchingSquaresTerrainChunk.Mode
+	elif chunk is MarchingSquaresCellChunk:
+		chunk.merge_mode = m_mode as MarchingSquaresCellChunk.Mode
 
 #endregion
 

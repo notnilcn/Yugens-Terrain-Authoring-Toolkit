@@ -9,9 +9,33 @@ This project is an effort to create a simple to use and powerfull terrain author
 * Create a bridge between two points by drawing a line between them
 * Paint up to 15(+1) custom textures onto the terrain
 * Paint a mask map that determines whether selected cells should draw `MultiMeshInstance3d` grass instances
+* Three grid types: Square (original marching squares), Triangle and Hexagon (flat-topped cell columns), selectable per terrain
+* Round, Square and Hexagon brush shapes; exact grid-aligned painting of whole cells/hexagons
+* Grass and runtime texture baking on all grid types
 * Get debug information for selected cells
 * Change the internal marching squares algorithm vertex merge threshold value resulting in smoother or blockier terrain
 * Change global terrain settings like the default wall texture, texture blend mode, grass animation fps and more...
+
+## Grid Modes
+
+The Terrain Settings tool has a **Grid Type** dropdown:
+
+* **Square** (default) - the original marching squares pipeline, unchanged.
+* **Triangle** - equilateral triangles on a triangular lattice.
+* **Hexagon** - regular pointy-top hexagons in odd-r offset rows.
+
+Triangle and hexagon terrains render every cell as a flat polygon at its own height
+with vertical cliffs where a neighbour is lower. All painting tools (height, level,
+smooth, bridge, vertex paint, grass mask, quick paint) work on all three grid types.
+
+* **Grid Aligned** (Brush, Level, Smooth, Bridge): requires the Hexagon brush and
+  Falloff off on a cell terrain. The brush then selects whole cells: `3N² + 3N + 1`
+  hexagon cells or `6N²` triangles, where `N` is the **Grid Size** attribute.
+* **Merge modes** (per chunk, Chunk Management tool): steps at or below a mode's
+  threshold are drawn as 45-degree ramps instead of cliffs. CUBIC keeps exact columns.
+* **Data folders**: each grid type stores its chunks in its own subfolder of the
+  terrain's data directory (`square/`, `triangle/`, `hex/`). Legacy data at the root
+  of the data directory is migrated into `square/` automatically.
 
 For more in-depth documentation, please refer to the _documentation_ folder in the addon.
 

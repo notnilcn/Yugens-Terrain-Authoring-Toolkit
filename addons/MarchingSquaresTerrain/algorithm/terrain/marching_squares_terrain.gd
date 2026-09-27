@@ -553,7 +553,7 @@ func _deferred_enter_tree() -> void:
 		if chunk is MarchingSquaresTerrainChunkBase:
 			chunks[chunk.chunk_coords] = chunk
 			chunk.terrain_system = self
-			if chunk is MarchingSquaresTerrainChunk:
+			if chunk is MarchingSquaresTerrainChunk or chunk is MarchingSquaresCellChunk:
 				chunk.grass_planter = null
 	
 	# Load external data if storage was previously initialized
@@ -600,17 +600,30 @@ func cells_per_chunk() -> Vector2i:
 	return Vector2i.ZERO
 
 
-## Height of a global cell for cell modes. Returns null when the cell's chunk
-## does not exist (used to skip walls at terrain borders).
-func get_cell_height(global_cell: Vector2i) -> Variant:
+## Resolve the chunk owning a global cell for cell modes.
+func chunk_for_cell(global_cell: Vector2i) -> MarchingSquaresTerrainChunkBase:
 	var cells := cells_per_chunk()
 	if cells == Vector2i.ZERO:
 		return null
 	var cc := MarchingSquaresHexGrid.chunk_of_cell(global_cell, cells)
-	var chunk = chunks.get(cc)
+	return chunks.get(cc)
+
+
+## Height of a global cell for cell modes. Returns null when the cell's chunk
+## does not exist (used to skip walls at terrain borders).
+func get_cell_height(global_cell: Vector2i) -> Variant:
+	var chunk = chunk_for_cell(global_cell)
 	if chunk == null:
 		return null
-	return chunk.get_height(MarchingSquaresHexGrid.local_cell(global_cell, cells))
+	return chunk.get_height(MarchingSquaresHexGrid.local_cell(global_cell, cells_per_chunk()))
+
+
+## Whether a global cell is smoothed (bridge-sloped) for cell modes.
+func get_cell_smooth(global_cell: Vector2i) -> bool:
+	var chunk = chunk_for_cell(global_cell)
+	if chunk == null:
+		return false
+	return chunk.get_smooth(MarchingSquaresHexGrid.local_cell(global_cell, cells_per_chunk()))
 
 
 ## World-space origin position of a cell chunk node.
@@ -784,31 +797,40 @@ func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunkBase, plugin,
 		plugin.ui.tool_attributes.show_tool_attributes(plugin.TerrainToolMode.CHUNK_MANAGEMENT)
 		plugin.gizmo_plugin.trigger_redraw(self)
 
-#region square grass helpers (cell chunks have no grass planter)
+#region grass helpers (all grid types)
 
-## Regenerate grass for every square chunk in this terrain.
+## Regenerate grass for every chunk in this terrain.
 func _regenerate_square_grass() -> void:
 	for chunk in chunks.values():
 		if chunk is MarchingSquaresTerrainChunk:
 			chunk.grass_planter.regenerate_all_cells()
+		elif chunk is MarchingSquaresCellChunk:
+			chunk.grass_planter.regenerate_all_cells()
 
 
-## Update grass subdivision counts and regenerate grass (square chunks only).
+## Update grass subdivision counts and regenerate grass for every chunk.
 func _update_square_grass_subdivisions() -> void:
 	for chunk in chunks.values():
 		if chunk is MarchingSquaresTerrainChunk:
 			chunk.grass_planter.multimesh.instance_count = (dimensions.x - 1) * (dimensions.z - 1) * grass_subdivisions * grass_subdivisions
 			chunk.grass_planter.regenerate_all_cells()
+		elif chunk is MarchingSquaresCellChunk:
+			var cells : Vector2i = chunk.cells_per_chunk()
+			chunk.grass_planter.multimesh.instance_count = cells.x * cells.y * grass_subdivisions * grass_subdivisions
+			chunk.grass_planter.regenerate_all_cells()
 
 
-## Apply the scaled grass size to every square chunk (cell chunks only).
+## Apply the scaled grass size to every chunk.
 func _apply_square_grass_scale(scaled_value: Vector2) -> void:
 	for chunk in chunks.values():
 		if chunk is MarchingSquaresTerrainChunk:
 			chunk.grass_planter.multimesh.mesh.size = scaled_value
 			chunk.grass_planter.multimesh.mesh.center_offset.y = scaled_value.y / 2.0
+		elif chunk is MarchingSquaresCellChunk:
+			chunk.grass_planter.multimesh.mesh.size = scaled_value
+			chunk.grass_planter.multimesh.mesh.center_offset.y = scaled_value.y / 2.0
 
-#endregion square grass helpers
+#endregion grass helpers
 
 #region texture (set) functions
 

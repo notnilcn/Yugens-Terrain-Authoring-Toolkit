@@ -23,7 +23,7 @@ var initialization_error : String = ""
 
 var current_terrain_node : MarchingSquaresTerrain
 
-var selected_chunk : MarchingSquaresTerrainChunk
+var selected_chunk : MarchingSquaresTerrainChunkBase
 
 # Flag to prevent _set_new_textures() when syncing preset from terrain node
 var _syncing_from_terrain : bool = false
@@ -1101,12 +1101,18 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 	var restore_pattern := {}
 	var pattern_cc := {}
 	var restore_pattern_cc := {}
+	# Bridge-painted cells blend with their neighbours so the bridge renders as
+	# a slanted surface instead of discrete flat steps (cell grid parity).
+	var smooth_pattern := {}
+	var smooth_restore := {}
 	
 	for draw_chunk_coords: Vector2i in current_draw_pattern.keys():
 		pattern[draw_chunk_coords] = {}
 		restore_pattern[draw_chunk_coords] = {}
 		pattern_cc[draw_chunk_coords] = {}
 		restore_pattern_cc[draw_chunk_coords] = {}
+		smooth_pattern[draw_chunk_coords] = {}
+		smooth_restore[draw_chunk_coords] = {}
 		var chunk : MarchingSquaresCellChunk = terrain.chunks[draw_chunk_coords]
 		if chunk == null:
 			continue
@@ -1163,6 +1169,8 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 						progress = ease(progress, ease_value)
 					restore_value = chunk.get_height(draw_cell_coords)
 					draw_value = lerpf(bridge_start_pos.y, brush_position.y, progress)
+					smooth_restore[draw_chunk_coords][draw_cell_coords] = chunk.get_smooth(draw_cell_coords)
+					smooth_pattern[draw_chunk_coords][draw_cell_coords] = true
 				_:
 					# BRUSH tool (fallthrough for any other height tool)
 					restore_value = chunk.get_height(draw_cell_coords)
@@ -1282,6 +1290,9 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 			"color_0": qp_color_restore,
 			"color_1": qp_color_restore_cc,
 		}
+		if mode == TerrainToolMode.BRIDGE:
+			qp_do["smooth"] = smooth_pattern
+			qp_undo["smooth"] = smooth_restore
 		undo_redo.create_action("terrain brush with quick paint")
 		undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, qp_do)
 		undo_redo.add_undo_method(self, "apply_composite_pattern_action", terrain, qp_undo)
@@ -1300,6 +1311,9 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 		"wall_color_0": wall_color_restore,
 		"wall_color_1": wall_color_restore_cc,
 	}
+	if mode == TerrainToolMode.BRIDGE:
+		do_patterns["smooth"] = smooth_pattern
+		undo_patterns["smooth"] = smooth_restore
 	undo_redo.create_action("terrain cell height draw")
 	undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, do_patterns)
 	undo_redo.add_undo_method(self, "apply_composite_pattern_action", terrain, undo_patterns)
@@ -1358,7 +1372,7 @@ func draw_color_1_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dicti
 func draw_grass_mask_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
 	for draw_chunk_coords: Vector2i in pattern:
 		var draw_chunk_dict = pattern[draw_chunk_coords]
-		var chunk : MarchingSquaresTerrainChunk = terrain.chunks[draw_chunk_coords]
+		var chunk : MarchingSquaresTerrainChunkBase = terrain.chunks[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var mask : Color = draw_chunk_dict[draw_cell_coords]
 			chunk.draw_grass_mask(draw_cell_coords.x, draw_cell_coords.y, mask)
@@ -1418,6 +1432,15 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.height[chunk_coords]:
 					chunk.draw_height(cell_coords.x, cell_coords.y, patterns.height[chunk_coords][cell_coords])
+	
+	# Apply smooth (bridge-blended) flags for cell modes
+	if patterns.has("smooth"):
+		for chunk_coords: Vector2i in patterns.smooth:
+			var chunk = terrain.chunks.get(chunk_coords)
+			if chunk:
+				affected_chunks[chunk_coords] = chunk
+				for cell_coords: Vector2i in patterns.smooth[chunk_coords]:
+					chunk.draw_smooth(cell_coords.x, cell_coords.y, patterns.smooth[chunk_coords][cell_coords])
 	
 	# Apply grass mask
 	if patterns.has("grass_mask") and not composite_disabled:

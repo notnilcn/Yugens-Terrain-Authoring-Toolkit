@@ -37,3 +37,17 @@ Feel free to change these animations to what looks best for your project! The tw
 
 * **mst_terrain** gdshaderinc → end of the fragment function.
 * **MarchingSquaresTerrainVertexColorHelper** script → at the start of the `blend_colors(vertex: Vector3, uv: Vector2, diag_midpoint: bool = false) -> Dictionary[String, Color]:` function
+
+### Triangle / Hexagon Cell Modes
+
+* **MarchingSquaresTerrainHexGrid** / **MarchingSquaresTriGrid** scripts → all coordinate math (world <-> cell, neighbours, hexagon selections).
+* **MarchingSquaresCellChunk** script → shared cell mesh generation (`_emit_cell`, `_emit_wall`, `_emit_ramp`), grass hooks and cell-mode save hooks.
+* **MarchingSquaresHexChunk** / **MarchingSquaresTriChunk** scripts → per-mode shape/neighbour implementations.
+* **MarchingSquaresCellGrassPlanter** script → grass placement for cell chunks.
+* The per-mode data subfolders (`square/`, `triangle/`, `hex/`) are handled by **MSTDataHandler** (`mode_name`, `mode_subdir`, `export_cell_chunk_data`, `import_cell_chunk_data`).
+
+### Grid Aligned Painting and Cell Chunk Gizmos
+
+* **brush_pattern_calculator** script → `grid_aligned_cells` and `grid_aligned_outline`.
+* **marching_squares_terrain_gizmo** script → `_redraw_cell_brush`, `_grid_aligned_brush_transform`.
+* **marching_squares_terrain_cell_chunk_gizmo** script → per-cell height handles.

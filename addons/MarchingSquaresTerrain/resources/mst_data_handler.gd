@@ -426,13 +426,14 @@ static func import_chunk_data(chunk: MarchingSquaresTerrainChunk, data: MSTChunk
 static func export_cell_chunk_data(chunk: MarchingSquaresCellChunk) -> MSTChunkData:
 	var data := MSTChunkData.new()
 	data.chunk_coords = chunk.chunk_coords
-	data.merge_mode = 0
+	data.merge_mode = chunk.merge_mode
 	if chunk.terrain_system:
 		data.grid_type = int(chunk.terrain_system.grid_type)
 	data.cell_count = chunk.cells_per_chunk()
 	
 	# Flatten the height array through a duplicate so the chunk keeps its data.
 	data.height_map = Array(chunk.height_map)
+	data.smooth_map = chunk.smooth_map.duplicate()
 	
 	var cell_count : int = chunk.color_map_0.size()
 	data.ground_texture_idx.resize(cell_count)
@@ -445,6 +446,9 @@ static func export_cell_chunk_data(chunk: MarchingSquaresCellChunk) -> MSTChunkD
 	
 	# Ephemeral data for BAKED mode
 	data.mesh = chunk.mesh
+	
+	if chunk.terrain_system and chunk.terrain_system.bake_grass and chunk.grass_planter:
+		data.grass_multimesh = chunk.grass_planter.multimesh
 	
 	if chunk.terrain_system and chunk.terrain_system.bake_collision:
 		for child in chunk.get_children():
@@ -472,11 +476,26 @@ static func import_cell_chunk_data(chunk: MarchingSquaresCellChunk, data: MSTChu
 	
 	chunk.chunk_coords = data.chunk_coords
 	chunk.height_map = Array(data.height_map)
+	var smooth_count : int = chunk.cells_per_chunk().x * chunk.cells_per_chunk().y
+	if data.smooth_map.size() == smooth_count:
+		chunk.smooth_map = data.smooth_map.duplicate()
+	else:
+		chunk.smooth_map = PackedByteArray()
+		chunk.smooth_map.resize(smooth_count)
+	chunk.refresh_smooth_flag()
+	if data.merge_mode >= 0 and data.merge_mode < MarchingSquaresCellChunk.Mode.size():
+		chunk.merge_mode = data.merge_mode as MarchingSquaresCellChunk.Mode
 	
 	if data.mesh:
 		chunk.mesh = data.mesh
 	elif chunk.terrain_system.storage_mode == MarchingSquaresTerrain.StorageMode.BAKED:
 		push_warning("Baking enabled, but terrain-resource does not contain mesh data")
+	
+	if chunk.terrain_system.bake_grass and not data.grass_multimesh:
+		push_warning("Grass baking enabled, but terrain-resource does not contain grass data")
+	
+	if data.grass_multimesh:
+		chunk._temp_grass_multimesh = data.grass_multimesh
 	
 	if chunk.terrain_system.bake_collision and data.collision_faces.is_empty():
 		push_warning("Collision baking enabled, but terrain-resource does not contain collision data")
@@ -515,12 +534,13 @@ static func needs_migration(terrain: MarchingSquaresTerrain) -> bool:
 	var dir_path := terrain.data_directory
 	if dir_path.is_empty():
 		return false
+	var mode_path := mode_subdir(terrain)
 	
 	for chunk_coords in terrain.chunks:
-		var chunk : MarchingSquaresTerrainChunk = terrain.chunks[chunk_coords]
+		var chunk : MarchingSquaresTerrainChunkBase = terrain.chunks[chunk_coords]
 		# Check if chunk has embedded data (height_map populated)
 		if chunk.height_map and not chunk.height_map.is_empty():
-			if not metadata_exists(dir_path, chunk_coords):
+			if not metadata_exists(mode_path, chunk_coords):
 				return true
 	
 	return false
@@ -533,7 +553,7 @@ static func migrate_to_external_storage(terrain: MarchingSquaresTerrain) -> void
 	
 	# Mark all chunks as dirty to force save
 	for chunk_coords in terrain.chunks:
-		var chunk : MarchingSquaresTerrainChunk = terrain.chunks[chunk_coords]
+		var chunk : MarchingSquaresTerrainChunkBase = terrain.chunks[chunk_coords]
 		chunk._data_dirty = true
 	
 	save_all_chunks(terrain)

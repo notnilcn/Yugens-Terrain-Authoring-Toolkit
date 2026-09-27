@@ -28,6 +28,9 @@ extends Resource
 ## Grass mask 
 @export var grass_mask : PackedByteArray
 
+## Smooth (bridge-blended) cell flags for cell modes; one byte per cell
+@export var smooth_map : PackedByteArray
+
 # Legacy format (V1.1) for backward compatibility during migration
 @export var color_map_0 : PackedColorArray
 @export var color_map_1 : PackedColorArray

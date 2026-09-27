@@ -223,4 +223,28 @@ static func grid_aligned_cells(terrain: MarchingSquaresTerrain, brush_pos: Vecto
 	var center := MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing)
 	return MarchingSquaresHexGrid.cells_in_hex_radius(center, maxi(grid_size, 0))
 
+
+## Outline that exactly encloses a grid-aligned selection:
+## { "center": Vector2, "radius": float, "rotation": float (radians around Y) }.
+## The hexagon outline visual is pointy-top in UV space; on triangle terrain the
+## lattice hexagons are flat-top (corners on the X axis) so a 30 degree rotation
+## aligns the outline with the selected triangles.
+static func grid_aligned_outline(terrain: MarchingSquaresTerrain, brush_pos: Vector2, grid_size: int) -> Dictionary:
+	if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
+		var lattice := MarchingSquaresTriGrid.nearest_lattice_point(brush_pos, terrain.cell_size)
+		var center := MarchingSquaresTriGrid.lattice_point(lattice.x, lattice.y, terrain.cell_size)
+		return {
+			"center": center,
+			"radius": float(maxi(grid_size, 1)) * terrain.cell_size.x,
+			"rotation": deg_to_rad(30.0),
+		}
+	var spacing := MarchingSquaresHexGrid.spacing_for(terrain.cell_size)
+	var cell := MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing)
+	var center := MarchingSquaresHexGrid.cell_center(cell, spacing)
+	return {
+		"center": center,
+		"radius": float(maxi(grid_size, 0)) * spacing.x + MarchingSquaresHexGrid.radius_for(terrain.cell_size),
+		"rotation": 0.0,
+	}
+
 #endregion

@@ -20,6 +20,7 @@ func _initialize() -> void:
 	_test_pattern_build(terrain)
 	_test_apply(terrain)
 	_test_gate_rules(terrain)
+	_test_outline(terrain)
 	
 	terrain.free()
 	if _failures == 0:
@@ -116,6 +117,65 @@ func _test_apply(terrain: MarchingSquaresTerrain) -> void:
 	_check(changed == 7, "7 cells changed for N=1 centered on a full chunk")
 	var center_local := HexGrid.local_cell(Vector2i(4, 3), cells)
 	_check(absf(chunk.get_height(center_local) - target_height) < 0.0001, "center cell leveled to target")
+
+
+## Mirror of the outline SDF used by the brush radius shader.
+func _outline_h(terrain: MarchingSquaresTerrain, outline: Dictionary, p: Vector2) -> float:
+	var center : Vector2 = outline["center"]
+	var radius : float = outline["radius"]
+	var rotation : float = outline["rotation"]
+	var local := (p - center).rotated(-rotation) / radius
+	return maxf(absf(local.y), maxf(absf(local.x) * 1.1547005383792517,
+		absf(local.y) + absf(local.x) * 0.5773502691896258))
+
+
+func _test_outline(terrain: MarchingSquaresTerrain) -> void:
+	# Every selected cell's center must be inside the drawn outline, and the
+	# first unselected ring must be outside it.
+	terrain.grid_type = MarchingSquaresTerrain.GridType.TRIANGLE
+	var n := 2
+	var selected := BPC.grid_aligned_cells(terrain, Vector2.ZERO, n)
+	var outline := BPC.grid_aligned_outline(terrain, Vector2.ZERO, n)
+	var all_inside := true
+	for cell in selected:
+		var center := BPC.cell_center_for(terrain, cell)
+		if _outline_h(terrain, outline, center) > 1.0001:
+			all_inside = false
+	_check(all_inside, "triangle outline encloses all selected cells")
+	var outside_count := 0
+	for i in range(-n - 2, n + 3):
+		for j in range(-n - 2, n + 3):
+			var cell := Vector2i(2 * i, j)
+			if cell in selected:
+				continue
+			var center := BPC.cell_center_for(terrain, cell)
+			if _outline_h(terrain, outline, center) > 1.0:
+				outside_count += 1
+	_check(outside_count > 0, "triangle outline excludes unselected cells")
+	
+	# Hexagon outline radius must cover the N-ring and exclude ring N+1.
+	terrain.grid_type = MarchingSquaresTerrain.GridType.HEX
+	n = 1
+	outline = BPC.grid_aligned_outline(terrain, Vector2.ZERO, n)
+	var spacing := MarchingSquaresHexGrid.spacing_for(terrain.cell_size)
+	var center_cell := MarchingSquaresHexGrid.world_to_cell(Vector2.ZERO, spacing)
+	var ring1_ok := true
+	for cell in MarchingSquaresHexGrid.cells_in_hex_radius(center_cell, n):
+		var center := BPC.cell_center_for(terrain, cell)
+		if _outline_h(terrain, outline, center) > 1.0001:
+			ring1_ok = false
+	_check(ring1_ok, "hex outline encloses the radius-N disk")
+	var inner := {}
+	for cell in MarchingSquaresHexGrid.cells_in_hex_radius(center_cell, n):
+		inner[cell] = true
+	var ring2_ok := true
+	for cell in MarchingSquaresHexGrid.cells_in_hex_radius(center_cell, n + 1):
+		if inner.has(cell):
+			continue
+		var center := BPC.cell_center_for(terrain, cell)
+		if _outline_h(terrain, outline, center) <= 1.0:
+			ring2_ok = false
+	_check(ring2_ok, "hex outline excludes the radius-N+1 ring")
 
 
 func _test_gate_rules(_terrain: MarchingSquaresTerrain) -> void:

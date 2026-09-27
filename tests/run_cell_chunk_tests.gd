@@ -59,6 +59,7 @@ func _test_hex_chunk(terrain: MarchingSquaresTerrain) -> void:
 	_check(idx.size() == flat_idx + 36, "hex walls add 36 indices (got %d extra)" % (idx.size() - flat_idx))
 	_check(absf(chunk.get_height(Vector2i(3, 2)) - 5.0) < 0.0001, "hex draw_height stores value")
 	_check(chunk._data_dirty, "hex draw marks chunk dirty")
+	_check_cell_normals(chunk, [Vector2i(3, 2)], "hex")
 	
 	# Collision body exists with the expected layers (17 masked, plus the
 	# terrain's extra collision layer).
@@ -91,6 +92,53 @@ func _test_tri_chunk(terrain: MarchingSquaresTerrain) -> void:
 	arrays = chunk.mesh.surface_get_arrays(0)
 	idx = arrays[Mesh.ARRAY_INDEX]
 	_check(idx.size() == before + 18, "tri walls add 18 indices (got %d extra)" % (idx.size() - before))
+	_check_cell_normals(chunk, [Vector2i(5, 2)], "tri")
+
+
+## Asserts: no downward normals, and every wall triangle's geometric normal
+## points away from the raised cell that owns it.
+func _check_cell_normals(chunk: MarchingSquaresCellChunk, raised: Array, label: String) -> void:
+	var cells := chunk.cells_per_chunk()
+	var arrays := chunk.mesh.surface_get_arrays(0)
+	var verts : PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals : PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices : PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var down := 0
+	for n in normals:
+		if n.y < -0.1:
+			down += 1
+	_check(down == 0, label + ": no downward normals (got %d)" % down)
+	
+	var origin_world := chunk.get_chunk_origin_world()
+	var offset := Vector2(origin_world.x, origin_world.y)
+	var centers : Array[Vector2] = []
+	for local in raised:
+		var global : Vector2i = chunk.chunk_coords * cells + (local as Vector2i)
+		centers.append(chunk.cell_center_world(global))
+	
+	var inward := 0
+	for i in range(0, indices.size(), 3):
+		var a := verts[indices[i]]
+		var b := verts[indices[i + 1]]
+		var c := verts[indices[i + 2]]
+		var fn := (b - a).cross(c - a)
+		if fn.length_squared() < 0.000001:
+			continue
+		fn = fn.normalized()
+		if absf(fn.y) > 0.5:
+			continue
+		var mid := (a + b + c) / 3.0
+		var mid_world := Vector2(mid.x, mid.z) + offset
+		var best : Vector2 = centers[0]
+		var best_dist := INF
+		for cc in centers:
+			var d := mid_world.distance_to(cc)
+			if d < best_dist:
+				best_dist = d
+				best = cc
+		if Vector2(fn.x, fn.z).dot(mid_world - best) < 0.0:
+			inward += 1
+	_check(inward == 0, label + ": walls face away from raised cells (got %d inward)" % inward)
 
 
 func _test_mode_switch_memory(terrain: MarchingSquaresTerrain) -> void:
