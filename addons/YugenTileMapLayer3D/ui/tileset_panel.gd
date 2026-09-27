@@ -29,6 +29,7 @@ extends PanelContainer
 @onready var cursor_step_dropdown: OptionButton = %CursorStepDropdown
 @onready var grid_snap_dropdown: OptionButton = %GridSnapDropdown
 @onready var grid_size_spinbox: SpinBox = %GridSizeSpinBox
+@onready var mst_grid_align_label: Label = %MSTGridAlignLabel
 @onready var grid_size_confirm_dialog: ConfirmationDialog = %GridSizeConfirmDialog
 @onready var _texture_change_warning_dialog: ConfirmationDialog = %TextureChangeWarningDialog
 @onready var texture_filter_dropdown: OptionButton = %TextureFilterDropdown
@@ -390,6 +391,8 @@ func _load_settings_to_ui(settings: YugenTileMapLayerSettings) -> void:
 	if grid_size_spinbox:
 		grid_size_spinbox.value = settings.grid_size
 
+	_update_mst_grid_align_mirror()
+
 	if cursor_step_dropdown:
 		var step_index: int = YugenGlobalConstants.CURSOR_STEP_OPTIONS.find(settings.cursor_step_size)
 		if step_index >= 0:
@@ -472,6 +475,33 @@ func initialize_animated_tile_manager() -> void:
 		
 
 
+## Mirror of the node's MST Grid Align state: while active, placement snaps to the MST
+## terrain lattice, so the grid size control is locked and the MST source is shown.
+func _update_mst_grid_align_mirror() -> void:
+	if not grid_size_spinbox:
+		return
+
+	var node: YugenTileMapLayer3D = current_tilemap3d_node
+	var active: bool = node != null and node.is_mst_grid_align_active()
+	grid_size_spinbox.editable = not active
+
+	if active:
+		var cell_size: Vector2 = node.get_mst_grid_align_status().get("cell_size", Vector2.ZERO)
+		grid_size_spinbox.tooltip_text = "Placement snaps to the MST lattice (cell size %.3f). Disable MST Grid Align on the node to edit." % cell_size.x
+		if mst_grid_align_label:
+			mst_grid_align_label.visible = true
+			mst_grid_align_label.text = "MST lattice: %.3f" % cell_size.x
+	elif node != null and node.mst_grid_align:
+		grid_size_spinbox.tooltip_text = "MST Grid Align is enabled but unavailable."
+		if mst_grid_align_label:
+			mst_grid_align_label.visible = true
+			mst_grid_align_label.text = "MST: %s" % node.get_mst_grid_align_status().get("reason", "unavailable")
+	else:
+		grid_size_spinbox.tooltip_text = ""
+		if mst_grid_align_label:
+			mst_grid_align_label.visible = false
+
+
 func _save_ui_to_settings() -> void:
 	if not current_tilemap3d_node or not current_tilemap3d_node.settings or _is_loading_from_node:
 		return
@@ -522,6 +552,8 @@ func _clear_ui() -> void:
 	_sync_tile_set_size_spinboxes(YugenGlobalConstants.DEFAULT_TILE_SIZE)
 	if grid_size_spinbox:
 		grid_size_spinbox.value = YugenGlobalConstants.DEFAULT_GRID_SIZE
+
+	_update_mst_grid_align_mirror()
 
 	if cursor_step_dropdown:
 		var step_index: int = YugenGlobalConstants.CURSOR_STEP_OPTIONS.find(1.0)

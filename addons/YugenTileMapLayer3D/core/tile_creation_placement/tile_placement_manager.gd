@@ -41,6 +41,19 @@ enum PlacementMode {
 var placement_mode: PlacementMode = PlacementMode.CURSOR_PLANE
 var cursor_3d: TileCursor3D = null
 
+# MST Grid Align context (Yugen port). When enabled, snap_to_grid() routes the
+# snapped grid position through MSTGridSnap so placement lands on the MST terrain
+# lattice. The context is pushed by YugenTileMapLayer3D; the MST helper is loaded
+# dynamically so the addon still works without MarchingSquaresTerrain installed.
+const MST_GRID_SNAP_PATH: String = "res://addons/MarchingSquaresTerrain/editor/utils/mst_grid_snap.gd"
+var mst_snap_enabled: bool = false
+var mst_terrain: Node3D = null
+var mst_align_kind: int = 0
+var mst_cell_multiplier: int = 1
+var mst_snap_y: bool = false
+var mst_y_snap_distance: float = 1.0
+var _mst_grid_snap_script: GDScript
+
 var _paint_stroke_undo_redo: Object = null
 var _paint_stroke_active: bool = false
 
@@ -325,16 +338,21 @@ func _is_in_bounds(pos: Vector3, min_b: Vector3, max_b: Vector3, tolerance: floa
 ## Unified grid snapping (Single Source of Truth).
 ## plane_normal=ZERO snaps all axes; UP/RIGHT/FORWARD only snaps axes parallel to that plane.
 ## snap_size defaults to grid_snap_size; minimum 0.5 (half-grid).
+## When an MST Grid Align context is active, the result is additionally projected onto the
+## assigned MarchingSquaresTerrain lattice before the plane constraint is re-applied.
 func snap_to_grid(grid_pos: Vector3, plane_normal: Vector3 = Vector3.ZERO, snap_size: float = -1.0) -> Vector3:
 	var resolution: float = snap_size if snap_size > 0.0 else grid_snap_size
 
 	if plane_normal == Vector3.ZERO:
 		var max_range: float = YugenGlobalConstants.MAX_GRID_RANGE
-		return Vector3(
+		var snapped_all: Vector3 = Vector3(
 			clampf(snappedf(grid_pos.x, resolution), -max_range, max_range),
 			clampf(snappedf(grid_pos.y, resolution), -max_range, max_range),
 			clampf(snappedf(grid_pos.z, resolution), -max_range, max_range)
 		)
+		if is_mst_snap_active():
+			return _apply_mst_snap(snapped_all, plane_normal)
+		return snapped_all
 
 	var snapped: Vector3 = grid_pos
 
@@ -347,6 +365,86 @@ func snap_to_grid(grid_pos: Vector3, plane_normal: Vector3 = Vector3.ZERO, snap_
 	else:
 		snapped.x = snappedf(grid_pos.x, resolution)
 		snapped.y = snappedf(grid_pos.y, resolution)
+
+	var max_range: float = YugenGlobalConstants.MAX_GRID_RANGE
+	snapped.x = clampf(snapped.x, -max_range, max_range)
+	snapped.y = clampf(snapped.y, -max_range, max_range)
+	snapped.z = clampf(snapped.z, -max_range, max_range)
+
+	if is_mst_snap_active():
+		return _apply_mst_snap(snapped, plane_normal)
+
+	return snapped
+
+
+## Pushes the MST Grid Align context used by snap_to_grid(). Pass enabled=false to disable.
+func set_mst_context(terrain: Node3D, enabled: bool, align_kind: int, cell_multiplier: int,
+		snap_y: bool, y_snap_distance: float) -> void:
+	mst_terrain = terrain
+	mst_snap_enabled = enabled
+	mst_align_kind = align_kind
+	mst_cell_multiplier = maxi(cell_multiplier, 1)
+	mst_snap_y = snap_y
+	mst_y_snap_distance = y_snap_distance
+
+
+func clear_mst_context() -> void:
+	mst_snap_enabled = false
+	mst_terrain = null
+
+
+func get_mst_grid_snap_script() -> GDScript:
+	if not _mst_grid_snap_script and ResourceLoader.exists(MST_GRID_SNAP_PATH):
+		_mst_grid_snap_script = load(MST_GRID_SNAP_PATH)
+	return _mst_grid_snap_script
+
+
+func is_mst_snap_active() -> bool:
+	if not mst_snap_enabled or not is_instance_valid(mst_terrain):
+		return false
+	if not ("grid_type" in mst_terrain) or not ("cell_size" in mst_terrain):
+		return false
+	var snap_script: GDScript = get_mst_grid_snap_script()
+	if not snap_script:
+		return false
+	return snap_script.is_supported(mst_terrain)
+
+
+## Projects a snapped grid position onto the MST lattice. Works in world space through the
+## tile map's transform, then converts back to grid units. Returns grid_pos unchanged when
+## the context is unavailable or the terrain is unsupported.
+func _apply_mst_snap(grid_pos: Vector3, plane_normal: Vector3) -> Vector3:
+	var snap_script: GDScript = get_mst_grid_snap_script()
+	if not snap_script or not is_instance_valid(mst_terrain):
+		return grid_pos
+
+	var tile_map_transform: Transform3D = Transform3D.IDENTITY
+	if active_tile_map_layer3d:
+		tile_map_transform = active_tile_map_layer3d.global_transform
+
+	var world: Vector3 = tile_map_transform * YugenGlobalUtil.grid_to_world(grid_pos, grid_size)
+	var opts: Dictionary = {
+		"cell_multiplier": mst_cell_multiplier,
+		"align_kind": mst_align_kind,
+		"y_snap": mst_snap_y,
+		"y_snap_distance": mst_y_snap_distance,
+	}
+	var result: Dictionary = snap_script.snap(world, mst_terrain, opts)
+	if result.get("unsupported", false):
+		return grid_pos
+
+	var local_world: Vector3 = tile_map_transform.affine_inverse() * (result["point"] as Vector3)
+	var snapped: Vector3 = YugenGlobalUtil.world_to_grid(local_world, grid_size)
+
+	# Re-apply the plane constraint: the plane's free axis keeps the upstream value,
+	# except when the user explicitly enabled Y snapping on the floor plane.
+	if plane_normal == Vector3.UP:
+		if not mst_snap_y:
+			snapped.y = grid_pos.y
+	elif plane_normal == Vector3.RIGHT:
+		snapped.x = grid_pos.x
+	elif plane_normal == Vector3.FORWARD:
+		snapped.z = grid_pos.z
 
 	var max_range: float = YugenGlobalConstants.MAX_GRID_RANGE
 	snapped.x = clampf(snapped.x, -max_range, max_range)

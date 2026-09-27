@@ -8,13 +8,13 @@ const DEFAULT_GRID_SIZE: float = 1.0
 const DEFAULT_GRID_SNAP_SIZE: float = 1.0
 const DEFAULT_GRID_SNAP: float = DEFAULT_GRID_SNAP_SIZE
 
-# True limit is ±3276.7; use ±2500 to stay clear of clamp errors
-const MAX_GRID_RANGE: float = 2500.0
+# Yugen port: true limit is ±327.67 at COORD_SCALE=100; use ±300 to stay clear of clamp errors
+const MAX_GRID_RANGE: float = 300.0
 
 # Half-grid (0.5) is the smallest supported; 0.25/0.125 are not
 const MIN_SNAP_SIZE: float = 0.5
 
-const GRID_PRECISION: float = 0.1
+const GRID_PRECISION: float = 0.01
 
 const MAX_RECOMMENDED_TILES: int = 50000
 

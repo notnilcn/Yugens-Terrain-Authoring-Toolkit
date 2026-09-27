@@ -318,14 +318,15 @@ func get_fill_grid_positions(width: int = 1) -> Array[Vector3]:
 			var tr: Vector3 = row_left_end.lerp(row_right_end, s1)
 			var center_world: Vector3 = (bl + tl + br + tr) / 4.0
 
-			## Convert world → grid and snap to tile key precision (0.1).
-			## Must match YugenTileKeySystem.COORD_SCALE=10. Coarser snaps (1.0)
+			## Convert world → grid and snap to tile key precision (YugenTileKeySystem.get_precision()).
+			## Must match YugenTileKeySystem.COORD_SCALE=100. Coarser snaps (1.0)
 			## collapse diagonal columns into the same grid cell.
+			var key_precision: float = YugenTileKeySystem.get_precision()
 			var grid_pos: Vector3 = YugenGlobalUtil.world_to_grid(center_world, grid_size)
 			grid_pos = Vector3(
-				snappedf(grid_pos.x, 0.1),
-				snappedf(grid_pos.y, 0.1),
-				snappedf(grid_pos.z, 0.1)
+				snappedf(grid_pos.x, key_precision),
+				snappedf(grid_pos.y, key_precision),
+				snappedf(grid_pos.z, key_precision)
 			)
 			result.append(grid_pos)
 

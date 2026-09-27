@@ -51,6 +51,37 @@ var _chunk_shadow_casting: int = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 @export_tool_button("Run Debug Report") var debug_report_button = validate_columnar_data_quality
 
+@export_group("MST Grid Align")
+## Optional MarchingSquaresTerrain whose lattice drives placement snapping.
+## The MST addon is loaded dynamically; when absent or unsupported, Grid Align stays inactive.
+@export var mst_terrain: Node3D = null:
+	set(value):
+		mst_terrain = value
+		_update_mst_grid_align()
+## When active, placement snaps to the MST terrain lattice (the map's own grid size is kept,
+## so existing tiles are never rescaled; positions land on the lattice in map grid units).
+@export var mst_grid_align: bool = false:
+	set(value):
+		mst_grid_align = value
+		_update_mst_grid_align()
+## Matches MSTGridSnap.AlignKind: 0 = vertex and center, 1 = vertex only, 2 = center only.
+@export_enum("Vertex and Center", "Vertex Only", "Center Only") var mst_align_kind: int = 0:
+	set(value):
+		mst_align_kind = value
+		_update_mst_grid_align()
+@export_range(1, 64, 1) var mst_cell_multiplier: int = 1:
+	set(value):
+		mst_cell_multiplier = maxi(value, 1)
+		_update_mst_grid_align()
+@export var mst_snap_y: bool = false:
+	set(value):
+		mst_snap_y = value
+		_update_mst_grid_align()
+@export_range(0.0, 1000.0, 0.01) var mst_y_snap_distance: float = 1.0:
+	set(value):
+		mst_y_snap_distance = value
+		_update_mst_grid_align()
+
 
 const ATLAS_COORDS_STRIDE: int = YugenTileMapLayerData.ATLAS_COORDS_STRIDE
 ## Runtime group used to find sibling YugenTileMapLayer3D nodes and warn on shared tile data.
@@ -187,7 +218,12 @@ var _vertex_tile_mesh_instances: Dictionary = {}
 var _vertex_tile_material: ShaderMaterial = null
 var _cached_warnings: PackedStringArray = PackedStringArray()
 var _warnings_dirty: bool = true
-var _active_placement_manager: YugenTilePlacementManager = null
+var _active_placement_manager: YugenTilePlacementManager = null:
+	set(value):
+		_active_placement_manager = value
+		_update_mst_placement_context()
+
+var _mst_grid_snap_script: GDScript
 
 var collision_layer: int = YugenGlobalConstants.DEFAULT_COLLISION_LAYER
 var collision_mask: int = YugenGlobalConstants.DEFAULT_COLLISION_MASK
@@ -413,6 +449,8 @@ func _apply_settings() -> void:
 		_rescale_custom_transforms(old_grid_size, grid_size)
 		call_deferred("_rebuild_chunks_from_saved_data", true)
 
+	_update_mst_grid_align()
+
 	notify_property_list_changed()
 
 
@@ -441,6 +479,91 @@ func _rescale_custom_transforms(old_grid_size: float, new_grid_size: float) -> v
 		var t: Transform3D = _tile_custom_transforms[key]
 		t.origin *= ratio
 		_tile_custom_transforms[key] = t
+
+
+## Returns the dynamically loaded MSTGridSnap script, or null when the MST addon is absent.
+func get_mst_grid_snap_script() -> GDScript:
+	if not _mst_grid_snap_script and ResourceLoader.exists(YugenTilePlacementManager.MST_GRID_SNAP_PATH):
+		_mst_grid_snap_script = load(YugenTilePlacementManager.MST_GRID_SNAP_PATH)
+	return _mst_grid_snap_script
+
+
+## Describes whether Grid Align can run. "supported" means the settings are valid;
+## "active" additionally requires mst_grid_align to be enabled.
+func get_mst_grid_align_status() -> Dictionary:
+	var status: Dictionary = {
+		"active": false,
+		"supported": false,
+		"reason": "",
+		"cell_size": Vector2.ZERO,
+	}
+	if not mst_grid_align:
+		status["reason"] = "disabled"
+		return status
+	var snap_script: GDScript = get_mst_grid_snap_script()
+	if not snap_script:
+		status["reason"] = "MarchingSquaresTerrain addon is not installed"
+		return status
+	if not is_instance_valid(mst_terrain):
+		status["reason"] = "no MST terrain assigned"
+		return status
+	if not ("grid_type" in mst_terrain) or not ("cell_size" in mst_terrain):
+		status["reason"] = "assigned node is not a MarchingSquaresTerrain"
+		return status
+	if not snap_script.is_supported(mst_terrain):
+		status["reason"] = "unsupported MST terrain type (square terrains only)"
+		return status
+
+	var cell_size: Vector2 = mst_terrain.get("cell_size")
+	if cell_size.x <= 0.0 or cell_size.y <= 0.0:
+		status["reason"] = "MST terrain has an invalid cell size"
+		return status
+	status["cell_size"] = cell_size
+
+	if absf(cell_size.x - cell_size.y) > 0.001:
+		status["reason"] = "MST cell size is not uniform (%.3f x %.3f)" % [cell_size.x, cell_size.y]
+		return status
+
+	# Tile keys quantize to YugenTileKeySystem.get_precision(). The MST lattice is
+	# expressed in this map's grid units, so a lattice half-spacing below that
+	# quantum would collapse adjacent cells onto one key.
+	var map_grid_size: float = settings.grid_size if settings else grid_size
+	if map_grid_size <= 0.0:
+		status["reason"] = "tile map has an invalid grid size"
+		return status
+	var lattice_step_grid: float = minf(cell_size.x, cell_size.y) / map_grid_size \
+		* float(maxi(mst_cell_multiplier, 1)) * 0.5
+	if lattice_step_grid < YugenTileKeySystem.get_precision():
+		status["reason"] = "MST cell size %.4f at map grid size %.3f and multiplier %d is below the tile-key precision (%.3f)" % [
+			cell_size.x, map_grid_size, mst_cell_multiplier, YugenTileKeySystem.get_precision()
+		]
+		return status
+
+	status["supported"] = true
+	status["active"] = true
+	return status
+
+
+func is_mst_grid_align_active() -> bool:
+	return get_mst_grid_align_status()["active"]
+
+
+## Pushes the current Grid Align state to the active placement manager. Called when the
+## export settings change, when settings are reapplied, and when a manager is assigned.
+func _update_mst_grid_align() -> void:
+	_update_mst_placement_context()
+
+
+func _update_mst_placement_context() -> void:
+	if not _active_placement_manager:
+		return
+	if is_mst_grid_align_active():
+		_active_placement_manager.set_mst_context(
+			mst_terrain, true, mst_align_kind, mst_cell_multiplier, mst_snap_y, mst_y_snap_distance
+		)
+	else:
+		_active_placement_manager.clear_mst_context()
+
 
 
 func _rebuild_chunks_from_saved_data(force_mesh_rebuild: bool = false) -> void:

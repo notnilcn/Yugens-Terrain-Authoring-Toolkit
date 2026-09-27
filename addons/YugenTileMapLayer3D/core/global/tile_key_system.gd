@@ -7,7 +7,8 @@ extends RefCounted
 # COORD_SCALE=10 => Grid range of ±3,276.7 from origin (0.1 precision, half-grid OK)
 # COORD_SCALE=100 => Grid range of ±327.67 from origin (0.01 precision)
 # COORD_SCALE=1000 => Grid range of ±32.767 from origin (0.001 precision)
-const COORD_SCALE: float = 10.0
+# Yugen port: raised from 10 to 100 so MST Grid Align cell sizes such as 0.25 store exactly.
+const COORD_SCALE: float = 100.0
 
 const MAX_COORD: int = 32767
 const MIN_COORD: int = -32768
