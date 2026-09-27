@@ -88,6 +88,18 @@ var falloff : bool = true
 var grid_aligned : bool = false
 var grid_size : int = 1
 
+
+## Single gate for the Grid Aligned control (terrain, brush shape, falloff).
+func grid_align_gate_passes() -> bool:
+	var t := current_terrain_node
+	if t == null:
+		return false
+	if t.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
+		return false
+	if current_brush_index != 2: # Hexagon brush only
+		return false
+	return falloff == false
+
 var should_mask_grass : bool = false
 
 # Currently selected preset for vertex textures (DOES change the global terrain)
@@ -157,7 +169,7 @@ func _enter_tree():
 	instance = self
 	call_deferred("_deferred_enter_tree")
 	
-	print_rich("Welcome to [color=MEDIUM_ORCHID][url=https://www.youtube.com/@yugen_seishin]YÅ«gen[/url][/color]'s [wave]Marching Squares Terrain Authoring Toolkit[/wave]\nThis plugin is under MIT license")
+	print_rich("Welcome to [color=MEDIUM_ORCHID][url=https://www.youtube.com/@yugen_seishin]YÃƒâ€¦Ã‚Â«gen[/url][/color]'s [wave]Marching Squares Terrain Authoring Toolkit[/wave]\nThis plugin is under MIT license")
 
 
 func _deferred_enter_tree() -> void:
@@ -171,7 +183,7 @@ func _safe_initialize() -> bool:
 	if is_initialized:
 		return true
 	
-	if not EngineWrapper.instance.is_editor():
+	if not EngineWrapper.is_editor():
 		initialization_error = "Plugin was initialized during runtime"
 		return false
 	
@@ -544,10 +556,14 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 # Calculates brush pattern and updates current_draw_pattern
 func update_draw_pattern(b_pos: Vector3):
 	var terrain_system : MarchingSquaresTerrain = current_terrain_node
+	var brush_pos : Vector2 = Vector2(b_pos.x, b_pos.z)
+	
+	if terrain_system.grid_type != MarchingSquaresTerrain.GridType.SQUARE:
+		_update_draw_pattern_cells(terrain_system, brush_pos)
+		return
 	
 	var bounds := BrushPatternCalculator.calculate_bounds(b_pos, brush_size, terrain_system)
 	var max_distance : float = BrushPatternCalculator.calculate_max_distance(brush_size, current_brush_index)
-	var brush_pos : Vector2 = Vector2(b_pos.x, b_pos.z)
 	
 	for chunk_z in range(bounds.chunk_tl.y, bounds.chunk_br.y + 1):
 		for chunk_x in range(bounds.chunk_tl.x, bounds.chunk_br.x + 1):
@@ -579,6 +595,52 @@ func update_draw_pattern(b_pos: Vector3):
 							current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
 					else:
 						current_draw_pattern[cursor_chunk_coords][cursor_cell_coords] = sample
+
+
+## Cell-mode variant of update_draw_pattern. Mirrors the gizmo's cell preview.
+func _update_draw_pattern_cells(terrain_system: MarchingSquaresTerrain, brush_pos: Vector2) -> void:
+	var cells := terrain_system.cells_per_chunk()
+	var max_distance : float = BrushPatternCalculator.calculate_max_distance(brush_size, current_brush_index)
+	
+	# Grid aligned selection sets every selected cell to 1.0 (no falloff).
+	if grid_aligned and grid_align_gate_passes():
+		for global in BrushPatternCalculator.grid_aligned_cells(terrain_system, brush_pos, grid_size):
+			var chunk_coords := MarchingSquaresHexGrid.chunk_of_cell(global, cells)
+			if not terrain_system.chunks.has(chunk_coords):
+				continue
+			var local := MarchingSquaresHexGrid.local_cell(global, cells)
+			if not current_draw_pattern.has(chunk_coords):
+				current_draw_pattern[chunk_coords] = {}
+			current_draw_pattern[chunk_coords][local] = 1.0
+		return
+	
+	for chunk_coords: Vector2i in terrain_system.chunks.keys():
+		var candidates := BrushPatternCalculator.cell_candidates_for_chunk(
+			chunk_coords, terrain_system, brush_pos, brush_size, 2)
+		for local: Vector2i in candidates:
+			var global := chunk_coords * cells + local
+			var center := BrushPatternCalculator.cell_center_for(terrain_system, global)
+			var sample : float
+			if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
+				sample = BrushPatternCalculator.tri_cell_sample(
+					brush_pos, center, brush_size, current_brush_index,
+					max_distance, falloff, falloff_curve, terrain_system.cell_size)
+			else:
+				var spacing := MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size)
+				sample = BrushPatternCalculator.hex_cell_sample(
+					brush_pos, center, brush_size, current_brush_index,
+					max_distance, falloff, falloff_curve,
+					MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing), spacing)
+			if sample < 0:
+				continue
+			if not current_draw_pattern.has(chunk_coords):
+				current_draw_pattern[chunk_coords] = {}
+			if current_draw_pattern[chunk_coords].has(local):
+				var prev_sample = current_draw_pattern[chunk_coords][local]
+				if sample > prev_sample:
+					current_draw_pattern[chunk_coords][local] = sample
+			else:
+				current_draw_pattern[chunk_coords][local] = sample
 
 
 func draw_pattern(terrain: MarchingSquaresTerrain):

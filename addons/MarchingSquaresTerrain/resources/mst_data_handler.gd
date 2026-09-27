@@ -49,8 +49,7 @@ static func generate_data_directory(terrain: MarchingSquaresTerrain) -> String:
 	var tree := terrain.get_tree()
 	if not tree:
 		return ""  # Node not in scene tree yet
-	var inst := EngineWrapper.instance
-	var scene_root := inst.get_root_for_node(terrain)
+	var scene_root := EngineWrapper.get_root_for_node(terrain)
 	if not scene_root or scene_root.scene_file_path.is_empty():
 		return ""
 	
@@ -92,9 +91,9 @@ static func copy_recursive(from_path: String, to_path: String) -> void:
 
 ## Check if a terrains data directory is unique
 static func is_data_directory_unique(terrain: MarchingSquaresTerrain) -> bool:
-	if not (EngineWrapper.instance.is_editor() and terrain.is_inside_tree()):
+	if not (EngineWrapper.is_editor() and terrain.is_inside_tree()):
 		return true
-	var scene_root := EngineWrapper.instance.get_root_for_node(terrain)
+	var scene_root := EngineWrapper.get_root_for_node(terrain)
 	var dirs := _collect_terrain_dirs_recursive(scene_root)
 
 	var simplified_path := terrain.data_directory.simplify_path()
@@ -605,7 +604,7 @@ static func _delete_chunk_directory(chunk_dir: String) -> void:
 #region color conversion helpers
 
 ## Convert Color pair to texture index (0-15).
-## Uses the 4×4 vertex color channel encoding system.
+## Uses the 4Ãƒâ€”4 vertex color channel encoding system.
 static func _colors_to_texture_idx(c0: Color, c1: Color) -> int:
 	var c0_idx := 0
 	var c0_max := c0.r
@@ -657,7 +656,7 @@ static func cleanup_orphaned_terrain_directories(terrain: MarchingSquaresTerrain
 	if not tree:
 		return
 	
-	var scene_root := EngineWrapper.instance.get_root_for_node(terrain)
+	var scene_root := EngineWrapper.get_root_for_node(terrain)
 	if not scene_root or scene_root.scene_file_path.is_empty():
 		return
 	

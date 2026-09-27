@@ -43,6 +43,7 @@ var terrain_settings_data : Dictionary = {
 var plugin : MarchingSquaresTerrainPlugin
 var attribute_list : MarchingSquaresToolAttributesList
 var settings : Dictionary = {}
+var settings_controls : Dictionary = {}
 
 var last_setting_type : SettingType = SettingType.ERROR
 var selected_chunk : MarchingSquaresTerrainChunk
@@ -70,6 +71,7 @@ func show_tool_attributes(tool_index: int) -> void:
 	for child in get_children():
 		child.queue_free()
 	settings.clear()
+	settings_controls.clear()
 	
 	if not plugin.toolbar.toolbox:
 		return
@@ -102,6 +104,10 @@ func show_tool_attributes(tool_index: int) -> void:
 		new_attributes.append(attribute_list.flatten)
 	if tool_attributes.falloff:
 		new_attributes.append(attribute_list.falloff)
+	if tool_attributes.grid_aligned:
+		new_attributes.append(attribute_list.grid_aligned)
+	if tool_attributes.grid_size:
+		new_attributes.append(attribute_list.grid_size)
 	if tool_attributes.mask_mode:
 		new_attributes.append(attribute_list.mask_mode)
 	if tool_attributes.material:
@@ -128,7 +134,38 @@ func show_tool_attributes(tool_index: int) -> void:
 	add_child(hbox_container)
 	last_setting_type = SettingType.ERROR # Reset the setting type for correct VSeparators
 	
+	_update_dependency_states()
+	
 	plugin.gizmo_plugin.trigger_redraw(plugin.current_terrain_node)
+
+
+## Whether the Grid Aligned checkbox may be active right now.
+func _can_grid_align() -> bool:
+	var t := plugin.current_terrain_node
+	if t == null:
+		return false
+	if t.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
+		return false
+	if plugin.current_brush_index != 2:
+		return false
+	return plugin.falloff == false
+
+
+## Sync control disabled states with the current plugin state.
+func _update_dependency_states() -> void:
+	if settings_controls.has("grid_aligned"):
+		var checkbox : CheckBox = settings_controls["grid_aligned"]
+		var can_align := _can_grid_align()
+		checkbox.disabled = not can_align
+		if not can_align and plugin.grid_aligned:
+			checkbox.set_pressed_no_signal(false)
+			plugin.grid_aligned = false
+	
+	if settings_controls.has("grid_size"):
+		var size_control = settings_controls["grid_size"]
+		size_control.editable = plugin.grid_aligned
+		size_control.mouse_filter = Control.MOUSE_FILTER_STOP if plugin.grid_aligned else Control.MOUSE_FILTER_IGNORE
+		size_control.modulate = Color(1, 1, 1, 1) if plugin.grid_aligned else Color(1, 1, 1, 0.45)
 
 
 func add_setting(p_params: Dictionary) -> void:
@@ -167,6 +204,7 @@ func add_setting(p_params: Dictionary) -> void:
 				checkbox.button_pressed = saved_setting_value
 			checkbox.toggled.connect(func(pressed): _on_setting_changed(setting_name, pressed))
 			checkbox.set_custom_minimum_size(Vector2(25, 25))
+			settings_controls[setting_name] = checkbox
 			
 			cont = CenterContainer.new()
 			cont.set_custom_minimum_size(Vector2(35, 35))
@@ -200,6 +238,7 @@ func add_setting(p_params: Dictionary) -> void:
 				spin_slider.set_value(default_value)
 				spin_slider.value_changed.connect(func(value): _on_setting_changed(setting_name, value))
 				spin_slider.set_custom_minimum_size(Vector2(80, 35))
+				settings_controls[setting_name] = spin_slider
 				
 				cont.add_theme_constant_override("margin_top", -5)
 				cont.add_child(spin_slider, true)
@@ -211,6 +250,7 @@ func add_setting(p_params: Dictionary) -> void:
 				hslider.set_value(default_value)
 				hslider.value_changed.connect(func(value): _on_setting_changed(setting_name, value))
 				hslider.set_custom_minimum_size(Vector2(80, 35))
+				settings_controls[setting_name] = hslider
 				
 				cont.add_theme_constant_override("margin_right", 10)
 				cont.add_theme_constant_override("margin_left", -3)
@@ -602,6 +642,10 @@ func _get_setting_value(p_setting_name: String) -> Variant:
 			return plugin.flatten
 		"falloff":
 			return plugin.falloff
+		"grid_aligned":
+			return plugin.grid_aligned
+		"grid_size":
+			return plugin.grid_size
 		"mask_mode":
 			return plugin.should_mask_grass
 		"material":

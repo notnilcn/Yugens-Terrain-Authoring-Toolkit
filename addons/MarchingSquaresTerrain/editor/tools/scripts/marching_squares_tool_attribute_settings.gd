@@ -10,6 +10,8 @@ class_name MarchingSquaresToolAttributeSettings
 @export var strength : bool = false
 @export var flatten : bool = false
 @export var falloff : bool = false
+@export var grid_aligned : bool = false
+@export var grid_size : bool = false
 
 # Brush specific attributes
 @export var mask_mode : bool = false

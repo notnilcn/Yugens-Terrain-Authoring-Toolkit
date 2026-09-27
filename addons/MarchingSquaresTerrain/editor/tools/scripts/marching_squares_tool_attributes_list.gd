@@ -56,6 +56,22 @@ var falloff : Dictionary = {
 	"default": true,
 }
 
+var grid_aligned : Dictionary = {
+	"name": "grid_aligned",
+	"type": "checkbox",
+	"label": "Grid Aligned",
+	"default": false,
+}
+
+var grid_size : Dictionary = {
+	"name": "grid_size",
+	"type": "slider",
+	"label": "Grid Size",
+	"range": Vector3(0.0, 20.0, 1.0),
+	"default": 1.0,
+	"tooltip": "Hexagon radius in cells (hex terrain) / hexagon side in triangles (minimum 1) - only used when Grid Aligned is on.",
+}
+
 var mask_mode : Dictionary = {
 	"name": "mask_mode",
 	"type": "checkbox",

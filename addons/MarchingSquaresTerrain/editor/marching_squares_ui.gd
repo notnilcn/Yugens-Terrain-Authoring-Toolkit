@@ -50,7 +50,7 @@ func _enter_tree() -> void:
 
 
 func _deferred_enter_tree() -> void:
-	if not EngineWrapper.instance.is_editor():
+	if not EngineWrapper.is_editor():
 		push_error("Attempt to load during runtime (NOT SUPPORTED IN CURRENT BUILD)")
 		return
 	
@@ -151,6 +151,12 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 				plugin.falloff = p_value
 				if plugin.BRUSH_RADIUS_MATERIAL:
 					plugin.BRUSH_RADIUS_MATERIAL.set_shader_parameter("falloff_visible", p_value)
+		"grid_aligned":
+			if p_value is bool:
+				plugin.grid_aligned = p_value
+		"grid_size":
+			if p_value is float or p_value is int:
+				plugin.grid_size = int(p_value)
 		"strength":
 			if p_value is float or p_value is int:
 				plugin.strength = float(p_value)
@@ -191,6 +197,10 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 		"paint_walls":
 			if p_value is bool:
 				plugin.paint_walls_mode = p_value
+	
+	# Keep dependent controls (Grid Aligned / Grid Size) in sync after any change
+	if tool_attributes:
+		tool_attributes._update_dependency_states()
 
 
 func _on_terrain_setting_changed(p_setting_name: String, p_value: Variant) -> void:

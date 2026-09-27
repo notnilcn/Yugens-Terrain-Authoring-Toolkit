@@ -235,7 +235,7 @@ func _redraw_cell_brush(terrain_system: MarchingSquaresTerrain, pos: Vector3, is
 	var marker := _marker_for(terrain_system)
 	
 	# Grid aligned selection replaces the brush shape entirely (M4).
-	var grid_aligned : bool = terrain_plugin.grid_aligned and _can_grid_align(terrain_system)
+	var grid_aligned : bool = terrain_plugin.grid_aligned and terrain_plugin.grid_align_gate_passes()
 	var selected : Array[Vector2i] = []
 	if grid_aligned:
 		selected = BrushPatternCalculator.grid_aligned_cells(terrain_system, brush_pos, terrain_plugin.grid_size)

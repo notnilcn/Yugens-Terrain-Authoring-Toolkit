@@ -107,7 +107,7 @@ func initialize_terrain(should_regenerate_mesh: bool = true):
 
 
 func _notification(what: int) -> void:
-	if not EngineWrapper.instance.is_editor():
+	if not EngineWrapper.is_editor():
 		return
 	
 	match what:
@@ -167,7 +167,7 @@ func _exit_tree() -> void:
 	_temp_mesh = null
 	_temp_collision_shapes.clear()
 	
-	if EngineWrapper.instance.is_editor():
+	if EngineWrapper.is_editor():
 		for child in get_children():
 			if child is StaticBody3D:
 				child.owner = null
@@ -205,8 +205,8 @@ func _recreate_collision_body() -> void:
 	body.add_child(col_shape)
 	add_child(body)
 	
-	if EngineWrapper.instance.is_editor():
-		var scene_root = EngineWrapper.instance.get_root_for_node(self)
+	if EngineWrapper.is_editor():
+		var scene_root = EngineWrapper.get_root_for_node(self)
 		if scene_root:
 			body.owner = scene_root
 			col_shape.owner = scene_root

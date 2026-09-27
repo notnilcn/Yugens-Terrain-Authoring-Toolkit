@@ -51,7 +51,7 @@ signal grid_type_changed (value : GridType)
 ## Note: Manually setting a path locks the save location even if you rename the terrain node later.
 @export_dir var data_directory : String = "":
 	get():
-		if EngineWrapper.instance.is_editor() and data_directory.is_empty():
+		if EngineWrapper.is_editor() and data_directory.is_empty():
 			var auto_path := MSTDataHandler.generate_data_directory(self)
 			if not auto_path.is_empty():
 				data_directory = auto_path
@@ -93,7 +93,7 @@ var _grid_type : GridType = GridType.SQUARE
 	set(value):
 		dimensions = value
 		terrain_material.set_shader_parameter("chunk_size", value)
-		if EngineWrapper.instance.is_editor():
+		if EngineWrapper.is_editor():
 			emit_signal("chunk_dimensions_changed", value)
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var cell_size : Vector2 = Vector2(2.0, 2.0): # XZ Unit size of each cell
 	set(value):
@@ -516,7 +516,7 @@ func _init() -> void:
 func _notification(what: int) -> void:
 	# Save all dirty chunks to external storage before scene save
 	if what == NOTIFICATION_EDITOR_PRE_SAVE:
-		if EngineWrapper.instance.is_editor():
+		if EngineWrapper.is_editor():
 			MSTDataHandler.save_all_chunks(self)
 
 
@@ -526,11 +526,11 @@ func _enter_tree() -> void:
 
 func _initialize_data_directory() -> void:
 	var copy_from_dir := ""
-	if EngineWrapper.instance.is_editor() and not data_directory.is_empty() and not MSTDataHandler.is_data_directory_unique(self):
+	if EngineWrapper.is_editor() and not data_directory.is_empty() and not MSTDataHandler.is_data_directory_unique(self):
 		copy_from_dir = data_directory
 		data_directory = ""
 	
-	if EngineWrapper.instance.is_editor() and (data_directory.is_empty()):
+	if EngineWrapper.is_editor() and (data_directory.is_empty()):
 		var auto_path := MSTDataHandler.generate_data_directory(self)
 		if not auto_path.is_empty():
 			data_directory = auto_path
@@ -559,7 +559,7 @@ func _deferred_enter_tree() -> void:
 	# Load external data if storage was previously initialized
 	if _storage_initialized:
 		MSTDataHandler.load_terrain_data(self)
-	elif EngineWrapper.instance.is_editor() and MSTDataHandler.needs_migration(self):
+	elif EngineWrapper.is_editor() and MSTDataHandler.needs_migration(self):
 		# Auto-migrate embedded data to external storage (editor only)
 		MSTDataHandler.migrate_to_external_storage(self)
 	
@@ -628,7 +628,7 @@ func cell_chunk_position(coords: Vector2i) -> Vector3:
 
 ## Switch grid modes: save, flush, reload. No undo support for mode switches.
 func _switch_grid_type(value: GridType):
-	if EngineWrapper.instance.is_editor():
+	if EngineWrapper.is_editor():
 		MSTDataHandler.save_all_chunks(self)
 	
 	# Free all chunks without re-saving them. remove_child + free is immediate so
@@ -652,7 +652,7 @@ func _switch_grid_type(value: GridType):
 		if undo_redo:
 			undo_redo.clear_history(false)
 	
-	if EngineWrapper.instance.is_editor():
+	if EngineWrapper.is_editor():
 		MSTDataHandler.load_terrain_data(self)
 		EditorInterface.mark_scene_as_unsaved()
 		set_deferred("_deferred_rebuild_chunks", true)
@@ -775,7 +775,7 @@ func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunkBase, plugin,
 	else:
 		chunk.position = cell_chunk_position(coords)
 	
-	EngineWrapper.instance.set_owner_recursive(chunk)
+	EngineWrapper.set_owner_recursive(chunk)
 	chunk.initialize_terrain(regenerate_mesh)
 	print_verbose("[MST] Added new chunk to terrain system at ", chunk)
 	if plugin:
@@ -812,7 +812,7 @@ func _apply_square_grass_scale(scaled_value: Vector2) -> void:
 
 #region texture (set) functions
 
-# WARNING: this function is currently not being used anymore. [Q] YÃƒâ€¦Ã‚Â«gen: was that intentional?
+# WARNING: this function is currently not being used anymore. [Q] YÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â«gen: was that intentional?
 # This (legacy) function is mainly there to ensure the plugin works on startup in a new project
 func _ensure_textures() -> void:
 	var grass_mat := grass_mesh.material as ShaderMaterial
