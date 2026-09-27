@@ -1,0 +1,55 @@
+# This is a basic workflow to help you get started with Actions
+
+name: UnitTests
+
+# Run on main and public-testing pushes and PRs
+on:
+  push:
+    branches: [ "main", "public-testing" ]
+  pull_request:
+    branches: [ "main", "public-testing" ]
+
+  # Allows running manually
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v6.0.2
+
+      # Runs a single command using the runners shell
+      - name: Run a one-line script
+        run: echo Hello, world!
+
+      - name: GdUnit4 - Test Runner Action
+      # You may pin to the exact commit or the version.
+      # uses: godot-gdunit-labs/gdUnit4-action@0d542d9c846ba19a8be8da2ff9285964977252fa
+        uses: godot-gdunit-labs/gdUnit4-action@v1.3.0
+        with:
+          # The version of Godot in which the tests should be run.
+          godot-version: 4.6.1
+          version: latest
+          # Comma-separated or newline-separated list of directories containing test to execute.
+          paths: tests
+          # The test execution timeout in minutes.
+          warnings-as-errors: false # optional, default is false
+          project_dir: ./ # optional, default is ./
+
+      - name: Fail on missing report
+        run: |
+          shopt -s globstar nullglob
+          files=(./reports/**/*.xml)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "❌ No XML report files found in ./reports/**/*.xml"
+            exit 1
+          else
+            echo "✅ Found ${#files[@]} XML file(s)"
+          fi
+          
