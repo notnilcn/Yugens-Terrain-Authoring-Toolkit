@@ -376,9 +376,20 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		# Check for terrain collision
 		if draw_area_hovered:
 			terrain_hovered = true
-			var chunk_x : int = floor(draw_position.x / (terrain.dimensions.x * terrain.cell_size.x))
-			var chunk_z : int = floor(draw_position.z / (terrain.dimensions.z * terrain.cell_size.y))
-			var chunk_coords := Vector2i(chunk_x, chunk_z)
+			var chunk_coords : Vector2i
+			if terrain.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
+				chunk_coords = Vector2i(
+					floori(draw_position.x / (terrain.dimensions.x * terrain.cell_size.x)),
+					floori(draw_position.z / (terrain.dimensions.z * terrain.cell_size.y)))
+			else:
+				var cells := terrain.cells_per_chunk()
+				var world_pos := Vector2(draw_position.x, draw_position.z)
+				var cell : Vector2i
+				if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
+					cell = MarchingSquaresTriGrid.world_to_cell(world_pos, terrain.cell_size)
+				else:
+					cell = MarchingSquaresHexGrid.world_to_cell(world_pos, MarchingSquaresHexGrid.spacing_for(terrain.cell_size))
+				chunk_coords = MarchingSquaresHexGrid.chunk_of_cell(cell, cells)
 			
 			is_chunk_plane_hovered = true
 			current_hovered_chunk = chunk_coords
@@ -454,14 +465,26 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		return EditorPlugin.AFTER_GUI_INPUT_PASS
 	
 	# Check for hovering over/clicking a new chunk
-	var chunk_plane := Plane(Vector3.UP, Vector3.ZERO)
+	var chunk_plane := Plane(Vector3.UP, terrain.global_position)
 	var intersection := chunk_plane.intersects_ray(_ray_origin, _ray_dir)
 	
 	if intersection:
-		var chunk_x : int = floor(intersection.x / ((terrain.dimensions.x-1) * terrain.cell_size.x))
-		var chunk_z : int = floor(intersection.z / ((terrain.dimensions.z-1) * terrain.cell_size.y))
+		var local_pos := terrain.to_local(intersection)
+		var chunk_coords : Vector2i
+		if terrain.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
+			chunk_coords = Vector2i(
+				floori(local_pos.x / ((terrain.dimensions.x-1) * terrain.cell_size.x)),
+				floori(local_pos.z / ((terrain.dimensions.z-1) * terrain.cell_size.y)))
+		else:
+			var cells := terrain.cells_per_chunk()
+			var world_pos := Vector2(local_pos.x, local_pos.z)
+			var cell : Vector2i
+			if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
+				cell = MarchingSquaresTriGrid.world_to_cell(world_pos, terrain.cell_size)
+			else:
+				cell = MarchingSquaresHexGrid.world_to_cell(world_pos, MarchingSquaresHexGrid.spacing_for(terrain.cell_size))
+			chunk_coords = MarchingSquaresHexGrid.chunk_of_cell(cell, cells)
 		
-		var chunk_coords := Vector2i(chunk_x, chunk_z)
 		var chunk = terrain.chunks.get(chunk_coords)
 		
 		current_hovered_chunk = chunk_coords
@@ -479,7 +502,7 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 			elif chunk:
 				var removed_chunk = terrain.chunks[chunk_coords]
 				get_undo_redo().create_action("remove chunk")
-				get_undo_redo().add_do_method(terrain, "remove_chunk_from_tree", chunk_x, chunk_z, self)
+				get_undo_redo().add_do_method(terrain, "remove_chunk_from_tree", chunk_coords.x, chunk_coords.y, self)
 				get_undo_redo().add_undo_method(terrain, "add_chunk", chunk_coords, removed_chunk, self)
 				get_undo_redo().commit_action()
 				return EditorPlugin.AFTER_GUI_INPUT_STOP
@@ -488,11 +511,11 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 			elif not chunk:
 				# Can add a new chunk here if there is a neighbouring non-empty chunk
 				# Also add if there are no chunks at all in the current terrain system
-				var can_add_empty : bool = terrain.chunks.is_empty() or terrain.has_chunk(chunk_x-1, chunk_z) or terrain.has_chunk(chunk_x+1, chunk_z) or terrain.has_chunk(chunk_x, chunk_z-1) or terrain.has_chunk(chunk_x, chunk_z+1)
+				var can_add_empty : bool = terrain.chunks.is_empty() or terrain.has_chunk(chunk_coords.x-1, chunk_coords.y) or terrain.has_chunk(chunk_coords.x+1, chunk_coords.y) or terrain.has_chunk(chunk_coords.x, chunk_coords.y-1) or terrain.has_chunk(chunk_coords.x, chunk_coords.y+1)
 				if can_add_empty:
 					get_undo_redo().create_action("add chunk")
-					get_undo_redo().add_do_method(terrain, "add_new_chunk", chunk_x, chunk_z, self)
-					get_undo_redo().add_undo_method(terrain, "remove_chunk", chunk_x, chunk_z, self)
+					get_undo_redo().add_do_method(terrain, "add_new_chunk", chunk_coords.x, chunk_coords.y, self)
+					get_undo_redo().add_undo_method(terrain, "remove_chunk", chunk_coords.x, chunk_coords.y, self)
 					get_undo_redo().commit_action()
 					return EditorPlugin.AFTER_GUI_INPUT_STOP
 		

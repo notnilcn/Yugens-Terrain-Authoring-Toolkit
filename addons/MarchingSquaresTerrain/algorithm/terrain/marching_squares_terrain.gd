@@ -82,10 +82,13 @@ signal grid_type_changed (value : GridType)
 ## The cell grid used by this terrain. Square keeps the original
 ## marching-squares behavior; Triangle and Hexagon use per-cell columns.
 @export_custom(PROPERTY_HINT_RANGE, "0, 2", PROPERTY_USAGE_STORAGE) var grid_type : GridType = GridType.SQUARE:
+	get:
+		return _grid_type
 	set(value):
-		if grid_type == value:
+		if _grid_type == value:
 			return
 		_switch_grid_type(value)
+var _grid_type : GridType = GridType.SQUARE
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var dimensions : Vector3i = Vector3i(33, 32, 33): # Total amount of height values in X and Z direction, and total height range
 	set(value):
 		dimensions = value
@@ -637,7 +640,7 @@ func _switch_grid_type(value: GridType):
 			child.queue_free()
 	chunks.clear()
 	
-	grid_type = value
+	_grid_type = value
 	force_batch_update()
 	grid_type_changed.emit(value)
 	

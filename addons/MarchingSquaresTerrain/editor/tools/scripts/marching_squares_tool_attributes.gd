@@ -22,6 +22,7 @@ enum SettingType {
 }
 
 var terrain_settings_data : Dictionary = {
+	"grid_type": "OptionButton",
 	"dimensions": "Vector3i",
 	"cell_size": "Vector2",
 	"blend_mode": "OptionButton",
@@ -516,6 +517,10 @@ func add_setting(p_params: Dictionary) -> void:
 							option_button.add_item("Smoothed Triangles")
 							option_button.add_item("Hard Squares")
 							option_button.add_item("Hard Triangles")
+						elif setting == "grid_type":
+							option_button.add_item("Square")
+							option_button.add_item("Triangle")
+							option_button.add_item("Hexagon")
 						elif setting == "extra_collision_layer":
 							for i in range(24):
 								option_button.add_item(str(i+9))

@@ -381,20 +381,14 @@ func _emit_cell(st: SurfaceTool, local: Vector2i, origin: Vector2) -> void:
 	var offsets := cell_corner_offsets(global)
 	var corner_count := offsets.size()
 	
-	# Top fan around the centroid.
-	st.set_smooth_group(0)
+	# Top fan around the centroid as explicit triangles (center, i, i+1)
 	var center_3d := Vector3(center.x, h, center.y)
-	_emit_top_vertex(st, center_3d, idx)
 	for i in range(corner_count):
-		var p := center + offsets[i]
-		_emit_top_vertex(st, Vector3(p.x, h, p.y), idx)
-	# Fan triangles: center, i, i+1
-	for i in range(corner_count):
-		var i0 := 1 + i
-		var i1 := 1 + (i + 1) % corner_count
-		st.add_index(0)
-		st.add_index(i0)
-		st.add_index(i1)
+		var p0 := center + offsets[i]
+		var p1 := center + offsets[(i + 1) % corner_count]
+		_emit_top_vertex(st, center_3d, idx)
+		_emit_top_vertex(st, Vector3(p0.x, h, p0.y), idx)
+		_emit_top_vertex(st, Vector3(p1.x, h, p1.y), idx)
 	
 	# Walls on edges whose neighbor is lower.
 	var neighbors := edge_neighbors(global)
@@ -429,25 +423,26 @@ func _emit_wall(st: SurfaceTool, idx: int, qa: Vector2, qb: Vector2, h_own: floa
 	var a_high := Vector3(qa.x, h_own, qa.y)
 	var b_high := Vector3(qb.x, h_own, qb.y)
 	
-	var verts := [a_low, a_high, b_high, b_low]
-	for vert in verts:
-		st.set_smooth_group(-1)
-		st.set_uv(Vector2(1, 1))
-		var gp := Vector2(vert.x + origin.x, vert.z + origin.y)
-		st.set_uv2(Vector2(gp.x + gp.y, gp.x + gp.y))
-		st.set_color(wall_color_map_0[idx])
-		st.set_custom(0, wall_color_map_1[idx])
-		st.set_custom(1, _custom1_for(idx, true))
-		st.set_custom(2, _custom2_for(idx, true))
-		st.add_vertex(vert)
-	
-	var base : int = st.get_vertex_count() - 4
-	st.add_index(base + 0)
-	st.add_index(base + 1)
-	st.add_index(base + 2)
-	st.add_index(base + 0)
-	st.add_index(base + 2)
-	st.add_index(base + 3)
+	# Quad (a_low, a_high, b_high, b_low) as two triangles. Winding faces away
+	# from the higher cell.
+	_emit_wall_vertex(st, idx, a_low, origin)
+	_emit_wall_vertex(st, idx, a_high, origin)
+	_emit_wall_vertex(st, idx, b_high, origin)
+	_emit_wall_vertex(st, idx, a_low, origin)
+	_emit_wall_vertex(st, idx, b_high, origin)
+	_emit_wall_vertex(st, idx, b_low, origin)
+
+
+func _emit_wall_vertex(st: SurfaceTool, idx: int, vert: Vector3, origin: Vector2) -> void:
+	st.set_smooth_group(-1)
+	st.set_uv(Vector2(1, 1))
+	var gp := Vector2(vert.x + origin.x, vert.z + origin.y)
+	st.set_uv2(Vector2(gp.x + gp.y, gp.x + gp.y))
+	st.set_color(wall_color_map_0[idx])
+	st.set_custom(0, wall_color_map_1[idx])
+	st.set_custom(1, _custom1_for(idx, true))
+	st.set_custom(2, _custom2_for(idx, true))
+	st.add_vertex(vert)
 
 
 ## CUSTOM1 = Color(grass_mask.r, 0, 0, rl_idx / 15) where rl_idx is the wall

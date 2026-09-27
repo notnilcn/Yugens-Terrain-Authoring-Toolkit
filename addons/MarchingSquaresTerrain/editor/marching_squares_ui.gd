@@ -196,6 +196,9 @@ func _on_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 func _on_terrain_setting_changed(p_setting_name: String, p_value: Variant) -> void:
 	var terrain := plugin.current_terrain_node
 	match p_setting_name:
+		"grid_type":
+			if p_value is int:
+				terrain.grid_type = p_value as MarchingSquaresTerrain.GridType
 		"dimensions":
 			if p_value is Vector3i:
 				terrain.dimensions = p_value

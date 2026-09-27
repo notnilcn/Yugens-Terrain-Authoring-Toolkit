@@ -23,6 +23,9 @@ func _create_gizmo(node: Node):
 			var ret = MarchingSquaresTerrainChunkGizmo.new()
 			_chunk_gizmos[node] = ret
 			return ret
+	elif node is MarchingSquaresCellChunk:
+		# v1: no per-cell handle gizmos for cell modes
+		return null
 	elif node is MarchingSquaresTerrain:
 		if not _terrain_gizmos.has(node):
 			node.tree_exited.connect(func(): _terrain_gizmos.erase(node), CONNECT_ONE_SHOT)
