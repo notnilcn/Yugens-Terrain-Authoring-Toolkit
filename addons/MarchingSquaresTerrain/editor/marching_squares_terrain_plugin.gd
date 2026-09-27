@@ -32,11 +32,13 @@ var _syncing_from_terrain : bool = false
 var BrushMode : Dictionary = {
 	"0" = preload("uid://cg3lvmu68oaaa"),
 	"1" = preload("uid://b6uwsa1vjeb4"),
+	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
 }
 
 var BrushMat : Dictionary = {
 	"0" = preload("uid://dtevocyixqsgv"),
 	"1" = preload("uid://daofaifmtbyak"),
+	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
 }
 
 var current_brush_index : int = 0
@@ -46,6 +48,8 @@ var brush_position : Vector3
 var BRUSH_VISUAL : Mesh = preload("uid://ch6cb07rh0m3l")
 var BRUSH_RADIUS_VISUAL : Mesh = preload("uid://cg3lvmu68oaaa")
 var BRUSH_RADIUS_MATERIAL : ShaderMaterial = preload("uid://dtevocyixqsgv")
+var CELL_HEX_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_cell_visual.tres")
+var CELL_TRI_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/tri_cell_visual.tres")
 @onready var falloff_curve : Curve = preload("uid://c0bexjsfvvcxb")
 #endregion
 
@@ -79,6 +83,10 @@ var strength : float = 1.0
 var height : float = 0.0
 var flatten : bool = true
 var falloff : bool = true
+
+# Grid-aligned painting (cell modes only; see BrushPatternCalculator)
+var grid_aligned : bool = false
+var grid_size : int = 1
 
 var should_mask_grass : bool = false
 
@@ -149,7 +157,7 @@ func _enter_tree():
 	instance = self
 	call_deferred("_deferred_enter_tree")
 	
-	print_rich("Welcome to [color=MEDIUM_ORCHID][url=https://www.youtube.com/@yugen_seishin]Yūgen[/url][/color]'s [wave]Marching Squares Terrain Authoring Toolkit[/wave]\nThis plugin is under MIT license")
+	print_rich("Welcome to [color=MEDIUM_ORCHID][url=https://www.youtube.com/@yugen_seishin]YÅ«gen[/url][/color]'s [wave]Marching Squares Terrain Authoring Toolkit[/wave]\nThis plugin is under MIT license")
 
 
 func _deferred_enter_tree() -> void:
@@ -574,6 +582,9 @@ func update_draw_pattern(b_pos: Vector3):
 
 
 func draw_pattern(terrain: MarchingSquaresTerrain):
+	if terrain.grid_type != MarchingSquaresTerrain.GridType.SQUARE:
+		draw_pattern_cells(terrain)
+		return
 	var undo_redo := MarchingSquaresTerrainPlugin.instance.get_undo_redo()
 	
 	var pattern := {}
@@ -1019,6 +1030,110 @@ func draw_pattern(terrain: MarchingSquaresTerrain):
 			undo_redo.commit_action()
 
 
+#region cell-mode painting
+
+## Cell-mode draw path. Pattern keys are chunk coords -> local cell -> value.
+func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
+	var undo_redo := MarchingSquaresTerrainPlugin.instance.get_undo_redo()
+	var pattern := {}
+	var restore_pattern := {}
+	
+	for draw_chunk_coords: Vector2i in current_draw_pattern.keys():
+		pattern[draw_chunk_coords] = {}
+		restore_pattern[draw_chunk_coords] = {}
+		var chunk : MarchingSquaresCellChunk = terrain.chunks[draw_chunk_coords]
+		if chunk == null:
+			continue
+		var draw_chunk_dict : Dictionary = current_draw_pattern[draw_chunk_coords]
+		for draw_cell_coords: Vector2i in draw_chunk_dict:
+			var sample : float = clamp(draw_chunk_dict[draw_cell_coords], 0.001, 0.999)
+			var global := draw_chunk_coords * terrain.cells_per_chunk() + draw_cell_coords
+			var restore_value = chunk.get_height(draw_cell_coords)
+			var draw_value
+			match mode:
+				TerrainToolMode.LEVEL:
+					draw_value = lerp(restore_value, height, sample)
+				TerrainToolMode.SMOOTH:
+					var total : float = chunk.get_height(draw_cell_coords)
+					var count : float = 1.0
+					for nb in chunk.edge_neighbors(global):
+						var h_nb = terrain.get_cell_height(nb)
+						if h_nb != null:
+							total += h_nb
+							count += 1.0
+					var avg : float = total / count
+					draw_value = lerp(restore_value, avg, sample * strength)
+				TerrainToolMode.BRIDGE:
+					var b_end := Vector2(brush_position.x, brush_position.z)
+					var b_start := Vector2(bridge_start_pos.x, bridge_start_pos.z)
+					var bridge_length := (b_end - b_start).length()
+					if bridge_length < 0.5:
+						return
+					var cell_center := BrushPatternCalculator.cell_center_for(terrain, global)
+					var bridge_dir := (b_end - b_start) / bridge_length
+					var progress := clamp((cell_center - b_start).dot(bridge_dir) / bridge_length, 0.0, 1.0)
+					if ease_value != -1.0:
+						progress = ease(progress, ease_value)
+					draw_value = lerpf(bridge_start_pos.y, brush_position.y, progress)
+				_:
+					# BRUSH tool (fallthrough for any other height tool)
+					if flatten:
+						draw_value = lerp(restore_value, brush_position.y, sample)
+					else:
+						var height_diff := brush_position.y - draw_height
+						draw_value = lerp(restore_value, restore_value + height_diff, sample)
+			restore_pattern[draw_chunk_coords][draw_cell_coords] = restore_value
+			pattern[draw_chunk_coords][draw_cell_coords] = draw_value
+	
+	if pattern.is_empty():
+		return
+	
+	# Regenerate affected chunks and the chunks owning their neighbours' walls.
+	var affected := _collect_cell_affected_chunks(terrain, pattern)
+	
+	_set_vertex_colors(terrain.default_wall_texture)
+	var wall_color_pattern := {}
+	var wall_color_restore := {}
+	for chunk_coords: Vector2i in pattern:
+		wall_color_pattern[chunk_coords] = {}
+		wall_color_restore[chunk_coords] = {}
+		var chunk : MarchingSquaresCellChunk = terrain.chunks[chunk_coords]
+		for cell_coords: Vector2i in pattern[chunk_coords]:
+			wall_color_restore[chunk_coords][cell_coords] = chunk.get_wall_color_0(cell_coords)
+			wall_color_pattern[chunk_coords][cell_coords] = vertex_color_0
+	
+	var do_patterns := {
+		"height": pattern,
+		"wall_color_0": wall_color_pattern,
+	}
+	var undo_patterns := {
+		"height": restore_pattern,
+		"wall_color_0": wall_color_restore,
+	}
+	undo_redo.create_action("terrain cell height draw")
+	undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, do_patterns)
+	undo_redo.add_undo_method(self, "apply_composite_pattern_action", terrain, undo_patterns)
+	undo_redo.commit_action()
+	for chunk in affected:
+		chunk.regenerate_mesh()
+
+
+## Chunks to regenerate for a cell pattern: painted chunks plus neighbours.
+func _collect_cell_affected_chunks(terrain: MarchingSquaresTerrain, pattern: Dictionary) -> Array:
+	var affected : Dictionary = {}
+	for chunk_coords: Vector2i in pattern.keys():
+		affected[chunk_coords] = true
+		for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			affected[chunk_coords + offset] = true
+	var result : Array = []
+	for coords in affected.keys():
+		if terrain.chunks.has(coords):
+			result.append(terrain.chunks[coords])
+	return result
+
+#endregion
+
+
 # For each cell in pattern, raise/lower by y delta
 func draw_height_pattern_action(terrain: MarchingSquaresTerrain, pattern: Dictionary):
 	for draw_chunk_coords: Vector2i in pattern:
@@ -1091,7 +1206,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	# Apply wall colors FIRST (before height changes that create ridge vertices)
 	if patterns.has("wall_color_0") and not composite_disabled:
 		for chunk_coords: Vector2i in patterns.wall_color_0:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.wall_color_0[chunk_coords]:
@@ -1099,7 +1214,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	
 	if patterns.has("wall_color_1") and not composite_disabled:
 		for chunk_coords: Vector2i in patterns.wall_color_1:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.wall_color_1[chunk_coords]:
@@ -1108,7 +1223,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	# Apply height changes (triggers ridge creation which uses wall colors)
 	if patterns.has("height"):
 		for chunk_coords: Vector2i in patterns.height:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.height[chunk_coords]:
@@ -1117,7 +1232,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	# Apply grass mask
 	if patterns.has("grass_mask") and not composite_disabled:
 		for chunk_coords: Vector2i in patterns.grass_mask:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.grass_mask[chunk_coords]:
@@ -1126,7 +1241,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	# Apply ground colors LAST
 	if patterns.has("color_0") and not composite_disabled:
 		for chunk_coords: Vector2i in patterns.color_0:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.color_0[chunk_coords]:
@@ -1134,7 +1249,7 @@ func apply_composite_pattern_action(terrain: MarchingSquaresTerrain, patterns: D
 	
 	if patterns.has("color_1") and not composite_disabled:
 		for chunk_coords: Vector2i in patterns.color_1:
-			var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(chunk_coords)
+			var chunk = terrain.chunks.get(chunk_coords)
 			if chunk:
 				affected_chunks[chunk_coords] = chunk
 				for cell_coords: Vector2i in patterns.color_1[chunk_coords]:
@@ -1346,7 +1461,10 @@ func _set_new_textures(_preset: MarchingSquaresTexturePreset) -> void:
 	EditorInterface.inspect_object(current_terrain_node)
 
 
-func get_cell_normal(chunk: MarchingSquaresTerrainChunk, cell: Vector2i) -> Vector3:
+func get_cell_normal(chunk: MarchingSquaresTerrainChunkBase, cell: Vector2i) -> Vector3:
+	if chunk is MarchingSquaresCellChunk:
+		return _get_cell_normal_cells(chunk, cell)
+	
 	var h_c := chunk.get_height(cell)
 	
 	var x0 := max(cell.x - 1, 0)
@@ -1364,5 +1482,27 @@ func get_cell_normal(chunk: MarchingSquaresTerrainChunk, cell: Vector2i) -> Vect
 	
 	var normal := Vector3(-sx, 1.0, -sz).normalized()
 	return normal
+
+
+## Approximate normal for a cell chunk: slope from the cell to its neighbours.
+func _get_cell_normal_cells(chunk: MarchingSquaresCellChunk, cell: Vector2i) -> Vector3:
+	var terrain := current_terrain_node
+	var global := chunk.chunk_coords * chunk.cells_per_chunk() + cell
+	var center := BrushPatternCalculator.cell_center_for(terrain, global)
+	var h := chunk.get_height(cell)
+	var sum := Vector3.ZERO
+	for nb in chunk.edge_neighbors(global):
+		var h_nb = terrain.get_cell_height(nb)
+		if h_nb == null:
+			continue
+		var dir2 := BrushPatternCalculator.cell_center_for(terrain, nb) - center
+		var dir := Vector3(dir2.x, 0, dir2.y)
+		if dir.length_squared() < 0.000001:
+			continue
+		var normal := Vector3(-dir.x, float(h_nb) - h, -dir.z)
+		sum += normal
+	if sum.length_squared() < 0.000001:
+		return Vector3.UP
+	return (sum + Vector3.UP).normalized()
 
 #endregion
