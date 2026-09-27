@@ -16,6 +16,9 @@ enum StorageMode {
 	RUNTIME,
 }
 
+enum GridType {SQUARE, TRIANGLE, HEX}
+signal grid_type_changed (value : GridType)
+
 @export_category("Storage Options")
 ## The storage mode for terrain data. 
 @export var storage_mode : StorageMode = StorageMode.BAKED:
@@ -33,14 +36,14 @@ enum StorageMode {
 @export var bake_grass : bool = true:
 	set(value):
 		bake_grass = value
-		for chunk : MarchingSquaresTerrainChunk in chunks.values():
+		for chunk in chunks.values():
 			chunk.mark_dirty()
 
 ## If true, storage will include collision data, ignored if storage_mode = RUNTIME
 @export var bake_collision : bool = true:
 	set(value):
 		bake_collision = value
-		for chunk : MarchingSquaresTerrainChunk in chunks.values():
+		for chunk in chunks.values():
 			chunk.mark_dirty()
 
 ## The folder where this terrain's data is saved. 
@@ -76,6 +79,13 @@ enum StorageMode {
 
 #region global terrain settings
 # Terrain Settings
+## The cell grid used by this terrain. Square keeps the original
+## marching-squares behavior; Triangle and Hexagon use per-cell columns.
+@export_custom(PROPERTY_HINT_RANGE, "0, 2", PROPERTY_USAGE_STORAGE) var grid_type : GridType = GridType.SQUARE:
+	set(value):
+		if grid_type == value:
+			return
+		_switch_grid_type(value)
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var dimensions : Vector3i = Vector3i(33, 32, 33): # Total amount of height values in X and Z direction, and total height range
 	set(value):
 		dimensions = value
@@ -95,12 +105,12 @@ enum StorageMode {
 		else:
 			terrain_material.set_shader_parameter("use_hard_textures", false)
 		terrain_material.set_shader_parameter("blend_mode", value)
-		for chunk: MarchingSquaresTerrainChunk in chunks.values():
+		for chunk in chunks.values():
 			chunk.regenerate_all_cells(true)
 @export_custom(PROPERTY_HINT_RANGE, "9, 32", PROPERTY_USAGE_STORAGE) var extra_collision_layer : int = 9:
 	set(value):
 		extra_collision_layer = value
-		for chunk: MarchingSquaresTerrainChunk in chunks.values():
+		for chunk in chunks.values():
 			chunk.regenerate_all_cells(true)
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var wall_threshold : float = 0.0: # Determines what part of the terrain's mesh are walls
 	set(value):
@@ -108,8 +118,7 @@ enum StorageMode {
 		terrain_material.set_shader_parameter("wall_threshold", value)
 		var grass_mat := grass_mesh.material as ShaderMaterial
 		grass_mat.set_shader_parameter("wall_threshold", value)
-		for chunk: MarchingSquaresTerrainChunk in chunks.values():
-			chunk.grass_planter.regenerate_all_cells()
+		_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var ridge_threshold: float = 1.0:
 	set(value):
 		ridge_threshold = value
@@ -137,17 +146,13 @@ enum StorageMode {
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_subdivisions : int = 3:
 	set(value):
 		grass_subdivisions = value
-		for chunk: MarchingSquaresTerrainChunk in chunks.values():
-			chunk.grass_planter.multimesh.instance_count = (dimensions.x-1) * (dimensions.z-1) * grass_subdivisions * grass_subdivisions
-			chunk.grass_planter.regenerate_all_cells()
+		_update_square_grass_subdivisions()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_size : Vector2 = Vector2(1.0, 1.0):
 	set(value):
 		grass_size = value
 		var scale_factor := (cell_size.x + cell_size.y) / 4.0
 		var scaled_value := value * scale_factor
-		for chunk: MarchingSquaresTerrainChunk in chunks.values():
-			chunk.grass_planter.multimesh.mesh.size = scaled_value
-			chunk.grass_planter.multimesh.mesh.center_offset.y = scaled_value.y / 2.0
+		_apply_square_grass_scale(scaled_value)
 #endregion
 
 #region vertex painting texture settings
@@ -161,8 +166,7 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_1", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_1", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_2 : Texture2D = preload("uid://dbnc04k3n0sro"):
 	set(value):
 		texture_2 = value
@@ -173,8 +177,7 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_2", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_2", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_3 : Texture2D = preload("uid://dbnc04k3n0sro"):
 	set(value):
 		texture_3 = value
@@ -185,8 +188,7 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_3", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_3", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_4 : Texture2D = preload("uid://dbnc04k3n0sro"):
 	set(value):
 		texture_4 = value
@@ -197,8 +199,7 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_4", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_4", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_5 : Texture2D = preload("uid://dbnc04k3n0sro"):
 	set(value):
 		texture_5 = value
@@ -209,8 +210,7 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_5", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_5", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_6 : Texture2D = preload("uid://cv87twjgbqq0s"):
 	set(value):
 		texture_6 = value
@@ -221,71 +221,61 @@ enum StorageMode {
 				grass_mat.set_shader_parameter("use_base_color_6", false)
 			else:
 				grass_mat.set_shader_parameter("use_base_color_6", true)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_7 : Texture2D:
 	set(value):
 		texture_7 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_gb", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_8 : Texture2D:
 	set(value):
 		texture_8 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_ga", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_9 : Texture2D:
 	set(value):
 		texture_9 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_br", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_10 : Texture2D:
 	set(value):
 		texture_10 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_bg", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_11 : Texture2D:
 	set(value):
 		texture_11 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_bb", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_12 : Texture2D:
 	set(value):
 		texture_12 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_ba", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_13 : Texture2D:
 	set(value):
 		texture_13 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_ar", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_14 : Texture2D:
 	set(value):
 		texture_14 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_ag", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_15 : Texture2D:
 	set(value):
 		texture_15 = value
 		if not is_batch_updating:
 			terrain_material.set_shader_parameter("vc_tex_ab", value)
-			for chunk: MarchingSquaresTerrainChunk in chunks.values():
-				chunk.grass_planter.regenerate_all_cells()
+			_regenerate_square_grass()
 #endregion
 
 #region grass textures
@@ -552,15 +542,16 @@ func _deferred_enter_tree() -> void:
 	
 	# Populate chunks dictionary from scene children
 	for chunk in get_children():
-		if chunk is MarchingSquaresTerrainChunk:
+		if chunk is MarchingSquaresTerrainChunkBase:
 			if chunk._data_dirty:
 				return
 	chunks.clear()
 	for chunk in get_children():
-		if chunk is MarchingSquaresTerrainChunk:
+		if chunk is MarchingSquaresTerrainChunkBase:
 			chunks[chunk.chunk_coords] = chunk
 			chunk.terrain_system = self
-			chunk.grass_planter = null
+			if chunk is MarchingSquaresTerrainChunk:
+				chunk.grass_planter = null
 	
 	# Load external data if storage was previously initialized
 	if _storage_initialized:
@@ -570,7 +561,7 @@ func _deferred_enter_tree() -> void:
 		MSTDataHandler.migrate_to_external_storage(self)
 	
 	# Initialize all chunks (regenerate mesh/grass from loaded data)
-	for chunk : MarchingSquaresTerrainChunk in chunks.values():
+	for chunk in chunks.values():
 		chunk.initialize_terrain(true)
 		
 	# Apply all persisted textures/colors to this terrain's unique shader materials
@@ -586,13 +577,105 @@ func has_chunk(x: int, z: int) -> bool:
 	return chunks.has(Vector2i(x, z))
 
 
+## Create the chunk node matching the current grid type.
+func make_chunk() -> MarchingSquaresTerrainChunkBase:
+	match grid_type:
+		GridType.TRIANGLE:
+			return MarchingSquaresTriChunk.new()
+		GridType.HEX:
+			return MarchingSquaresHexChunk.new()
+		_:
+			return MarchingSquaresTerrainChunk.new()
+
+
+## Cell counts per chunk for cell modes. Square mode returns Vector2i.ZERO.
+func cells_per_chunk() -> Vector2i:
+	if grid_type == GridType.TRIANGLE:
+		return Vector2i(2 * dimensions.x, dimensions.z)
+	if grid_type == GridType.HEX:
+		return Vector2i(dimensions.x, dimensions.z)
+	return Vector2i.ZERO
+
+
+## Height of a global cell for cell modes. Returns null when the cell's chunk
+## does not exist (used to skip walls at terrain borders).
+func get_cell_height(global_cell: Vector2i) -> Variant:
+	var cells := cells_per_chunk()
+	if cells == Vector2i.ZERO:
+		return null
+	var cc := MarchingSquaresHexGrid.chunk_of_cell(global_cell, cells)
+	var chunk = chunks.get(cc)
+	if chunk == null:
+		return null
+	return chunk.get_height(MarchingSquaresHexGrid.local_cell(global_cell, cells))
+
+
+## World-space origin position of a cell chunk node.
+func cell_chunk_position(coords: Vector2i) -> Vector3:
+	var cells := cells_per_chunk()
+	if grid_type == GridType.TRIANGLE:
+		var p := MarchingSquaresTriGrid.lattice_point(
+			coords.x * dimensions.x, coords.y * dimensions.z, cell_size)
+		return Vector3(p.x, 0, p.y)
+	elif grid_type == GridType.HEX:
+		var p := MarchingSquaresHexGrid.cell_center(coords * cells, MarchingSquaresHexGrid.spacing_for(cell_size))
+		return Vector3(p.x, 0, p.y)
+	return Vector3.ZERO
+
+
+## Switch grid modes: save, flush, reload. No undo support for mode switches.
+func _switch_grid_type(value: GridType):
+	if EngineWrapper.instance.is_editor():
+		MSTDataHandler.save_all_chunks(self)
+	
+	# Free all chunks without re-saving them
+	for child in get_children():
+		if child is MarchingSquaresTerrainChunkBase:
+			child._skip_save_on_exit = true
+			child.owner = null
+			remove_child(child)
+			child.queue_free()
+	chunks.clear()
+	
+	grid_type = value
+	force_batch_update()
+	grid_type_changed.emit(value)
+	
+	# Mode switches clear undo history (scene-relative setup changed)
+	var plugin := MarchingSquaresTerrainPlugin.instance
+	if plugin:
+		var undo_redo := plugin.get_undo_redo()
+		if undo_redo:
+			undo_redo.clear_history(false)
+	
+	if EngineWrapper.instance.is_editor():
+		MSTDataHandler.load_terrain_data(self)
+		EditorInterface.mark_scene_as_unsaved()
+		set_deferred("_deferred_rebuild_chunks", true)
+
+
+func _deferred_rebuild_chunks(_unused: bool) -> void:
+	for chunk in chunks.values():
+		chunk.initialize_terrain(true)
+
+
 func add_new_chunk(chunk_x: int, chunk_z: int, plugin):
 	var chunk_coords := Vector2i(chunk_x, chunk_z)
-	var new_chunk := MarchingSquaresTerrainChunk.new()
+	var new_chunk := make_chunk()
 	new_chunk.name = "Chunk "+str(chunk_coords)
 	new_chunk.terrain_system = self
 	new_chunk.mark_dirty()
 	add_chunk(chunk_coords, new_chunk, plugin, false)
+	
+	if grid_type != GridType.SQUARE:
+		# Cell modes: no border heights to copy. Regenerate neighbours so their
+		# walls face the new chunk.
+		for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			var neighbor = chunks.get(chunk_coords + offset)
+			if neighbor:
+				neighbor.regenerate_mesh()
+		new_chunk.regenerate_mesh()
+		return
 	
 	var chunk_left : MarchingSquaresTerrainChunk = chunks.get(Vector2i(chunk_x-1, chunk_z))
 	if chunk_left:
@@ -619,16 +702,19 @@ func add_new_chunk(chunk_x: int, chunk_z: int, plugin):
 
 func remove_chunk(x: int, z: int, plugin):
 	var chunk_coords := Vector2i(x, z)
-	var chunk : MarchingSquaresTerrainChunk = chunks[chunk_coords]
+	var chunk : MarchingSquaresTerrainChunkBase = chunks[chunk_coords]
 	chunks.erase(chunk_coords)  # Use chunk_coords, not chunk object
 	chunk.free()
+	
+	if grid_type != GridType.SQUARE:
+		_regenerate_neighbor_chunks(chunk_coords)
 	
 	if plugin.selected_chunk and plugin.selected_chunk.chunk_coords == chunk.chunk_coords:
 		var temp_chunk := MarchingSquaresTerrainChunk.new()
 		temp_chunk.chunk_coords = Vector2i(99999, 99999)
 		plugin.selected_chunk = temp_chunk
 		for child in get_children():
-			if child is MarchingSquaresTerrainChunk:
+			if child is MarchingSquaresTerrainChunkBase:
 				plugin.selected_chunk = child
 				break
 	plugin.ui.tool_attributes.show_tool_attributes(plugin.TerrainToolMode.CHUNK_MANAGEMENT)
@@ -638,25 +724,35 @@ func remove_chunk(x: int, z: int, plugin):
 # Remove a chunk but still keep it in memory (so that undo can restore it)
 func remove_chunk_from_tree(x: int, z: int, plugin):
 	var chunk_coords := Vector2i(x, z)
-	var chunk : MarchingSquaresTerrainChunk = chunks[chunk_coords]
+	var chunk : MarchingSquaresTerrainChunkBase = chunks[chunk_coords]
 	chunks.erase(chunk_coords)  # Use chunk_coords, not chunk object
 	chunk._skip_save_on_exit = true  # Prevent mesh save during undo/redo
 	remove_child(chunk)
 	chunk.owner = null
+	
+	if grid_type != GridType.SQUARE:
+		_regenerate_neighbor_chunks(chunk_coords)
 	
 	if plugin.selected_chunk and plugin.selected_chunk.chunk_coords == chunk.chunk_coords:
 		var temp_chunk := MarchingSquaresTerrainChunk.new()
 		temp_chunk.chunk_coords = Vector2i(99999, 99999)
 		plugin.selected_chunk = temp_chunk
 		for child in get_children():
-			if child is MarchingSquaresTerrainChunk:
+			if child is MarchingSquaresTerrainChunkBase:
 				plugin.selected_chunk = child
 				break
 	plugin.ui.tool_attributes.show_tool_attributes(plugin.TerrainToolMode.CHUNK_MANAGEMENT)
 	plugin.gizmo_plugin.trigger_redraw(self)
 
 
-func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunk, plugin, regenerate_mesh: bool = true):
+func _regenerate_neighbor_chunks(chunk_coords: Vector2i) -> void:
+	for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		var neighbor = chunks.get(chunk_coords + offset)
+		if neighbor:
+			neighbor.regenerate_mesh()
+
+
+func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunkBase, plugin, regenerate_mesh: bool = true):
 	chunk.terrain_system = self
 	chunk.chunk_coords = coords
 	chunk._skip_save_on_exit = false  # Reset flag when chunk is re-added (undo restores chunk)
@@ -666,11 +762,14 @@ func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunk, plugin, reg
 	# Use position instead of global_position to avoid "is_inside_tree()" errors
 	# when multiple scenes with MarchingSquaresTerrain are open in editor tabs.
 	# Since chunks are direct children of terrain, position equals global_position.
-	chunk.position = Vector3(
-		coords.x * ((dimensions.x - 1) * cell_size.x),
-		0,
-		coords.y * ((dimensions.z - 1) * cell_size.y)
-	)
+	if grid_type == GridType.SQUARE:
+		chunk.position = Vector3(
+			coords.x * ((dimensions.x - 1) * cell_size.x),
+			0,
+			coords.y * ((dimensions.z - 1) * cell_size.y)
+		)
+	else:
+		chunk.position = cell_chunk_position(coords)
 	
 	EngineWrapper.instance.set_owner_recursive(chunk)
 	chunk.initialize_terrain(regenerate_mesh)
@@ -681,9 +780,35 @@ func add_chunk(coords: Vector2i, chunk: MarchingSquaresTerrainChunk, plugin, reg
 		plugin.ui.tool_attributes.show_tool_attributes(plugin.TerrainToolMode.CHUNK_MANAGEMENT)
 		plugin.gizmo_plugin.trigger_redraw(self)
 
+#region square grass helpers (cell chunks have no grass planter)
+
+## Regenerate grass for every square chunk in this terrain.
+func _regenerate_square_grass() -> void:
+	for chunk in chunks.values():
+		if chunk is MarchingSquaresTerrainChunk:
+			chunk.grass_planter.regenerate_all_cells()
+
+
+## Update grass subdivision counts and regenerate grass (square chunks only).
+func _update_square_grass_subdivisions() -> void:
+	for chunk in chunks.values():
+		if chunk is MarchingSquaresTerrainChunk:
+			chunk.grass_planter.multimesh.instance_count = (dimensions.x - 1) * (dimensions.z - 1) * grass_subdivisions * grass_subdivisions
+			chunk.grass_planter.regenerate_all_cells()
+
+
+## Apply the scaled grass size to every square chunk (cell chunks only).
+func _apply_square_grass_scale(scaled_value: Vector2) -> void:
+	for chunk in chunks.values():
+		if chunk is MarchingSquaresTerrainChunk:
+			chunk.grass_planter.multimesh.mesh.size = scaled_value
+			chunk.grass_planter.multimesh.mesh.center_offset.y = scaled_value.y / 2.0
+
+#endregion square grass helpers
+
 #region texture (set) functions
 
-# WARNING: this function is currently not being used anymore. [Q] Yūgen: was that intentional?
+# WARNING: this function is currently not being used anymore. [Q] YÃƒâ€¦Ã‚Â«gen: was that intentional?
 # This (legacy) function is mainly there to ensure the plugin works on startup in a new project
 func _ensure_textures() -> void:
 	var grass_mat := grass_mesh.material as ShaderMaterial

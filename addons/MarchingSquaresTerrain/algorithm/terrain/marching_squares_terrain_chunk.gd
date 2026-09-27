@@ -1,5 +1,5 @@
 @tool
-extends MeshInstance3D
+extends MarchingSquaresTerrainChunkBase
 class_name MarchingSquaresTerrainChunk
 
 
@@ -13,10 +13,6 @@ const MERGE_MODE = {
 	Mode.SPHERICAL: 20.0,
 }
 
-# These two need to be normal export vars or else godot's internal logic crashes the plugin
-@export var terrain_system : MarchingSquaresTerrain
-@export var chunk_coords : Vector2i = Vector2i.ZERO
-
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var merge_mode : Mode = Mode.POLYHEDRON: # The max height distance between points before a wall is created between them
 	set(mode):
 		merge_mode = mode
@@ -28,20 +24,8 @@ const MERGE_MODE = {
 				grass_mat.set_shader_parameter("is_merge_round", false)
 			merge_threshold = MERGE_MODE[mode]
 			regenerate_all_cells(true)
-@export_storage var height_map : Array # Stores the heights from the heightmap
-#region cell_geometry storage
-# Color maps are now ephemeral and created at runtime
-# Persisted via MSTDataHandler
-var color_map_0 : PackedColorArray # Stores the colors from vertex_color_0 (ground)
-var color_map_1 : PackedColorArray # Stores the colors from vertex_color_1 (ground)
-var wall_color_map_0 : PackedColorArray # Stores the colors for wall vertices (slot encoding channel 0)
-var wall_color_map_1 : PackedColorArray # Stores the colors for wall vertices (slot encoding channel 1)
-var grass_mask_map : PackedColorArray # Stores if a cell should have grass or not
-#endregion
 
 var merge_threshold : float = MERGE_MODE[Mode.POLYHEDRON]
-
-var grass_planter : MarchingSquaresGrassPlanter
 
 var global_position_cached : Vector3 = Vector3.ZERO
 
@@ -65,8 +49,6 @@ var st : SurfaceTool # The surfacetool used to construct the current terrain
 var cell_geometry : Dictionary = {} # Stores all generated tiles so that their geometry can quickly be reused
 
 var needs_update : Array[Array] # Stores which tiles need to be updated because one of their corners' heights was changed.
-var _skip_save_on_exit : bool = false # Set to true when chunk is removed temporarily (undo/redo)
-var _data_dirty : bool = false # Set to true when source data changes, triggers save in MSTDataHandler
 
 #region temporary storage vars
 # Temporary storage for ephemeral resources during scene save
@@ -439,7 +421,7 @@ func generate_height_map():
 		for x in range(dimensions.x):
 			height_map[z][x] = 0.0
 	
-	var noise := terrain_system.noise_hmap
+	var noise : Noise = terrain_system.noise_hmap
 	if noise:
 		for z in range(dimensions.z):
 			for x in range(dimensions.x):
@@ -618,7 +600,7 @@ func _recreate_collision_body() -> void:
 				body.add_to_group(group)
 
 
-func regenerate_all_cells(use_threads: bool):
+func regenerate_all_cells(use_threads: bool = false):
 	for z in range(dimensions.z-1):
 		for x in range(dimensions.x-1):
 			needs_update[z][x] = true

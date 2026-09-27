@@ -7,6 +7,12 @@ extends Resource
 ## Chunk coordinates in the terrain grid
 @export var chunk_coords : Vector2i
 
+## Grid type of the owning terrain (matches MarchingSquaresTerrain.GridType)
+@export var grid_type : int = 0
+
+## Cell count for cell modes (triangle/hex); zero for square chunks
+@export var cell_count : Vector2i = Vector2i.ZERO
+
 ## Merge mode setting 
 @export var merge_mode : int
 

@@ -12,6 +12,23 @@ static func generate_terrain_uid() -> String:
 
 #region directory management
 
+## Per-mode data folder names. Must match MarchingSquaresTerrain.GridType order.
+const MODE_NAMES : Array[String] = ["square", "triangle", "hex"]
+
+
+## Folder name for the terrain's active grid type.
+static func mode_name(terrain: MarchingSquaresTerrain) -> String:
+	var idx : int = terrain.grid_type
+	if idx < 0 or idx >= MODE_NAMES.size():
+		return MODE_NAMES[0]
+	return MODE_NAMES[idx]
+
+
+## Path to the terrain's active grid type data folder.
+static func mode_subdir(terrain: MarchingSquaresTerrain) -> String:
+	return terrain.data_directory.path_join(mode_name(terrain))
+
+
 ## Ensure directory exists, create one if needed.
 static func ensure_directory_exists(path: String) -> bool:
 	if DirAccess.dir_exists_absolute(path):
@@ -114,12 +131,17 @@ static func save_all_chunks(terrain: MarchingSquaresTerrain) -> void:
 		printerr("MSTDataHandler: Failed to create data directory: ", dir_path)
 		return
 	
+	var mode_path := mode_subdir(terrain)
+	if not ensure_directory_exists(mode_path):
+		printerr("MSTDataHandler: Failed to create mode directory: ", mode_path)
+		return
+	
 	# Calculate initial size
-	var initial_size : int = MarchingSquaresFileUtils.get_directory_size_recursive(dir_path)
+	var initial_size : int = MarchingSquaresFileUtils.get_directory_size_recursive(mode_path)
 	
 	var saved_count := 0
 	for chunk_coords in terrain.chunks:
-		var chunk : MarchingSquaresTerrainChunk = terrain.chunks[chunk_coords]
+		var chunk : MarchingSquaresTerrainChunkBase = terrain.chunks[chunk_coords]
 		
 		# Skip chunks being removed during undo/redo
 		if chunk._skip_save_on_exit:
@@ -127,7 +149,7 @@ static func save_all_chunks(terrain: MarchingSquaresTerrain) -> void:
 		
 		# Determine if chunk needs saving:
 		var needs_save : bool = chunk._data_dirty
-		if not needs_save and not metadata_exists(dir_path, chunk_coords):
+		if not needs_save and not metadata_exists(mode_path, chunk_coords):
 			needs_save = true
 		
 		if needs_save:
@@ -136,7 +158,7 @@ static func save_all_chunks(terrain: MarchingSquaresTerrain) -> void:
 			saved_count += 1
 	
 	if saved_count > 0:
-		_report_storage_size_change(terrain, dir_path, initial_size, saved_count)
+		_report_storage_size_change(terrain, mode_path, initial_size, saved_count)
 		terrain._last_storage_mode = terrain.storage_mode
 	
 	# Clean up orphaned chunk directories that no longer exist in scene
@@ -149,8 +171,8 @@ static func save_all_chunks(terrain: MarchingSquaresTerrain) -> void:
 
 
 ## Save chunk data to external file.
-static func save_chunk_resources(terrain: MarchingSquaresTerrain, chunk: MarchingSquaresTerrainChunk) -> void:
-	var dir_path := terrain.data_directory
+static func save_chunk_resources(terrain: MarchingSquaresTerrain, chunk: MarchingSquaresTerrainChunkBase) -> void:
+	var dir_path := mode_subdir(terrain)
 	if dir_path.is_empty():
 		printerr("MSTDataHandler: Cannot save chunk - no valid data directory")
 		return
@@ -160,7 +182,11 @@ static func save_chunk_resources(terrain: MarchingSquaresTerrain, chunk: Marchin
 	ensure_directory_exists(chunk_dir)
 	
 	# Export chunk data 
-	var data : MSTChunkData = export_chunk_data(chunk)
+	var data : MSTChunkData
+	if chunk is MarchingSquaresCellChunk:
+		data = export_cell_chunk_data(chunk)
+	else:
+		data = export_chunk_data(chunk)
 	
 	# Clear ephemeral data based on mode and config
 	var is_baked_mode : bool = terrain.storage_mode == MarchingSquaresTerrain.StorageMode.BAKED
@@ -187,13 +213,17 @@ static func save_chunk_resources(terrain: MarchingSquaresTerrain, chunk: Marchin
 
 ## Load all terrain data from external files.
 static func load_terrain_data(terrain: MarchingSquaresTerrain) -> void:
-	var dir_path := terrain.data_directory
 	print_verbose("MSTDataHandler: load_terrain_data")
+	var dir_path := terrain.data_directory
 	if dir_path.is_empty():
 		return
 	
-	# Scan for chunk directories (format: chunk_X_Y/)
-	var dir := DirAccess.open(dir_path)
+	# Legacy layout: square chunks at the root. Migrate into square/.
+	if terrain.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
+		migrate_root_chunks_to_square(terrain)
+	
+	var mode_path := mode_subdir(terrain)
+	var dir := DirAccess.open(mode_path)
 	if not dir:
 		return
 	
@@ -213,20 +243,53 @@ static func load_terrain_data(terrain: MarchingSquaresTerrain) -> void:
 	if chunk_dirs.is_empty():
 		return
 	
-	print_verbose("MSTDataHandler: Loading ", chunk_dirs.size(), " chunk(s) from ", dir_path)
+	print_verbose("MSTDataHandler: Loading ", chunk_dirs.size(), " chunk(s) from ", mode_path)
 	
 	for coords in chunk_dirs:
+		# Cell modes: create missing chunk nodes so the data has somewhere to go.
+		if terrain.grid_type != MarchingSquaresTerrain.GridType.SQUARE and not terrain.chunks.has(coords):
+			var chunk := terrain.make_chunk()
+			chunk.name = "Chunk " + str(coords)
+			terrain.add_chunk(coords, chunk, null, false)
 		load_chunk_from_directory(terrain, coords)
+
+
+## Move legacy root-level chunk folders into square/. Returns true when the
+## square/ folder exists afterwards.
+static func migrate_root_chunks_to_square(terrain: MarchingSquaresTerrain) -> bool:
+	var dir_path := terrain.data_directory
+	var square_path := dir_path.path_join("square")
+	if DirAccess.dir_exists_absolute(square_path):
+		return true
+	var dir := DirAccess.open(dir_path)
+	if not dir:
+		return false
+	var legacy : Array[String] = []
+	dir.list_dir_begin()
+	var entry_name := dir.get_next()
+	while entry_name != "":
+		if dir.current_is_dir() and entry_name.begins_with("chunk_"):
+			legacy.append(entry_name)
+		entry_name = dir.get_next()
+	dir.list_dir_end()
+	if legacy.is_empty():
+		return false
+	print("MSTDataHandler: Migrating ", legacy.size(), " chunk(s) into square/")
+	if not ensure_directory_exists(square_path):
+		return false
+	for legacy_name in legacy:
+		DirAccess.rename_absolute(dir_path.path_join(legacy_name), square_path.path_join(legacy_name))
+	return true
 
 
 ## Load a single chunk's source data from metadata file.
 static func load_chunk_from_directory(terrain: MarchingSquaresTerrain, coords: Vector2i) -> void:
-	var dir_path := terrain.data_directory
+	var dir_path := mode_subdir(terrain)
 	var chunk_name := "chunk_%d_%d" % [coords.x, coords.y]
 	var chunk_dir := dir_path.path_join(chunk_name)
 	
 	# Mesh, collision, and grass are regenerated separately by the chunk
-	var chunk : MarchingSquaresTerrainChunk = terrain.chunks.get(coords)
+	var chunk : MarchingSquaresTerrainChunkBase = terrain.chunks.get(coords)
 	if not chunk:
 		return
 	
@@ -235,7 +298,10 @@ static func load_chunk_from_directory(terrain: MarchingSquaresTerrain, coords: V
 	if ResourceLoader.exists(metadata_path):
 		var data : MSTChunkData = load(metadata_path)
 		if data:
-			import_chunk_data(chunk, data)
+			if chunk is MarchingSquaresCellChunk:
+				import_cell_chunk_data(chunk, data)
+			else:
+				import_chunk_data(chunk, data)
 	
 	print_verbose("MSTDataHandler: Loaded chunk ", coords)
 
@@ -355,6 +421,89 @@ static func import_chunk_data(chunk: MarchingSquaresTerrainChunk, data: MSTChunk
 
 #endregion
 
+#region cell chunk data export / import
+
+## Export a cell-mode chunk (triangle/hex) to MSTChunkData.
+static func export_cell_chunk_data(chunk: MarchingSquaresCellChunk) -> MSTChunkData:
+	var data := MSTChunkData.new()
+	data.chunk_coords = chunk.chunk_coords
+	data.merge_mode = 0
+	if chunk.terrain_system:
+		data.grid_type = int(chunk.terrain_system.grid_type)
+	data.cell_count = chunk.cells_per_chunk()
+	
+	# Flatten the height array through a duplicate so the chunk keeps its data.
+	data.height_map = Array(chunk.height_map)
+	
+	var cell_count : int = chunk.color_map_0.size()
+	data.ground_texture_idx.resize(cell_count)
+	data.wall_texture_idx.resize(cell_count)
+	data.grass_mask.resize(cell_count)
+	for i in cell_count:
+		data.ground_texture_idx[i] = _colors_to_texture_idx(chunk.color_map_0[i], chunk.color_map_1[i])
+		data.wall_texture_idx[i] = _colors_to_texture_idx(chunk.wall_color_map_0[i], chunk.wall_color_map_1[i])
+		data.grass_mask[i] = 1 if chunk.grass_mask_map[i].r > 0.5 else 0
+	
+	# Ephemeral data for BAKED mode
+	data.mesh = chunk.mesh
+	
+	if chunk.terrain_system and chunk.terrain_system.bake_collision:
+		for child in chunk.get_children():
+			if child is StaticBody3D:
+				for shape_child in child.get_children():
+					if shape_child is CollisionShape3D and shape_child.shape is ConcavePolygonShape3D:
+						data.set_collision_from_shape(shape_child.shape)
+						break
+	
+	# Clear legacy arrays
+	data.color_map_0 = PackedColorArray()
+	data.color_map_1 = PackedColorArray()
+	data.wall_color_map_0 = PackedColorArray()
+	data.wall_color_map_1 = PackedColorArray()
+	data.grass_mask_map = PackedColorArray()
+	
+	return data
+
+
+## Restore a cell-mode chunk from MSTChunkData.
+static func import_cell_chunk_data(chunk: MarchingSquaresCellChunk, data: MSTChunkData) -> void:
+	if not data:
+		printerr("MSTDataHandler: import_cell_chunk_data called with null data")
+		return
+	
+	chunk.chunk_coords = data.chunk_coords
+	chunk.height_map = Array(data.height_map)
+	
+	if data.mesh:
+		chunk.mesh = data.mesh
+	elif chunk.terrain_system.storage_mode == MarchingSquaresTerrain.StorageMode.BAKED:
+		push_warning("Baking enabled, but terrain-resource does not contain mesh data")
+	
+	if chunk.terrain_system.bake_collision and data.collision_faces.is_empty():
+		push_warning("Collision baking enabled, but terrain-resource does not contain collision data")
+	
+	if not data.collision_faces.is_empty():
+		chunk._temp_collision_shapes = [data.get_collision_shape()]
+	
+	var cell_count : int = data.ground_texture_idx.size()
+	chunk.color_map_0.resize(cell_count)
+	chunk.color_map_1.resize(cell_count)
+	chunk.wall_color_map_0.resize(cell_count)
+	chunk.wall_color_map_1.resize(cell_count)
+	chunk.grass_mask_map.resize(cell_count)
+	for i in cell_count:
+		var ground_colors : Array = _texture_idx_to_colors(data.ground_texture_idx[i])
+		chunk.color_map_0[i] = ground_colors[0]
+		chunk.color_map_1[i] = ground_colors[1]
+		
+		var wall_colors : Array = _texture_idx_to_colors(data.wall_texture_idx[i])
+		chunk.wall_color_map_0[i] = wall_colors[0]
+		chunk.wall_color_map_1[i] = wall_colors[1]
+		
+		chunk.grass_mask_map[i] = Color(1, 0, 0, 0) if data.grass_mask[i] > 0 else Color(0, 0, 0, 0)
+
+#endregion
+
 #region migration
 
 ## Check if this terrain needs migration from embedded to external storage.
@@ -398,7 +547,7 @@ static func migrate_to_external_storage(terrain: MarchingSquaresTerrain) -> void
 
 ## Clean up orphaned chunk directories that no longer exist in the scene.
 static func cleanup_orphaned_chunk_files(terrain: MarchingSquaresTerrain) -> void:
-	var dir_path := terrain.data_directory
+	var dir_path := mode_subdir(terrain)
 	if dir_path.is_empty():
 		return
 	
@@ -534,6 +683,10 @@ static func cleanup_orphaned_terrain_directories(terrain: MarchingSquaresTerrain
 	var folder_name := dir.get_next()
 	while folder_name != "":
 		if dir.current_is_dir():
+			# Mode folders under a terrain are never orphaned terrain dirs.
+			if folder_name in MODE_NAMES:
+				folder_name = dir.get_next()
+				continue
 			var res_name := terrain_data_dir.path_join(folder_name).simplify_path()
 			if not active_dirs.has(res_name):
 				orphaned_dirs.append(res_name)
