@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://cphtpklx81l3w"]
 
-[ext_resource type="Script" path="res://addons/cyclops_level_builder/controls/vector3_edit.gd" id="1_lnptu"]
-[ext_resource type="Script" path="res://addons/cyclops_level_builder/controls/numeric_line_edit.gd" id="1_vq40o"]
+[ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/gui/controls/vector3_edit.gd" id="1_lnptu"]
+[ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/gui/controls/numeric_line_edit.gd" id="1_vq40o"]
 
 [node name="vector3_edit" type="HBoxContainer"]
 offset_right = 237.0
