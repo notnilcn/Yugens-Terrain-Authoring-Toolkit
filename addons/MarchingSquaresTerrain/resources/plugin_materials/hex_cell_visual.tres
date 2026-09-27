@@ -1,4 +1,4 @@
-[gd_resource type="ArrayMesh" format=4]
+[gd_resource type="ArrayMesh" format=4 uid="uid://b7eu435a2qe0g"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_adumu"]
 render_priority = 11

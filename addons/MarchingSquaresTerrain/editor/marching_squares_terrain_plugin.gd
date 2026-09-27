@@ -1205,27 +1205,39 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 	
 	_set_vertex_colors(terrain.default_wall_texture)
 	var wall_color_pattern := {}
+	var wall_color_pattern_cc := {}
 	var wall_color_restore := {}
+	var wall_color_restore_cc := {}
 	for chunk_coords: Vector2i in pattern:
 		wall_color_pattern[chunk_coords] = {}
+		wall_color_pattern_cc[chunk_coords] = {}
 		wall_color_restore[chunk_coords] = {}
+		wall_color_restore_cc[chunk_coords] = {}
 		var chunk : MarchingSquaresCellChunk = terrain.chunks[chunk_coords]
 		for cell_coords: Vector2i in pattern[chunk_coords]:
 			wall_color_restore[chunk_coords][cell_coords] = chunk.get_wall_color_0(cell_coords)
+			wall_color_restore_cc[chunk_coords][cell_coords] = chunk.get_wall_color_1(cell_coords)
 			wall_color_pattern[chunk_coords][cell_coords] = vertex_color_0
+			wall_color_pattern_cc[chunk_coords][cell_coords] = vertex_color_1
 	
 	if current_quick_paint:
 		# QUICK PAINT: height + wall, grass and ground textures in one action.
 		_set_vertex_colors(current_quick_paint.wall_texture_slot)
 		var qp_wall_pattern := {}
+		var qp_wall_pattern_cc := {}
 		var qp_wall_restore := {}
+		var qp_wall_restore_cc := {}
 		for chunk_coords: Vector2i in pattern:
 			qp_wall_pattern[chunk_coords] = {}
+			qp_wall_pattern_cc[chunk_coords] = {}
 			qp_wall_restore[chunk_coords] = {}
+			qp_wall_restore_cc[chunk_coords] = {}
 			var chunk : MarchingSquaresCellChunk = terrain.chunks[chunk_coords]
 			for cell_coords: Vector2i in pattern[chunk_coords]:
 				qp_wall_restore[chunk_coords][cell_coords] = chunk.get_wall_color_0(cell_coords)
+				qp_wall_restore_cc[chunk_coords][cell_coords] = chunk.get_wall_color_1(cell_coords)
 				qp_wall_pattern[chunk_coords][cell_coords] = vertex_color_0
+				qp_wall_pattern_cc[chunk_coords][cell_coords] = vertex_color_1
 		
 		var grass_pattern := {}
 		var grass_restore := {}
@@ -1239,26 +1251,36 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 		
 		_set_vertex_colors(current_quick_paint.ground_texture_slot)
 		var qp_color_pattern := {}
+		var qp_color_pattern_cc := {}
 		var qp_color_restore := {}
+		var qp_color_restore_cc := {}
 		for chunk_coords: Vector2i in pattern:
 			qp_color_pattern[chunk_coords] = {}
+			qp_color_pattern_cc[chunk_coords] = {}
 			qp_color_restore[chunk_coords] = {}
+			qp_color_restore_cc[chunk_coords] = {}
 			var chunk : MarchingSquaresCellChunk = terrain.chunks[chunk_coords]
 			for cell_coords: Vector2i in pattern[chunk_coords]:
 				qp_color_restore[chunk_coords][cell_coords] = chunk.get_color_0(cell_coords)
+				qp_color_restore_cc[chunk_coords][cell_coords] = chunk.get_color_1(cell_coords)
 				qp_color_pattern[chunk_coords][cell_coords] = vertex_color_0
+				qp_color_pattern_cc[chunk_coords][cell_coords] = vertex_color_1
 		
 		var qp_do := {
 			"height": pattern,
 			"wall_color_0": qp_wall_pattern,
+			"wall_color_1": qp_wall_pattern_cc,
 			"grass_mask": grass_pattern,
 			"color_0": qp_color_pattern,
+			"color_1": qp_color_pattern_cc,
 		}
 		var qp_undo := {
 			"height": restore_pattern,
 			"wall_color_0": qp_wall_restore,
+			"wall_color_1": qp_wall_restore_cc,
 			"grass_mask": grass_restore,
 			"color_0": qp_color_restore,
+			"color_1": qp_color_restore_cc,
 		}
 		undo_redo.create_action("terrain brush with quick paint")
 		undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, qp_do)
@@ -1271,10 +1293,12 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 	var do_patterns := {
 		"height": pattern,
 		"wall_color_0": wall_color_pattern,
+		"wall_color_1": wall_color_pattern_cc,
 	}
 	var undo_patterns := {
 		"height": restore_pattern,
 		"wall_color_0": wall_color_restore,
+		"wall_color_1": wall_color_restore_cc,
 	}
 	undo_redo.create_action("terrain cell height draw")
 	undo_redo.add_do_method(self, "apply_composite_pattern_action", terrain, do_patterns)
