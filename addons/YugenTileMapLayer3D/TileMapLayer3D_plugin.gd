@@ -29,6 +29,9 @@ var _smart_fill_manager: SmartFillManager = null
 
 var _vertex_edit_manager: VertexEditManager = null
 
+# Yugen port: visual inspector for YugenLayerOrderOverrideRule (dual-grid layer ordering).
+var _layer_order_inspector_plugin: YugenLayerOrderOverrideInspectorPlugin = null
+
 
 var plugin_settings: TilePlacerPluginSettings = null
 
@@ -67,6 +70,9 @@ func _enter_tree() -> void:
 	_sculpt_gizmo_plugin.vertex_edit_manager = _vertex_edit_manager
 
 	add_node_3d_gizmo_plugin(_sculpt_gizmo_plugin)
+
+	_layer_order_inspector_plugin = YugenLayerOrderOverrideInspectorPlugin.new()
+	add_inspector_plugin(_layer_order_inspector_plugin)
 
 
 	plugin_settings = TilePlacerPluginSettings.new()
@@ -170,6 +176,9 @@ func _exit_tree() -> void:
 	if _sculpt_gizmo_plugin:
 		remove_node_3d_gizmo_plugin(_sculpt_gizmo_plugin)
 		_sculpt_gizmo_plugin = null
+	if _layer_order_inspector_plugin:
+		remove_inspector_plugin(_layer_order_inspector_plugin)
+		_layer_order_inspector_plugin = null
 	if _sculpt_manager:
 		_sculpt_manager.reset()
 		_sculpt_manager = null

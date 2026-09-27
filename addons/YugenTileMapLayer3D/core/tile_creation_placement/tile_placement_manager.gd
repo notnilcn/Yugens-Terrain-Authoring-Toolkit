@@ -68,6 +68,23 @@ func remove_tile_everywhere(tile_key: int) -> void:
 		_remove_tile_from_multimesh(tile_key)
 		active_tile_map_layer3d.remove_saved_tile_data(tile_key)
 	_spatial_index.remove_tile(tile_key)
+	_notify_dual_grid_key_changed(tile_key)
+
+
+## Notifies the tile map that a flat FLOOR tile changed so dual-grid variants can refresh.
+func _notify_dual_grid_changed(grid_pos: Vector3, orientation: int) -> void:
+	if not active_tile_map_layer3d:
+		return
+	if orientation != YugenGlobalUtil.TileOrientation.FLOOR:
+		return
+	active_tile_map_layer3d.refresh_dual_grid_neighbourhood(grid_pos)
+
+
+func _notify_dual_grid_key_changed(tile_key: int) -> void:
+	if not active_tile_map_layer3d:
+		return
+	var unpacked: Dictionary = YugenTileKeySystem.unpack_tile_key(tile_key)
+	_notify_dual_grid_changed(unpacked["position"], int(unpacked["orientation"]))
 
 
 ## Emergency recovery for aborted batch operations; normally balance begin/end instead.
@@ -873,11 +890,11 @@ func _do_place_tile(tile_key: int, grid_pos: Vector3, uv_rect: Rect2, orientatio
 	)
 
 	_spatial_index.add_tile(tile_key, grid_pos)
+	_notify_dual_grid_changed(grid_pos, orientation)
 
 
 func _undo_place_tile(tile_key: int) -> void:
 	remove_tile_everywhere(tile_key)
-
 
 func _do_replace_tile_dict(tile_key: int, grid_pos: Vector3, tile_info: PlacedTileInfo) -> void:
 	if active_tile_map_layer3d.has_tile(tile_key):
@@ -942,6 +959,8 @@ func _do_replace_tile_dict(tile_key: int, grid_pos: Vector3, tile_info: PlacedTi
 		data.atlas_coords,
 		data.depth_growth_mode
 	)
+
+	_notify_dual_grid_changed(grid_pos, orientation)
 
 
 func _do_erase_tile(tile_key: int) -> void:

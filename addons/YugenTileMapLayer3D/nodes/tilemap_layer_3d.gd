@@ -82,6 +82,20 @@ var _chunk_shadow_casting: int = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		mst_y_snap_distance = value
 		_update_mst_grid_align()
 
+@export_group("Dual Grid Auto Tile")
+## When enabled, flat FLOOR tiles pick their atlas/UV variant from their XZ neighbours using
+## the dual-grid peering rules. BOX/PRISM, walls, tilts and vertex-edited tiles are untouched.
+@export var dual_grid_auto_tile: bool = false
+## Reverse the default paint order used for generic multi-terrain mixes.
+@export var dual_grid_reverse_order: bool = false
+## Optional bespoke mixes between two terrain ids.
+@export var dual_grid_bespoke_rules: Array[YugenBespokeMixRule] = []
+## Optional layer-order overrides for art-layering edge cases.
+@export var dual_grid_order_rules: Array[YugenLayerOrderOverrideRule] = []
+## Atlas origin of the 4x4 terrain block for the texture-only UV fallback.
+## (-1, -1) derives it from the tile's current UV rect, assuming it is the full variant.
+@export var dual_grid_terrain_block_origin: Vector2i = Vector2i(-1, -1)
+
 
 const ATLAS_COORDS_STRIDE: int = YugenTileMapLayerData.ATLAS_COORDS_STRIDE
 ## Runtime group used to find sibling YugenTileMapLayer3D nodes and warn on shared tile data.
@@ -823,6 +837,100 @@ func update_tile_uv(
 		chunk.set_instance_color(tile_ref.instance_index, Color(1, 1, 1, 1))
 
 	return true
+
+
+## Recomputes dual-grid display variants for the display cells around a changed world tile.
+## Called by the placement manager after painting/erasing a flat FLOOR tile.
+func refresh_dual_grid_neighbourhood(world_grid_pos: Vector3) -> void:
+	if not dual_grid_auto_tile:
+		return
+	var cell := Vector2i(roundi(world_grid_pos.x), roundi(world_grid_pos.z))
+	for offset: Vector2i in YugenDualGridResolver.NEIGHBORS:
+		_apply_dual_grid_variant(cell + offset, world_grid_pos.y)
+
+
+## Terrain id of a flat FLOOR tile at a grid cell, or AUTOTILE_NO_TERRAIN when absent.
+func _dual_grid_terrain_at(cell: Vector2i, layer_y: float) -> int:
+	var key: int = YugenGlobalUtil.make_tile_key(
+		Vector3(float(cell.x), layer_y, float(cell.y)), YugenGlobalUtil.TileOrientation.FLOOR
+	)
+	var index: int = get_tile_index(key)
+	if index < 0:
+		return YugenGlobalConstants.AUTOTILE_NO_TERRAIN
+	var info: PlacedTileInfo = get_tile_info_at_index(index)
+	if info == null:
+		return YugenGlobalConstants.AUTOTILE_NO_TERRAIN
+	if info.mesh_mode != YugenGlobalConstants.MeshMode.FLAT_SQUARE:
+		return YugenGlobalConstants.AUTOTILE_NO_TERRAIN
+	if info.orientation != YugenGlobalUtil.TileOrientation.FLOOR:
+		return YugenGlobalConstants.AUTOTILE_NO_TERRAIN
+	return info.terrain_id
+
+
+func _apply_dual_grid_variant(cell: Vector2i, layer_y: float) -> void:
+	var terrain: int = _dual_grid_terrain_at(cell, layer_y)
+	if terrain == YugenGlobalConstants.AUTOTILE_NO_TERRAIN:
+		return
+
+	var occupancy := func(world_cell: Vector2i) -> int:
+		return _dual_grid_terrain_at(world_cell, layer_y)
+
+	var resolved: Dictionary = YugenDualGridResolver.resolve(cell, occupancy, {
+		"bespoke_rules": dual_grid_bespoke_rules,
+		"order_override_rules": dual_grid_order_rules,
+		"reverse_order": dual_grid_reverse_order,
+	})
+	if resolved["source_id"] != terrain:
+		return
+
+	var variant: Vector2i = resolved["atlas_coords"]
+	if variant.x < 0:
+		return
+
+	var key: int = YugenGlobalUtil.make_tile_key(
+		Vector3(float(cell.x), layer_y, float(cell.y)), YugenGlobalUtil.TileOrientation.FLOOR
+	)
+	var index: int = get_tile_index(key)
+	if index < 0:
+		return
+	var info: PlacedTileInfo = get_tile_info_at_index(index)
+	if info == null:
+		return
+
+	var uv_rect: Rect2 = _dual_grid_uv_for_variant(info, variant)
+	if uv_rect.size.x <= 0.0 or uv_rect.is_equal_approx(info.uv_rect):
+		return
+
+	var atlas_source_id: int = info.atlas_source_id
+	var atlas_coords: Vector2i = info.atlas_coords
+	if get_tileset() != null:
+		atlas_coords = variant
+	update_tile_uv(key, uv_rect, atlas_source_id, atlas_coords)
+
+
+## Resolves the UV rect for a dual-grid variant: TileSet atlas coords when a TileSet is
+## assigned, otherwise the 4x4 terrain block inside the user's texture atlas.
+func _dual_grid_uv_for_variant(info: PlacedTileInfo, variant: Vector2i) -> Rect2:
+	if get_tileset() != null and info.atlas_source_id >= 0:
+		var atlas_uv: Rect2 = TileAtlasResolver.get_uv_rect_for_coords(self, info.atlas_source_id, variant)
+		if atlas_uv.size.x > 0.0:
+			return atlas_uv
+
+	var tile_size: Vector2 = Vector2(TileAtlasResolver.get_tile_size(self))
+	if tile_size.x <= 0.0 or tile_size.y <= 0.0:
+		tile_size = info.uv_rect.size
+	if tile_size.x <= 0.0 or tile_size.y <= 0.0:
+		return Rect2()
+
+	var origin: Vector2i = dual_grid_terrain_block_origin
+	if origin.x < 0 or origin.y < 0:
+		var current_coords := Vector2i(
+			roundi(info.uv_rect.position.x / tile_size.x),
+			roundi(info.uv_rect.position.y / tile_size.y)
+		)
+		origin = YugenDualGridResolver.block_origin_from_full(current_coords)
+	var target: Vector2i = origin + variant
+	return Rect2(Vector2(target) * tile_size, info.uv_rect.size)
 
 func get_shared_material(debug_show_red_backfaces: bool) -> ShaderMaterial:
 	if not _shared_material and tileset_texture:
