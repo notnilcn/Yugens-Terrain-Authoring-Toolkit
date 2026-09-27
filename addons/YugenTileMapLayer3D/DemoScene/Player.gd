@@ -1,0 +1,40 @@
+extends CharacterBody3D
+class_name TestPlayer
+
+var speed:float
+@export var WALK_SPEED:int = 8.0
+const SPRINT_SPEED = 7.0
+const JUMP_VELOCITY = 4.5
+@onready var fps_label_3d: Label3D = %FpsLabel3D
+@onready var player_body: MeshInstance3D = %PlayerBody
+@onready var player_col_shape: CollisionShape3D = %CollisionShape3D
+
+
+
+func _physics_process(delta: float) -> void:
+	fps_label_3d.text = str(Engine.get_frames_per_second())
+	if not is_on_floor():
+		velocity += get_gravity() * delta
+
+	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
+		velocity.y = JUMP_VELOCITY
+	
+	if Input.is_action_pressed("ui_cancel"):
+		speed = SPRINT_SPEED
+	else:
+		speed = WALK_SPEED
+
+	var input_dir:Vector2 = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var direction :Vector3 = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	if is_on_floor():
+		if direction:
+			velocity.x = direction.x * speed
+			velocity.z = direction.z * speed
+		else:
+			velocity.x = lerp(velocity.x, direction.x * speed, delta * 7.0)
+			velocity.z = lerp(velocity.z, direction.z * speed, delta * 7.0)
+	else:
+		velocity.x = lerp(velocity.x, direction.x * speed, delta * 3.0)
+		velocity.z = lerp(velocity.z, direction.z * speed, delta * 3.0)
+	
+	move_and_slide()

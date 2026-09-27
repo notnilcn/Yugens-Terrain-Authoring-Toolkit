@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://blfv8tf6tiv0b"]
+
+[ext_resource type="Script" path="res://addons/YugenCyclopsLevelBuilder/actions/keymap_node.gd" id="1_djsgr"]
+
+[node name="KeymapNode" type="Node"]
+script = ExtResource("1_djsgr")

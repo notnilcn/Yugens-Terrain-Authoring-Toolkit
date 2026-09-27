@@ -1,0 +1,171 @@
+@tool
+class_name TileSetTerrainReader
+extends RefCounted
+
+## Reads terrain data from a Godot TileSet resource. Read-only — never modifies the TileSet.
+
+var _tileset: TileSet
+var _source_id: int
+var _terrain_set: int
+
+
+func _init(tileset: TileSet, source_id: int = YugenGlobalConstants.AUTOTILE_DEFAULT_SOURCE_ID, terrain_set: int = YugenGlobalConstants.AUTOTILE_DEFAULT_TERRAIN_SET) -> void:
+	_tileset = tileset
+	_source_id = source_id
+	_terrain_set = terrain_set
+
+
+func is_valid() -> bool:
+	if _tileset == null:
+		return false
+	if _tileset.get_terrain_sets_count() == 0:
+		return false
+	if _terrain_set >= _tileset.get_terrain_sets_count():
+		return false
+	if _tileset.get_source_count() == 0:
+		return false
+	return true
+
+
+func has_terrains() -> bool:
+	if _tileset == null:
+		return false
+	if _tileset.get_terrain_sets_count() == 0:
+		return false
+	if _terrain_set >= _tileset.get_terrain_sets_count():
+		return false
+	return _tileset.get_terrains_count(_terrain_set) > 0
+
+
+func get_terrains() -> Array[Dictionary]:
+	var terrains: Array[Dictionary] = []
+
+	if _tileset == null:
+		return terrains
+	if _tileset.get_terrain_sets_count() == 0:
+		return terrains
+	if _terrain_set >= _tileset.get_terrain_sets_count():
+		return terrains
+
+	var count: int = _tileset.get_terrains_count(_terrain_set)
+	for i: int in range(count):
+		terrains.append({
+			"id": i,
+			"name": _tileset.get_terrain_name(_terrain_set, i),
+			"color": _tileset.get_terrain_color(_terrain_set, i),
+		})
+
+	return terrains
+
+
+func get_terrain_name(terrain_id: int) -> String:
+	if not is_valid():
+		return ""
+	if terrain_id < 0 or terrain_id >= _tileset.get_terrains_count(_terrain_set):
+		return ""
+	return _tileset.get_terrain_name(_terrain_set, terrain_id)
+
+
+func get_terrain_color(terrain_id: int) -> Color:
+	if not is_valid():
+		return Color.WHITE
+	if terrain_id < 0 or terrain_id >= _tileset.get_terrains_count(_terrain_set):
+		return Color.WHITE
+	return _tileset.get_terrain_color(_terrain_set, terrain_id)
+
+
+func get_atlas() -> TileSetAtlasSource:
+	if _tileset == null:
+		return null
+	if not _tileset.has_source(_source_id):
+		return null
+	var source: TileSetSource = _tileset.get_source(_source_id)
+	if source is TileSetAtlasSource:
+		return source as TileSetAtlasSource
+	return null
+
+
+func get_tile_size() -> Vector2i:
+	if _tileset == null:
+		return YugenGlobalConstants.DEFAULT_TILE_SIZE
+	return _tileset.tile_size
+
+
+func get_texture() -> Texture2D:
+	var atlas: TileSetAtlasSource = get_atlas()
+	if atlas == null:
+		return null
+	return atlas.texture
+
+
+func get_texture_region_size() -> Vector2i:
+	var atlas: TileSetAtlasSource = get_atlas()
+	if atlas == null:
+		return get_tile_size()
+	return atlas.texture_region_size
+
+
+func count_configured_tiles(terrain_id: int) -> int:
+	var atlas: TileSetAtlasSource = get_atlas()
+	if atlas == null:
+		return 0
+
+	var count: int = 0
+	var texture: Texture2D = atlas.texture
+	if texture == null:
+		return 0
+
+	var texture_size: Vector2i = Vector2i(texture.get_size())
+	var region_size: Vector2i = atlas.texture_region_size
+
+	if region_size.x <= 0 or region_size.y <= 0:
+		return 0
+
+	var grid_size := Vector2i(texture_size.x / region_size.x, texture_size.y / region_size.y)
+
+	for y: int in range(grid_size.y):
+		for x: int in range(grid_size.x):
+			var coords := Vector2i(x, y)
+			if not atlas.has_tile(coords):
+				continue
+			var tile_data: TileData = atlas.get_tile_data(coords, 0)
+			if tile_data == null:
+				continue
+			if tile_data.terrain_set == _terrain_set and tile_data.terrain == terrain_id:
+				count += 1
+
+	return count
+
+
+func get_terrain_count() -> int:
+	if _tileset == null:
+		return 0
+	if _tileset.get_terrain_sets_count() == 0:
+		return 0
+	if _terrain_set >= _tileset.get_terrain_sets_count():
+		return 0
+	return _tileset.get_terrains_count(_terrain_set)
+
+
+func has_terrain(terrain_id: int) -> bool:
+	if not is_valid():
+		return false
+	return terrain_id >= 0 and terrain_id < _tileset.get_terrains_count(_terrain_set)
+
+
+func get_terrain_set_mode() -> TileSet.TerrainMode:
+	if not is_valid():
+		return TileSet.TERRAIN_MODE_MATCH_CORNERS_AND_SIDES
+	return _tileset.get_terrain_set_mode(_terrain_set)
+
+
+func get_tileset() -> TileSet:
+	return _tileset
+
+
+func get_source_id() -> int:
+	return _source_id
+
+
+func get_terrain_set() -> int:
+	return _terrain_set
