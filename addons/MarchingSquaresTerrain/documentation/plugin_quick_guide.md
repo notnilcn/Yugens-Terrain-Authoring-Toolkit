@@ -82,5 +82,18 @@ For community showcases, feature requests and bug reporting, please refer to the
   * "Ridge Threshold" controls how close grass sprites get spawned to lowering terrain(cliffs).
   * "Ledge Threshold" controls how close grass sprites get spawned to elevating terrain (walls).
 
+### MST Grid Align (for the bundled ports)
+The addon ships `editor/utils/mst_grid_snap.gd` (`MSTGridSnap`), the shared helper used by
+the bundled Cyclops and TileMapLayer3D ports to snap edits to a terrain lattice:
+
+* Square terrains only in v1 (triangle/hex report as unsupported; callers grey out Grid Align).
+* Snaps to the nearest **lattice vertex or cell center**, scaled by a cell-size multiplier.
+* Optional Y snapping to a user distance (`snappedf`), applied in terrain-local space.
+* All math runs through `terrain.to_local` / `to_global`, so moved, rotated or scaled
+  terrains keep working.
+* Ports point at a terrain through their own UI (Cyclops: **Snap > Use Selected Terrain**;
+  TileMapLayer3D: the node's **MST Grid Align** export group). Nothing in the MST addon
+  depends on the ports.
+
 ## License (MIT)
 Feel free to use, improve and change this plugin according to your needs, but include a copyright mention to the original project and author.

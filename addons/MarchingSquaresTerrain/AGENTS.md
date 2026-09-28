@@ -10,7 +10,7 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 | `editor/marching_squares_ui.gd` | Dock UI; builds tool settings from attribute dictionaries and forwards changes to the plugin. |
 | `editor/gizmos/` | `MarchingSquaresTerrainGizmo` (brush/selection drawing), `MarchingSquaresTerrainChunkGizmo`, `MarchingSquaresTerrainCellChunkGizmo` (per-cell height handles), and the gizmo plugin that registers them. |
 | `editor/tools/scripts/` | Tool resources + attribute system: `MarchingSquaresTool`, `MarchingSquaresToolbox`, `MarchingSquaresToolbar`, `MarchingSquaresToolAttributes(+List,+Settings)`, texture presets/lists/names/quick paints, geometry baker. |
-| `editor/utils/` | `BrushPatternCalculator` (brush sampling, `grid_aligned_cells`, `grid_aligned_outline`), `EngineWrapper` (editor-vs-runtime helpers), file utils. |
+| `editor/utils/` | `BrushPatternCalculator` (brush sampling, `grid_aligned_cells`, `grid_aligned_outline`), `MSTGridSnap` (shared square-lattice snapping helper for the bundled ports), `EngineWrapper` (editor-vs-runtime helpers), file utils. |
 | `algorithm/terrain/marching_squares_terrain.gd` | `MarchingSquaresTerrain` (`Node3D`): `GridType {SQUARE, TRIANGLE, HEX}`, chunk lifecycle, data directory, save hooks. |
 | `algorithm/terrain/marching_squares_terrain_chunk.gd` | Original square marching-squares chunk. |
 | `algorithm/terrain/marching_squares_terrain_chunk_base.gd` | `MarchingSquaresTerrainChunkBase`: shared virtual API for all chunk types (heights, colors, dirty flag). |
@@ -56,5 +56,5 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 ## Verification
 
 - Parse/import check from the repo root: `godot --headless --editor --quit --path .` (see the root `AGENTS.md` for the local Godot binary).
-- Headless behaviour tests: `godot --headless --path . --script res://tests/run_grid_tests.gd` (also `run_cell_chunk_tests`, `run_brush_tests`, `run_grid_align_tests`, `run_merge_tests`, `run_bridge_smooth_tests`, `run_tool_tests`, `run_cell_save_tests`, `run_perf_tests`). They print `PASSED`/`FAILED` and exit non-zero on failure.
+- Headless behaviour tests: `godot --headless --path . --script res://tests/run_grid_tests.gd` (also `run_cell_chunk_tests`, `run_brush_tests`, `run_grid_align_tests`, `run_merge_tests`, `run_bridge_smooth_tests`, `run_tool_tests`, `run_cell_save_tests`, `run_perf_tests`, `run_mst_snap_tests`). They print `PASSED`/`FAILED` and exit non-zero on failure.
 - Windowed only (the dummy renderer has no MultiMesh readback): `run_cell_grass_tests.gd`; visual captures use `capture_*.gd -- --capture` and save PNGs to `user://`.
