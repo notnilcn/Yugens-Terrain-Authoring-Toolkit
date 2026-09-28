@@ -3,11 +3,42 @@ class_name BrushPatternCalculator
 
 ## Calculates which cells fall within a brush and their falloff samples.
 ## Used by both plugin (for editing) and gizmo (for visualization).
+
+# Normalized hexagon SDF constants (2 / sqrt(3) and 1 / sqrt(3)).
+const HEXAGON_SIDE_SCALE : float = 1.1547005383792517
+const HEXAGON_EDGE_SCALE : float = 0.5773502691896258
+const COS_30 : float = 0.8660254037844386
+const SIN_30 : float = 0.5
+
+
 class BrushBounds:
 	var chunk_tl : Vector2i
 	var chunk_br : Vector2i
 	var cell_tl : Vector2i
 	var cell_br : Vector2i
+
+
+## True for the Hexagon and Hexagon30 brush shapes.
+static func is_hexagon_brush(brush_index: int) -> bool:
+	return brush_index == 2 or brush_index == 3
+
+
+## True when the hexagon brush is rotated 30 degrees (flat-top).
+static func is_rotated_hexagon(brush_index: int) -> bool:
+	return brush_index == 3
+
+
+static func _rotate_30(v: Vector2) -> Vector2:
+	return Vector2(v.x * COS_30 + v.y * SIN_30, -v.x * SIN_30 + v.y * COS_30)
+
+
+## Pointy-top hexagon field in normalized space: <= 1 is inside, > 1 outside.
+## Rotating the sample point by 30 degrees yields the flat-top (Hexagon30) shape.
+static func hexagon_field(uv: Vector2, rotated_30: bool) -> float:
+	if rotated_30:
+		uv = _rotate_30(uv)
+	return maxf(absf(uv.y), maxf(absf(uv.x) * HEXAGON_SIDE_SCALE,
+		absf(uv.y) + absf(uv.x) * HEXAGON_EDGE_SCALE))
 
 
 static func calculate_bounds(pos: Vector3, brush_size: float, terrain: MarchingSquaresTerrain) -> BrushBounds:
@@ -49,6 +80,8 @@ static func calculate_max_distance(brush_size: float, brush_index: int) -> float
 			max_distance *= max_distance * 2
 		2: # Hexagon brush (pointy-top)
 			max_distance *= max_distance
+		3: # Hexagon30 brush (flat-top)
+			max_distance *= max_distance
 	return max_distance
 
 
@@ -62,11 +95,10 @@ static func calculate_falloff_sample(
 	falloff_curve: Curve
 	) -> float:
 	
-	if brush_index == 2:
-		# Pointy-top hexagon test in normalized brush space.
+	if is_hexagon_brush(brush_index):
+		# Hexagon test in normalized brush space.
 		var uv := (world_pos - brush_pos) / (brush_size * 0.5)
-		var h := maxf(absf(uv.y), maxf(absf(uv.x) * 1.1547005383792517,
-										absf(uv.y) + absf(uv.x) * 0.5773502691896258))
+		var h := hexagon_field(uv, is_rotated_hexagon(brush_index))
 		if h > 1.0:
 			return -1.0  # Outside brush
 		if not use_falloff:
@@ -125,13 +157,18 @@ static func hex_cell_sample(
 	center_cell : Vector2i,
 	spacing : Vector2
 	) -> float:
-	if brush_index == 2:
-		# Continuous hex distance in cell space.
+	if is_hexagon_brush(brush_index):
+		# Continuous hex distance in cell space around the cell under the
+		# brush. Cell centers sit on a pointy-top odd-r lattice where
+		# world X = spacing.x * (q + r / 2) and world Z = spacing.y * r, so
+		# the axial delta is (dx / sx - 0.5 * dz / sz, dz / sz).
 		var center_pos := MarchingSquaresHexGrid.cell_center(center_cell, spacing)
 		var d_pos := cell_pos - center_pos
+		if is_rotated_hexagon(brush_index):
+			d_pos = _rotate_30(d_pos)
 		var d_cell_f := Vector2(
-			d_pos.x / spacing.x,
-			d_pos.y / spacing.y - 0.5 * absf(d_pos.x) / spacing.x)
+			d_pos.x / spacing.x - 0.5 * d_pos.y / spacing.y,
+			d_pos.y / spacing.y)
 		var dist := maxf(absf(d_cell_f.x), maxf(absf(d_cell_f.y), absf(d_cell_f.x + d_cell_f.y)))
 		var radius_cells : float = brush_size / spacing.x * 0.5 + 0.5
 		if dist > radius_cells:
@@ -155,10 +192,12 @@ static func tri_cell_sample(
 	falloff_curve : Curve,
 	cell_size : Vector2
 	) -> float:
-	if brush_index == 2:
-		var af := MarchingSquaresTriGrid.lattice_floats(cell_pos - brush_pos, cell_size)
-		var h := maxf(absf(af.y), maxf(absf(af.x) * 1.1547005383792517,
-										absf(af.y) + absf(af.x) * 0.5773502691896258))
+	if is_hexagon_brush(brush_index):
+		var rel := cell_pos - brush_pos
+		if is_rotated_hexagon(brush_index):
+			rel = _rotate_30(rel)
+		var af := MarchingSquaresTriGrid.lattice_floats(rel, cell_size)
+		var h := hexagon_field(af, false)
 		var radius_lattice : float = brush_size / cell_size.x * 0.5
 		if h > radius_lattice:
 			return -1.0
@@ -226,9 +265,9 @@ static func grid_aligned_cells(terrain: MarchingSquaresTerrain, brush_pos: Vecto
 
 ## Outline that exactly encloses a grid-aligned selection:
 ## { "center": Vector2, "radius": float, "rotation": float (radians around Y) }.
-## The hexagon outline visual is pointy-top in UV space; on triangle terrain the
-## lattice hexagons are flat-top (corners on the X axis) so a 30 degree rotation
-## aligns the outline with the selected triangles.
+## The hexagon outline visual is pointy-top in UV space; the cell-mode lattice
+## hexagons are flat-top (corners on the X axis) so a 30 degree rotation aligns
+## the outline with the selected cells on both triangle and hex terrain.
 static func grid_aligned_outline(terrain: MarchingSquaresTerrain, brush_pos: Vector2, grid_size: int) -> Dictionary:
 	if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
 		var lattice := MarchingSquaresTriGrid.nearest_lattice_point(brush_pos, terrain.cell_size)
@@ -244,7 +283,7 @@ static func grid_aligned_outline(terrain: MarchingSquaresTerrain, brush_pos: Vec
 	return {
 		"center": center,
 		"radius": float(maxi(grid_size, 0)) * spacing.x + MarchingSquaresHexGrid.radius_for(terrain.cell_size),
-		"rotation": 0.0,
+		"rotation": deg_to_rad(30.0),
 	}
 
 #endregion

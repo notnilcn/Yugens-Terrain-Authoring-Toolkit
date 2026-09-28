@@ -11,11 +11,11 @@ For community showcases, feature requests and bug reporting, please refer to the
 
 ### Brush Tool
 * Used to elevate or lower terrain.
-  * The brush shape can be set to Round, Square or Hexagon.
+  * The brush shape can be set to Round, Square, Hexagon or Hexagon30 (a hexagon rotated 30 degrees).
   * Holding **[SHIFT]** and pressing **[LEFT MOUSE BUTTON]** with most brush tools selected will keep adding terrain to the selection even after letting go of the original mouse click.
   * In the same fashion as above, holding **[SHIFT]** and using the **[SCROLL WHEEL]** decreases and increases the current brush size.
   * You can also press **[ALT]**, **[ESC]** or **[RMB]** to deselect the current draw selection.
-  * On Triangle or Hexagon terrain, using the Hexagon brush with Falloff off enables
+  * On Triangle or Hexagon terrain, using the Hexagon or Hexagon30 brush with Falloff off enables
     **Grid Aligned** painting: the brush selects whole cells (`Grid Size` hexagon
     radius/side) instead of a soft round area.
 

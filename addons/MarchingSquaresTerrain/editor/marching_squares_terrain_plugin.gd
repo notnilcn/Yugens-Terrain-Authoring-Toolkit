@@ -29,16 +29,20 @@ var selected_chunk : MarchingSquaresTerrainChunkBase
 var _syncing_from_terrain : bool = false
 
 #region brush variables
+# Hexagon30 (index 3) reuses the pointy-top hexagon visual; the gizmo rotates
+# its transform by 30 degrees so it renders flat-top.
 var BrushMode : Dictionary = {
 	"0" = preload("uid://cg3lvmu68oaaa"),
 	"1" = preload("uid://b6uwsa1vjeb4"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
+	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
 }
 
 var BrushMat : Dictionary = {
 	"0" = preload("uid://dtevocyixqsgv"),
 	"1" = preload("uid://daofaifmtbyak"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
+	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
 }
 
 var current_brush_index : int = 0
@@ -96,7 +100,7 @@ func grid_align_gate_passes() -> bool:
 		return false
 	if t.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
 		return false
-	if current_brush_index != 2: # Hexagon brush only
+	if not BrushPatternCalculator.is_hexagon_brush(current_brush_index):
 		return false
 	return falloff == false
 
@@ -477,7 +481,10 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 		
 		if draw_area_hovered and event is InputEventMouseMotion:
 			brush_position = draw_position
-			if is_drawing and (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING or mode == TerrainToolMode.GRASS_MASK):
+			# Smooth and vertex paint apply continuously while dragging. The
+			# other brush tools accumulate a selection in current_draw_pattern
+			# (through the gizmo) and apply it once on release.
+			if is_drawing and (mode == TerrainToolMode.SMOOTH or mode == TerrainToolMode.VERTEX_PAINTING):
 				draw_pattern(terrain)
 				current_draw_pattern.clear()
 		

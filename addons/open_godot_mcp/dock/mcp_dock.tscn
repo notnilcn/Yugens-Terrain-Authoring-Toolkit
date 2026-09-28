@@ -228,12 +228,14 @@ sk-yyy"
 [node name="AgnesVision" type="CheckButton" parent="Scroll/VBox/AgnesSection" unique_id=807338493]
 layout_mode = 2
 size_flags_horizontal = 3
+button_pressed = true
 text = "Vision (see images)"
 text_overrun_behavior = 3
 
 [node name="AgnesImageGen" type="CheckButton" parent="Scroll/VBox/AgnesSection" unique_id=932555397]
 layout_mode = 2
 size_flags_horizontal = 3
+button_pressed = true
 text = "Image generation"
 text_overrun_behavior = 3
 
@@ -300,14 +302,13 @@ autowrap_mode = 3
 [node name="ProjectConfigCheck" type="CheckButton" parent="Scroll/VBox/ConfigLocationSection" unique_id=184629742]
 layout_mode = 2
 size_flags_horizontal = 3
-button_pressed = true
 text = "Use project-level config"
 text_overrun_behavior = 3
 
 [node name="ConfigPathLabel" type="Label" parent="Scroll/VBox/ConfigLocationSection" unique_id=74497624]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Path: C:/Users/Clinton/OneDrive/g/main/client/.open_godot_mcp/config.json"
+text = "Path: C:\\Users\\Clinton/.open_godot_mcp/config.json"
 autowrap_mode = 3
 
 [node name="SaveBtn" type="Button" parent="Scroll/VBox" unique_id=765558170]
@@ -330,5 +331,5 @@ autowrap_mode = 3
 [node name="ConfigHelpLabel" type="Label" parent="Scroll/VBox" unique_id=989278637]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Config stored in this project. Add .open_godot_mcp/ to .gitignore to protect API keys."
+text = "Config stored in your home folder, outside any project repo."
 autowrap_mode = 3

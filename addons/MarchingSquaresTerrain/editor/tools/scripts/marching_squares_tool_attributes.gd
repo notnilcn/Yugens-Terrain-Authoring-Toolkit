@@ -146,7 +146,7 @@ func _can_grid_align() -> bool:
 		return false
 	if t.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
 		return false
-	if plugin.current_brush_index != 2:
+	if not BrushPatternCalculator.is_hexagon_brush(plugin.current_brush_index):
 		return false
 	return plugin.falloff == false
 

@@ -184,12 +184,16 @@ func _test_gate_rules(_terrain: MarchingSquaresTerrain) -> void:
 	var cases := [
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 2, "falloff": false, "expect": true},
 		{"grid": MarchingSquaresTerrain.GridType.TRIANGLE, "brush": 2, "falloff": false, "expect": true},
+		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 3, "falloff": false, "expect": true},
+		{"grid": MarchingSquaresTerrain.GridType.TRIANGLE, "brush": 3, "falloff": false, "expect": true},
 		{"grid": MarchingSquaresTerrain.GridType.SQUARE, "brush": 2, "falloff": false, "expect": false},
+		{"grid": MarchingSquaresTerrain.GridType.SQUARE, "brush": 3, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 0, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 1, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 2, "falloff": true, "expect": false},
+		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 3, "falloff": true, "expect": false},
 	]
 	for case in cases:
 		var passes : bool = case["grid"] != MarchingSquaresTerrain.GridType.SQUARE \
-			and case["brush"] == 2 and case["falloff"] == false
+			and BPC.is_hexagon_brush(case["brush"]) and case["falloff"] == false
 		_check(passes == case["expect"], "gate %s" % str(case))

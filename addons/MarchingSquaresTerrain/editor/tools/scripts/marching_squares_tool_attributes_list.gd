@@ -6,7 +6,7 @@ var brush_type : Dictionary = {
 	"name": "brush_type",
 	"type": "option",
 	"label": "Brush Type",
-	"options": ["Round", "Square", "Hexagon"],
+	"options": ["Round", "Square", "Hexagon", "Hexagon30"],
 	"default": 0,
 }
 
@@ -69,7 +69,7 @@ var grid_size : Dictionary = {
 	"label": "Grid Size",
 	"range": Vector3(0.0, 20.0, 1.0),
 	"default": 1.0,
-	"tooltip": "Hexagon radius in cells (hex terrain) / hexagon side in triangles (minimum 1) - only used when Grid Aligned is on.",
+	"tooltip": "Hexagon/Hexagon30 radius in cells (hex terrain) / hexagon side in triangles (minimum 1) - only used when Grid Aligned is on.",
 }
 
 var mask_mode : Dictionary = {

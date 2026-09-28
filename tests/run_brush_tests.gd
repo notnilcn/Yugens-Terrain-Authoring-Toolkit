@@ -19,6 +19,8 @@ func _initialize() -> void:
 	_test_hex_brush_square_terrain(terrain)
 	_test_hex_sampling(terrain)
 	_test_tri_sampling(terrain)
+	_test_hex_brush_disk(terrain)
+	_test_hex30_sampling(terrain)
 	_test_grid_aligned_sets(terrain)
 	_test_pattern_application(terrain)
 	
@@ -51,6 +53,15 @@ func _test_hex_brush_square_terrain(_terrain: MarchingSquaresTerrain) -> void:
 	_check(corner_sample < 0, "hex brush bounding-box corner is outside")
 	var edge_sample := BPC.calculate_falloff_sample(Vector2(0, 4.9), Vector2(0, 0), 10.0, 2, max_d, false, curve)
 	_check(edge_sample > 0, "hex brush top edge is inside")
+	# Hexagon30 is the same hexagon rotated 30 degrees: an X vertex instead of
+	# the pointy-top Y vertex.
+	var max_d30 := BPC.calculate_max_distance(10.0, 3)
+	var x_vertex_hex := BPC.calculate_falloff_sample(Vector2(4.9, 0), Vector2(0, 0), 10.0, 2, max_d, false, curve)
+	var x_vertex_hex30 := BPC.calculate_falloff_sample(Vector2(4.9, 0), Vector2(0, 0), 10.0, 3, max_d30, false, curve)
+	var y_vertex_hex := BPC.calculate_falloff_sample(Vector2(0, 4.9), Vector2(0, 0), 10.0, 2, max_d, false, curve)
+	var y_vertex_hex30 := BPC.calculate_falloff_sample(Vector2(0, 4.9), Vector2(0, 0), 10.0, 3, max_d30, false, curve)
+	_check(x_vertex_hex < 0 and x_vertex_hex30 > 0, "hexagon30 reaches the X vertex")
+	_check(y_vertex_hex > 0 and y_vertex_hex30 < 0, "hexagon30 excludes the Y vertex")
 	# Round/square results unchanged.
 	var round_sample := BPC.calculate_falloff_sample(Vector2(0, 0), Vector2(0, 0), 10.0, 0, BPC.calculate_max_distance(10.0, 0), false, curve)
 	_check(round_sample == 1.0, "round brush center sample unchanged")
@@ -83,6 +94,70 @@ func _test_tri_sampling(terrain: MarchingSquaresTerrain) -> void:
 	var far := TriGrid.cell_center(Vector2i(30, 30), terrain.cell_size)
 	var far_sample := BPC.tri_cell_sample(center, far, 12.0, 0, max_d, false, curve, terrain.cell_size)
 	_check(far_sample < 0, "tri far cell excluded")
+	# Hexagon30 must stay usable on triangle terrain too.
+	var max_d30 := BPC.calculate_max_distance(12.0, 3)
+	var center30 := BPC.tri_cell_sample(center, center, 12.0, 3, max_d30, false, curve, terrain.cell_size)
+	_check(center30 == 1.0, "tri hexagon30 cell at brush center samples 1.0")
+	var far30 := BPC.tri_cell_sample(center, far, 12.0, 3, max_d30, false, curve, terrain.cell_size)
+	_check(far30 < 0, "tri hexagon30 far cell excluded")
+
+
+## The non-grid-aligned hexagon brush must select whole hex rings: every cell
+## within the brush radius is inside and the next ring is outside. This guards
+## the axial distance conversion that previously sheared the shape.
+func _test_hex_brush_disk(terrain: MarchingSquaresTerrain) -> void:
+	terrain.grid_type = MarchingSquaresTerrain.GridType.HEX
+	var spacing := HexGrid.spacing_for(terrain.cell_size)
+	var curve := Curve.new(); curve.add_point(Vector2(0, 0)); curve.add_point(Vector2(1, 1))
+	var brush_size := 12.0
+	var max_d := BPC.calculate_max_distance(brush_size, 2)
+	var center_cell := Vector2i(3, 3)
+	var center := HexGrid.cell_center(center_cell, spacing)
+	# radius_cells = brush_size / spacing.x * 0.5 + 0.5 = 3.5 at cell_size 2.
+	for cell in HexGrid.cells_in_hex_radius(center_cell, 4):
+		var dist := HexGrid.hex_distance(cell, center_cell)
+		var sample := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 2, max_d, false, curve, center_cell, spacing)
+		if dist <= 3:
+			_check(sample == 1.0, "hexagon brush selects distance-%d cell %s" % [dist, cell])
+		else:
+			_check(sample < 0.0, "hexagon brush excludes distance-%d cell %s" % [dist, cell])
+
+
+## Hexagon30 selects a rotated hexagon: same center, different cell set, and
+## the metric is symmetric under the lattice's 60 degree rotations.
+func _test_hex30_sampling(terrain: MarchingSquaresTerrain) -> void:
+	terrain.grid_type = MarchingSquaresTerrain.GridType.HEX
+	var spacing := HexGrid.spacing_for(terrain.cell_size)
+	var curve := Curve.new(); curve.add_point(Vector2(0, 0)); curve.add_point(Vector2(1, 1))
+	var brush_size := 12.0
+	var max_d := BPC.calculate_max_distance(brush_size, 3)
+	var center_cell := Vector2i(3, 3)
+	var center := HexGrid.cell_center(center_cell, spacing)
+	var center_sample := BPC.hex_cell_sample(center, center, brush_size, 3, max_d, false, curve, center_cell, spacing)
+	_check(center_sample == 1.0, "hexagon30 cell at brush center samples 1.0")
+	
+	var hex_set := {}
+	var hex30_set := {}
+	for cell in HexGrid.cells_in_hex_radius(center_cell, 4):
+		var cell_center := HexGrid.cell_center(cell, spacing)
+		if BPC.hex_cell_sample(center, cell_center, brush_size, 2, max_d, false, curve, center_cell, spacing) > 0:
+			hex_set[cell] = true
+		if BPC.hex_cell_sample(center, cell_center, brush_size, 3, max_d, false, curve, center_cell, spacing) > 0:
+			hex30_set[cell] = true
+	_check(hex_set != hex30_set, "hexagon30 selects a different set than hexagon")
+	
+	# A 60 degree rotation around the center maps the lattice onto itself, so
+	# the rotated hexagon must sample rotated cells equally.
+	var symmetric := true
+	for cell: Vector2i in hex30_set:
+		var delta := HexGrid.cell_center(cell, spacing) - center
+		var rotated := Vector2(delta.x * 0.5 - delta.y * 0.8660254037844386, delta.x * 0.8660254037844386 + delta.y * 0.5)
+		var rotated_cell := HexGrid.world_to_cell(center + rotated, spacing)
+		var sample_a := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 3, max_d, false, curve, center_cell, spacing)
+		var sample_b := BPC.hex_cell_sample(center, HexGrid.cell_center(rotated_cell, spacing), brush_size, 3, max_d, false, curve, center_cell, spacing)
+		if absf(sample_a - sample_b) > 0.0001:
+			symmetric = false
+	_check(symmetric, "hexagon30 metric is 60 degree rotation symmetric")
 
 
 func _test_grid_aligned_sets(terrain: MarchingSquaresTerrain) -> void:

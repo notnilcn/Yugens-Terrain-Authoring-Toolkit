@@ -102,9 +102,18 @@ func _redraw():
 	terrain_plugin.BRUSH_VISUAL.size = Vector2(1.0, 1.0) * (terrain_system.cell_size.x + terrain_system.cell_size.y) / 4.0
 	
 	if terrain_chunk_hovered:
-		# Brush radius visualization
+		# Brush radius visualization. Cell-mode hexagon selections are flat-top
+		# in world space, so their outline starts at 30 degrees; Hexagon30 adds
+		# another 30 (a 60 degree rotation is the same hexagon).
+		var brush_rotation : float = 0.0
+		if BrushPatternCalculator.is_hexagon_brush(terrain_plugin.current_brush_index):
+			if terrain_system.grid_type != MarchingSquaresTerrain.GridType.SQUARE:
+				brush_rotation += deg_to_rad(30.0)
+			if BrushPatternCalculator.is_rotated_hexagon(terrain_plugin.current_brush_index):
+				brush_rotation += deg_to_rad(30.0)
 		var brush_transform : Transform3D
-		brush_transform = Transform3D(Vector3.RIGHT * terrain_plugin.brush_size, Vector3.UP, Vector3.BACK * terrain_plugin.brush_size, pos)
+		brush_transform = Transform3D(Basis(Vector3.UP, brush_rotation) * Basis(
+			Vector3.RIGHT * terrain_plugin.brush_size, Vector3.UP, Vector3.BACK * terrain_plugin.brush_size), pos)
 		
 		if is_wall_painting:
 			var viewport := EditorInterface.get_editor_viewport_3d()
@@ -133,7 +142,7 @@ func _redraw():
 			brush_transform = Transform3D(basis, pos)
 		
 		# Grid aligned selections get an outline that exactly encloses the
-		# selected cells (lattice hexagon on triangle terrain).
+		# selected cells (lattice hexagon on cell terrain).
 		if terrain_plugin.grid_aligned and terrain_plugin.grid_align_gate_passes():
 			brush_transform = _grid_aligned_brush_transform(terrain_system, pos)
 		
