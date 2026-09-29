@@ -5,17 +5,17 @@ class_name MarchingSquaresTerrainPlugin
 
 static var instance : MarchingSquaresTerrainPlugin
 
-const EMPTY_TEXTURE_PRESET : MarchingSquaresTexturePreset = preload("uid://db4scsn2nqqyu")
-const BrushPatternCalculator = preload("uid://bli1mnri3jwpa")
+const EMPTY_TEXTURE_PRESET : MarchingSquaresTexturePreset = preload("res://addons/MarchingSquaresTerrain/resources/empty_project.tres")
+const BrushPatternCalculator = preload("res://addons/MarchingSquaresTerrain/editor/utils/brush_pattern_calculator.gd")
 
-var vp_texture_names = preload("uid://dd7fens03aosa")
+var vp_texture_names = preload("res://addons/MarchingSquaresTerrain/resources/texture_names.tres")
 
 var gizmo_plugin := MarchingSquaresTerrainGizmoPlugin.new()
 var toolbar := MarchingSquaresToolbar.new()
 var tool_attributes := MarchingSquaresToolAttributes.new()
 var active_tool : int = 0
 
-var UI : Script = preload("uid://bmedudg6sllf8")
+var UI : Script = preload("res://addons/MarchingSquaresTerrain/editor/marching_squares_ui.gd")
 var ui : MarchingSquaresUI
 
 var is_initialized : bool = false
@@ -32,8 +32,8 @@ var _syncing_from_terrain : bool = false
 # Hexagon30 (index 3) reuses the pointy-top hexagon visual; the gizmo rotates
 # its transform by 30 degrees so it renders flat-top.
 var BrushMode : Dictionary = {
-	"0" = preload("uid://cg3lvmu68oaaa"),
-	"1" = preload("uid://b6uwsa1vjeb4"),
+	"0" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/round_brush_radius_visual.tres"),
+	"1" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/square_brush_radius_visual.tres"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
 	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
 	"4" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle_brush_radius_visual.tres"),
@@ -41,8 +41,8 @@ var BrushMode : Dictionary = {
 }
 
 var BrushMat : Dictionary = {
-	"0" = preload("uid://dtevocyixqsgv"),
-	"1" = preload("uid://daofaifmtbyak"),
+	"0" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/round_brush_radius_material.tres"),
+	"1" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/square_brush_radius_material.tres"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
 	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
 	"4" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle_brush_radius_material.tres"),
@@ -53,12 +53,12 @@ var current_brush_index : int = 0
 
 var brush_position : Vector3
 
-var BRUSH_VISUAL : Mesh = preload("uid://ch6cb07rh0m3l")
-var BRUSH_RADIUS_VISUAL : Mesh = preload("uid://cg3lvmu68oaaa")
-var BRUSH_RADIUS_MATERIAL : ShaderMaterial = preload("uid://dtevocyixqsgv")
+var BRUSH_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/brush_visual.tres")
+var BRUSH_RADIUS_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/round_brush_radius_visual.tres")
+var BRUSH_RADIUS_MATERIAL : ShaderMaterial = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/round_brush_radius_material.tres")
 var CELL_HEX_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_cell_visual.tres")
 var CELL_TRI_VISUAL : Mesh = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/tri_cell_visual.tres")
-@onready var falloff_curve : Curve = preload("uid://c0bexjsfvvcxb")
+@onready var falloff_curve : Curve = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/curve_falloff.tres")
 #endregion
 
 #region tool_mode vars
@@ -203,10 +203,10 @@ func _safe_initialize() -> bool:
 		initialization_error = "No tree detected while initializing"
 		return false
 	
-	var terrain_script := preload("uid://cddg1xr5hye1d")
-	var chunk_script := preload("uid://cql4d8s5t5xcx")
-	var terrain_icon := preload("uid://jfugomwkrm54")
-	var chunk_icon := preload("uid://dj8y22ded0j8r")
+	var terrain_script := preload("res://addons/MarchingSquaresTerrain/algorithm/terrain/marching_squares_terrain.gd")
+	var chunk_script := preload("res://addons/MarchingSquaresTerrain/algorithm/terrain/marching_squares_terrain_chunk.gd")
+	var terrain_icon := preload("res://addons/MarchingSquaresTerrain/editor/icons/Marching_Squares_Terrain_Icon.svg")
+	var chunk_icon := preload("res://addons/MarchingSquaresTerrain/editor/icons/Marching_Squares_Terrain_Chunk_Icon.svg")
 	
 	if terrain_script and chunk_script:
 		add_custom_type("MarchingSquaresTerrain", "Node3D", terrain_script, terrain_icon)

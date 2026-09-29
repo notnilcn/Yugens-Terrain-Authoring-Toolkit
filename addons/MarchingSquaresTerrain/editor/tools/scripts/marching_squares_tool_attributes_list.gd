@@ -79,7 +79,7 @@ var mask_mode : Dictionary = {
 	"default": true,
 }
 
-var vp_tex_names : MarchingSquaresTextureNames = preload("uid://dd7fens03aosa")
+var vp_tex_names : MarchingSquaresTextureNames = preload("res://addons/MarchingSquaresTerrain/resources/texture_names.tres")
 
 var material : Dictionary = {
 	"name": "material",

@@ -46,7 +46,7 @@ var _corner_height_cache : Dictionary = {}
 var _corner_key_cache : Dictionary = {}
 const CORNER_KEY_SCALE : float = 1024.0
 
-var bake_material : ShaderMaterial = preload("uid://cbbvkbnwmr2em")
+var bake_material : ShaderMaterial = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/mst_terrain_baked.tres")
 
 #region temporary storage vars (mirrors the square chunk save hooks)
 var _temp_mesh : ArrayMesh

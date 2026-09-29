@@ -159,7 +159,7 @@ var _grid_type : GridType = GridType.SQUARE
 #endregion
 
 #region vertex painting texture settings
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_1 : Texture2D = preload("uid://dbnc04k3n0sro"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_1 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_terrain_noise.res"):
 	set(value):
 		texture_1 = value
 		if not is_batch_updating:
@@ -170,7 +170,7 @@ var _grid_type : GridType = GridType.SQUARE
 			else:
 				grass_mat.set_shader_parameter("use_base_color_1", true)
 			_regenerate_square_grass()
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_2 : Texture2D = preload("uid://dbnc04k3n0sro"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_2 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_terrain_noise.res"):
 	set(value):
 		texture_2 = value
 		if not is_batch_updating:
@@ -181,7 +181,7 @@ var _grid_type : GridType = GridType.SQUARE
 			else:
 				grass_mat.set_shader_parameter("use_base_color_2", true)
 			_regenerate_square_grass()
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_3 : Texture2D = preload("uid://dbnc04k3n0sro"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_3 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_terrain_noise.res"):
 	set(value):
 		texture_3 = value
 		if not is_batch_updating:
@@ -192,7 +192,7 @@ var _grid_type : GridType = GridType.SQUARE
 			else:
 				grass_mat.set_shader_parameter("use_base_color_3", true)
 			_regenerate_square_grass()
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_4 : Texture2D = preload("uid://dbnc04k3n0sro"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_4 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_terrain_noise.res"):
 	set(value):
 		texture_4 = value
 		if not is_batch_updating:
@@ -203,7 +203,7 @@ var _grid_type : GridType = GridType.SQUARE
 			else:
 				grass_mat.set_shader_parameter("use_base_color_4", true)
 			_regenerate_square_grass()
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_5 : Texture2D = preload("uid://dbnc04k3n0sro"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_5 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_terrain_noise.res"):
 	set(value):
 		texture_5 = value
 		if not is_batch_updating:
@@ -214,7 +214,7 @@ var _grid_type : GridType = GridType.SQUARE
 			else:
 				grass_mat.set_shader_parameter("use_base_color_5", true)
 			_regenerate_square_grass()
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_6 : Texture2D = preload("uid://cv87twjgbqq0s"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var texture_6 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/wall_noise_texture.res"):
 	set(value):
 		texture_6 = value
 		if not is_batch_updating:
@@ -282,37 +282,37 @@ var _grid_type : GridType = GridType.SQUARE
 #endregion
 
 #region grass textures
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_1 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_1 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_1 = value
 		if not is_batch_updating:
 			var grass_mat := grass_mesh.material as ShaderMaterial
 			grass_mat.set_shader_parameter("grass_texture_1", value)
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_2 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_2 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_2 = value
 		if not is_batch_updating:
 			var grass_mat := grass_mesh.material as ShaderMaterial
 			grass_mat.set_shader_parameter("grass_texture_2", value)
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_3 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_3 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_3 = value
 		if not is_batch_updating:
 			var grass_mat := grass_mesh.material as ShaderMaterial
 			grass_mat.set_shader_parameter("grass_texture_3", value)
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_4 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_4 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_4 = value
 		if not is_batch_updating:
 			var grass_mat := grass_mesh.material as ShaderMaterial
 			grass_mat.set_shader_parameter("grass_texture_4", value)
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_5 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_5 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_5 = value
 		if not is_batch_updating:
 			var grass_mat := grass_mesh.material as ShaderMaterial
 			grass_mat.set_shader_parameter("grass_texture_5", value)
-@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_6 : Texture2D = preload("uid://cxvnfgy865wsk"):
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var grass_sprite_tex_6 : Texture2D = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/grass_leaf_sprite.png"):
 	set(value):
 		grass_sprite_tex_6 = value
 		if not is_batch_updating:
@@ -485,9 +485,9 @@ var _grid_type : GridType = GridType.SQUARE
 
 signal load_finished
 
-var void_texture := preload("uid://csvthlqhb8g5j")
-var placeholder_wind_texture := preload("uid://dk1t5hy2tiil7") # Change to your own texture
-var placeholder_rl_noise_texture := preload("uid://85iqlmnoua0e") # Change to your own texture
+var void_texture := preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/void_texture.tres")
+var placeholder_wind_texture := preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/wind_noise_texture.tres") # Change to your own texture
+var placeholder_rl_noise_texture := preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/rl_noise_texture.tres") # Change to your own texture
 
 var terrain_material : ShaderMaterial = null
 var grass_mesh : QuadMesh = null 
@@ -506,8 +506,8 @@ func _validate_property(property: Dictionary) -> void:
 func _init() -> void:
 	# Create unique copies of shared resources for this node instance
 	# This prevents texture/material changes from affecting other MarchingSquaresTerrain nodes
-	terrain_material = preload("uid://bahbybbjwkhlg").duplicate(true)
-	var base_grass_mesh := preload("uid://h41fuxldpf1u")
+	terrain_material = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/mst_terrain_shader.tres").duplicate(true)
+	var base_grass_mesh := preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/mst_grass_mesh.tres")
 	grass_mesh = base_grass_mesh.duplicate(true)
 	grass_mesh.material = base_grass_mesh.material.duplicate(true)
 	print_verbose("Last storage mode: ", _last_storage_mode)
