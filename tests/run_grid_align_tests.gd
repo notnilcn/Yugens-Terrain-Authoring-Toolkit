@@ -190,6 +190,8 @@ func _test_gate_rules(_terrain: MarchingSquaresTerrain) -> void:
 		{"grid": MarchingSquaresTerrain.GridType.SQUARE, "brush": 3, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 0, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 1, "falloff": false, "expect": false},
+		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 4, "falloff": false, "expect": false},
+		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 5, "falloff": false, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 2, "falloff": true, "expect": false},
 		{"grid": MarchingSquaresTerrain.GridType.HEX, "brush": 3, "falloff": true, "expect": false},
 	]

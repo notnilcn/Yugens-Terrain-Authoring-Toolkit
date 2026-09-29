@@ -10,6 +10,9 @@ const HEXAGON_EDGE_SCALE : float = 0.5773502691896258
 const COS_30 : float = 0.8660254037844386
 const SIN_30 : float = 0.5
 
+# Normalized equilateral triangle SDF constant (sqrt(3)).
+const TRIANGLE_SIDE_SCALE : float = 1.7320508075688772
+
 
 class BrushBounds:
 	var chunk_tl : Vector2i
@@ -28,6 +31,16 @@ static func is_rotated_hexagon(brush_index: int) -> bool:
 	return brush_index == 3
 
 
+## True for the Triangle and Triangle180 brush shapes.
+static func is_triangle_brush(brush_index: int) -> bool:
+	return brush_index == 4 or brush_index == 5
+
+
+## True when the triangle brush is rotated 180 degrees (point-down).
+static func is_rotated_triangle(brush_index: int) -> bool:
+	return brush_index == 5
+
+
 static func _rotate_30(v: Vector2) -> Vector2:
 	return Vector2(v.x * COS_30 + v.y * SIN_30, -v.x * SIN_30 + v.y * COS_30)
 
@@ -39,6 +52,15 @@ static func hexagon_field(uv: Vector2, rotated_30: bool) -> float:
 		uv = _rotate_30(uv)
 	return maxf(absf(uv.y), maxf(absf(uv.x) * HEXAGON_SIDE_SCALE,
 		absf(uv.y) + absf(uv.x) * HEXAGON_EDGE_SCALE))
+
+
+## Equilateral triangle field in normalized space: <= 1 is inside, > 1 outside.
+## The base triangle has its apex on +Y and a flat bottom edge; rotating the
+## sample point by 180 degrees yields the point-down (Triangle180) shape.
+static func triangle_field(uv: Vector2, rotated_180: bool) -> float:
+	if rotated_180:
+		uv = -uv
+	return maxf(TRIANGLE_SIDE_SCALE * absf(uv.x) + uv.y, -2.0 * uv.y)
 
 
 static func calculate_bounds(pos: Vector3, brush_size: float, terrain: MarchingSquaresTerrain) -> BrushBounds:
@@ -82,6 +104,10 @@ static func calculate_max_distance(brush_size: float, brush_index: int) -> float
 			max_distance *= max_distance
 		3: # Hexagon30 brush (flat-top)
 			max_distance *= max_distance
+		4: # Triangle brush (point-up)
+			max_distance *= max_distance
+		5: # Triangle180 brush (point-down)
+			max_distance *= max_distance
 	return max_distance
 
 
@@ -105,6 +131,17 @@ static func calculate_falloff_sample(
 			return 1.0
 		var t_hex : float = 1.0 - clampf(h, 0.2, 1.0)
 		return falloff_curve.sample(clamp(t_hex, 0.001, 0.999))
+	
+	if is_triangle_brush(brush_index):
+		# Triangle test in normalized brush space.
+		var uv := (world_pos - brush_pos) / (brush_size * 0.5)
+		var h := triangle_field(uv, is_rotated_triangle(brush_index))
+		if h > 1.0:
+			return -1.0  # Outside brush
+		if not use_falloff:
+			return 1.0
+		var t_tri : float = 1.0 - clampf(h, 0.2, 1.0)
+		return falloff_curve.sample(clamp(t_tri, 0.001, 0.999))
 	
 	var distance_squared := brush_pos.distance_squared_to(world_pos)
 	if distance_squared > max_distance:
@@ -180,8 +217,8 @@ static func hex_cell_sample(
 	return calculate_falloff_sample(cell_pos, brush_pos, brush_size, brush_index, max_distance, use_falloff, falloff_curve)
 
 
-## Sample for one triangle-terrain cell. The hexagon brush is measured in
-## lattice space so its shape aligns with the lattice rows.
+## Sample for one triangle-terrain cell. Brush shapes are measured in world
+## space so the selected cells match the drawn brush outline on every terrain.
 static func tri_cell_sample(
 	brush_pos : Vector2,
 	cell_pos : Vector2,
@@ -190,21 +227,8 @@ static func tri_cell_sample(
 	max_distance : float,
 	use_falloff : bool,
 	falloff_curve : Curve,
-	cell_size : Vector2
+	_cell_size : Vector2
 	) -> float:
-	if is_hexagon_brush(brush_index):
-		var rel := cell_pos - brush_pos
-		if is_rotated_hexagon(brush_index):
-			rel = _rotate_30(rel)
-		var af := MarchingSquaresTriGrid.lattice_floats(rel, cell_size)
-		var h := hexagon_field(af, false)
-		var radius_lattice : float = brush_size / cell_size.x * 0.5
-		if h > radius_lattice:
-			return -1.0
-		if not use_falloff:
-			return 1.0
-		var t : float = 1.0 - clampf(h / maxf(radius_lattice, 0.001), 0.2, 1.0)
-		return falloff_curve.sample(clamp(t, 0.001, 0.999))
 	return calculate_falloff_sample(cell_pos, brush_pos, brush_size, brush_index, max_distance, use_falloff, falloff_curve)
 
 

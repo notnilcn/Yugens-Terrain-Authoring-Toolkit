@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_tri_sampling(terrain)
 	_test_hex_brush_disk(terrain)
 	_test_hex30_sampling(terrain)
+	_test_triangle_brush(terrain)
 	_test_grid_aligned_sets(terrain)
 	_test_pattern_application(terrain)
 	
@@ -100,6 +101,16 @@ func _test_tri_sampling(terrain: MarchingSquaresTerrain) -> void:
 	_check(center30 == 1.0, "tri hexagon30 cell at brush center samples 1.0")
 	var far30 := BPC.tri_cell_sample(center, far, 12.0, 3, max_d30, false, curve, terrain.cell_size)
 	_check(far30 < 0, "tri hexagon30 far cell excluded")
+	# Hexagon brushes on triangle terrain sample in world space so the selected
+	# cells match the drawn outline (no lattice-space warping).
+	var max_d2 := BPC.calculate_max_distance(12.0, 2)
+	var probe := center + Vector2(1.3, -0.7)
+	var tri_sample := BPC.tri_cell_sample(center, probe, 12.0, 2, max_d2, true, curve, terrain.cell_size)
+	var world_sample := BPC.calculate_falloff_sample(probe, center, 12.0, 2, max_d2, true, curve)
+	_check(absf(tri_sample - world_sample) < 0.0001, "tri hexagon sampling matches the world-space shape")
+	var vertex_inside := BPC.tri_cell_sample(center, center + Vector2(0, 5.5), 12.0, 2, max_d2, false, curve, terrain.cell_size)
+	var vertex_outside := BPC.tri_cell_sample(center, center + Vector2(0, 6.5), 12.0, 2, max_d2, false, curve, terrain.cell_size)
+	_check(vertex_inside > 0 and vertex_outside < 0, "tri hexagon selection follows the drawn hexagon radius")
 
 
 ## The non-grid-aligned hexagon brush must select whole hex rings: every cell
@@ -158,6 +169,24 @@ func _test_hex30_sampling(terrain: MarchingSquaresTerrain) -> void:
 		if absf(sample_a - sample_b) > 0.0001:
 			symmetric = false
 	_check(symmetric, "hexagon30 metric is 60 degree rotation symmetric")
+
+
+## Triangle brush shape: point-up/down orientation and 180 degree flip.
+func _test_triangle_brush(_terrain: MarchingSquaresTerrain) -> void:
+	var curve := Curve.new(); curve.add_point(Vector2(0, 0)); curve.add_point(Vector2(1, 1))
+	var max_d := BPC.calculate_max_distance(10.0, 4)
+	var max_d180 := BPC.calculate_max_distance(10.0, 5)
+	var top := Vector2(0, 4.9)
+	var bottom := Vector2(0, -4.9)
+	_check(BPC.calculate_falloff_sample(top, Vector2.ZERO, 10.0, 4, max_d, false, curve) > 0, "triangle apex is inside")
+	_check(BPC.calculate_falloff_sample(top, Vector2.ZERO, 10.0, 5, max_d180, false, curve) < 0, "triangle180 excludes the apex")
+	_check(BPC.calculate_falloff_sample(bottom, Vector2.ZERO, 10.0, 5, max_d180, false, curve) > 0, "triangle180 bottom vertex is inside")
+	_check(BPC.calculate_falloff_sample(bottom, Vector2.ZERO, 10.0, 4, max_d, false, curve) < 0, "triangle excludes the flipped bottom vertex")
+	# The flat edge sits at -0.5 * radius (2.5) and the sides at |x| = 2.887 on y = 0.
+	_check(BPC.calculate_falloff_sample(Vector2(0, -2.4), Vector2.ZERO, 10.0, 4, max_d, false, curve) > 0, "triangle inside above the bottom edge")
+	_check(BPC.calculate_falloff_sample(Vector2(0, -2.6), Vector2.ZERO, 10.0, 4, max_d, false, curve) < 0, "triangle clipped by the bottom edge")
+	_check(BPC.calculate_falloff_sample(Vector2(2.8, 0), Vector2.ZERO, 10.0, 4, max_d, false, curve) > 0, "triangle side inside")
+	_check(BPC.calculate_falloff_sample(Vector2(2.9, 0), Vector2.ZERO, 10.0, 4, max_d, false, curve) < 0, "triangle side outside")
 
 
 func _test_grid_aligned_sets(terrain: MarchingSquaresTerrain) -> void:

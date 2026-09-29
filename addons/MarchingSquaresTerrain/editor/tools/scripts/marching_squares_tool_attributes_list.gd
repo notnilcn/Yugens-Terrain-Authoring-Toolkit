@@ -6,7 +6,7 @@ var brush_type : Dictionary = {
 	"name": "brush_type",
 	"type": "option",
 	"label": "Brush Type",
-	"options": ["Round", "Square", "Hexagon", "Hexagon30"],
+	"options": ["Round", "Square", "Hexagon", "Hexagon30", "Triangle", "Triangle180"],
 	"default": 0,
 }
 

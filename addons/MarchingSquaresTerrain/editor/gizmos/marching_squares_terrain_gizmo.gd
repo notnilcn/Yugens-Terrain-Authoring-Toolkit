@@ -102,12 +102,14 @@ func _redraw():
 	terrain_plugin.BRUSH_VISUAL.size = Vector2(1.0, 1.0) * (terrain_system.cell_size.x + terrain_system.cell_size.y) / 4.0
 	
 	if terrain_chunk_hovered:
-		# Brush radius visualization. Cell-mode hexagon selections are flat-top
-		# in world space, so their outline starts at 30 degrees; Hexagon30 adds
-		# another 30 (a 60 degree rotation is the same hexagon).
+		# Brush radius visualization. Hexagon selections on hex terrain snap to
+		# the cell lattice, which is flat-top in world space, so their outline
+		# starts at 30 degrees; Hexagon30 adds another 30 (a 60 degree rotation
+		# is the same hexagon). Other terrain/sampling combinations use the
+		# outline as-is.
 		var brush_rotation : float = 0.0
 		if BrushPatternCalculator.is_hexagon_brush(terrain_plugin.current_brush_index):
-			if terrain_system.grid_type != MarchingSquaresTerrain.GridType.SQUARE:
+			if terrain_system.grid_type == MarchingSquaresTerrain.GridType.HEX:
 				brush_rotation += deg_to_rad(30.0)
 			if BrushPatternCalculator.is_rotated_hexagon(terrain_plugin.current_brush_index):
 				brush_rotation += deg_to_rad(30.0)
@@ -215,8 +217,10 @@ func _redraw():
 			var chunk = terrain_system.chunks[draw_chunk_coords]
 			var draw_chunk_dict : Dictionary = terrain_plugin.current_draw_pattern[draw_chunk_coords]
 			for draw_coords: Vector2i in draw_chunk_dict:
+				var sample : float = draw_chunk_dict[draw_coords]
 				var draw_world : Vector2
 				var draw_y : float
+				var marker_global := Vector2i.ZERO
 				if terrain_system.grid_type == MarchingSquaresTerrain.GridType.SQUARE:
 					draw_world = Vector2(
 						(draw_chunk_coords.x * (terrain_system.dimensions.x - 1) + draw_coords.x) * terrain_system.cell_size.x,
@@ -224,20 +228,21 @@ func _redraw():
 					draw_y = terrain_plugin.draw_height if terrain_plugin.flatten else chunk.height_map[draw_coords.y][draw_coords.x]
 				else:
 					var global := _global_of_local_cell(terrain_system, draw_chunk_coords, draw_coords)
+					marker_global = global
 					draw_world = BrushPatternCalculator.cell_center_for(terrain_system, global)
 					draw_y = terrain_plugin.draw_height if terrain_plugin.flatten else chunk.get_height(draw_coords)
 				
-				var sample : float = draw_chunk_dict[draw_coords]
+				var marker_basis := _cell_marker_basis(terrain_system, marker_global, sample)
 				
 				# If setting, also show a square at the height to set to
 				if terrain_plugin.is_setting and terrain_plugin.draw_height_set:
 					var draw_position := Vector3(draw_world.x, draw_y + height_diff * sample, draw_world.y)
-					var draw_transform := Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
+					var draw_transform := Transform3D(marker_basis, draw_position)
 					if not is_wall_painting:
 						add_mesh(_marker_for(terrain_system), null, draw_transform)
 				else:
 					var draw_position := Vector3(draw_world.x, draw_y, draw_world.y)
-					var draw_transform := Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
+					var draw_transform := Transform3D(marker_basis, draw_position)
 					if not is_wall_painting:
 						add_mesh(_marker_for(terrain_system), null, draw_transform)
 
@@ -290,9 +295,19 @@ func _draw_cell_marker(terrain_system: MarchingSquaresTerrain, marker: Mesh, chu
 		var h = terrain_system.get_cell_height(global)
 		y = float(h) if h != null else 0.0
 	var draw_position := Vector3(center.x, y, center.y)
-	var draw_transform := Transform3D(Vector3.RIGHT*sample, Vector3.UP*sample, Vector3.BACK*sample, draw_position)
+	var draw_transform := Transform3D(_cell_marker_basis(terrain_system, global, sample), draw_position)
 	if not is_wall_painting:
 		add_mesh(marker, null, draw_transform)
+
+
+## Marker basis for one cell. Triangle cells alternate orientation per column,
+## so A cells (even x, apex towards +Z) use the B-oriented marker flipped 180
+## degrees. Hex and square cells use the marker as-is.
+func _cell_marker_basis(terrain_system: MarchingSquaresTerrain, global: Vector2i, sample: float) -> Basis:
+	var basis := Basis(Vector3.RIGHT * sample, Vector3.UP * sample, Vector3.BACK * sample)
+	if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE and (global.x & 1) == 0:
+		basis = Basis(Vector3.UP, PI) * basis
+	return basis
 
 
 func _add_to_pattern(chunk_coords: Vector2i, local: Vector2i, sample: float) -> void:

@@ -31,6 +31,16 @@ func _initialize() -> void:
 	if absf(chunk.get_height(Vector2i(2, 3)) - 3.5) > 0.0001:
 		printerr("FAIL: gizmo move_cell_height did not update the height")
 		_failures += 1
+	
+	# Triangle cell markers alternate orientation: A cells (even x) must have
+	# their apex flipped to +Z, B cells (odd x) keep the mesh apex on -Z.
+	var brush_gizmo := MarchingSquaresTerrainGizmo.new()
+	terrain.grid_type = MarchingSquaresTerrain.GridType.TRIANGLE
+	var apex_a := brush_gizmo._cell_marker_basis(terrain, Vector2i(0, 0), 1.0) * Vector3(0, 0, -1)
+	var apex_b := brush_gizmo._cell_marker_basis(terrain, Vector2i(1, 0), 1.0) * Vector3(0, 0, -1)
+	if apex_a.z < 0.9 or apex_b.z > -0.9:
+		printerr("FAIL: triangle cell marker orientation does not follow the cell column")
+		_failures += 1
 	terrain.free()
 	
 	if _failures == 0:

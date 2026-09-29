@@ -36,6 +36,8 @@ var BrushMode : Dictionary = {
 	"1" = preload("uid://b6uwsa1vjeb4"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
 	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_visual.tres"),
+	"4" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle_brush_radius_visual.tres"),
+	"5" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle180_brush_radius_visual.tres"),
 }
 
 var BrushMat : Dictionary = {
@@ -43,6 +45,8 @@ var BrushMat : Dictionary = {
 	"1" = preload("uid://daofaifmtbyak"),
 	"2" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
 	"3" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/hex_brush_radius_material.tres"),
+	"4" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle_brush_radius_material.tres"),
+	"5" = preload("res://addons/MarchingSquaresTerrain/resources/plugin_materials/triangle180_brush_radius_material.tres"),
 }
 
 var current_brush_index : int = 0

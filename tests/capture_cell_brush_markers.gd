@@ -90,7 +90,10 @@ func _draw_markers(terrain: MarchingSquaresTerrain, mesh: Mesh) -> int:
 				continue
 			var mi := MeshInstance3D.new()
 			mi.mesh = mesh
-			mi.position = Vector3(center.x, float(h), center.y)
+			var basis := Basis.IDENTITY
+			if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE and (global.x & 1) == 0:
+				basis = Basis(Vector3.UP, PI)
+			mi.transform = Transform3D(basis, Vector3(center.x, float(h), center.y))
 			terrain.add_child(mi)
 			count += 1
 	return count

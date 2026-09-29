@@ -641,7 +641,12 @@ func cell_chunk_position(coords: Vector2i) -> Vector3:
 
 ## Switch grid modes: save, flush, reload. No undo support for mode switches.
 func _switch_grid_type(value: GridType):
-	if EngineWrapper.is_editor():
+	# Scene loading assigns stored properties before the node enters the tree.
+	# The editor save/load and deferred rebuild must not run there: they would
+	# create duplicate chunk nodes next to the scene's own chunk nodes. Entering
+	# the tree loads the active mode through _deferred_enter_tree instead.
+	var in_tree := is_inside_tree()
+	if in_tree and EngineWrapper.is_editor():
 		MSTDataHandler.save_all_chunks(self)
 	
 	# Free all chunks without re-saving them. remove_child + free is immediate so
@@ -657,6 +662,9 @@ func _switch_grid_type(value: GridType):
 	_grid_type = value
 	force_batch_update()
 	grid_type_changed.emit(value)
+	
+	if not in_tree:
+		return
 	
 	# Mode switches clear undo history (scene-relative setup changed)
 	var plugin := MarchingSquaresTerrainPlugin.instance
