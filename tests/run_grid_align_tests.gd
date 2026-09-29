@@ -176,6 +176,18 @@ func _test_outline(terrain: MarchingSquaresTerrain) -> void:
 		if _outline_h(terrain, outline, center) <= 1.0:
 			ring2_ok = false
 	_check(ring2_ok, "hex outline excludes the radius-N+1 ring")
+	
+	# N=0 selects a single pointy-top cell, so the outline must use the cell's
+	# orientation and enclose its corners exactly.
+	n = 0
+	outline = BPC.grid_aligned_outline(terrain, Vector2.ZERO, n)
+	_check(absf(outline["rotation"]) < 0.0001, "hex outline N=0 is pointy-top")
+	var cell_center := MarchingSquaresHexGrid.cell_center(center_cell, spacing)
+	var corners_inside := true
+	for corner in MarchingSquaresHexGrid.corner_offsets(MarchingSquaresHexGrid.radius_for(terrain.cell_size)):
+		if _outline_h(terrain, outline, cell_center + corner) > 1.001:
+			corners_inside = false
+	_check(corners_inside, "hex outline N=0 encloses the cell corners")
 
 
 func _test_gate_rules(_terrain: MarchingSquaresTerrain) -> void:
