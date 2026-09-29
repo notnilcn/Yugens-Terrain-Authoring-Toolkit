@@ -410,14 +410,8 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 					floori(draw_position.x / (terrain.dimensions.x * terrain.cell_size.x)),
 					floori(draw_position.z / (terrain.dimensions.z * terrain.cell_size.y)))
 			else:
-				var cells := terrain.cells_per_chunk()
-				var world_pos := Vector2(draw_position.x, draw_position.z)
-				var cell : Vector2i
-				if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
-					cell = MarchingSquaresTriGrid.world_to_cell(world_pos, terrain.cell_size)
-				else:
-					cell = MarchingSquaresHexGrid.world_to_cell(world_pos, MarchingSquaresHexGrid.spacing_for(terrain.cell_size))
-				chunk_coords = MarchingSquaresHexGrid.chunk_of_cell(cell, cells)
+				chunk_coords = terrain.chunk_of_cell(
+					terrain.world_to_cell(Vector2(draw_position.x, draw_position.z)))
 			
 			is_chunk_plane_hovered = true
 			current_hovered_chunk = chunk_coords
@@ -507,14 +501,8 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 				floori(local_pos.x / ((terrain.dimensions.x-1) * terrain.cell_size.x)),
 				floori(local_pos.z / ((terrain.dimensions.z-1) * terrain.cell_size.y)))
 		else:
-			var cells := terrain.cells_per_chunk()
-			var world_pos := Vector2(local_pos.x, local_pos.z)
-			var cell : Vector2i
-			if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
-				cell = MarchingSquaresTriGrid.world_to_cell(world_pos, terrain.cell_size)
-			else:
-				cell = MarchingSquaresHexGrid.world_to_cell(world_pos, MarchingSquaresHexGrid.spacing_for(terrain.cell_size))
-			chunk_coords = MarchingSquaresHexGrid.chunk_of_cell(cell, cells)
+			chunk_coords = terrain.chunk_of_cell(
+				terrain.world_to_cell(Vector2(local_pos.x, local_pos.z)))
 		
 		var chunk = terrain.chunks.get(chunk_coords)
 		
@@ -542,7 +530,12 @@ func handle_mouse(camera: Camera3D, event: InputEvent) -> int:
 			elif not chunk:
 				# Can add a new chunk here if there is a neighbouring non-empty chunk
 				# Also add if there are no chunks at all in the current terrain system
-				var can_add_empty : bool = terrain.chunks.is_empty() or terrain.has_chunk(chunk_coords.x-1, chunk_coords.y) or terrain.has_chunk(chunk_coords.x+1, chunk_coords.y) or terrain.has_chunk(chunk_coords.x, chunk_coords.y-1) or terrain.has_chunk(chunk_coords.x, chunk_coords.y+1)
+				var can_add_empty : bool = terrain.chunks.is_empty()
+				if not can_add_empty:
+					for neighbor_coords in terrain.chunk_neighbors(chunk_coords):
+						if terrain.chunks.has(neighbor_coords):
+							can_add_empty = true
+							break
 				if can_add_empty:
 					get_undo_redo().create_action("add chunk")
 					get_undo_redo().add_do_method(terrain, "add_new_chunk", chunk_coords.x, chunk_coords.y, self)
@@ -610,16 +603,15 @@ func update_draw_pattern(b_pos: Vector3):
 
 ## Cell-mode variant of update_draw_pattern. Mirrors the gizmo's cell preview.
 func _update_draw_pattern_cells(terrain_system: MarchingSquaresTerrain, brush_pos: Vector2) -> void:
-	var cells := terrain_system.cells_per_chunk()
 	var max_distance : float = BrushPatternCalculator.calculate_max_distance(brush_size, current_brush_index)
 	
 	# Grid aligned selection sets every selected cell to 1.0 (no falloff).
 	if grid_aligned and grid_align_gate_passes():
 		for global in BrushPatternCalculator.grid_aligned_cells(terrain_system, brush_pos, grid_size):
-			var chunk_coords := MarchingSquaresHexGrid.chunk_of_cell(global, cells)
+			var chunk_coords := terrain_system.chunk_of_cell(global)
 			if not terrain_system.chunks.has(chunk_coords):
 				continue
-			var local := MarchingSquaresHexGrid.local_cell(global, cells)
+			var local := terrain_system.local_cell(global)
 			if not current_draw_pattern.has(chunk_coords):
 				current_draw_pattern[chunk_coords] = {}
 			current_draw_pattern[chunk_coords][local] = 1.0
@@ -629,7 +621,7 @@ func _update_draw_pattern_cells(terrain_system: MarchingSquaresTerrain, brush_po
 		var candidates := BrushPatternCalculator.cell_candidates_for_chunk(
 			chunk_coords, terrain_system, brush_pos, brush_size, 2)
 		for local: Vector2i in candidates:
-			var global := chunk_coords * cells + local
+			var global := terrain_system.global_of_local(chunk_coords, local)
 			var center := BrushPatternCalculator.cell_center_for(terrain_system, global)
 			var sample : float
 			if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
@@ -641,7 +633,7 @@ func _update_draw_pattern_cells(terrain_system: MarchingSquaresTerrain, brush_po
 				sample = BrushPatternCalculator.hex_cell_sample(
 					brush_pos, center, brush_size, current_brush_index,
 					max_distance, falloff, falloff_curve,
-					MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing), spacing)
+					terrain_system.cell_center_of(terrain_system.world_to_cell(brush_pos)), spacing)
 			if sample < 0:
 				continue
 			if not current_draw_pattern.has(chunk_coords):
@@ -1130,7 +1122,7 @@ func draw_pattern_cells(terrain: MarchingSquaresTerrain) -> void:
 		var draw_chunk_dict : Dictionary = current_draw_pattern[draw_chunk_coords]
 		for draw_cell_coords: Vector2i in draw_chunk_dict:
 			var sample : float = clamp(draw_chunk_dict[draw_cell_coords], 0.001, 0.999)
-			var global := draw_chunk_coords * terrain.cells_per_chunk() + draw_cell_coords
+			var global := terrain.global_of_local(draw_chunk_coords, draw_cell_coords)
 			var restore_value
 			var draw_value
 			match mode:
@@ -1338,8 +1330,8 @@ func _collect_cell_affected_chunks(terrain: MarchingSquaresTerrain, pattern: Dic
 	var affected : Dictionary = {}
 	for chunk_coords: Vector2i in pattern.keys():
 		affected[chunk_coords] = true
-		for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
-			affected[chunk_coords + offset] = true
+		for neighbor_coords in terrain.chunk_neighbors(chunk_coords):
+			affected[neighbor_coords] = true
 	var result : Array = []
 	for coords in affected.keys():
 		if terrain.chunks.has(coords):

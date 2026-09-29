@@ -10,7 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://cv87twjgbqq0s" path="res://addons/MarchingSquaresTerrain/resources/plugin_materials/wall_noise_texture.res" id="8_7mabo"]
 [ext_resource type="Script" uid="uid://mtlf02qfkqp5" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_quick_paint.gd" id="9_77stx"]
 [ext_resource type="Script" uid="uid://fvb3vi413siv" path="res://addons/MarchingSquaresTerrain/editor/tools/scripts/marching_squares_texture_preset.gd" id="10_52i7q"]
-[ext_resource type="Script" uid="uid://b0t1ojtpvt58o" path="res://addons/MarchingSquaresTerrain/algorithm/hex/marching_squares_hex_chunk.gd" id="11_j2hbo"]
+[ext_resource type="Script" uid="uid://b7k12vmffw5tb" path="res://addons/MarchingSquaresTerrain/algorithm/hex_rings/marching_squares_hex_rings_chunk.gd" id="11_j2hbo"]
 [ext_resource type="Script" uid="uid://fgqy2qf4tl87" path="res://addons/MarchingSquaresTerrain/algorithm/cells/marching_squares_cell_grass_planter.gd" id="12_54x3k"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_e28qv"]
@@ -117,7 +117,8 @@ far = 1200.0
 script = ExtResource("3_0450b")
 data_directory = "res://scenes/mst_demo_scene_TerrainData/MarchingSquaresTerrain_45197e24"
 _storage_initialized = true
-grid_type = 2
+grid_type = 3
+chunk_hex_radius = 8
 texture_7 = SubResource("Texture2D_vynns")
 texture_8 = SubResource("Texture2D_p1dug")
 texture_9 = SubResource("Texture2D_38l2j")
@@ -130,40 +131,70 @@ texture_15 = SubResource("Texture2D_fpfsv")
 current_texture_preset = SubResource("Resource_j2hbo")
 metadata/_custom_type_script = "uid://cddg1xr5hye1d"
 
-[node name="Chunk (-1, -1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=499407877 node_paths=PackedStringArray("terrain_system")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65, 0, -57.157677)
+[node name="Chunk (0, 0)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=623095533 node_paths=PackedStringArray("terrain_system")]
 script = ExtResource("11_j2hbo")
 terrain_system = NodePath("..")
-chunk_coords = Vector2i(-1, -1)
 
-[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (-1, -1)" unique_id=358389007]
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (0, 0)" unique_id=1232801044]
 cast_shadow = 0
 script = ExtResource("12_54x3k")
 
-[node name="Chunk (-1, 0)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=18070457 node_paths=PackedStringArray("terrain_system")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, 0)
+[node name="Chunk (0, 1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1015401686 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 15.588457)
+script = ExtResource("11_j2hbo")
+terrain_system = NodePath("..")
+chunk_coords = Vector2i(0, 1)
+
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (0, 1)" unique_id=925782032]
+cast_shadow = 0
+script = ExtResource("12_54x3k")
+
+[node name="Chunk (-1, 1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1962340861 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 29.444862)
+script = ExtResource("11_j2hbo")
+terrain_system = NodePath("..")
+chunk_coords = Vector2i(-1, 1)
+
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (-1, 1)" unique_id=2001128810]
+cast_shadow = 0
+script = ExtResource("12_54x3k")
+
+[node name="Chunk (-1, 0)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1782977018 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26, 0, 13.856406)
 script = ExtResource("11_j2hbo")
 terrain_system = NodePath("..")
 chunk_coords = Vector2i(-1, 0)
 
-[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (-1, 0)" unique_id=1189087906]
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (-1, 0)" unique_id=447074116]
 cast_shadow = 0
 script = ExtResource("12_54x3k")
 
-[node name="Chunk (0, -1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1794496722 node_paths=PackedStringArray("terrain_system")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -57.157677)
+[node name="Chunk (0, -1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1443992523 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25, 0, -15.588457)
 script = ExtResource("11_j2hbo")
 terrain_system = NodePath("..")
 chunk_coords = Vector2i(0, -1)
 
-[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (0, -1)" unique_id=267281716]
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (0, -1)" unique_id=604561119]
 cast_shadow = 0
 script = ExtResource("12_54x3k")
 
-[node name="Chunk (0, 0)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1125977766 node_paths=PackedStringArray("terrain_system")]
+[node name="Chunk (1, -1)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=1122433548 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, -29.444862)
 script = ExtResource("11_j2hbo")
 terrain_system = NodePath("..")
+chunk_coords = Vector2i(1, -1)
 
-[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (0, 0)" unique_id=1916904263]
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (1, -1)" unique_id=426554451]
+cast_shadow = 0
+script = ExtResource("12_54x3k")
+
+[node name="Chunk (1, 0)" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain" unique_id=319624327 node_paths=PackedStringArray("terrain_system")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, -13.856406)
+script = ExtResource("11_j2hbo")
+terrain_system = NodePath("..")
+chunk_coords = Vector2i(1, 0)
+
+[node name="GrassPlanter" type="MultiMeshInstance3D" parent="SubViewportContainer/SubViewport/MarchingSquaresTerrain/Chunk (1, 0)" unique_id=1875369778]
 cast_shadow = 0
 script = ExtResource("12_54x3k")

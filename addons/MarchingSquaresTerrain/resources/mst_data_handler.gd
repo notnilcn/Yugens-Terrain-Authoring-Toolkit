@@ -13,7 +13,7 @@ static func generate_terrain_uid() -> String:
 #region directory management
 
 ## Per-mode data folder names. Must match MarchingSquaresTerrain.GridType order.
-const MODE_NAMES : Array[String] = ["square", "triangle", "hex"]
+const MODE_NAMES : Array[String] = ["square", "triangle", "hex", "hex_rings"]
 
 
 ## Folder name for the terrain's active grid type.

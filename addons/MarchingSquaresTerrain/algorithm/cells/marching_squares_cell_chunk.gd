@@ -66,6 +66,17 @@ func cells_per_chunk() -> Vector2i:
 	return Vector2i.ZERO
 
 
+## Whether a local cell coordinate exists in this chunk. Ring chunks override this to
+## skip the bounding-box corners outside their hex disk.
+func has_cell(_local: Vector2i) -> bool:
+	return true
+
+
+## Local (bounding-box) cell coordinate of a global cell in its owning chunk.
+func local_cell(global: Vector2i) -> Vector2i:
+	return MarchingSquaresHexGrid.local_cell(global, cells_per_chunk())
+
+
 ## World-space position of a global cell's center.
 func cell_center_world(_cell: Vector2i) -> Vector2:
 	return Vector2.ZERO
@@ -521,7 +532,8 @@ func regenerate_mesh(_use_threads: bool = false):
 	_grass_dirty_cells.clear()
 	for r in range(cells.y):
 		for c in range(cells.x):
-			_emit_cell(st, Vector2i(c, r), origin)
+			if has_cell(Vector2i(c, r)):
+				_emit_cell(st, Vector2i(c, r), origin)
 	
 	# Regenerate grass only for cells whose height/colors/mask changed.
 	if grass_planter:
@@ -642,6 +654,8 @@ func _index_of_key(keys: Array, key: Vector2i) -> int:
 
 
 func _emit_cell(st: SurfaceTool, local: Vector2i, origin: Vector2) -> void:
+	if not has_cell(local):
+		return
 	var global := _chunk_global_cell(local)
 	var idx := cell_index(local)
 	var h : float = height_map[idx]
@@ -701,7 +715,7 @@ func _emit_cell(st: SurfaceTool, local: Vector2i, origin: Vector2) -> void:
 		var nb_chunk = terrain.chunk_for_cell(nb) if terrain else null
 		if nb_chunk == null:
 			continue
-		var nb_local := MarchingSquaresHexGrid.local_cell(nb, cells_per_chunk())
+		var nb_local := local_cell(nb)
 		var h_nb : float = nb_chunk.get_height(nb_local)
 		var pair := edge_corner_indices(global, edge)
 		var qa := center + offsets[pair.x]

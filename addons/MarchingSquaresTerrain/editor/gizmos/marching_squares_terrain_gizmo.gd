@@ -109,7 +109,8 @@ func _redraw():
 		# outline as-is.
 		var brush_rotation : float = 0.0
 		if BrushPatternCalculator.is_hexagon_brush(terrain_plugin.current_brush_index):
-			if terrain_system.grid_type == MarchingSquaresTerrain.GridType.HEX:
+			if terrain_system.grid_type == MarchingSquaresTerrain.GridType.HEX \
+					or terrain_system.grid_type == MarchingSquaresTerrain.GridType.HEX_RINGS:
 				brush_rotation += deg_to_rad(30.0)
 			if BrushPatternCalculator.is_rotated_hexagon(terrain_plugin.current_brush_index):
 				brush_rotation += deg_to_rad(30.0)
@@ -329,7 +330,7 @@ func _cell_sample(terrain_system: MarchingSquaresTerrain, brush_pos: Vector2, ce
 	return BrushPatternCalculator.hex_cell_sample(
 		brush_pos, center, terrain_plugin.brush_size, terrain_plugin.current_brush_index,
 		max_distance, terrain_plugin.falloff, terrain_plugin.falloff_curve,
-		MarchingSquaresHexGrid.world_to_cell(brush_pos, MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size)),
+		terrain_system.cell_center_of(terrain_system.world_to_cell(brush_pos)),
 		MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size))
 
 
@@ -340,21 +341,19 @@ func _marker_for(terrain_system: MarchingSquaresTerrain) -> Mesh:
 
 
 func _global_of_local_cell(terrain_system: MarchingSquaresTerrain, chunk_coords: Vector2i, local: Vector2i) -> Vector2i:
-	return chunk_coords * terrain_system.cells_per_chunk() + local
+	return terrain_system.global_of_local(chunk_coords, local)
 
 
 func _chunk_of_global_cell(terrain_system: MarchingSquaresTerrain, global: Vector2i) -> Vector2i:
-	return MarchingSquaresHexGrid.chunk_of_cell(global, terrain_system.cells_per_chunk())
+	return terrain_system.chunk_of_cell(global)
 
 
 func _local_of_global_cell(terrain_system: MarchingSquaresTerrain, global: Vector2i) -> Vector2i:
-	return MarchingSquaresHexGrid.local_cell(global, terrain_system.cells_per_chunk())
+	return terrain_system.local_cell(global)
 
 
 func _world_to_global_cell(terrain_system: MarchingSquaresTerrain, p: Vector2) -> Vector2i:
-	if terrain_system.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
-		return MarchingSquaresTriGrid.world_to_cell(p, terrain_system.cell_size)
-	return MarchingSquaresHexGrid.world_to_cell(p, MarchingSquaresHexGrid.spacing_for(terrain_system.cell_size))
+	return terrain_system.world_to_cell(p)
 
 
 ## Outline transform that exactly encloses a grid-aligned selection (M6).

@@ -75,12 +75,12 @@ func _test_hex_sampling(terrain: MarchingSquaresTerrain) -> void:
 	var curve := Curve.new(); curve.add_point(Vector2(0, 0)); curve.add_point(Vector2(1, 1))
 	var center_cell := Vector2i(3, 3)
 	var center := HexGrid.cell_center(center_cell, spacing)
-	var sample := BPC.hex_cell_sample(center, center, 12.0, 0, max_d, false, curve, center_cell, spacing)
+	var sample := BPC.hex_cell_sample(center, center, 12.0, 0, max_d, false, curve, center, spacing)
 	_check(sample == 1.0, "hex cell at brush center samples 1.0")
 	# A cell far away is excluded.
 	var far_cell := Vector2i(20, 20)
 	var far_center := HexGrid.cell_center(far_cell, spacing)
-	var far_sample := BPC.hex_cell_sample(center, far_center, 12.0, 0, max_d, false, curve, center_cell, spacing)
+	var far_sample := BPC.hex_cell_sample(center, far_center, 12.0, 0, max_d, false, curve, center, spacing)
 	_check(far_sample < 0, "hex far cell excluded")
 
 
@@ -127,7 +127,7 @@ func _test_hex_brush_disk(terrain: MarchingSquaresTerrain) -> void:
 	# radius_cells = brush_size / spacing.x * 0.5 + 0.5 = 3.5 at cell_size 2.
 	for cell in HexGrid.cells_in_hex_radius(center_cell, 4):
 		var dist := HexGrid.hex_distance(cell, center_cell)
-		var sample := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 2, max_d, false, curve, center_cell, spacing)
+		var sample := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 2, max_d, false, curve, center, spacing)
 		if dist <= 3:
 			_check(sample == 1.0, "hexagon brush selects distance-%d cell %s" % [dist, cell])
 		else:
@@ -144,16 +144,16 @@ func _test_hex30_sampling(terrain: MarchingSquaresTerrain) -> void:
 	var max_d := BPC.calculate_max_distance(brush_size, 3)
 	var center_cell := Vector2i(3, 3)
 	var center := HexGrid.cell_center(center_cell, spacing)
-	var center_sample := BPC.hex_cell_sample(center, center, brush_size, 3, max_d, false, curve, center_cell, spacing)
+	var center_sample := BPC.hex_cell_sample(center, center, brush_size, 3, max_d, false, curve, center, spacing)
 	_check(center_sample == 1.0, "hexagon30 cell at brush center samples 1.0")
 	
 	var hex_set := {}
 	var hex30_set := {}
 	for cell in HexGrid.cells_in_hex_radius(center_cell, 4):
 		var cell_center := HexGrid.cell_center(cell, spacing)
-		if BPC.hex_cell_sample(center, cell_center, brush_size, 2, max_d, false, curve, center_cell, spacing) > 0:
+		if BPC.hex_cell_sample(center, cell_center, brush_size, 2, max_d, false, curve, center, spacing) > 0:
 			hex_set[cell] = true
-		if BPC.hex_cell_sample(center, cell_center, brush_size, 3, max_d, false, curve, center_cell, spacing) > 0:
+		if BPC.hex_cell_sample(center, cell_center, brush_size, 3, max_d, false, curve, center, spacing) > 0:
 			hex30_set[cell] = true
 	_check(hex_set != hex30_set, "hexagon30 selects a different set than hexagon")
 	
@@ -164,8 +164,8 @@ func _test_hex30_sampling(terrain: MarchingSquaresTerrain) -> void:
 		var delta := HexGrid.cell_center(cell, spacing) - center
 		var rotated := Vector2(delta.x * 0.5 - delta.y * 0.8660254037844386, delta.x * 0.8660254037844386 + delta.y * 0.5)
 		var rotated_cell := HexGrid.world_to_cell(center + rotated, spacing)
-		var sample_a := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 3, max_d, false, curve, center_cell, spacing)
-		var sample_b := BPC.hex_cell_sample(center, HexGrid.cell_center(rotated_cell, spacing), brush_size, 3, max_d, false, curve, center_cell, spacing)
+		var sample_a := BPC.hex_cell_sample(center, HexGrid.cell_center(cell, spacing), brush_size, 3, max_d, false, curve, center, spacing)
+		var sample_b := BPC.hex_cell_sample(center, HexGrid.cell_center(rotated_cell, spacing), brush_size, 3, max_d, false, curve, center, spacing)
 		if absf(sample_a - sample_b) > 0.0001:
 			symmetric = false
 	_check(symmetric, "hexagon30 metric is 60 degree rotation symmetric")

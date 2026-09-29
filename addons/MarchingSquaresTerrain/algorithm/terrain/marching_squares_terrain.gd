@@ -16,7 +16,7 @@ enum StorageMode {
 	RUNTIME,
 }
 
-enum GridType {SQUARE, TRIANGLE, HEX}
+enum GridType {SQUARE, TRIANGLE, HEX, HEX_RINGS}
 signal grid_type_changed (value : GridType)
 
 @export_category("Storage Options")
@@ -81,7 +81,7 @@ signal grid_type_changed (value : GridType)
 # Terrain Settings
 ## The cell grid used by this terrain. Square keeps the original
 ## marching-squares behavior; Triangle and Hexagon use per-cell columns.
-@export_custom(PROPERTY_HINT_RANGE, "0, 2", PROPERTY_USAGE_STORAGE) var grid_type : GridType = GridType.SQUARE:
+@export_custom(PROPERTY_HINT_RANGE, "0, 3", PROPERTY_USAGE_STORAGE) var grid_type : GridType = GridType.SQUARE:
 	get:
 		return _grid_type
 	set(value):
@@ -92,9 +92,39 @@ var _grid_type : GridType = GridType.SQUARE
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var dimensions : Vector3i = Vector3i(33, 32, 33): # Total amount of height values in X and Z direction, and total height range
 	set(value):
 		dimensions = value
-		terrain_material.set_shader_parameter("chunk_size", value)
+		terrain_material.set_shader_parameter("chunk_size", _shader_chunk_size())
 		if EngineWrapper.is_editor():
 			emit_signal("chunk_dimensions_changed", value)
+## Hex-ring mode (GridType.HEX_RINGS): hexes from a chunk's center to its edge. A chunk owns
+## the disk of micro-hexes whose low-res owner is that chunk (server chunk_hex_radius).
+@export_custom(PROPERTY_HINT_RANGE, "1, 8", PROPERTY_USAGE_STORAGE) var chunk_hex_radius : int = 2:
+	set(value):
+		value = clampi(value, 1, 8)
+		if chunk_hex_radius == value:
+			return
+		if grid_type == GridType.HEX_RINGS and not chunks.is_empty():
+			# Changing the radius changes cell ownership, so rebuild the chunks
+			# from their fine-hex data instead of just regenerating meshes.
+			_remap_hex_ring_radius(value)
+			return
+		chunk_hex_radius = value
+		terrain_material.set_shader_parameter("chunk_size", _shader_chunk_size())
+		for chunk in chunks.values():
+			chunk.regenerate_mesh()
+## Hex-ring mode: torus lap size in chunks (0 = wrapping off). Set from the server's
+## MapConfig so seam cell lookups canonicalize into the lap (server wrap_chunk_coords).
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var wrap_chunk_cols : int = 0:
+	set(value):
+		if wrap_chunk_cols == value:
+			return
+		wrap_chunk_cols = value
+		_regenerate_all_chunk_meshes()
+@export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var wrap_chunk_rows : int = 0:
+	set(value):
+		if wrap_chunk_rows == value:
+			return
+		wrap_chunk_rows = value
+		_regenerate_all_chunk_meshes()
 @export_custom(PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE) var cell_size : Vector2 = Vector2(2.0, 2.0): # XZ Unit size of each cell
 	set(value):
 		cell_size = value
@@ -587,6 +617,8 @@ func make_chunk() -> MarchingSquaresTerrainChunkBase:
 			return MarchingSquaresTriChunk.new()
 		GridType.HEX:
 			return MarchingSquaresHexChunk.new()
+		GridType.HEX_RINGS:
+			return MarchingSquaresHexRingsChunk.new()
 		_:
 			return MarchingSquaresTerrainChunk.new()
 
@@ -597,16 +629,108 @@ func cells_per_chunk() -> Vector2i:
 		return Vector2i(2 * dimensions.x, dimensions.z)
 	if grid_type == GridType.HEX:
 		return Vector2i(dimensions.x, dimensions.z)
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.cells_per_chunk(chunk_hex_radius)
 	return Vector2i.ZERO
+
+
+## Chunk size in cells fed to the terrain shader. Hex-ring chunks are (2R+1)
+## cells across and ignore dimensions, so keep the shader texture tiling in sync.
+func _shader_chunk_size() -> Vector3i:
+	if grid_type == GridType.HEX_RINGS:
+		var cells := MarchingSquaresHexRingsGrid.cells_per_chunk(chunk_hex_radius)
+		return Vector3i(cells.x, dimensions.y, cells.y)
+	return dimensions
+
+
+## Regenerate every chunk mesh (hex-ring layout changes may alter seam walls).
+func _regenerate_all_chunk_meshes() -> void:
+	for chunk in chunks.values():
+		chunk.regenerate_mesh()
+
+
+#region cell coordinate dispatch (per grid mode)
+
+## Global cell coordinate from a chunk coordinate and local cell.
+func global_of_local(chunk_coords: Vector2i, local: Vector2i) -> Vector2i:
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.global_cell(chunk_coords, local, chunk_hex_radius)
+	return chunk_coords * cells_per_chunk() + local
+
+
+## Chunk owning a global cell. Ring chunks canonicalize into the lap when wrapping is on.
+func chunk_of_cell(global_cell: Vector2i) -> Vector2i:
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.chunk_of_cell(wrap_cell(global_cell), chunk_hex_radius)
+	if grid_type == GridType.TRIANGLE:
+		return MarchingSquaresTriGrid.chunk_of_cell(global_cell, cells_per_chunk())
+	return MarchingSquaresHexGrid.chunk_of_cell(global_cell, cells_per_chunk())
+
+
+## Local (bounding-box) cell coordinate of a global cell in its owning chunk.
+func local_cell(global_cell: Vector2i) -> Vector2i:
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.local_cell(wrap_cell(global_cell), chunk_hex_radius)
+	if grid_type == GridType.TRIANGLE:
+		return MarchingSquaresTriGrid.local_cell(global_cell, cells_per_chunk())
+	return MarchingSquaresHexGrid.local_cell(global_cell, cells_per_chunk())
+
+
+## World-space XZ center of a global cell.
+func cell_center_of(global_cell: Vector2i) -> Vector2:
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.cell_center(
+			global_cell, MarchingSquaresHexRingsGrid.spacing_for(cell_size))
+	if grid_type == GridType.TRIANGLE:
+		return MarchingSquaresTriGrid.cell_center(global_cell, cell_size)
+	return MarchingSquaresHexGrid.cell_center(global_cell, MarchingSquaresHexGrid.spacing_for(cell_size))
+
+
+## Cell containing a world-space XZ point.
+func world_to_cell(world_pos: Vector2) -> Vector2i:
+	if grid_type == GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.world_to_cell(
+			world_pos, MarchingSquaresHexRingsGrid.spacing_for(cell_size))
+	if grid_type == GridType.TRIANGLE:
+		return MarchingSquaresTriGrid.world_to_cell(world_pos, cell_size)
+	return MarchingSquaresHexGrid.world_to_cell(world_pos, MarchingSquaresHexGrid.spacing_for(cell_size))
+
+
+## Chunk coords sharing cell walls with the given chunk. Ring chunks use the 6 axial
+## neighbours (wrapped into the lap when wrapping is on); rectangle chunks use 4.
+func chunk_neighbors(chunk_coords: Vector2i) -> Array[Vector2i]:
+	var result : Array[Vector2i] = []
+	if grid_type == GridType.HEX_RINGS:
+		for delta in MarchingSquaresHexRingsGrid.NEIGHBOR_OFFSETS:
+			result.append(wrap_chunk(chunk_coords + delta))
+	else:
+		for delta in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			result.append(chunk_coords + delta)
+	return result
+
+
+## Canonical lap cell for an arbitrary fine hex (ring chunks only; other modes are 1:1).
+func wrap_cell(global_cell: Vector2i) -> Vector2i:
+	if grid_type != GridType.HEX_RINGS or wrap_chunk_cols <= 0 or wrap_chunk_rows <= 0:
+		return global_cell
+	return MarchingSquaresHexRingsGrid.wrap_cell(
+		global_cell, chunk_hex_radius, wrap_chunk_cols, wrap_chunk_rows)
+
+
+## Canonical lap chunk coords (ring chunks only; other modes are 1:1).
+func wrap_chunk(chunk_coords: Vector2i) -> Vector2i:
+	if grid_type != GridType.HEX_RINGS or wrap_chunk_cols <= 0 or wrap_chunk_rows <= 0:
+		return chunk_coords
+	return Vector2i(posmod(chunk_coords.x, wrap_chunk_cols), posmod(chunk_coords.y, wrap_chunk_rows))
+
+#endregion
 
 
 ## Resolve the chunk owning a global cell for cell modes.
 func chunk_for_cell(global_cell: Vector2i) -> MarchingSquaresTerrainChunkBase:
-	var cells := cells_per_chunk()
-	if cells == Vector2i.ZERO:
+	if cells_per_chunk() == Vector2i.ZERO:
 		return null
-	var cc := MarchingSquaresHexGrid.chunk_of_cell(global_cell, cells)
-	return chunks.get(cc)
+	return chunks.get(chunk_of_cell(global_cell))
 
 
 ## Height of a global cell for cell modes. Returns null when the cell's chunk
@@ -615,7 +739,7 @@ func get_cell_height(global_cell: Vector2i) -> Variant:
 	var chunk = chunk_for_cell(global_cell)
 	if chunk == null:
 		return null
-	return chunk.get_height(MarchingSquaresHexGrid.local_cell(global_cell, cells_per_chunk()))
+	return chunk.get_height(local_cell(global_cell))
 
 
 ## Whether a global cell is smoothed (bridge-sloped) for cell modes.
@@ -623,18 +747,21 @@ func get_cell_smooth(global_cell: Vector2i) -> bool:
 	var chunk = chunk_for_cell(global_cell)
 	if chunk == null:
 		return false
-	return chunk.get_smooth(MarchingSquaresHexGrid.local_cell(global_cell, cells_per_chunk()))
+	return chunk.get_smooth(local_cell(global_cell))
 
 
 ## World-space origin position of a cell chunk node.
 func cell_chunk_position(coords: Vector2i) -> Vector3:
-	var cells := cells_per_chunk()
 	if grid_type == GridType.TRIANGLE:
 		var p := MarchingSquaresTriGrid.lattice_point(
 			coords.x * dimensions.x, coords.y * dimensions.z, cell_size)
 		return Vector3(p.x, 0, p.y)
 	elif grid_type == GridType.HEX:
+		var cells := cells_per_chunk()
 		var p := MarchingSquaresHexGrid.cell_center(coords * cells, MarchingSquaresHexGrid.spacing_for(cell_size))
+		return Vector3(p.x, 0, p.y)
+	elif grid_type == GridType.HEX_RINGS:
+		var p := MarchingSquaresHexRingsGrid.chunk_center_world(coords, chunk_hex_radius, cell_size)
 		return Vector3(p.x, 0, p.y)
 	return Vector3.ZERO
 
@@ -684,6 +811,88 @@ func _deferred_rebuild_chunks(_unused: bool) -> void:
 		chunk.initialize_terrain(true)
 
 
+## Rebuild hex-ring chunks for a new chunk_hex_radius. Fine-hex data is keyed by
+## global axial cell, so painted heights/colors/mask/smooth survive the change.
+func _remap_hex_ring_radius(new_radius: int) -> void:
+	var old_radius := chunk_hex_radius
+	var old_cells := MarchingSquaresHexRingsGrid.cells_per_chunk(old_radius)
+	
+	# Gather every real cell's data keyed by its global axial coordinate.
+	var gathered : Dictionary = {}
+	for chunk in chunks.values():
+		if not (chunk is MarchingSquaresHexRingsChunk):
+			continue
+		for r in range(old_cells.y):
+			for c in range(old_cells.x):
+				var local := Vector2i(c, r)
+				if not MarchingSquaresHexRingsGrid.has_local(local, old_radius):
+					continue
+				var global := MarchingSquaresHexRingsGrid.global_cell(chunk.chunk_coords, local, old_radius)
+				gathered[global] = [
+					chunk.get_height(local),
+					chunk.get_color_0(local),
+					chunk.get_color_1(local),
+					chunk.get_wall_color_0(local),
+					chunk.get_wall_color_1(local),
+					chunk.get_grass_mask(local),
+					chunk.get_smooth(local),
+				]
+	
+	# Free all chunks without saving: the gathered data is written back below and the
+	# rebuilt chunks are marked dirty, so the next save overwrites the old files.
+	for child in get_children():
+		if child is MarchingSquaresTerrainChunkBase:
+			child._skip_save_on_exit = true
+			child.owner = null
+			remove_child(child)
+			child.free()
+	chunks.clear()
+	
+	chunk_hex_radius = new_radius
+	terrain_material.set_shader_parameter("chunk_size", _shader_chunk_size())
+	
+	# Create one chunk per new owner, then restore the gathered cells.
+	for global in gathered.keys():
+		var owner := chunk_of_cell(global)
+		if not chunks.has(owner):
+			var new_chunk := make_chunk()
+			new_chunk.name = "Chunk " + str(owner)
+			add_chunk(owner, new_chunk, null, false)
+	
+	for global in gathered.keys():
+		var chunk : MarchingSquaresHexRingsChunk = chunks.get(chunk_of_cell(global))
+		if chunk == null:
+			continue
+		var local := local_cell(global)
+		var data : Array = gathered[global]
+		chunk.draw_height(local.x, local.y, data[0])
+		chunk.draw_color_0(local.x, local.y, data[1])
+		chunk.draw_color_1(local.x, local.y, data[2])
+		chunk.draw_wall_color_0(local.x, local.y, data[3])
+		chunk.draw_wall_color_1(local.x, local.y, data[4])
+		chunk.draw_grass_mask(local.x, local.y, data[5])
+		chunk.draw_smooth(local.x, local.y, data[6])
+	
+	for chunk in chunks.values():
+		if chunk is MarchingSquaresCellChunk:
+			chunk.refresh_smooth_flag()
+		chunk.regenerate_mesh()
+	
+	# The previous selection and undo history referenced the freed chunks.
+	var plugin := MarchingSquaresTerrainPlugin.instance
+	if plugin:
+		var undo_redo := plugin.get_undo_redo()
+		if undo_redo:
+			undo_redo.clear_history(false)
+		plugin.selected_chunk = null
+		for chunk in chunks.values():
+			plugin.selected_chunk = chunk
+			break
+	
+	if EngineWrapper.is_editor():
+		EditorInterface.mark_scene_as_unsaved()
+
+
 func add_new_chunk(chunk_x: int, chunk_z: int, plugin):
 	var chunk_coords := Vector2i(chunk_x, chunk_z)
 	var new_chunk := make_chunk()
@@ -695,8 +904,8 @@ func add_new_chunk(chunk_x: int, chunk_z: int, plugin):
 	if grid_type != GridType.SQUARE:
 		# Cell modes: no border heights to copy. Regenerate neighbours so their
 		# walls face the new chunk.
-		for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
-			var neighbor = chunks.get(chunk_coords + offset)
+		for neighbor_coords in chunk_neighbors(chunk_coords):
+			var neighbor = chunks.get(neighbor_coords)
 			if neighbor:
 				neighbor.regenerate_mesh()
 		new_chunk.regenerate_mesh()
@@ -771,8 +980,8 @@ func remove_chunk_from_tree(x: int, z: int, plugin):
 
 
 func _regenerate_neighbor_chunks(chunk_coords: Vector2i) -> void:
-	for offset in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
-		var neighbor = chunks.get(chunk_coords + offset)
+	for neighbor_coords in chunk_neighbors(chunk_coords):
+		var neighbor = chunks.get(neighbor_coords)
 		if neighbor:
 			neighbor.regenerate_mesh()
 
@@ -898,7 +1107,7 @@ func force_batch_update() -> void:
 	var grass_mat := grass_mesh.material as ShaderMaterial
 	
 	# TERRAIN MATERIAL - Core parameters
-	terrain_material.set_shader_parameter("chunk_size", dimensions)
+	terrain_material.set_shader_parameter("chunk_size", _shader_chunk_size())
 	terrain_material.set_shader_parameter("cell_size", cell_size)
 	
 	# TERRAIN MATERIAL - Ground Textures

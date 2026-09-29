@@ -11,13 +11,14 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 | `editor/gizmos/` | `MarchingSquaresTerrainGizmo` (brush/selection drawing), `MarchingSquaresTerrainChunkGizmo`, `MarchingSquaresTerrainCellChunkGizmo` (per-cell height handles), and the gizmo plugin that registers them. |
 | `editor/tools/scripts/` | Tool resources + attribute system: `MarchingSquaresTool`, `MarchingSquaresToolbox`, `MarchingSquaresToolbar`, `MarchingSquaresToolAttributes(+List,+Settings)`, texture presets/lists/names/quick paints, geometry baker. |
 | `editor/utils/` | `BrushPatternCalculator` (brush sampling, `grid_aligned_cells`, `grid_aligned_outline`), `MSTGridSnap` (shared square-lattice snapping helper for the bundled ports), `EngineWrapper` (editor-vs-runtime helpers), file utils. |
-| `algorithm/terrain/marching_squares_terrain.gd` | `MarchingSquaresTerrain` (`Node3D`): `GridType {SQUARE, TRIANGLE, HEX}`, chunk lifecycle, data directory, save hooks. |
+| `algorithm/terrain/marching_squares_terrain.gd` | `MarchingSquaresTerrain` (`Node3D`): `GridType {SQUARE, TRIANGLE, HEX, HEX_RINGS}`, chunk lifecycle, data directory, save hooks, wrap props. |
 | `algorithm/terrain/marching_squares_terrain_chunk.gd` | Original square marching-squares chunk. |
 | `algorithm/terrain/marching_squares_terrain_chunk_base.gd` | `MarchingSquaresTerrainChunkBase`: shared virtual API for all chunk types (heights, colors, dirty flag). |
 | `algorithm/terrain/marching_squares_terrain_cell.gd`, `..._vertex_color_helper.gd` | Per-cell data plus texture/grass vertex-color math (consumed by the `mst_terrain` shader). |
 | `algorithm/cells/marching_squares_cell_chunk.gd` | `MarchingSquaresCellChunk`: shared mesh generation for triangle/hex (`_emit_cell`, `_emit_wall`, `_emit_ramp`), merge modes, grass + save hooks. |
 | `algorithm/cells/marching_squares_cell_grass_planter.gd` | Grass placement for cell chunks. |
 | `algorithm/hex/`, `algorithm/tri/` | `MarchingSquaresHexGrid`/`MarchingSquaresHexChunk` and `MarchingSquaresTriGrid`/`MarchingSquaresTriChunk`: per-mode coordinate math and shape/neighbour implementations. |
+| `algorithm/hex_rings/` | `MarchingSquaresHexRingsGrid`/`MarchingSquaresHexRingsChunk`: hex-ring mode — a low-res chunk hex owning a disk of micro-hexes (the server hexmod layout), coordinate math + wrap (`wrap_cell`). |
 | `algorithm/grass/marching_squares_grass_planter.gd` | Square-grid grass (MultiMesh). |
 | `resources/mst_chunk_data.gd` | `MSTChunkData`: serialized per-chunk payload. |
 | `resources/mst_data_handler.gd` | `MSTDataHandler`: all external save/load, per-mode subfolders, legacy data migration. |
@@ -28,8 +29,8 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 
 ## Core architecture
 
-- **Grid types.** `SQUARE` is the original marching-squares pipeline. `TRIANGLE`/`HEX` are cell modes: every cell renders as a flat polygon at its own height with walls/ramps toward lower neighbours. `MarchingSquaresTerrain.make_chunk()` dispatches on `grid_type`; all painting tools work on all three modes.
-- **Data.** Chunks are stored outside the scene under the terrain's `data_directory`, in per-mode subfolders `square/`, `triangle/`, `hex/` (`MSTDataHandler.MODE_NAMES`, order must match `GridType`). Each chunk is `chunk_<x>_<y>/metadata.res` (an `MSTChunkData`). Legacy data at the directory root is migrated to `square/`. Saving is triggered from `NOTIFICATION_EDITOR_PRE_SAVE` and explicit `MSTDataHandler` calls, not on every stroke.
+- **Grid types.** `SQUARE` is the original marching-squares pipeline. `TRIANGLE`/`HEX` are cell modes: every cell renders as a flat polygon at its own height with walls/ramps toward lower neighbours. `HEX_RINGS` is the hexmod chunk mode: the canonical world is `wrap_chunk_cols × wrap_chunk_rows` low-res chunk hexes (axial chunk coords), each owning the disk of micro-hexes whose `to_lower_res` is that chunk; cell coords are global axial and `chunk_hex_radius` sets the disk radius. With `wrap_chunk_cols/rows` > 0, `chunk_for_cell`/`local_cell` canonicalize seam cells into the lap (`MarchingSquaresHexRingsGrid.wrap_cell`), so border chunks read their wrapped neighbours. Chunks expose `has_cell(local)` — the bounding-box corners outside the disk are skipped by the mesh/grass loops. `MarchingSquaresTerrain.make_chunk()` dispatches on `grid_type`; painting tools use the terrain's `chunk_of_cell`/`local_cell`/`global_of_local`/`world_to_cell`/`cell_center_of`/`chunk_neighbors` helpers so they work on all four modes.
+- **Data.** Chunks are stored outside the scene under the terrain's `data_directory`, in per-mode subfolders `square/`, `triangle/`, `hex/`, `hex_rings/` (`MSTDataHandler.MODE_NAMES`, order must match `GridType`). Each chunk is `chunk_<x>_<y>/metadata.res` (an `MSTChunkData`). Legacy data at the directory root is migrated to `square/`. Saving is triggered from `NOTIFICATION_EDITOR_PRE_SAVE` and explicit `MSTDataHandler` calls, not on every stroke.
 - **Editor tools.** `TerrainToolMode` enumerates the tools; attributes are declared in `MarchingSquaresToolAttributeSettings` + `MarchingSquaresToolAttributesList`, resolved in `MarchingSquaresToolAttributes` (`add_setting`, `_get_setting_value`) and `MarchingSquaresUI._on_setting_changed`, then executed in the plugin's `draw_pattern`. Grid-aligned painting is gated by `grid_align_gate_passes()` (cell terrain + hex brush + falloff off) and sampled with `BrushPatternCalculator.grid_aligned_cells`.
 - **Rendering.** One `MeshInstance3D` per chunk plus a `StaticBody3D` collider. Texture/grass information rides in vertex colors (`color_0`, `color_1`, wall/grass maps) interpreted by `MarchingSquaresTerrainVertexColorHelper` and `mst_terrain.gdshader`; grass is a MultiMesh driven by the grass planters. Bake shaders feed runtime texture baking.
 
@@ -43,7 +44,7 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 ## Extending
 
 - **New tool or attribute**: `documentation/documentation+/internal_tool_system.md` walks through the tool resource, attribute lists, UI wiring, and `draw_pattern` behaviour.
-- **New grid mode**: add a `GridType` value + chunk class + grid math class, wire into the terrain's `make_chunk()`/mode switch, and append the folder name to `MSTDataHandler.MODE_NAMES` (order = enum order).
+- **New grid mode**: add a `GridType` value + chunk class + grid math class, wire into the terrain's `make_chunk()` plus the coordinate dispatch helpers (`cells_per_chunk`, `chunk_of_cell`, `local_cell`, `global_of_local`, `world_to_cell`, `cell_center_of`, `chunk_neighbors`, `cell_chunk_position`), and append the folder name to `MSTDataHandler.MODE_NAMES` (order = enum order).
 
 ## Pitfalls
 

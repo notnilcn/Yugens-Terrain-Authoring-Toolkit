@@ -182,7 +182,9 @@ static func get_cell_range_for_chunk(chunk_coords: Vector2i, bounds: BrushBounds
 
 #region cell-mode sampling
 
-## Sample for one hex-terrain cell. brush_pos and cell_pos are world XZ.
+## Sample for one hex-terrain cell. brush_pos and cell_pos are world XZ; center_pos is the
+## world-space center of the cell under the brush (the same pointy-top lattice for the offset
+## hex grid and the axial hex-rings grid).
 static func hex_cell_sample(
 	brush_pos : Vector2,
 	cell_pos : Vector2,
@@ -191,15 +193,14 @@ static func hex_cell_sample(
 	max_distance : float,
 	use_falloff : bool,
 	falloff_curve : Curve,
-	center_cell : Vector2i,
+	center_pos : Vector2,
 	spacing : Vector2
 	) -> float:
 	if is_hexagon_brush(brush_index):
 		# Continuous hex distance in cell space around the cell under the
-		# brush. Cell centers sit on a pointy-top odd-r lattice where
-		# world X = spacing.x * (q + r / 2) and world Z = spacing.y * r, so
-		# the axial delta is (dx / sx - 0.5 * dz / sz, dz / sz).
-		var center_pos := MarchingSquaresHexGrid.cell_center(center_cell, spacing)
+		# brush. Cell centers sit on a pointy-top lattice where world
+		# X = spacing.x * (q + r / 2) and world Z = spacing.y * r, so the
+		# axial delta is (dx / sx - 0.5 * dz / sz, dz / sz).
 		var d_pos := cell_pos - center_pos
 		if is_rotated_hexagon(brush_index):
 			d_pos = _rotate_30(d_pos)
@@ -245,21 +246,23 @@ static func cell_candidates_for_chunk(
 	var result : Array[Vector2i] = []
 	if cells == Vector2i.ZERO:
 		return result
+	# Ring chunks are small and not rectangular-indexed: return every real cell and let the
+	# brush sample filter them.
+	if terrain.grid_type == MarchingSquaresTerrain.GridType.HEX_RINGS:
+		var ring_chunk = terrain.chunks.get(chunk_coords)
+		if ring_chunk == null:
+			return result
+		for r in range(cells.y):
+			for c in range(cells.x):
+				if ring_chunk.has_cell(Vector2i(c, r)):
+					result.append(Vector2i(c, r))
+		return result
 	# Convert the brush bounds into global cell space and intersect with chunk.
 	var half := brush_size * 0.5
-	var global_min := Vector2i.ZERO
-	var global_max := Vector2i.ZERO
-	if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
-		var lo := MarchingSquaresTriGrid.world_to_cell(brush_pos - Vector2(half, half), terrain.cell_size)
-		var hi := MarchingSquaresTriGrid.world_to_cell(brush_pos + Vector2(half, half), terrain.cell_size)
-		global_min = Vector2i(mini(lo.x, hi.x) - margin, mini(lo.y, hi.y) - margin)
-		global_max = Vector2i(maxi(lo.x, hi.x) + margin, maxi(lo.y, hi.y) + margin)
-	else:
-		var spacing := MarchingSquaresHexGrid.spacing_for(terrain.cell_size)
-		var lo := MarchingSquaresHexGrid.world_to_cell(brush_pos - Vector2(half, half), spacing)
-		var hi := MarchingSquaresHexGrid.world_to_cell(brush_pos + Vector2(half, half), spacing)
-		global_min = Vector2i(mini(lo.x, hi.x) - margin, mini(lo.y, hi.y) - margin)
-		global_max = Vector2i(maxi(lo.x, hi.x) + margin, maxi(lo.y, hi.y) + margin)
+	var lo := terrain.world_to_cell(brush_pos - Vector2(half, half))
+	var hi := terrain.world_to_cell(brush_pos + Vector2(half, half))
+	var global_min := Vector2i(mini(lo.x, hi.x) - margin, mini(lo.y, hi.y) - margin)
+	var global_max := Vector2i(maxi(lo.x, hi.x) + margin, maxi(lo.y, hi.y) + margin)
 	
 	var chunk_min := chunk_coords * cells
 	var local_min := Vector2i(maxi(global_min.x, chunk_min.x), maxi(global_min.y, chunk_min.y)) - chunk_min
@@ -272,9 +275,7 @@ static func cell_candidates_for_chunk(
 
 ## World-space XZ center of a global cell.
 static func cell_center_for(terrain: MarchingSquaresTerrain, global_cell: Vector2i) -> Vector2:
-	if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
-		return MarchingSquaresTriGrid.cell_center(global_cell, terrain.cell_size)
-	return MarchingSquaresHexGrid.cell_center(global_cell, MarchingSquaresHexGrid.spacing_for(terrain.cell_size))
+	return terrain.cell_center_of(global_cell)
 
 
 ## Cells selected by a grid-aligned brush. size_mode: false = hex, true = tri.
@@ -282,6 +283,8 @@ static func grid_aligned_cells(terrain: MarchingSquaresTerrain, brush_pos: Vecto
 	if terrain.grid_type == MarchingSquaresTerrain.GridType.TRIANGLE:
 		var center := MarchingSquaresTriGrid.nearest_lattice_point(brush_pos, terrain.cell_size)
 		return MarchingSquaresTriGrid.cells_in_hexagon(center, maxi(grid_size, 1), terrain.cell_size)
+	if terrain.grid_type == MarchingSquaresTerrain.GridType.HEX_RINGS:
+		return MarchingSquaresHexRingsGrid.cells_in_hex_radius(terrain.world_to_cell(brush_pos), maxi(grid_size, 0))
 	var spacing := MarchingSquaresHexGrid.spacing_for(terrain.cell_size)
 	var center := MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing)
 	return MarchingSquaresHexGrid.cells_in_hex_radius(center, maxi(grid_size, 0))
@@ -303,8 +306,8 @@ static func grid_aligned_outline(terrain: MarchingSquaresTerrain, brush_pos: Vec
 			"rotation": deg_to_rad(30.0),
 		}
 	var spacing := MarchingSquaresHexGrid.spacing_for(terrain.cell_size)
-	var cell := MarchingSquaresHexGrid.world_to_cell(brush_pos, spacing)
-	var center := MarchingSquaresHexGrid.cell_center(cell, spacing)
+	var cell := terrain.world_to_cell(brush_pos)
+	var center := terrain.cell_center_of(cell)
 	var radius_cells := maxi(grid_size, 0)
 	return {
 		"center": center,
