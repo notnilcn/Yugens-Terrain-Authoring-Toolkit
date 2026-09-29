@@ -37,7 +37,7 @@ This folder is the **entire plugin**. It is distributed by copying the folder in
 
 - Follow `documentation/documentation+/code_style_guide.md`: tabs, `MarchingSquares`/`MST` class-name prefixes, snake_case, `variable : type` spacing, 2 blank lines between sections/functions, `#region` blocks, `##` comments for editor-visible APIs.
 - Scripts run in the editor: keep `@tool` behaviour safe and guard runtime-only APIs (`EngineWrapper.is_editor()`, `Engine.is_editor_hint()`).
-- Never hand-edit `.uid` files. Move/rename scripts through the editor so `uid://` preloads stay valid — many preloads reference UIDs, not paths.
+- Never hand-edit `.uid` files. Move/rename scripts through the editor so resource `uid://` references stay valid — scripts preload by path, so update any preloads pointing at a moved file.
 - Keep the addon self-contained and copy-paste friendly.
 
 ## Extending
