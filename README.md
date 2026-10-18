@@ -1,84 +1,260 @@
-# Yūgen's Terrain Authoring Toolkit
-The public version of the Marching Squares Terrain plugin for godot.
+<p align="center">
+  <img src="docs/images/hero.png" alt="Pixelizer3D running in Godot 4.7" width="920">
+</p>
 
-This project is an effort to create a simple to use and powerfull terrain authoring tool inside godot aimed at 3d pixel art games. However, the plugin featured in this project can be used for a wide variety of games and experimentation is encouraged! As of right now the plugin has the following features:
+<h1 align="center">Pixelizer3D</h1>
 
-* Elevate and lower terrain based on cells in a chunk grid
-* Level terrain to a user-set height
-* Smooth terrain depending on the average height of neighbouring cells
-* Create a bridge between two points by drawing a line between them
-* Paint up to 15(+1) custom textures onto the terrain
-* Paint a mask map that determines whether selected cells should draw `MultiMeshInstance3d` grass instances
-* Three grid types: Square (original marching squares), Triangle and Hexagon (flat-topped cell columns), selectable per terrain
-* Round, Square and Hexagon brush shapes; exact grid-aligned painting of whole cells/hexagons
-* Grass and runtime texture baking on all grid types
-* Get debug information for selected cells
-* Change the internal marching squares algorithm vertex merge threshold value resulting in smoother or blockier terrain
-* Change global terrain settings like the default wall texture, texture blend mode, grass animation fps and more...
-* Bundled ports of **Cyclops Level Builder** and **TileMapLayer3D**, both with a shared **MST Grid Align** snapping mode (see below)
+<p align="center">
+  <b>Realtime 3D pixel art for Godot 4.7 (Forward+).</b><br>
+  Snap any 3D scene onto a chunky macro-pixel lattice, ink it with clean
+  screen-space outlines, grade it through a palette LUT, and light it with
+  pixelated god rays and cloud shadows — all in-engine, no render-to-texture
+  hackery in your game code.
+</p>
 
-## Grid Modes
+<p align="center">
+  <a href="addons/pixelizer_3d/README.md">Addon reference</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#the-demo">Demo</a> ·
+  <a href="#shader-bridge">Shader bridge</a> ·
+  <a href="AGENTS.md">Architecture</a>
+</p>
 
-The Terrain Settings tool has a **Grid Type** dropdown:
+---
 
-* **Square** (default) - the original marching squares pipeline, unchanged.
-* **Triangle** - equilateral triangles on a triangular lattice.
-* **Hexagon** - regular pointy-top hexagons in odd-r offset rows.
+## Why Pixelizer3D
 
-Triangle and hexagon terrains render every cell as a flat polygon at its own height
-with vertical cliffs where a neighbour is lower. All painting tools (height, level,
-smooth, bridge, vertex paint, grass mask, quick paint) work on all three grid types.
+Most "3D pixel art" tricks force a choice: either you render the whole game at a
+tiny resolution (cheap, but every object shares one pixel grid and the HUD,
+text and UI die with it), or you leave 3D alone and fake the pixels in post.
+Pixelizer3D takes a different route.
 
-* **Grid Aligned** (Brush, Level, Smooth, Bridge): requires the Hexagon brush and
-  Falloff off on a cell terrain. The brush then selects whole cells: `3N² + 3N + 1`
-  hexagon cells or `6N²` triangles, where `N` is the **Grid Size** attribute.
-* **Merge modes** (per chunk, Chunk Management tool): steps at or below a mode's
-  threshold are drawn as 45-degree ramps instead of cliffs. CUBIC keeps exact columns.
-* **Data folders**: each grid type stores its chunks in its own subfolder of the
-  terrain's data directory (`square/`, `triangle/`, `hex/`). Legacy data at the root
-  of the data directory is migrated into `square/` automatically.
+It renders a hidden **metadata pass** that tags every pixelized fragment with its
+object's macro-pixel size, outline id and view depth. A small compositor chain
+then reconstructs the image on a per-object grid: each object gets crisp,
+stable blocks of its own size, outlines are drawn between tags, and depth is
+written back so foreground geometry still occludes correctly. Because it is a
+compositor effect, the pixel look composites with everything else — UI, 3D, and
+any shader you write — while your scene stays a normal Godot scene.
 
-For more in-depth documentation, please refer to the _documentation_ folder in the addon.
+The result stays **stable while the camera moves** (a phase-anchored texel snap)
+and works on **ordinary materials**: parent your world under one applier, and
+every mesh beneath it is pixelized. Wiring is explicit — one
+`PixelizerManager3D` per viewport, plus one `PixelizerApplier3D` per subtree you
+want pixelized.
 
-## Bundled Ports (Grid Align + Dual Grid)
+## Feature tour
 
-This repository also ships two vendored, renamed ports under `addons/`:
+### Macro-pixel rendering, per object
 
-* `addons/YugenCyclopsLevelBuilder/` — full port of [Cyclops Level Builder](https://github.com/blackears/cyclopsLevelBuilder) (MIT, Mark McKay). Adds a **Grid Align** snapping system that snaps block edits to an assigned `MarchingSquaresTerrain` lattice (vertices/cell centers, cell-size multiplier, optional Y snap).
-* `addons/YugenTileMapLayer3D/` — full port of [TileMapLayer3D](https://github.com/DanTrz/TileMapLayer3D) (MIT, DanTrz). Adds the same **MST Grid Align** placement snapping plus a **Dual Grid Auto Tile** mode that picks a tile's display variant from its XZ neighbours using the DualGrid / TileMapDual v5 peering rules (bespoke mixes and layer-order overrides included).
+Every `MeshInstance3D`, `MultiMeshInstance3D`, `GPUParticles3D` and
+`CPUParticles3D` under a `PixelizerApplier3D` is converted automatically.
+Pixel size is a live, per-object setting (`1`–`5`), and **`UNIFIED` anchor mode**
+pins a whole group to one world-origin lattice so terrain chunks and grass share
+one grid with no seams.
 
-Both ports depend on the `MSTGridSnap` helper that ships inside the MST addon, but load and behave like upstream when no terrain is assigned.
-See [`documentation/working_with_ports.md`](documentation/working_with_ports.md) for setup and controls.
+<p align="center">
+  <img src="docs/images/demo-terrain.png" alt="Pixelized MarchingSquaresTerrain with grass and outlines" width="820">
+</p>
 
-For community showcases, feature requests and bug reporting, please refer to the [discord](https://discord.gg/ZSeYkTCgft).
-A bug can also be reported by opening a new issue thread in the issues tab of this github project.
+### Screen-space outlines & subject focus
 
-## Install Guide
+A 256-id outline palette draws silhouette **and** inner-depth edges as clean
+screen-space lines that thicken and break the way hand-drawn ink does. Tag an
+object (or a whole applier subtree), override a single id's colour, or hide an
+outline entirely — per object or inherited from the applier. An object can also
+opt out of the silhouette tint into a reserved **focus** id.
 
-To install the plugin, simply download or clone the latest stable version of this project and copy the plugin from this project's addon folder into your own. Make sure to turn on the plugin in godot by going into the project settings and under "plugins" checking the checkbox next to the plugin's name.
+### Palette LUT + ordered dither
 
-Watch the [YouTube](https://www.youtube.com/playlist?list=PLXcmz5ZRdiyTpf_Jk9gGNb9QQ6Hus8xiP) videos to get started with the plugin!!!
+Bake a 16³-colour LUT (256×256, 16 dither bands) and the shader grades every
+pixelized fragment into it, with the dither band driven by the macro grid
+(never screen space, so it scrolls with the world, not the camera). Grading runs
+after the anchor clip, so the palette rides the pixel blocks. Grading is applied
+to the **albedo**, so lighting, cloud shadows and emission still act on top of
+the graded colour — the palette constrains colour, not the final brightness.
 
-## Known Issues
+### A 3-pass compositor pipeline
 
-1. Smooth texture blending breaks at certain elevated/lowered cell edge cases
-2. d3d12 doesn't load terrain material properly when in game on some devices
+All of it runs on the GPU as `CompositorEffect`s, in this fixed order:
+
+```
+god_rays?  →  snapshot  →  apply_pixelization
+(compute,    (compute,     (raster + depth write-back: inline 5x5 anchor search,
+ additive,    colour+depth  replicate blocks, outlines, dither grade)
+ optional)    in one pass)
+```
+
+God rays run *first* (when a `PixelizerGodRays3D` node is present) and write
+into the scene colour, so the rays themselves are replicated into macro-pixels
+like everything else. Depth write-back is why the
+foreground reads correctly through the pixel blocks. The anchor map is computed
+inline in the apply pass (one full-screen dispatch fewer).
+
+### Effects that share one world
+
+- **God rays** march the same cloud field as the shadows, so light shafts open
+  exactly where the clouds have gaps.
+- **Cloud shadows** are sun-projected, optionally banded, and pushed to every
+  registered receiver (terrain, water, custom materials).
+- **Water** is an opaque, banded coast shader that receives the same clouds.
+- **Fireflies**, **point-light volumes**, and a **day/night rig** drive
+  ambient, sky and sun ramps from a normalized time of day.
+- **Low-res SubViewport mode** gives you a single uniform low-res lattice
+  (with a sharp-bilinear upscale and smooth sub-texel scroll) when you don't
+  need per-object sizes.
+
+### A status HUD and a runtime tuner
+
+`PixelizerDiagnosticsOverlay` is a `CanvasLayer` that hosts a one-line status
+readout (pipeline state, pixel size, ray/palette flags, FPS, draw calls) plus two
+runtime tuning docks: a manager/effect dock on the right (one foldable panel per
+export group of the resolved manager and of each scene effect node) and an
+object inspector on the left. Press `Tab` to toggle it.
+
+<p align="center">
+  <img src="docs/images/demo-diagnostics.png" alt="PixelizerDiagnosticsOverlay status line, manager/effect tuner dock and object inspector" width="820">
+</p>
+
+> The status line and the tuner are best-effort tools, not a supported API.
+> Several manager/effect exports are read only during setup, so their sliders
+> have no effect at runtime — see the "diagnostics overlay" section of
+> [`AGENTS.md`](AGENTS.md) for which ones.
+
+## Quick start
+
+1. Copy `addons/pixelizer_3d/` into your Godot 4.7 project and enable the plugin
+   in **Project Settings → Plugins**.
+2. Add a `PixelizerManager3D` node and rename it to exactly
+   `PixelizerManager3D` (top-level appliers and effects resolve it by sibling
+   name). One manager per viewport.
+3. Add a `PixelizerApplier3D` as a sibling and parent your world content under
+   it. A top-level applier resolves the sibling manager; a nested applier
+   resolves its parent applier's manager. **No manager, no pixelization** — the
+   addon never creates one, and reports the missing node.
+
+```gdscript
+var applier := PixelizerApplier3D.new()
+applier.pixel_size = 3
+applier.anchor_mode = 1  # UNIFIED (see PixelizerGeometryState.anchor_mode)
+add_child(applier)       # 'applier' must be a sibling of the manager
+applier.add_child(my_model)
+# anything parented under `applier` is now pixelized
+
+# shared pipeline settings live on the manager you placed:
+manager.sun = sun
+
+# Optional effects are separate scene nodes — add only what the scene needs:
+#   PixelizerSkyClouds3D (cloud shadows / deck), PixelizerGodRays3D,
+#   PixelizerWater3D, PixelizerFireflies3D, ... Each resolves the manager itself.
+```
+
+Have a shader of your own? Include the macros header, call the entry points, and
+register the material:
+
+```gdscript
+# in your .gdshader:
+#   #include "res://addons/pixelizer_3d/shaders/anchor_macros.gdshaderinc"
+manager.register_pixelized_material(my_material)
+```
+
+> Unregistered custom `ShaderMaterial`s are left exactly as authored (a
+> pixelizer material cannot preserve an arbitrary shader), and the node they sit
+> on is skipped. Register them as above, or bridge them (see below).
+
+> Requirements: Godot **4.7**, **Forward+**, MSAA/TAA off. Compatibility and
+> headless fall back with a warning (low-res mode still runs on Mobile).
+
+## The demo
+
+This repository is also the reference project — open it in Godot 4.7 and press
+**F5**. The main scene is `demo/demo.tscn`.
+
+You play a **Knight** (`CharacterBody3D` + arcball camera) in a
+`MarchingSquaresTerrain` bowl with a grass planter, six KayKit adventurer
+characters lined up in the distance, a firefly swarm, a point-light volume, a
+sky cloud deck and a water tile — all sitting under a `PixelizerApplier3D`
+(the demo also places a `PixelizerManager3D` explicitly for its bridge settings).
+
+**Controls**
+
+| Input | Action |
+|---|---|
+| `WASD` | Move (camera-relative) |
+| `Space` | Jump |
+| Arrow keys | Orbit camera (yaw / pitch) |
+| Mouse drag | Orbit camera |
+| Wheel | Zoom (`min_distance`–`max_distance`, 2–60 m) |
+| `Tab` | Toggle the `PixelizerDiagnosticsOverlay` |
+
+The demo is wired to the **shader bridge**: the vendored
+`MarchingSquaresTerrain` shaders are approved and generated into
+`res://pixelizer_bridges/` (a generated artifact). Rebuild it with the bridge
+dock (**Project → Tools → Pixelizer3D Shader Bridge**), which preserves the
+manifest's approved entries. `tests/bridge/generate_bridges.gd` is **not** a
+substitute: it writes a new three-entry manifest over the production one and
+uses flat output paths the dock does not read. The terrain applier uses
+`pixel_size = 5`, `UNIFIED` anchor mode and `outline_enabled = 0` so the chunk
+seams and elevation steps stay uninked.
+
+## Shader bridge
+
+Third-party shaders that can't be edited still join the pipeline. The **shader
+bridge** does an explicit, reviewable **editor-time text transform** that writes
+a separate generated `.gdshader` plus a manifest; at runtime the game only does
+a manifest lookup and an in-place `material.shader` swap — **no runtime source
+generation, and the source addon is never written to.**
+
+1. Open **Project → Tools → Pixelizer3D Shader Bridge**.
+2. Set the manifest, an output dir **outside** the scanned addon roots, and the
+   roots to scan.
+3. **Scan** to classify every spatial shader, **Approve** the ones you want,
+   **Preview** the injected diff, then **Generate approved**.
+4. Point your manager's `bridge_manifests` at the manifest and enable
+   `auto_bridge_custom_shaders`.
+
+Stale, unapproved, missing-output or version-mismatched entries are never
+applied. The failure mode is always "rendered as authored", never a broken
+shader.
+
+## Editor integration
+
+The addon adds a bridge dock and registers the **Bake PaletteLUT to PNG** tool.
+Every node exposes its settings as inspector export groups, and the applier
+options inherit cleanly down the tree.
+
+## Nodes at a glance
+
+| Node | What it does |
+|---|---|
+| `PixelizerApplier3D` | The entry point: subtree pixelizer with inheritable per-group settings. Resolves the manager (sibling `PixelizerManager3D` at the top level, else the parent applier's). |
+| `PixelizerManager3D` | The pipeline driver (metadata viewport/camera, compositor passes, shared settings). **Place one explicitly** and name it exactly `PixelizerManager3D`. Auto-follows the viewport's active camera. One per viewport. |
+| `PixelizerObjectProfile` | Per-object override `Resource`, owned by the manager's `object_profiles` array and pointing at its target geometry. |
+| `PixelizerSkyClouds3D` · `PixelizerGodRays3D` · `PixelizerWater3D` · `PixelizerPointLightVolume3D` · `PixelizerFireflies3D` · `PixelizerDayNight3D` | Optional per-scene effect nodes (add only what you need). |
+| `PixelizerDiagnosticsOverlay` | Optional status HUD + runtime tuner docks (`Tab`). |
+
+## Repository layout
+
+```
+addons/pixelizer_3d/   the addon (copy this into your project)
+addons/MarchingSquaresTerrain/  vendored terrain addon (upstream, unmodified)
+demo/                  the playable demo scene and assets
+pixelizer_bridges/     generated bridge shaders + manifest (demo)
+tests/bridge/          headless bridge fixtures + windowed compile smoke test
+docs/images/           screenshots used in this README
+AGENTS.md              architecture and load-bearing invariants
+CREDITS.md             inspiration, assets and licenses
+```
+
+## Tests
+
+Headless shader-bridge fixtures (`tests/bridge/bridge_fixtures.gd`), a windowed
+compile smoke test for the generated shaders, and a standalone PNG diff tool
+(`tests/compare_captures.py`) live in `tests/` — see
+[`tests/README.md`](tests/README.md).
 
 ## Credits
 
-Developed by [Yūgen](https://www.youtube.com/@yugen_seishin) and originally forked from [Jackachulian](https://github.com/jackachulian/jackachulian) on github.
-
-Collaborators (v1.1.0 ONWARDS):
-* [DanTrz](https://github.com/DanTrz)
-* [powertomato](https://github.com/powertomato)
-* [santarl](https://github.com/santarl)
-
-A special thanks to DanTrz (creator of the TileMapLayer3D plugin), powertomato and santarl for co-authoring big parts of the plugin since the 1.0 release. They have been amazing contributors to the project and awesome people to work with!
-
-Contributors:
-* [Dylearn](https://www.youtube.com/@Dylearn)
-* [AtSaturn](https://www.youtube.com/@AtPlayerSaturn)
-* My lifelong best friends!
-
-###
-A big thanks to the above people for giving helpful insights, discussing certain features and thinking together about math related problems. Without them I couldn't have finished the plugin as fast as I have.
+Pixelizer3D stands on the shoulders of several open-source Godot pixel-art
+projects and the KayKit character pack. The full list, with licenses, is in
+[`CREDITS.md`](CREDITS.md).
