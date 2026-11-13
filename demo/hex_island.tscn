@@ -1,38 +1,37 @@
-[gd_scene format=3 uid="uid://b3102twgra21n"]
+[gd_scene format=4 uid="uid://b3102twgra21n"]
 
-[ext_resource type="MarchingSquaresTerrainData" path="res://demo/hex_island_data.res" id="1_bj2ra"]
-[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/mst_terrain.gdshader" id="2_uhwe7"]
-[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/mst_grass.gdshader" id="3_v8bhq"]
-[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/water.gdshader" id="4_jv7wc"]
-[ext_resource type="PackedScene" path="res://demo/assets/characters/Knight.fbx" id="5_fjd52"]
-[ext_resource type="PackedScene" path="res://demo/assets/characters/Barbarian.fbx" id="6_sjwl0"]
-[ext_resource type="PackedScene" path="res://demo/assets/characters/Mage.fbx" id="7_xh4vs"]
-[ext_resource type="PackedScene" path="res://demo/assets/characters/Rogue.fbx" id="8_1iviu"]
-[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/firefly.gdshader" id="9_6rs6u"]
-[ext_resource type="PackedScene" path="res://demo/player.tscn" id="10_prig"]
-[ext_resource type="PixelBuilderMeshData" path="res://demo/builder_demo_ruin.tres" id="11_ruin"]
-[ext_resource type="Texture2D" uid="uid://bvbrycwsngfkh" path="res://addons/MarchingSquaresTerrain/textures/ground/grass.png" id="mst_ground_grass"]
-[ext_resource type="Texture2D" uid="uid://1j5idkknr5l6" path="res://addons/MarchingSquaresTerrain/textures/ground/meadow.png" id="mst_ground_meadow"]
-[ext_resource type="Texture2D" uid="uid://co56gspvpq788" path="res://addons/MarchingSquaresTerrain/textures/ground/forest_floor.png" id="mst_ground_forest_floor"]
-[ext_resource type="Texture2D" uid="uid://8gl6vsoro8t4" path="res://addons/MarchingSquaresTerrain/textures/ground/sand.png" id="mst_ground_sand"]
-[ext_resource type="Texture2D" uid="uid://f00f52m3dubn" path="res://addons/MarchingSquaresTerrain/textures/ground/dirt.png" id="mst_ground_dirt"]
+[ext_resource type="MarchingSquaresTerrainData" uid="uid://rnrwd3e71wri" path="res://demo/hex_island_data.res" id="1_bj2ra"]
+[ext_resource type="Shader" uid="uid://d22ntw6rq445k" path="res://addons/MarchingSquaresTerrain/shaders/mst_terrain.gdshader" id="2_uhwe7"]
+[ext_resource type="Shader" uid="uid://b8aleqg60wbei" path="res://addons/MarchingSquaresTerrain/shaders/mst_grass.gdshader" id="3_v8bhq"]
+[ext_resource type="Shader" uid="uid://b7s7je1pp0lv1" path="res://addons/MarchingSquaresTerrain/shaders/water.gdshader" id="4_jv7wc"]
+[ext_resource type="PackedScene" uid="uid://dfbb7xdfegaw5" path="res://demo/assets/characters/Barbarian.fbx" id="6_sjwl0"]
+[ext_resource type="PackedScene" uid="uid://du4s3rpoct151" path="res://demo/assets/characters/Mage.fbx" id="7_xh4vs"]
+[ext_resource type="PackedScene" uid="uid://buejmg5j3t1ah" path="res://demo/assets/characters/Rogue.fbx" id="8_1iviu"]
+[ext_resource type="PackedScene" uid="uid://c5jig175v6538" path="res://demo/player.tscn" id="10_prig"]
+[ext_resource type="PixelBuilderMeshData" uid="uid://bfihvn2361nco" path="res://demo/builder_demo_ruin.tres" id="11_ruin"]
+[ext_resource type="Shader" uid="uid://d2qix30fca07i" path="res://addons/MarchingSquaresTerrain/shaders/waterfall.gdshader" id="20_7lkep"]
+[ext_resource type="Texture2D" uid="uid://d1rdb7yfek625" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="mst_grass_sprite"]
+[ext_resource type="Texture2D" uid="uid://pw7r4s5gqgpl" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="mst_ground_clay"]
 [ext_resource type="Texture2D" uid="uid://5lw2huhld0sf" path="res://addons/MarchingSquaresTerrain/textures/ground/cliff.png" id="mst_ground_cliff"]
 [ext_resource type="Texture2D" uid="uid://e8vpk41q6v4l" path="res://addons/MarchingSquaresTerrain/textures/ground/dark_rock.png" id="mst_ground_dark_rock"]
-[ext_resource type="Texture2D" uid="uid://xyd1i4e24hvp" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="mst_ground_snow"]
+[ext_resource type="Texture2D" uid="uid://f00f52m3dubn" path="res://addons/MarchingSquaresTerrain/textures/ground/dirt.png" id="mst_ground_dirt"]
+[ext_resource type="Texture2D" uid="uid://co56gspvpq788" path="res://addons/MarchingSquaresTerrain/textures/ground/forest_floor.png" id="mst_ground_forest_floor"]
+[ext_resource type="Texture2D" uid="uid://bvbrycwsngfkh" path="res://addons/MarchingSquaresTerrain/textures/ground/grass.png" id="mst_ground_grass"]
 [ext_resource type="Texture2D" uid="uid://3u5h4fomm377" path="res://addons/MarchingSquaresTerrain/textures/ground/gravel.png" id="mst_ground_gravel"]
-[ext_resource type="Texture2D" uid="uid://pw7r4s5gqgpl" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="mst_ground_clay"]
+[ext_resource type="Texture2D" uid="uid://1j5idkknr5l6" path="res://addons/MarchingSquaresTerrain/textures/ground/meadow.png" id="mst_ground_meadow"]
 [ext_resource type="Texture2D" uid="uid://bw060wilfwlsv" path="res://addons/MarchingSquaresTerrain/textures/ground/moss.png" id="mst_ground_moss"]
 [ext_resource type="Texture2D" uid="uid://dc4ytl4ppvi1q" path="res://addons/MarchingSquaresTerrain/textures/ground/path.png" id="mst_ground_path"]
 [ext_resource type="Texture2D" uid="uid://bcxkv33ryvexo" path="res://addons/MarchingSquaresTerrain/textures/ground/plain.png" id="mst_ground_plain"]
+[ext_resource type="Texture2D" uid="uid://8gl6vsoro8t4" path="res://addons/MarchingSquaresTerrain/textures/ground/sand.png" id="mst_ground_sand"]
+[ext_resource type="Texture2D" uid="uid://xyd1i4e24hvp" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="mst_ground_snow"]
 [ext_resource type="Texture2D" uid="uid://c2h7gapfc7rg5" path="res://addons/MarchingSquaresTerrain/textures/ground/void.png" id="mst_ground_void"]
-[ext_resource type="Texture2D" uid="uid://d1rdb7yfek625" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="mst_grass_sprite"]
 
 [sub_resource type="Environment" id="Environment_052rw"]
 background_mode = 1
-background_color = Color(0.5, 0.66499996, 0.875, 1)
+background_color = Color(0.516691, 0.6614233, 0.8589051, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.55, 0.6, 0.7, 1)
-ambient_light_energy = 0.6
+ambient_light_color = Color(0.54403895, 0.5952312, 0.70715326, 1)
+ambient_light_energy = 0.59284675
 
 [sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_c8aeu"]
 display_name = "Grass"
@@ -136,97 +135,93 @@ pattern = 13
 tint = Color(1, 1, 1, 1)
 
 [sub_resource type="MarchingSquaresTexturePreset" id="MarchingSquaresTexturePreset_82xx5"]
-resource_name = "Textures"
 slots = Array[MarchingSquaresTextureSlot]([SubResource("MarchingSquaresTextureSlot_c8aeu"), SubResource("MarchingSquaresTextureSlot_n6ug1"), SubResource("MarchingSquaresTextureSlot_00roj"), SubResource("MarchingSquaresTextureSlot_y2nwi"), SubResource("MarchingSquaresTextureSlot_ls6bm"), SubResource("MarchingSquaresTextureSlot_j5i3s"), SubResource("MarchingSquaresTextureSlot_7lkep"), SubResource("MarchingSquaresTextureSlot_4gm7k"), SubResource("MarchingSquaresTextureSlot_b864q"), SubResource("MarchingSquaresTextureSlot_csokv"), SubResource("MarchingSquaresTextureSlot_5o5n5"), SubResource("MarchingSquaresTextureSlot_bx2jk"), SubResource("MarchingSquaresTextureSlot_pvuxt"), SubResource("MarchingSquaresTextureSlot_opny1"), SubResource("MarchingSquaresTextureSlot_dg7is"), SubResource("MarchingSquaresTextureSlot_ila2o")])
+resource_name = "Textures"
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8xxu0"]
 render_priority = 0
 shader = ExtResource("2_uhwe7")
-shader_parameter/pt_flags = null
-shader_parameter/tints = null
-shader_parameter/scales = null
-shader_parameter/texture_world_size = null
-shader_parameter/blend_mode = null
-shader_parameter/blend_sharpness = null
-shader_parameter/blend_noise_scale = null
-shader_parameter/blend_noise_strength = null
-shader_parameter/use_ridge_texture = null
-shader_parameter/use_ledge_texture = null
-shader_parameter/ridge_threshold = null
-shader_parameter/ledge_threshold = null
-shader_parameter/rl_noise_scale = null
-shader_parameter/rl_noise_strength = null
+shader_parameter/pt_flags = 32
+shader_parameter/mst_grid = Vector4(0, 32, 32, 2)
+shader_parameter/mst_cell_size = Vector2(2, 2)
+shader_parameter/mst_grid_line = Vector4(0, 0.08, 0, 0)
+shader_parameter/mst_grid_color = Color(1, 1, 1, 0.35)
+shader_parameter/mst_chunk_color = Color(1, 0.85, 0.3, 0.6)
+shader_parameter/mst_cursor = Vector4(0, 0, 1, -1)
+shader_parameter/mst_cursor_color = Color(0.3, 1, 0.4, 1)
+shader_parameter/mst_cursor_params = Vector4(0.12, 0.25, 1, 0)
+shader_parameter/mst_fog = 0
+shader_parameter/mst_fog_a = Color(0.05, 0.06, 0.09, 1)
+shader_parameter/mst_fog_b = Color(0.09, 0.1, 0.14, 1)
+shader_parameter/mst_fog_hidden = Vector4(0.55, 0.25, 0.25, 0)
+shader_parameter/mst_highlight = Vector4(0.18, 4, 0, 0)
+shader_parameter/mst_debug_view = 0
+shader_parameter/mst_contour_step = 1.0
+shader_parameter/mst_auto_enabled = 0
+shader_parameter/mst_auto_mask = 1
+shader_parameter/mst_auto_noise = Vector4(0.35, 1, 0.25, 0.08)
+shader_parameter/mst_auto_rock = Vector4(5, 38, 6, 6)
+shader_parameter/mst_auto_lip = Vector4(4, 0.35, 0, 0)
+shader_parameter/mst_auto_shore = Vector4(3, 0, 0.8, 0.4)
+shader_parameter/mst_auto_shore2 = Vector4(8, 0, 0, 0)
+shader_parameter/mst_auto_snow = Vector4(7, 14, 2, 0.06)
+shader_parameter/mst_auto_snow2 = Vector4(42, 12, 1.5, 0)
+shader_parameter/tints = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/scales = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/texture_world_size = 8.0
+shader_parameter/blend_mode = 0
+shader_parameter/blend_sharpness = 3.0
+shader_parameter/blend_noise_scale = 0.5
+shader_parameter/blend_noise_strength = 0.0
+shader_parameter/blend_dither = true
+shader_parameter/use_ridge_texture = true
+shader_parameter/use_ledge_texture = true
+shader_parameter/ridge_threshold = 0.6
+shader_parameter/ledge_threshold = 0.6
+shader_parameter/rl_noise_scale = 1.3
+shader_parameter/rl_noise_strength = 0.5
 shader_parameter/slope_rock = 0.72
 shader_parameter/shore_enabled = true
 shader_parameter/shore_level = 0.45
 shader_parameter/shore_band = 0.7
 shader_parameter/shore_slot = 3
-shader_parameter/bands = null
-shader_parameter/shade_floor = null
-shader_parameter/wall_shade = null
+shader_parameter/bands = 3
+shader_parameter/shade_floor = 0.3
+shader_parameter/wall_shade = 0.88
+shader_parameter/wall_strata = 0.14
 shader_parameter/wall_strata_height = 0.625
 shader_parameter/wall_strata_noise = 0.15
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_tk56f"]
 render_priority = 0
 shader = ExtResource("3_v8bhq")
-shader_parameter/pt_flags = null
-shader_parameter/ground_tints = null
-shader_parameter/ground_scales = null
-shader_parameter/texture_world_size = null
-shader_parameter/grass_tints = null
-shader_parameter/tip_lighten = null
-shader_parameter/root_darken = null
-shader_parameter/billboard_mode = null
-shader_parameter/wind_strength = null
-shader_parameter/wind_speed = null
-shader_parameter/wind_scale = null
-shader_parameter/wind_direction = null
-shader_parameter/animation_fps = null
-shader_parameter/bands = null
-shader_parameter/shade_floor = null
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_rkd2k"]
-render_priority = 0
-shader = ExtResource("4_jv7wc")
-shader_parameter/shallow_color = null
-shader_parameter/deep_color = null
-shader_parameter/foam_color = null
-shader_parameter/depth_scale = null
-shader_parameter/depth_bands = null
-shader_parameter/foam_width = null
-shader_parameter/foam_speed = null
-shader_parameter/wave_height = null
-shader_parameter/wave_speed = null
-shader_parameter/wave_scale = null
-shader_parameter/sparkle = null
-shader_parameter/bands = null
-shader_parameter/shade_floor = null
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_iruoj"]
-size = Vector2(240, 240)
-subdivide_width = 32
-subdivide_depth = 32
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_yxj06"]
-render_priority = 0
-shader = ExtResource("9_6rs6u")
-shader_parameter/color = Color(1, 0.9, 0.45, 1)
-shader_parameter/size = 0.12
-shader_parameter/wander = 0.6
-shader_parameter/blink_speed = null
-shader_parameter/night_only = 1.0
-
-[sub_resource type="QuadMesh" id="QuadMesh_82bka"]
-
-[sub_resource type="MultiMesh" id="MultiMesh_mfqgr"]
-transform_format = 1
-use_custom_data = true
-custom_aabb = AABB(-8.72, -2.22, -8.72, 17.44, 4.44, 17.44)
-instance_count = 48
-mesh = SubResource("QuadMesh_82bka")
-
-[sub_resource type="PixelPalette" id="PixelPalette_rsai4"]
+shader_parameter/pt_flags = 32
+shader_parameter/mst_fog = 0
+shader_parameter/mst_fog_hidden = Vector4(0.55, 0.25, 0.25, 0)
+shader_parameter/mst_debug_view = 0
+shader_parameter/alpha_cutoff = 0.5
+shader_parameter/ground_tints = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/ground_scales = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/texture_world_size = 8.0
+shader_parameter/grass_tints = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/ground_match = 1.0
+shader_parameter/tip_lighten = 0.3
+shader_parameter/root_darken = 0.3
+shader_parameter/blade_variation = 0.18
+shader_parameter/billboard_mode = 0
+shader_parameter/animate_active = true
+shader_parameter/use_wind_texture = false
+shader_parameter/wind_strength = 0.2
+shader_parameter/wind_speed = 0.14
+shader_parameter/wind_scale = 0.02
+shader_parameter/wind_direction = Vector2(1, 1)
+shader_parameter/animation_fps = 0.0
+shader_parameter/gust_strength = 0.5
+shader_parameter/gust_spacing = 9.0
+shader_parameter/gust_speed = 3.0
+shader_parameter/fire_flutter = 0.35
+shader_parameter/bands = 3
+shader_parameter/shade_floor = 0.35
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_tree"]
 display_name = "Tree"
@@ -236,10 +231,9 @@ density = 0.2
 scale_min = 0.85
 scale_max = 1.35
 ground_slots = 4
-slope_max = 25.0
-cluster_scale = 0.0
-wind_sway = 0.05
 seed = 11
+slope_max = 25.0
+wind_sway = 0.05
 collision = 1
 collision_size = Vector3(0.4, 1, 0.4)
 collision_layer = 4
@@ -249,14 +243,13 @@ display_name = "Pine"
 shape = 4
 shape_seed = 5
 density = 0.08
-scale_min = 0.8
 scale_max = 1.5
 ground_slots = 2
+seed = 12
 slope_max = 32.0
 cluster_scale = 18.0
 cluster_threshold = -0.15
 wind_sway = 0.03
-seed = 12
 collision = 1
 collision_size = Vector3(0.4, 1, 0.4)
 collision_layer = 4
@@ -265,30 +258,26 @@ collision_layer = 4
 display_name = "Bush"
 shape = 2
 shape_seed = 2
-density = 0.05
 scale_min = 0.6
-scale_max = 1.2
+align_to_normal = 0.3
 ground_slots = 5
+seed = 13
 slope_max = 30.0
 cluster_scale = 12.0
 cluster_threshold = -0.2
-align_to_normal = 0.3
 wind_sway = 0.04
-seed = 13
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_rock"]
 display_name = "Rock"
-shape = 1
 shape_seed = 7
 density = 0.025
 scale_min = 0.45
-scale_max = 1.2
-ground_slots = 11
-slope_max = 55.0
 align_to_normal = 0.8
 y_offset = -0.12
-hue_jitter = 0.01
+ground_slots = 11
 seed = 14
+slope_max = 55.0
+hue_jitter = 0.01
 collision = 1
 collision_size = Vector3(0.8, 1, 0.8)
 collision_layer = 4
@@ -299,32 +288,86 @@ display_name = "Flowers"
 shape = 5
 shape_seed = 4
 density = 0.09
-scale_min = 0.8
-scale_max = 1.2
+align_to_normal = 0.6
 ground_slots = 3
+seed = 15
 slope_max = 25.0
 cluster_scale = 9.0
 cluster_threshold = 0.25
-align_to_normal = 0.6
-wind_sway = 0.06
 outline = false
-seed = 15
+wind_sway = 0.06
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_pebbles"]
 display_name = "Pebbles (small hexes)"
-shape = 1
 shape_seed = 9
 density = 0.8
 scale_min = 0.22
 scale_max = 0.36
+align_to_normal = 0.5
+y_offset = -0.05
 per_cell_max = 2
 small_hexes = true
 ground_slots = 3
-slope_max = 20.0
-align_to_normal = 0.5
-y_offset = -0.05
-hue_jitter = 0.01
 seed = 16
+slope_max = 20.0
+hue_jitter = 0.01
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rkd2k"]
+render_priority = 0
+shader = ExtResource("4_jv7wc")
+shader_parameter/shallow_color = Color(0.36, 0.72, 0.74, 1)
+shader_parameter/deep_color = Color(0.1, 0.27, 0.42, 1)
+shader_parameter/turquoise_color = Color(0.36, 0.7, 0.66, 1)
+shader_parameter/turquoise_depth = 0.6
+shader_parameter/grazing_color = Color(0.07, 0.2, 0.27, 1)
+shader_parameter/grazing_strength = 0.55
+shader_parameter/depth_scale = 4.0
+shader_parameter/depth_bands = 4
+shader_parameter/rim_dither = 0.6
+shader_parameter/sky_toward_sun = Color(1, 0.84, 0.6, 1)
+shader_parameter/sky_away_from_sun = Color(0.36, 0.48, 0.74, 1)
+shader_parameter/reflection_strength = 0.3
+shader_parameter/reflection_bands = 2
+shader_parameter/sparkle = 0.6
+shader_parameter/swell_height = 0.12
+shader_parameter/swell_length = 12.0
+shader_parameter/swell_steepness = 0.45
+shader_parameter/swell_speed = 1.0
+shader_parameter/swell_direction = Vector2(1, 0.35)
+shader_parameter/wave_height = 0.06
+shader_parameter/wave_speed = 1.1
+shader_parameter/wave_scale = 0.7
+shader_parameter/foam_color = Color(0.93, 0.97, 0.95, 1)
+shader_parameter/foam_width = 0.7
+shader_parameter/foam_speed = 0.6
+shader_parameter/foam_pulse_speed = 0.35
+shader_parameter/foam_dead_time = 0.45
+shader_parameter/foam_surge = 1.5
+shader_parameter/bands = 3
+shader_parameter/shade_floor = 0.55
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_4gm7k"]
+render_priority = 0
+shader = ExtResource("20_7lkep")
+shader_parameter/water_color = Color(0.17, 0.43, 0.58, 1)
+shader_parameter/deep_color = Color(0.1, 0.28, 0.44, 1)
+shader_parameter/streak_color = Color(0.44, 0.72, 0.82, 1)
+shader_parameter/foam_color = Color(0.86, 0.94, 0.95, 1)
+shader_parameter/fall_speed = 3.2
+shader_parameter/streak_density = 4.0
+shader_parameter/streak_length = 0.7
+shader_parameter/base_foam = 0.22
+shader_parameter/foam_speed = 0.8
+shader_parameter/spray_rate = 0.7
+shader_parameter/spray_rise = 0.7
+shader_parameter/foam_light = 0.95
+shader_parameter/foam_night_light = 0.3
+shader_parameter/ripple_scale = 1.4
+shader_parameter/ripple_speed = 0.35
+shader_parameter/bands = 3
+shader_parameter/shade_floor = 0.6
+
+[sub_resource type="PixelPalette" id="PixelPalette_rsai4"]
 
 [node name="HexIsland" type="Node3D" unique_id=13368921]
 
@@ -332,9 +375,9 @@ seed = 16
 environment = SubResource("Environment_052rw")
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=435429203]
-transform = Transform3D(0.8507166, 0.34833568, -0.39362875, 0, 0.748878, 0.662708, 0.5256247, -0.5637767, 0.6370829, 0, 0, 0)
-light_color = Color(1, 0.97, 0.9, 1)
-light_energy = 1.1
+transform = Transform3D(0.66690344, 0.4619894, -0.58464146, 0, 0.7846018, 0.62, 0.7451442, -0.41348013, 0.5232536, 0, 0, 0)
+light_color = Color(1, 0.9592701, 0.8785401, 1)
+light_energy = 1.1059611
 shadow_enabled = true
 directional_shadow_max_distance = 120.0
 
@@ -345,29 +388,25 @@ ring_radius = 2
 level_height = 2.5
 hex_edge_style = 3
 hex_edge_instanced = true
-lod_distance = 48.0
 texture_set = SubResource("MarchingSquaresTexturePreset_82xx5")
 terrain_material = SubResource("ShaderMaterial_8xxu0")
 grass_size = Vector2(0.55, 0.65)
 grass_material = SubResource("ShaderMaterial_tk56f")
 grass_min_height = 0.6
 scatter_items = Array[PixelScatterItem]([SubResource("PixelScatterItem_tree"), SubResource("PixelScatterItem_pine"), SubResource("PixelScatterItem_bush"), SubResource("PixelScatterItem_rock"), SubResource("PixelScatterItem_flowers"), SubResource("PixelScatterItem_pebbles")])
+lod_distance = 48.0
 
 [node name="GrassFire" type="PixelFireSystem" parent="MarchingSquaresTerrain" unique_id=1500700010]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 9.85, 6)
 preview_in_editor = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 9.85, 6)
 
 [node name="PixelWater" type="PixelWater" parent="." unique_id=807881125]
 size = Vector2(240, 240)
 material = SubResource("ShaderMaterial_rkd2k")
 water_cells = PackedVector3Array(-1, 2, 10, 0, 2, 10, 0, 1, 10)
 waterfall_level_height = 0.5
+waterfall_material = SubResource("ShaderMaterial_4gm7k")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
-layers = 524289
-material_override = SubResource("ShaderMaterial_rkd2k")
-cast_shadow = 0
-instance_shader_parameters/pt_flags = 0
-mesh = SubResource("PlaneMesh_iruoj")
 
 [node name="PixelSky" type="PixelSky" parent="." unique_id=594274798 node_paths=PackedStringArray("sun")]
 sun = NodePath("../Sun")
@@ -384,33 +423,32 @@ process_priority = -10
 [node name="Characters" type="PixelObject" parent="." unique_id=1958540450]
 snap_to_texel = true
 
-[node name="Barbarian" type="Node3D" parent="Characters" unique_id=2107889562 instance=ExtResource("6_sjwl0")]
+[node name="Barbarian" parent="Characters" unique_id=2107889562 instance=ExtResource("6_sjwl0")]
 transform = Transform3D(0.82782984, 0, 0.98656917, 0, 1.2878746, 0, -0.98656917, 0, 0.82782984, -2, 7.5, 6)
 
-[node name="Mage" type="Node3D" parent="Characters" unique_id=1572218756 instance=ExtResource("7_xh4vs")]
+[node name="Mage" parent="Characters" unique_id=1572218756 instance=ExtResource("7_xh4vs")]
 transform = Transform3D(0.12701455, 0, 0.72033507, 0, 0.7314474, 0, -0.72033507, 0, 0.12701455, 4.2, 10, 2.6)
 
-[node name="Rogue" type="Node3D" parent="Characters" unique_id=1559529485 instance=ExtResource("8_1iviu")]
+[node name="Rogue" parent="Characters" unique_id=1559529485 instance=ExtResource("8_1iviu")]
 transform = Transform3D(-0.27369544, 0, 0.7519721, 0, 0.800232, 0, -0.7519721, 0, -0.27369544, 6, 10, 7)
 
 [node name="BuilderRuin" type="PixelObject" parent="." unique_id=1500700020]
 
 [node name="Ruin" type="PixelBuilderMesh" parent="BuilderRuin" unique_id=1500700021]
-transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, 8, 10, 3.4641016)
 data = ExtResource("11_ruin")
 anchor_cell = Vector2i(3, 2)
 anchored = true
+transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, 8, 10, 3.4641016)
+instance_shader_parameters/pt_flags = 32
 
-[node name="PlayerRig" parent="." instance=ExtResource("10_prig")]
+[node name="PlayerRig" parent="." unique_id=1328195813 instance=ExtResource("10_prig")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 0)
 
 [node name="Lantern" type="PixelLightVolume" parent="." unique_id=986444803]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 9.1, 9)
 
 [node name="Fireflies" type="PixelFireflies" parent="." unique_id=1125234400]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 4)
-material_override = SubResource("ShaderMaterial_yxj06")
-cast_shadow = 0
-multimesh = SubResource("MultiMesh_mfqgr")
 
 [node name="Camera" type="PixelOrbitCamera" parent="." unique_id=633589575]
 target = Vector3(0, 10, 4)
@@ -422,6 +460,7 @@ size = 26.0
 
 [node name="PixelRenderer" type="PixelRenderer" parent="." unique_id=57036734]
 pixel_size = 3
+editor_preview = true
 palette = SubResource("PixelPalette_rsai4")
 god_rays = true
 ray_sheet_surface_fade = 100.0
@@ -433,18 +472,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.5, 8)
 
 [node name="PixelDiagnostics" type="PixelDiagnostics" parent="." unique_id=687209648]
 layer = 100
-visible = false
 
 [node name="Weather" type="PixelWeather" parent="." unique_id=1500700001 node_paths=PackedStringArray("sun", "environment")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
 sun = NodePath("../Sun")
 environment = NodePath("../WorldEnvironment")
+process_priority = -20
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
 
 [node name="Birds" type="PixelBirds" parent="." unique_id=1500700002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 2)
 
 [node name="Smoke" type="PixelSmoke" parent="." unique_id=1500700003]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 10, 4)
 fire = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 10, 4)
 
 [node name="Dust" type="PixelParticleField" parent="." unique_id=1500700004]
+
+[node name="Birds2" type="PixelBirds" parent="." unique_id=132625228]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.1525574e-07, 9.9999895, -1.7166138e-05)

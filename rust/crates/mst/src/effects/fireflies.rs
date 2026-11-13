@@ -10,7 +10,9 @@ use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::multi_mesh::TransformFormat;
 use godot::classes::{INode3D, MultiMesh, MultiMeshInstance3D, Node3D, QuadMesh, ShaderMaterial};
 use godot::prelude::*;
+use crate::writes::ShaderParams;
 
+use crate::features::Feature;
 use crate::globals;
 use super::Rng;
 use crate::util::*;
@@ -130,7 +132,13 @@ impl INode3D for PixelFireflies {
     }
 
     fn ready(&mut self) {
+        crate::features::watch(&self.to_gd());
         self.rebuild();
+        super::gate(&self.to_gd(), Feature::Fireflies);
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Fireflies)
     }
 }
 
@@ -159,7 +167,8 @@ impl PixelFireflies {
     }
 
     fn rebuild(&mut self) {
-        if !self.base().is_inside_tree() {
+        // Feature off: build nothing (the gate builds the swarm when it is turned on).
+        if !self.base().is_inside_tree() || !crate::features::enabled(Feature::Fireflies) {
             return;
         }
         let mut quad = QuadMesh::new_gd();
@@ -194,12 +203,12 @@ impl PixelFireflies {
 
     fn update_material(&mut self) {
         let Some(mut m) = self.material.clone() else { return };
-        m.set_shader_parameter("color", &self.color.to_variant());
-        m.set_shader_parameter("size", &self.size.to_variant());
-        m.set_shader_parameter("wander", &self.wander.to_variant());
-        m.set_shader_parameter("blink_speed", &self.blink_speed.to_variant());
-        m.set_shader_parameter("energy", &self.energy.to_variant());
-        m.set_shader_parameter("night_only", &self.night_only.to_variant());
+        m.param("color", &self.color.to_variant());
+        m.param("size", &self.size.to_variant());
+        m.param("wander", &self.wander.to_variant());
+        m.param("blink_speed", &self.blink_speed.to_variant());
+        m.param("energy", &self.energy.to_variant());
+        m.param("night_only", &self.night_only.to_variant());
         if let Some(s) = &mut self.swarm {
             s.set_material_override(&m);
         }
@@ -208,6 +217,14 @@ impl PixelFireflies {
 
 #[godot_api]
 impl PixelFireflies {
+    /// Fireflies feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if super::gate(&self.to_gd(), Feature::Fireflies) && self.get_swarm().is_none() {
+            self.rebuild();
+        }
+    }
+
     /// The internal swarm instance (read-only access for tools and tests).
     #[func]
     pub fn get_swarm(&self) -> Option<Gd<MultiMeshInstance3D>> {

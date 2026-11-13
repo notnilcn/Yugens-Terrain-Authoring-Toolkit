@@ -60,7 +60,7 @@ void fragment() {
 	vec2 p = vec2(UV.x * 2.0 - 1.0, 1.0 - UV.y * 2.0);
 	// Lumpy rim: the radius wobbles with angle, churning slowly per puff.
 	float a = atan(p.y, p.x);
-	float ph = seed * 40.0 + TIME * churn_speed * (seed > 0.5 ? 1.0 : -1.0);
+	float ph = seed * 40.0 + pt_time * churn_speed * (seed > 0.5 ? 1.0 : -1.0);
 	float rim = 1.0 - lumpiness * (0.5 + 0.5 * sin(a * lumps + ph)) * (0.6 + 0.4 * sin(a * (lumps - 2.0) - ph * 1.3));
 	float r = length(p) / max(rim, 0.05);
 	// Dome density: thick in the middle, thin at the rim, thinning with age. The Bayer threshold

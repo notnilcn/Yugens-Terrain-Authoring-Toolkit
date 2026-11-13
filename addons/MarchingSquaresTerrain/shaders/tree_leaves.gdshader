@@ -57,7 +57,7 @@ float pt_foliage_hash(vec3 origin, float instance_id) {
 void vertex() {
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	float seed = pt_foliage_hash(origin, float(INSTANCE_ID));
-	float clock = wind_fps > 0.0 ? floor(TIME * wind_fps) / wind_fps : TIME;
+	float clock = wind_fps > 0.0 ? floor(pt_time * wind_fps) / wind_fps : pt_time;
 	vec3 card_scale = vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz), length(MODEL_MATRIX[2].xyz));
 	vec3 local = (inverse(MODEL_MATRIX) * vec4(VERTEX, 1.0)).xyz;
 	float ly = abs(local.y) > abs(local.z) ? local.y : -local.z;
@@ -81,7 +81,7 @@ void vertex() {
 	int cell = int(floor(seed * float(max(variation_count, 1))));
 	if (animate_frames) {
 		int frames = max(1, animation_frames);
-		cell = (int(floor(seed * float(frames))) + int(floor(TIME * max(animation_fps, 0.001)))) % frames;
+		cell = (int(floor(seed * float(frames))) + int(floor(pt_time * max(animation_fps, 0.001)))) % frames;
 	}
 	int columns = max(1, int(atlas_cells.x));
 	f_uv = (UV + vec2(float(cell % columns), float(cell / columns))) / max(atlas_cells, vec2(1.0));
@@ -112,6 +112,7 @@ void fragment() {
 	ALPHA = a;
 	ALPHA_SCISSOR_THRESHOLD = max(alpha_scissor_threshold, 0.01);
 	ALBEDO = c;
+	vec3 world_pos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	{ vec4 pt_fs = pt_fog_surface(ALBEDO, world_pos, mst_pixel_lattice(world_pos, INV_VIEW_MATRIX, FRAGCOORD.xy)); ALBEDO = pt_fs.rgb; EMISSION *= pt_fs.a; } // [fog of war]
 	PT_META_OUTPUT(NORMAL)
 }

@@ -146,8 +146,8 @@ void vertex() {
 	// The swell dies down in the shallows so it does not slosh through the shore.
 	float damp = clamp(depth / 3.0, 0.0, 1.0);
 	vec3 n;
-	vec3 g = gerstner(wp.xz, TIME, damp, n);
-	float chop = sin(wp.x * wave_scale + TIME * wave_speed) + cos(wp.z * wave_scale * 1.31 + TIME * wave_speed * 0.83);
+	vec3 g = gerstner(wp.xz, pt_time, damp, n);
+	float chop = sin(wp.x * wave_scale + pt_time * wave_speed) + cos(wp.z * wave_scale * 1.31 + pt_time * wave_speed * 0.83);
 	g.y += chop * wave_height * 0.5;
 	crest = g.y / max(swell_height * 1.6 * damp, 1e-3);
 	VERTEX += (inverse(MODEL_MATRIX) * vec4(g, 0.0)).xyz;
@@ -158,7 +158,7 @@ void fragment() {
 	float ground = terrain_height(world_pos.xz);
 	float depth = ground < -1e5 ? depth_scale : max(world_pos.y - ground, 0.0);
 	vec3 wn;
-	gerstner(world_pos.xz, TIME, clamp(depth / 3.0, 0.0, 1.0), wn);
+	gerstner(world_pos.xz, pt_time, clamp(depth / 3.0, 0.0, 1.0), wn);
 
 	// Depth bands with an ordered-dither rim between them.
 	float nb = float(depth_bands);
@@ -176,7 +176,7 @@ void fragment() {
 	if (pt_water_a.x > 0.5 && pt_water_b.x > 0.0) {
 		float fade = 1.0 - clamp(depth / 2.5, 0.0, 1.0);
 		float cb = max(pt_water_b.z, 1.0);
-		float c = floor(pt_caustic(world_pos.xz, TIME, pt_water_b.y) * fade * cb) / cb;
+		float c = floor(pt_caustic(world_pos.xz, pt_time, pt_water_b.y) * fade * cb) / cb;
 		col += PT_CAUSTIC_COLOR * c * pt_water_b.x * 0.35;
 	}
 
@@ -197,8 +197,8 @@ void fragment() {
 	}
 
 	// Shore foam: a noisy band that surges out in pulses, then rests.
-	float n = pt_vnoise(world_pos.xz * 1.7 + vec2(TIME * foam_speed, -TIME * foam_speed * 0.7));
-	float phase = fract(TIME * foam_pulse_speed + pt_vnoise(world_pos.xz * 0.05) * 0.5);
+	float n = pt_vnoise(world_pos.xz * 1.7 + vec2(pt_time * foam_speed, -pt_time * foam_speed * 0.7));
+	float phase = fract(pt_time * foam_pulse_speed + pt_vnoise(world_pos.xz * 0.05) * 0.5);
 	float live = 1.0 - foam_dead_time;
 	float surge = phase < live ? sin(3.14159 * phase / live) : 0.0;
 	// Distance to the shore line ~ depth / ground slope, so the foam stays a band of constant
@@ -222,7 +222,7 @@ void fragment() {
 		vec2 g = world_pos.xz * 1.4;
 		vec2 cell = floor(g);
 		float h = pt_hash(cell);
-		float age = fract(TIME * 1.6 + h * 7.0);
+		float age = fract(pt_time * 1.6 + h * 7.0);
 		vec2 centre = cell + 0.25 + 0.5 * vec2(pt_hash(cell + 3.1), pt_hash(cell + 7.7));
 		float dist = length(g - centre);
 		if (h < pt_wet * 0.8 && abs(dist - age * 0.45) < 0.05) {

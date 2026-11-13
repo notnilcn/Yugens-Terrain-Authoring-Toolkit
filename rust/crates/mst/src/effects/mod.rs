@@ -16,7 +16,31 @@ pub mod weather;
 use godot::classes::{Camera3D, Node};
 use godot::prelude::*;
 
+use crate::features::{self, Feature};
 use crate::util::is_editor;
+
+/// The feature gate every effect node applies (from `ready` and from
+/// `features::CALLBACK`): shows or hides the meshes the node built for itself (its internal
+/// children), turns its `_process` on or off and refreshes its configuration warnings.
+/// Returns whether the feature is on. The node's own `visible` is never touched (it is saved).
+pub fn gate(node: &Gd<impl Inherits<Node>>, f: Feature) -> bool {
+    let on = features::enabled(f);
+    crate::writes::set_internals_visible(node, on);
+    let mut n = node.clone().upcast::<Node>();
+    n.set_process(on);
+    // Deferred: the editor reads the warnings back through the (currently bound) node.
+    n.call_deferred("update_configuration_warnings", &[]);
+    on
+}
+
+/// `get_configuration_warnings` body of a gated effect node.
+pub fn gate_warnings(f: Feature) -> PackedStringArray {
+    let mut w = PackedStringArray::new();
+    if let Some(msg) = features::warning(f) {
+        w.push(&msg);
+    }
+    w
+}
 
 /// Small deterministic PRNG (SplitMix64), so a given seed always gives the same result.
 pub struct Rng(pub u64);

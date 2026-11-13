@@ -11,7 +11,8 @@ use godot::classes::scroll_container::ScrollMode;
 use godot::classes::{
     BoxMesh, Button, CanvasLayer, CheckBox, ClassDb, ColorPickerButton, Control, FoldableContainer, GeometryInstance3D, GridContainer,
     HBoxContainer, ICanvasLayer, InputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion, Label, MeshInstance3D,
-    Node, Node3D, OptionButton, PanelContainer, Performance, ScrollContainer, SpinBox, StandardMaterial3D, StyleBoxFlat, VBoxContainer,
+    Node, Node3D, OptionButton, PanelContainer, Performance, ScrollContainer, SpinBox, StandardMaterial3D, StyleBoxFlat, TabContainer,
+    VBoxContainer,
 };
 use godot::global::{Key, MouseButton};
 use godot::prelude::*;
@@ -19,26 +20,39 @@ use godot::register::info::{PropertyHint, PropertyUsageFlags};
 use pt_core::meta::id_meta_from_flags;
 use pt_core::pick::{ray_aabb, ray_faces};
 
+use super::actions;
+use crate::features::{self, Feature};
 use crate::globals;
 use crate::render::object::PixelObject;
 use crate::util::*;
 
-/// Classes that get a tuner section (the renderer only for the first one found).
-const TUNED_CLASSES: [&str; 10] = [
-    "PixelRenderer",
-    "PixelSky",
-    "PixelDayNight",
-    "PixelWater",
-    "PixelFireflies",
-    "PixelLightVolume",
-    "PixelOrbitCamera",
-    "MarchingSquaresTerrain",
-    "PixelObject",
-    "PixelBuilderMesh",
+/// Tuner tabs.
+const TABS: [&str; 3] = ["Effects", "Render", "Scene"];
+const TAB_EFFECTS: usize = 0;
+/// Classes that get a tuner section, in section order, with their tab (the renderer only for
+/// the first one found). Every gated effect (`features::for_class`) must be listed here.
+const TUNED_CLASSES: [(&str, usize); 16] = [
+    ("PixelRenderer", 1),
+    ("PixelWeather", 0),
+    ("PixelDayNight", 0),
+    ("PixelSky", 0),
+    ("PixelWater", 0),
+    ("PixelFireSystem", 0),
+    ("PixelSmoke", 0),
+    ("PixelBirds", 0),
+    ("PixelFireflies", 0),
+    ("PixelParticleField", 0),
+    ("PixelLightVolume", 0),
+    ("PixelOrbitCamera", 1),
+    ("MarchingSquaresTerrain", 2),
+    ("PixelObject", 2),
+    ("PixelBuilderMesh", 2),
+    ("MarchingSquaresWildFlowers", 2),
 ];
+/// Resource classes that get a nested section when a tuned property holds one.
+const NESTED_RESOURCES: [&str; 3] = ["PixelPalette", "PixelOutlinePalette", "PixelObjectProfile"];
 /// Upper bound on sections per class, so scenes with many objects stay usable.
 const MAX_PER_CLASS: usize = 8;
-const DEBUG_VIEWS: [&str; 6] = ["Final", "Normals", "Depth", "PixelSize", "OutlineFlags", "RawColor"];
 /// Nearest AABB candidates that get the exact triangle test per pick.
 const MAX_TRIANGLE_CANDIDATES: usize = 24;
 /// Nodes in this group (and their subtrees) are never picked.
@@ -60,13 +74,32 @@ enum Editor {
     Spin(Gd<SpinBox>),
     Choice(Gd<OptionButton>),
     Color(Gd<ColorPickerButton>),
+    /// Vector2 / Vector2i / Vector3 / Vector3i: one spin box per component.
+    Vector(Vec<Gd<SpinBox>>),
+}
+
+/// A live read-out line of a section (`actions::live_text`).
+struct Live {
+    obj: Gd<Object>,
+    class: &'static str,
+    label: Gd<Label>,
 }
 
 /// Runtime diagnostics overlay (does nothing in the editor). Toggle it with `toggle_key`.
 ///
 /// * Status line: FPS, draw calls, primitives and the `PixelRenderer` status.
-/// * Tuner (right dock): the exported bool / number / enum / color properties of the renderer,
-///   the effects, terrains, pixel objects and builder meshes in the scene; edits apply live.
+/// * Tuner (right dock), in three tabs:
+///   * *Effects*: the project's feature toggles (clouds, god rays, water, weather, birds, ...;
+///     for this session), then every effect node in the scene: weather (one button per
+///     weather: rain, snow, storm, ...; snow overlay, lightning), day-night (dawn / noon / dusk
+///     / night), sky, water, fire (ignite at the view, extinguish), smoke (bursts), birds
+///     (scare / land), fireflies, particle fields and light volumes, each with a live state
+///     line;
+///   * *Render*: the renderer (debug view, palettes) and the orbit camera;
+///   * *Scene*: terrains, pixel objects, builder meshes and wild flowers.
+///
+///   Every exported bool / number / enum / color / vector property gets an editor, under its
+///   inspector group; edits apply live.
 /// * Object inspector (left dock): *Select Object* then click a mesh in the viewport (AABB
 ///   pre-pass + exact triangle test). Hovered meshes get the hover outline (id 254), the
 ///   selection the selection outline (id 255) and a translucent box. The panel shows the
@@ -96,7 +129,9 @@ pub struct PixelDiagnostics {
 
     status: Option<Gd<Label>>,
     tuner: Option<Gd<Control>>,
-    sections: Option<Gd<VBoxContainer>>,
+    sections: Vec<Gd<VBoxContainer>>,
+    feature_checks: Vec<(Feature, Gd<CheckBox>)>,
+    live: Vec<Live>,
     debug_view: Option<Gd<OptionButton>>,
     object_panel: Option<Gd<Control>>,
     object_hint: Option<Gd<Label>>,
@@ -128,7 +163,9 @@ impl ICanvasLayer for PixelDiagnostics {
             sections_start_folded: true,
             status: None,
             tuner: None,
-            sections: None,
+            sections: Vec::new(),
+            feature_checks: Vec::new(),
+            live: Vec::new(),
             debug_view: None,
             object_panel: None,
             object_hint: None,
@@ -284,6 +321,69 @@ fn setter(obj: &Gd<Object>, prop: &StringName, map: impl Fn(&Variant) -> Variant
     })
 }
 
+/// `rain_layer_spacing` -> "Rain Layer Spacing" (after stripping the group `prefix`).
+fn pretty(name: &str, prefix: &str) -> String {
+    let short = name.strip_prefix(prefix).filter(|s| !s.is_empty()).unwrap_or(name);
+    short
+        .split('_')
+        .filter(|w| !w.is_empty())
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                Some(f) => f.to_uppercase().chain(c).collect::<String>(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Labels of `PixelRenderer.debug_view` (read from its enum hint, so new views show up).
+fn debug_views() -> Vec<(String, i64)> {
+    let props = ClassDb::singleton().class_get_property_list_ex("PixelRenderer").no_inheritance(true).done();
+    props
+        .iter_shared()
+        .find(|d| d.get("name").is_some_and(|v| v.to_string() == "debug_view"))
+        .and_then(|d| d.get("hint_string"))
+        .map(|h| parse_enum(&h.to_string()))
+        .unwrap_or_else(|| vec![("Final".into(), 0)])
+}
+
+/// Components of a vector variant type (None for other types).
+fn vector_dims(t: VariantType) -> Option<(usize, bool)> {
+    match t {
+        VariantType::VECTOR2 => Some((2, false)),
+        VariantType::VECTOR2I => Some((2, true)),
+        VariantType::VECTOR3 => Some((3, false)),
+        VariantType::VECTOR3I => Some((3, true)),
+        _ => None,
+    }
+}
+
+fn vector_parts(v: &Variant) -> Vec<f64> {
+    if let Ok(x) = v.try_to::<Vector3>() {
+        vec![x.x as f64, x.y as f64, x.z as f64]
+    } else if let Ok(x) = v.try_to::<Vector2>() {
+        vec![x.x as f64, x.y as f64]
+    } else if let Ok(x) = v.try_to::<Vector3i>() {
+        vec![x.x as f64, x.y as f64, x.z as f64]
+    } else if let Ok(x) = v.try_to::<Vector2i>() {
+        vec![x.x as f64, x.y as f64]
+    } else {
+        Vec::new()
+    }
+}
+
+fn vector_variant(t: VariantType, c: &[f64]) -> Variant {
+    let g = |i: usize| c.get(i).copied().unwrap_or(0.0);
+    match t {
+        VariantType::VECTOR2 => Vector2::new(g(0) as f32, g(1) as f32).to_variant(),
+        VariantType::VECTOR2I => Vector2i::new(g(0).round() as i32, g(1).round() as i32).to_variant(),
+        VariantType::VECTOR3I => Vector3i::new(g(0).round() as i32, g(1).round() as i32, g(2).round() as i32).to_variant(),
+        _ => Vector3::new(g(0) as f32, g(1) as f32, g(2) as f32).to_variant(),
+    }
+}
+
 fn v3(v: Vector3) -> [f32; 3] {
     [v.x, v.y, v.z]
 }
@@ -378,15 +478,25 @@ impl PixelDiagnostics {
         dv_label.set_h_size_flags(SizeFlags::EXPAND_FILL);
         dv_row.add_child(&dv_label);
         let mut dv = OptionButton::new_alloc();
-        for (i, name) in DEBUG_VIEWS.iter().enumerate() {
-            dv.add_item_ex(*name).id(i as i32).done();
+        for (name, id) in debug_views() {
+            dv.add_item_ex(name.as_str()).id(id as i32).done();
         }
         dv.connect("item_selected", &Callable::from_object_method(&this, "on_debug_view_selected"));
         dv_row.add_child(&dv);
         col.add_child(&dv_row);
 
-        let sections = VBoxContainer::new_alloc();
-        col.add_child(&self.scroll_with(&sections));
+        let mut tabs = TabContainer::new_alloc();
+        tabs.set_v_size_flags(SizeFlags::EXPAND_FILL);
+        tabs.add_theme_font_size_override("font_size", 12);
+        let mut sections = Vec::new();
+        for name in TABS {
+            let inner = VBoxContainer::new_alloc();
+            let mut scroll = self.scroll_with(&inner);
+            scroll.set_name(name);
+            tabs.add_child(&scroll);
+            sections.push(inner);
+        }
+        col.add_child(&tabs);
         tuner.add_child(&col);
         tuner.set_visible(self.show_tuner);
         root.add_child(&tuner);
@@ -423,7 +533,7 @@ impl PixelDiagnostics {
         add_internal(&mut base, &root);
         self.status = Some(status);
         self.tuner = Some(tuner.upcast());
-        self.sections = Some(sections);
+        self.sections = sections;
         self.debug_view = Some(dv);
         self.object_panel = Some(obj_panel.upcast());
         self.object_hint = Some(hint);
@@ -449,7 +559,7 @@ impl PixelDiagnostics {
                 continue;
             }
             let class = n.get_class().to_string();
-            if let Some(i) = TUNED_CLASSES.iter().position(|c| *c == class) {
+            if let Some(i) = TUNED_CLASSES.iter().position(|(c, _)| *c == class) {
                 let limit = if i == 0 { 1 } else { MAX_PER_CLASS };
                 if counts[i] < limit {
                     counts[i] += 1;
@@ -469,28 +579,51 @@ impl PixelDiagnostics {
         let fps = perf.get_monitor(Monitor::TIME_FPS);
         let draws = perf.get_monitor(Monitor::RENDER_TOTAL_DRAW_CALLS_IN_FRAME);
         let prims = perf.get_monitor(Monitor::RENDER_TOTAL_PRIMITIVES_IN_FRAME);
-        let mut text = format!("{fps:.0} fps | {draws:.0} draws | {:.1}k prims", prims / 1000.0);
+        let mut text = format!("{fps:.0} fps | {draws:.0} draws | {:.1}k prims | {} hides", prims / 1000.0, self.toggle_key.as_str());
         match self.renderer.as_mut().filter(|r| r.is_instance_valid()) {
             Some(r) => {
                 let line = r.call("get_status_line", &[]);
                 text.push_str(&format!("\n{}", line.try_to::<GString>().unwrap_or_default()));
                 let view = r.get("debug_view").try_to::<i32>().unwrap_or(0);
                 if let Some(dv) = &mut self.debug_view {
-                    dv.select(view);
+                    let idx = dv.get_item_index(view);
+                    if idx >= 0 {
+                        dv.select(idx);
+                    }
                 }
             }
             None => text.push_str("\nno PixelRenderer"),
         }
-        text.push_str(&format!("\n{} to toggle", self.toggle_key.as_str()));
+        let effects = self.effects_summary();
+        if !effects.is_empty() {
+            text.push_str(&format!("\n{effects}"));
+        }
+        // Docks start below the status panel (its line count varies with the scene).
+        let mut top = 72.0;
         if let Some(s) = &mut self.status {
             s.set_text(&text);
+            if let Some(panel) = s.get_parent().and_then(|p| p.try_cast::<Control>().ok()) {
+                top = panel.get_position().y + panel.get_combined_minimum_size().y + 6.0;
+            }
         }
         let (show_tuner, show_obj) = (self.show_tuner, self.show_object_panel);
+        let has_selection = self.selected.as_ref().is_some_and(|s| s.is_instance_valid());
         if let Some(t) = &mut self.tuner {
             t.set_visible(show_tuner);
+            t.set_offset(Side::TOP, top);
         }
         if let Some(t) = &mut self.object_panel {
             t.set_visible(show_obj);
+            t.set_offset(Side::TOP, top);
+            // Without a selection the inspector shrinks to its header instead of covering
+            // the left of the screen.
+            if has_selection {
+                t.set_anchor(Side::BOTTOM, 1.0);
+                t.set_offset(Side::BOTTOM, -8.0);
+            } else {
+                t.set_anchor(Side::BOTTOM, 0.0);
+                t.set_offset(Side::BOTTOM, top);
+            }
         }
     }
 
@@ -519,8 +652,97 @@ impl PixelDiagnostics {
                         c.set_pick_color(v.try_to::<Color>().unwrap_or(Color::BLACK));
                     }
                 }
+                Editor::Vector(spins) => {
+                    let editing = spins.iter().any(|s| s.get_line_edit().is_some_and(|l| l.has_focus()));
+                    if !editing {
+                        for (s, c) in spins.iter_mut().zip(vector_parts(&v)) {
+                            s.set_value_no_signal(c);
+                        }
+                    }
+                }
             }
         }
+        for (f, c) in &mut self.feature_checks {
+            c.set_pressed_no_signal(features::enabled(*f));
+        }
+        self.live.retain(|l| l.obj.is_instance_valid() && l.label.is_instance_valid());
+        for l in &mut self.live {
+            let text = actions::live_text(l.class, &mut l.obj).unwrap_or_default();
+            l.label.set_text(&text);
+            l.label.set_visible(!text.is_empty());
+        }
+    }
+
+    /// Weather, time of day and feature count for the status line.
+    fn effects_summary(&mut self) -> String {
+        let mut parts = Vec::new();
+        for l in &mut self.live {
+            if !l.obj.is_instance_valid() {
+                continue;
+            }
+            match l.class {
+                "PixelWeather" => {
+                    let o = &mut l.obj;
+                    let wet = o.call("get_wetness", &[]).try_to::<f32>().unwrap_or(0.0);
+                    let snow = o.call("get_snow_cover", &[]).try_to::<f32>().unwrap_or(0.0);
+                    parts.push(format!("weather {} (wet {wet:.2}, snow {snow:.2})", o.call("get_weather_name", &[])));
+                }
+                "PixelDayNight" => {
+                    let o = &l.obj;
+                    let ov = o.get("time_override").try_to::<f32>().unwrap_or(-1.0);
+                    let t = if ov >= 0.0 { ov } else { o.get("time_of_day").try_to::<f32>().unwrap_or(0.0) };
+                    parts.push(format!("time {}", actions::clock_text(t)));
+                }
+                _ => {}
+            }
+        }
+        let on = features::ALL.iter().filter(|i| features::enabled(i.feature)).count();
+        parts.push(format!("features {on}/{}", features::ALL.len()));
+        parts.join(" | ")
+    }
+
+    /// The *Features* section: one switch per project feature (for this session).
+    fn add_features_section(&mut self, mut container: Gd<VBoxContainer>) {
+        self.feature_checks.clear();
+        let mut fold = FoldableContainer::new_alloc();
+        fold.set_title("Features (this session)");
+        let mut col = VBoxContainer::new_alloc();
+        let mut grid = GridContainer::new_alloc();
+        grid.set_columns(2);
+        for info in features::ALL {
+            let mut c = CheckBox::new_alloc();
+            c.set_text(info.label);
+            c.set_tooltip_text(info.hint);
+            c.add_theme_font_size_override("font_size", 12);
+            c.set_h_size_flags(SizeFlags::EXPAND_FILL);
+            let feat = info.feature;
+            c.connect(
+                "toggled",
+                &Callable::from_fn("pixel_diagnostics_feature", move |args: &[&Variant]| {
+                    let on = args.first().and_then(|v| v.try_to::<bool>().ok()).unwrap_or(false);
+                    features::set_enabled(feat, on);
+                }),
+            );
+            grid.add_child(&c);
+            self.feature_checks.push((feat, c));
+        }
+        col.add_child(&grid);
+        let mut all = HBoxContainer::new_alloc();
+        for (text, on) in [("All on", true), ("Defaults", false)] {
+            let mut b = button(text);
+            b.connect(
+                "pressed",
+                &Callable::from_fn("pixel_diagnostics_features_all", move |_: &[&Variant]| {
+                    for i in features::ALL {
+                        features::set_enabled(i.feature, on || i.default);
+                    }
+                }),
+            );
+            all.add_child(&b);
+        }
+        col.add_child(&all);
+        fold.add_child(&col);
+        container.add_child(&fold);
     }
 
     /// Builds one foldable section with an editor per supported exported property of `class`.
@@ -528,19 +750,45 @@ impl PixelDiagnostics {
         let mut fold = FoldableContainer::new_alloc();
         fold.set_title(title);
         fold.set_folded(folded);
+        let mut col = VBoxContainer::new_alloc().upcast::<Control>();
+        if !object_panel {
+            // Live state line + quick actions (effects).
+            if let Some(cls) = TUNED_CLASSES.iter().map(|(c, _)| *c).find(|c| *c == class)
+                && actions::live_text(cls, &mut obj.clone()).is_some()
+            {
+                let label = actions::live_label(&mut col);
+                self.live.push(Live { obj: obj.clone(), class: cls, label });
+            }
+            actions::add_actions(&mut col, class, &obj);
+        }
         let mut grid = GridContainer::new_alloc();
         grid.set_columns(2);
+        let mut group = (String::new(), String::new());
+        let mut subgroup = (String::new(), String::new());
+        let mut shown_header = String::new();
+        let mut nested: Vec<(String, Gd<Object>)> = Vec::new();
 
         let props = ClassDb::singleton().class_get_property_list_ex(class).no_inheritance(true).done();
         let editor_flag = PropertyUsageFlags::EDITOR.ord() as i64;
-        let skip = (PropertyUsageFlags::GROUP.ord() | PropertyUsageFlags::SUBGROUP.ord() | PropertyUsageFlags::CATEGORY.ord()) as i64;
+        let (group_flag, subgroup_flag) = (PropertyUsageFlags::GROUP.ord() as i64, PropertyUsageFlags::SUBGROUP.ord() as i64);
+        let skip = PropertyUsageFlags::CATEGORY.ord() as i64;
         for d in props.iter_shared() {
             let get_i = |k: &str| d.get(k).and_then(|v| v.try_to::<i64>().ok()).unwrap_or(0);
             let usage = get_i("usage");
+            let name = d.get("name").map(|v| v.to_string()).unwrap_or_default();
+            if usage & (group_flag | subgroup_flag) != 0 {
+                let prefix = d.get("hint_string").map(|v| v.to_string()).unwrap_or_default();
+                if usage & group_flag != 0 {
+                    group = (name, prefix);
+                    subgroup = (String::new(), String::new());
+                } else {
+                    subgroup = (name, prefix);
+                }
+                continue;
+            }
             if usage & editor_flag == 0 || usage & skip != 0 {
                 continue;
             }
-            let name = d.get("name").map(|v| v.to_string()).unwrap_or_default();
             let hint = get_i("hint");
             let hint_string = d.get("hint_string").map(|v| v.to_string()).unwrap_or_default();
             let ty = get_i("type");
@@ -600,10 +848,59 @@ impl PixelDiagnostics {
                     c.connect("color_changed", &setter(&obj, &prop, |v| v.clone()));
                     Some(Editor::Color(c))
                 }
+                t if vector_dims(t).is_some() => {
+                    let (n, int) = vector_dims(t).unwrap_or((3, false));
+                    let spins: Vec<Gd<SpinBox>> = (0..n)
+                        .map(|_| {
+                            let mut s = SpinBox::new_alloc();
+                            s.set_min(-1e6);
+                            s.set_max(1e6);
+                            s.set_step(if int { 1.0 } else { 0.01 });
+                            s.set_custom_minimum_size(Vector2::new(if n == 2 { 60.0 } else { 40.0 }, 0.0));
+                            s.set_h_size_flags(SizeFlags::EXPAND_FILL);
+                            s
+                        })
+                        .collect();
+                    for s in &spins {
+                        let all = spins.clone();
+                        let mut s = s.clone();
+                        s.connect(
+                            "value_changed",
+                            &setter(&obj, &prop, move |_| {
+                                let c: Vec<f64> = all.iter().map(|x| x.get_value()).collect();
+                                vector_variant(t, &c)
+                            }),
+                        );
+                    }
+                    Some(Editor::Vector(spins))
+                }
+                VariantType::OBJECT => {
+                    // Nested resource sections (palettes, profiles) after this one.
+                    if let Ok(res) = obj.get(&prop).try_to::<Gd<Object>>()
+                        && NESTED_RESOURCES.iter().any(|c| res.is_class(*c))
+                    {
+                        nested.push((name.clone(), res));
+                    }
+                    None
+                }
                 _ => None,
             };
             let Some(editor) = editor else { continue };
-            let mut l = label(&name);
+            // Group / subgroup header before its first shown property.
+            let header = if subgroup.0.is_empty() { group.0.clone() } else { format!("{} / {}", group.0, subgroup.0) };
+            if header != shown_header {
+                if !header.is_empty() {
+                    let mut h = label(&header);
+                    h.set_modulate(Color::from_rgba(1.0, 0.85, 0.5, 1.0));
+                    grid.add_child(&h);
+                    grid.add_child(&Control::new_alloc());
+                }
+                shown_header = header;
+            }
+            let prefix = if !subgroup.1.is_empty() && name.starts_with(&subgroup.1) { &subgroup.1 } else { &group.1 };
+            let mut l = label(&pretty(&name, prefix));
+            l.set_tooltip_text(&name);
+            l.set_mouse_filter(MouseFilter::PASS);
             l.set_h_size_flags(SizeFlags::EXPAND_FILL);
             grid.add_child(&l);
             let ctrl: Gd<Control> = match &editor {
@@ -611,12 +908,26 @@ impl PixelDiagnostics {
                 Editor::Spin(s) => s.clone().upcast(),
                 Editor::Choice(o) => o.clone().upcast(),
                 Editor::Color(c) => c.clone().upcast(),
+                Editor::Vector(spins) => {
+                    let mut row = HBoxContainer::new_alloc();
+                    row.add_theme_constant_override("separation", 2);
+                    for s in spins {
+                        row.add_child(s);
+                    }
+                    row.upcast()
+                }
             };
             grid.add_child(&ctrl);
             self.bindings.push(Binding { obj: obj.clone(), prop, editor, object_panel });
         }
-        fold.add_child(&grid);
+        col.add_child(&grid);
+        fold.add_child(&col);
         container.add_child(&fold);
+        for (prop, res) in nested {
+            let cls = res.get_class().to_string();
+            let t = format!("{title} > {} ({cls})", pretty(&prop, ""));
+            self.add_section(container.clone(), &cls, res, &t, true, object_panel);
+        }
     }
 
     // ---- picking ---------------------------------------------------------------------------
@@ -720,6 +1031,8 @@ impl PixelDiagnostics {
             crate::render::object::highlight(&n.clone().upcast(), 2);
         }
         self.selected = g;
+        // Re-lay out the inspector dock on the next frame.
+        self.refresh_timer = 0.0;
         self.rebuild_object_panel();
     }
 
@@ -866,7 +1179,8 @@ impl PixelDiagnostics {
             return;
         }
         self.bindings.retain(|b| b.object_panel);
-        if let Some(sections) = &self.sections {
+        self.live.clear();
+        for sections in &self.sections {
             for mut c in sections.get_children().iter_shared() {
                 c.queue_free();
             }
@@ -874,12 +1188,19 @@ impl PixelDiagnostics {
         let targets = self.find_targets();
         self.renderer = targets.iter().find(|(i, _)| *i == 0).map(|(_, n)| n.clone());
         let folded = self.sections_start_folded;
-        let Some(sections) = self.sections.clone() else { return };
-        for (k, (i, node)) in targets.iter().enumerate() {
-            let class = TUNED_CLASSES[*i];
+        if self.sections.len() < TABS.len() {
+            return;
+        }
+        self.add_features_section(self.sections[TAB_EFFECTS].clone());
+        // Keep the panel compact: on the Effects tab the first effect starts open below the
+        // features, elsewhere the first section of the tab.
+        let mut opened = [false; TABS.len()];
+        for (i, node) in &targets {
+            let (class, tab) = TUNED_CLASSES[*i];
             let title = format!("{class}: {}", node.get_name());
-            // Only the first section starts open, keeping the panel compact.
-            self.add_section(sections.clone(), class, node.clone().upcast(), &title, k > 0 && folded, false);
+            let open = !opened[tab] || !folded;
+            opened[tab] = true;
+            self.add_section(self.sections[tab].clone(), class, node.clone().upcast(), &title, !open, false);
         }
         self.pull_values();
         self.update_status();
@@ -887,8 +1208,9 @@ impl PixelDiagnostics {
 
     #[func]
     fn on_debug_view_selected(&mut self, index: i64) {
+        let id = self.debug_view.as_ref().map(|d| d.get_item_id(index as i32)).unwrap_or(index as i32);
         if let Some(r) = self.renderer.as_mut().filter(|r| r.is_instance_valid()) {
-            r.set("debug_view", &index.to_variant());
+            r.set("debug_view", &id.to_variant());
         }
     }
 

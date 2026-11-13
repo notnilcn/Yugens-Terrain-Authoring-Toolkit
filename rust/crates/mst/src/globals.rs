@@ -3,6 +3,8 @@
 use godot::classes::RenderingServer;
 use godot::classes::rendering_server::GlobalShaderParameterType as T;
 use godot::prelude::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// Render layer (1-based) seen only by the metadata camera. Pixelized geometry is put on it.
@@ -86,6 +88,8 @@ fn list() -> Vec<(&'static str, T, Variant)> {
         ("pt_fire_tex", T::SAMPLER2D, Variant::nil()),
         ("pt_fire_rect", T::VEC4, Vector4::ZERO.to_variant()),
         ("pt_fire_a", T::VEC4, Vector4::new(0.0, 1.0, 1.0, 1.0).to_variant()),
+        // Shared effect clock (clock.rs): every addon shader animates with it instead of TIME.
+        ("pt_time", T::FLOAT, 0.0f32.to_variant()),
     ]
 }
 
@@ -108,6 +112,38 @@ pub fn ensure() {
     }
 }
 
-pub fn set(name: &str, value: &Variant) {
-    RenderingServer::singleton().global_shader_parameter_set(name, value);
+thread_local! {
+    /// Last value written per global, so unchanged values never reach the RenderingServer
+    /// (each write would wake the editor for another redraw; see `writes`).
+    static LAST: RefCell<HashMap<&'static str, Variant>> = RefCell::new(HashMap::new());
+}
+
+/// Drops the cached values (before the engine unloads; see `lib.rs`).
+pub fn clear_cache() {
+    LAST.with_borrow_mut(|m| m.clear());
+}
+
+/// Sets a global shader parameter, unless it already holds `value`.
+pub fn set(name: &'static str, value: &Variant) {
+    // Textures are set rarely and must not be kept alive by the cache (it outlives the
+    // scene): always write them.
+    if value.get_type() == VariantType::OBJECT {
+        LAST.with_borrow_mut(|m| m.remove(name));
+        RenderingServer::singleton().global_shader_parameter_set(&crate::writes::name(name), value);
+        return;
+    }
+    let changed = LAST.with_borrow_mut(|m| match m.get_mut(name) {
+        Some(v) if v == value => false,
+        Some(v) => {
+            *v = value.clone();
+            true
+        }
+        None => {
+            m.insert(name, value.clone());
+            true
+        }
+    });
+    if changed {
+        RenderingServer::singleton().global_shader_parameter_set(&crate::writes::name(name), value);
+    }
 }

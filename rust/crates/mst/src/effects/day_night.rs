@@ -204,9 +204,11 @@ pub struct PixelDayNight {
     time_override: f32,
     /// The sun light. Empty = first DirectionalLight3D among this node's siblings.
     #[export]
+    #[var(get = get_sun)]
     sun: Option<Gd<DirectionalLight3D>>,
     /// Environment to grade. Empty = first WorldEnvironment among this node's siblings.
     #[export]
+    #[var(get = get_environment)]
     environment: Option<Gd<WorldEnvironment>>,
     /// Tilts the sun's arc towards +Z (0 = passes straight overhead at noon).
     #[export(range = (0.0, 80.0, 0.5))]
@@ -439,14 +441,14 @@ impl PixelDayNight {
             };
             if sun.is_inside_tree() {
                 let origin = sun.get_global_position();
-                sun.set_global_transform(Transform3D::new(basis_facing_away(light_dir), origin));
+                crate::writes::set_global_transform(&mut sun, Transform3D::new(basis_facing_away(light_dir), origin));
             }
-            sun.set_color(key.sun);
-            sun.set_param(Param::ENERGY, key.sun_energy * self.sun_energy_scale + sun_extra);
+            crate::set_changed!(sun, get_color, set_color, key.sun);
+            crate::set_changed!(sun, get_param(Param::ENERGY), set_param(Param::ENERGY), key.sun_energy * self.sun_energy_scale + sun_extra);
             // Shadows fade out through the sunset instead of popping off (the moon casts none).
-            sun.set_shadow(self.sun_shadows && elevation >= DUSK_FLOOR);
+            crate::set_changed!(sun, has_shadow, set_shadow, self.sun_shadows && elevation >= DUSK_FLOOR);
             let shadow = if elevation >= DUSK_FLOOR { smoothstep(DUSK_FLOOR, 0.02, elevation) } else { 0.0 };
-            sun.set_param(Param::SHADOW_OPACITY, shadow);
+            crate::set_changed!(sun, get_param(Param::SHADOW_OPACITY), set_param(Param::SHADOW_OPACITY), shadow);
         }
 
         if let Some(env) = self.sibling(&self.environment).and_then(|w| w.get_environment()) {
@@ -516,7 +518,7 @@ impl PixelDayNight {
         if !self.apply_fog && weather_fog <= 1e-5 {
             if self.weather_fog_on {
                 // Weather fog cleared and the day/night does not drive fog: switch it back off.
-                env.set_fog_enabled(false);
+                crate::set_changed!(env, is_fog_enabled, set_fog_enabled, false);
                 self.weather_fog_on = false;
             }
             return;
@@ -540,23 +542,23 @@ impl PixelDayNight {
             let wc = m.p.fog_color.lerp(key.ambient.darkened(0.6), (night * 0.8) as f64);
             color = color.lerp(wc, m.p.fog_mix as f64);
         }
-        env.set_fog_enabled(true);
-        env.set_fog_light_color(color);
-        env.set_fog_density(density.max(0.0));
+        crate::set_changed!(env, is_fog_enabled, set_fog_enabled, true);
+        crate::set_changed!(env, get_fog_light_color, set_fog_light_color, color);
+        crate::set_changed!(env, get_fog_density, set_fog_density, density.max(0.0));
     }
 
     fn grade_environment(mut env: Gd<Environment>, key: &Key) {
-        env.set_ambient_light_color(key.ambient);
-        env.set_ambient_light_energy(key.ambient_energy);
+        crate::set_changed!(env, get_ambient_light_color, set_ambient_light_color, key.ambient);
+        crate::set_changed!(env, get_ambient_light_energy, set_ambient_light_energy, key.ambient_energy);
         match env.get_background() {
-            BgMode::COLOR => env.set_bg_color(key.sky_top.lerp(key.sky_horizon, 0.5)),
+            BgMode::COLOR => crate::set_changed!(env, get_bg_color, set_bg_color, key.sky_top.lerp(key.sky_horizon, 0.5)),
             BgMode::SKY => {
                 let mat = env.get_sky().and_then(|s| s.get_material());
                 if let Some(mut p) = mat.and_then(|m| m.try_cast::<ProceduralSkyMaterial>().ok()) {
-                    p.set_sky_top_color(key.sky_top);
-                    p.set_sky_horizon_color(key.sky_horizon);
-                    p.set_ground_horizon_color(key.sky_horizon.darkened(0.2));
-                    p.set_ground_bottom_color(key.sky_top.darkened(0.6));
+                    crate::set_changed!(p, get_sky_top_color, set_sky_top_color, key.sky_top);
+                    crate::set_changed!(p, get_sky_horizon_color, set_sky_horizon_color, key.sky_horizon);
+                    crate::set_changed!(p, get_ground_horizon_color, set_ground_horizon_color, key.sky_horizon.darkened(0.2));
+                    crate::set_changed!(p, get_ground_bottom_color, set_ground_bottom_color, key.sky_top.darkened(0.6));
                 }
             }
             _ => {}
@@ -566,6 +568,18 @@ impl PixelDayNight {
 
 #[godot_api]
 impl PixelDayNight {
+    /// `sun`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_sun(&self) -> Option<Gd<DirectionalLight3D>> {
+        crate::util::live(&self.sun)
+    }
+
+    /// `environment`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_environment(&self) -> Option<Gd<WorldEnvironment>> {
+        crate::util::live(&self.environment)
+    }
+
     /// 0 in daylight, 1 at night (smooth around dawn and dusk).
     #[func]
     fn get_night_factor(&self) -> f32 {

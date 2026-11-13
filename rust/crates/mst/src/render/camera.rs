@@ -79,6 +79,8 @@ pub struct PixelOrbitCamera {
 
     yaw_goal: f32,
     rotating: bool,
+    /// Inputs of the last `place` (it skips while they are unchanged).
+    placed: Option<[f32; 8]>,
     base: Base<Camera3D>,
 }
 
@@ -106,6 +108,7 @@ impl ICamera3D for PixelOrbitCamera {
             edge_margin: 6.0,
             yaw_goal: 45.0,
             rotating: false,
+            placed: None,
             base,
         }
     }
@@ -161,13 +164,22 @@ impl PixelOrbitCamera {
         let origin = self.target + basis.col_c() * self.distance.max(0.01);
         let ortho = self.orthographic;
         let size = self.ortho_size.clamp(lo, hi);
+        // Nothing to do while the inputs are unchanged: re-placing an unmoved camera every frame
+        // kept the editor redrawing (the camera's gizmo and its RenderingServer state).
+        let key = [self.target.x, self.target.y, self.target.z, self.yaw_deg, self.pitch_deg, self.distance, size, if ortho { 1.0 } else { 0.0 }];
+        if self.placed == Some(key) {
+            return;
+        }
+        self.placed = Some(key);
         let mut cam = self.base_mut();
-        cam.set_global_transform(Transform3D::new(basis, origin));
+        crate::writes::set_global_transform(&mut cam, Transform3D::new(basis, origin));
         if ortho {
             if cam.get_projection() != ProjectionType::ORTHOGONAL {
                 cam.set_projection(ProjectionType::ORTHOGONAL);
             }
-            cam.set_size(size);
+            if cam.get_size() != size {
+                cam.set_size(size);
+            }
         } else if cam.get_projection() != ProjectionType::PERSPECTIVE {
             cam.set_projection(ProjectionType::PERSPECTIVE);
         }

@@ -35,6 +35,7 @@
 use godot::builtin::{Array, Transform3D, Vector2, Vector3};
 use godot::classes::{Engine, Node3D, Path3D, Shape3D, SpringArm3D};
 use godot::prelude::*;
+use godot::builtin::math::ApproxEq;
 
 use crate::abi::{
     PcamKind, TWEEN_DEFAULT_DURATION, TWEEN_DEFAULT_EASE, TWEEN_DEFAULT_TRANSITION, set_layer,
@@ -1051,7 +1052,9 @@ impl PhantomCamera3D {
         if self.follow_damping && !editor {
             if !self.is_third_person_follow {
                 let target_position = self.follow_target_output_position;
-                self.base_mut().set_global_position(target_position);
+                if !self.base().get_global_position().approx_eq(&target_position) {
+                    self.base_mut().set_global_position(target_position);
+                }
                 for i in 0..3 {
                     let (output, velocity) = crate::math::smooth_damp(
                         f64_of(axis3(&self.base().get_global_position(), i)),
@@ -1092,13 +1095,17 @@ impl PhantomCamera3D {
                 let target_quat = self.look_at_target_quat(self.target_position_offset(), up);
                 let target_basis = Basis::from_quaternion(target_quat);
                 self.transform_output.basis = target_basis;
-                self.base_mut().set_global_basis(target_basis);
+                if !self.base().get_global_basis().approx_eq(&target_basis) {
+                    self.base_mut().set_global_basis(target_basis);
+                }
             }
         } else if self.has_follow_spring_arm {
             if let Some(arm) = self.follow_spring_arm.clone() {
                 let basis = arm.get_global_basis();
                 self.transform_output.basis = basis;
-                self.base_mut().set_global_basis(basis);
+                if !self.base().get_global_basis().approx_eq(&basis) {
+                    self.base_mut().set_global_basis(basis);
+                }
             }
         }
     }
@@ -1127,7 +1134,9 @@ impl PhantomCamera3D {
             } else {
                 degrees.x = 90.0;
             }
-            self.base_mut().set_global_rotation_degrees(degrees);
+            if !self.base().get_global_rotation_degrees().approx_eq(&degrees) {
+                self.base_mut().set_global_rotation_degrees(degrees);
+            }
             self.transform_output.basis = self.base().get_global_basis();
             return self.base().get_quaternion();
         }
@@ -1190,10 +1199,14 @@ impl PhantomCamera3D {
             let output = current_quat * real_of(ratio_a) + target_quat * real_of(ratio_b);
 
             self.transform_output.basis = Basis::from_quaternion(output);
-            self.base_mut().set_quaternion(output);
+            if !self.base().get_quaternion().approx_eq(&output) {
+                self.base_mut().set_quaternion(output);
+            }
         } else {
             self.transform_output.basis = Basis::from_quaternion(target_quat);
-            self.base_mut().set_quaternion(target_quat);
+            if !self.base().get_quaternion().approx_eq(&target_quat) {
+                self.base_mut().set_quaternion(target_quat);
+            }
         }
     }
 

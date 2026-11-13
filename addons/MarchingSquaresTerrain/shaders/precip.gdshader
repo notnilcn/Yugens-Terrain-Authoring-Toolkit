@@ -153,9 +153,9 @@ void vertex() {
 	depth_tint = 0.0;
 	flake = 1.0;
 	if (mode == 1) {
-		POSITION = snow_vertex(VERTEX, INSTANCE_CUSTOM, c, VIEW_MATRIX, PROJECTION_MATRIX, VIEWPORT_SIZE, TIME, depth_tint, flake);
+		POSITION = snow_vertex(VERTEX, INSTANCE_CUSTOM, c, VIEW_MATRIX, PROJECTION_MATRIX, VIEWPORT_SIZE, pt_time, depth_tint, flake);
 	} else {
-		POSITION = rain_vertex(VERTEX, INSTANCE_CUSTOM, c, VIEW_MATRIX, PROJECTION_MATRIX, TIME, splash);
+		POSITION = rain_vertex(VERTEX, INSTANCE_CUSTOM, c, VIEW_MATRIX, PROJECTION_MATRIX, pt_time, splash);
 	}
 }
 

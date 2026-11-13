@@ -63,11 +63,11 @@ void fragment() {
 		// Teardrop: base centred a bit below the quad centre, narrowing towards the tip.
 		vec2 q = vec2(p.x, p.y + 0.25);
 		float up = max(q.y, 0.0);
-		float sway = sin(TIME * churn_speed * 1.7 + seed * 31.0 + up * 3.0) * 0.18 * up;
+		float sway = sin(pt_time * churn_speed * 1.7 + seed * 31.0 + up * 3.0) * 0.18 * up;
 		q.x = (q.x - sway) * (1.0 + up * taper);
 		q.y *= q.y > 0.0 ? 0.62 : 1.25;
 		float a = atan(q.y, q.x);
-		float ph = seed * 40.0 + TIME * churn_speed * (seed > 0.5 ? 1.0 : -1.0);
+		float ph = seed * 40.0 + pt_time * churn_speed * (seed > 0.5 ? 1.0 : -1.0);
 		float rim = 1.0 - lumpiness * (0.5 + 0.5 * sin(a * lumps + ph)) * (0.6 + 0.4 * sin(a * (lumps - 2.0) - ph * 1.3));
 		float r = length(q) / max(rim, 0.05);
 		float fade = smoothstep(0.45, 1.0, age);

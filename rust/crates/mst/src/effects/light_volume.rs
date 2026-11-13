@@ -5,8 +5,10 @@
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::light_3d::Param;
-use godot::classes::{INode3D, MeshInstance3D, Node3D, OmniLight3D, ShaderMaterial, QuadMesh, Time};
+use godot::classes::{INode3D, MeshInstance3D, Node3D, OmniLight3D, ShaderMaterial, QuadMesh};
 use godot::prelude::*;
+use crate::features::Feature;
+use crate::writes::ShaderParams;
 
 use crate::globals;
 use crate::util::*;
@@ -122,22 +124,27 @@ impl INode3D for PixelLightVolume {
         self.light = Some(light);
         self.volume = Some(glow);
         self.volume_mat = Some(mat);
-        self.apply();
-        let flicker = !is_editor();
-        self.base_mut().set_process(flicker);
+        crate::features::watch(&self.to_gd());
+        self._on_pixel_features_changed();
     }
 
-    fn process(&mut self, _delta: f64) {
-        if self.flicker <= 0.0 {
+    fn process(&mut self, delta: f64) {
+        crate::clock::tick(delta);
+        // The light flickers with the shared clock (still in a paused editor).
+        if self.flicker <= 0.0 || !crate::clock::running() {
             return;
         }
         // Same waveform as light_volume.gdshader, so the light and its glow pulse together.
-        let t = Time::singleton().get_ticks_msec() as f32 / 1000.0;
+        let t = crate::clock::now();
         let f = 1.0 - self.flicker * (0.5 + 0.5 * (t * 13.0).sin() * (t * 7.3 + 1.7).sin());
         let e = self.energy * f;
         if let Some(l) = &mut self.light {
             l.set_param(Param::ENERGY, e);
         }
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::LightVolumes)
     }
 }
 
@@ -159,23 +166,32 @@ impl PixelLightVolume {
         if let Some(v) = &mut self.volume {
             // The shader expands the quad into a camera-facing disc, so cull with the glow.
             v.set_custom_aabb(Aabb::new(Vector3::splat(-cull_r), Vector3::splat(2.0 * cull_r)));
-            v.set_visible(self.volume_enabled);
+            v.set_visible(self.volume_enabled && crate::features::enabled(Feature::LightVolumes));
         }
         if let Some(m) = &mut self.volume_mat {
-            m.set_shader_parameter("color", &self.light_color.to_variant());
-            m.set_shader_parameter("radius", &glow_r.to_variant());
-            m.set_shader_parameter("intensity", &self.volume_intensity.to_variant());
-            m.set_shader_parameter("halo_size", &self.halo_size.to_variant());
-            m.set_shader_parameter("halo_intensity", &self.halo_intensity.to_variant());
-            m.set_shader_parameter("bands", &self.volume_bands.to_variant());
-            m.set_shader_parameter("flicker", &self.flicker.to_variant());
-            m.set_shader_parameter("night_boost", &self.night_boost.to_variant());
+            m.param("color", &self.light_color.to_variant());
+            m.param("radius", &glow_r.to_variant());
+            m.param("intensity", &self.volume_intensity.to_variant());
+            m.param("halo_size", &self.halo_size.to_variant());
+            m.param("halo_intensity", &self.halo_intensity.to_variant());
+            m.param("bands", &self.volume_bands.to_variant());
+            m.param("flicker", &self.flicker.to_variant());
+            m.param("night_boost", &self.night_boost.to_variant());
         }
     }
 }
 
 #[godot_api]
 impl PixelLightVolume {
+    /// Light Volumes feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if super::gate(&self.to_gd(), Feature::LightVolumes) {
+            // The gate showed every internal; the glow follows `volume_enabled` again.
+            self.apply();
+        }
+    }
+
     #[func]
     fn set_radius(&mut self, v: f32) {
         self.radius = v.max(0.01);

@@ -12,6 +12,8 @@ use godot::classes::image::Format;
 use godot::classes::multi_mesh::TransformFormat;
 use godot::classes::{INode3D, Image, ImageTexture, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh, ShaderMaterial};
 use godot::prelude::*;
+use crate::writes::ShaderParams;
+use crate::features::Feature;
 use pt_core::fire::{FireField, FireParams, StepEvents};
 use pt_core::math::{Vec2 as PVec2, v2};
 
@@ -54,13 +56,13 @@ impl PartSet {
         mm.set_use_custom_data(true);
         mm.set_mesh(&quad);
         mm.set_instance_count(self.max as i32);
-        mm.set_visible_instance_count(0);
+        crate::writes::set_visible_instances(&mut mm, 0);
         let mut mi = MultiMeshInstance3D::new_alloc();
         mi.set_name(name);
         mi.set_multimesh(&mm);
         mi.set_cast_shadows_setting(ShadowCastingSetting::OFF);
         mi.set_as_top_level(true);
-        mi.set_global_transform(Transform3D::IDENTITY);
+        crate::writes::set_global_transform(&mut mi, Transform3D::IDENTITY);
         if self.material.is_none() {
             self.material = Some(shader_material(shader));
         }
@@ -100,7 +102,7 @@ impl PartSet {
             hi = hi.coord_max(p.pos + Vector3::splat(s));
         }
         mm.set_buffer(&PackedFloat32Array::from(buf.as_slice()));
-        mm.set_visible_instance_count(n as i32);
+        crate::writes::set_visible_instances(&mut mm, n as i32);
         if n > 0 {
             mm.set_custom_aabb(Aabb::new(lo, hi - lo));
         }
@@ -341,7 +343,12 @@ impl INode3D for PixelFireSystem {
         self.to_gd().add_to_group("__pixel_fire");
         self.rng = Rng(self.seed as u64 ^ 0xF12E_0000);
         self.build_visuals();
-        self.base_mut().set_process(true);
+        crate::features::watch(&self.to_gd());
+        self._on_pixel_features_changed();
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Fire)
     }
 
     fn exit_tree(&mut self) {
@@ -349,6 +356,8 @@ impl INode3D for PixelFireSystem {
     }
 
     fn process(&mut self, delta: f64) {
+        // The editor's ignite tool runs the fire whatever the clock does (it is a live preview).
+        let delta = if self.ignite_tool { crate::clock::tick(delta); delta } else { crate::clock::step(delta) };
         let active = !is_editor() || self.preview_in_editor || self.ignite_tool;
         if !active {
             self.publish_off();
@@ -453,22 +462,22 @@ impl PixelFireSystem {
     fn update_materials(&mut self) {
         let flags = object_flags(1, false, 0, true).to_variant();
         if let Some(m) = &mut self.flames.material {
-            m.set_shader_parameter("core_color", &self.core_color.to_variant());
-            m.set_shader_parameter("flame_color", &self.flame_color.to_variant());
-            m.set_shader_parameter("rim_color", &self.rim_color.to_variant());
-            m.set_shader_parameter("ember_color", &self.flame_color.to_variant());
-            m.set_shader_parameter("pt_flags", &flags);
+            m.param("core_color", &self.core_color.to_variant());
+            m.param("flame_color", &self.flame_color.to_variant());
+            m.param("rim_color", &self.rim_color.to_variant());
+            m.param("ember_color", &self.flame_color.to_variant());
+            m.param("pt_flags", &flags);
         }
         if let Some(m) = &mut self.smoke.material {
-            m.set_shader_parameter("smoke_color", &self.smoke_color.to_variant());
-            m.set_shader_parameter("soot_color", &self.smoke_color.darkened(0.45).to_variant());
-            m.set_shader_parameter("pt_flags", &flags);
+            m.param("smoke_color", &self.smoke_color.to_variant());
+            m.param("soot_color", &self.smoke_color.darkened(0.45).to_variant());
+            m.param("pt_flags", &flags);
         }
         if let Some(m) = &mut self.steam.material {
-            m.set_shader_parameter("smoke_color", &self.steam_color.lightened(0.15).to_variant());
-            m.set_shader_parameter("soot_color", &self.steam_color.to_variant());
-            m.set_shader_parameter("dissolve_start", &0.2f32.to_variant());
-            m.set_shader_parameter("pt_flags", &flags);
+            m.param("smoke_color", &self.steam_color.lightened(0.15).to_variant());
+            m.param("soot_color", &self.steam_color.to_variant());
+            m.param("dissolve_start", &0.2f32.to_variant());
+            m.param("pt_flags", &flags);
         }
     }
 
@@ -624,7 +633,7 @@ impl PixelFireSystem {
             match blazes.get(k) {
                 Some((c, w)) => {
                     let pos = self.to_world(v2(c.x, c.z), c.y + 0.6);
-                    l.set_global_position(pos);
+                    crate::writes::set_global_position(l, pos);
                     let size = (w / 6.0).clamp(0.3, 1.0);
                     l.set("energy", &(self.light_energy * size).to_variant());
                     l.set("volume_intensity", &(self.glow_intensity * size).to_variant());
@@ -738,6 +747,14 @@ impl PixelFireSystem {
 
 #[godot_api]
 impl PixelFireSystem {
+    /// Fire feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if !super::gate(&self.to_gd(), Feature::Fire) {
+            self.publish_off();
+        }
+    }
+
     /// The first cells of a new fire caught (`position`: world centre of the blaze).
     #[signal]
     fn fire_started(position: Vector3);

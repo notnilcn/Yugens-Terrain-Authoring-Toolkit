@@ -50,7 +50,7 @@ void vertex() {
 		v.y += w * 0.06;
 	} else {
 		// Two frames: raised "V" (narrower) / spread with drooped tips.
-		float up = step(0.5, fract(TIME * flap_speed + INSTANCE_CUSTOM.x));
+		float up = step(0.5, fract(pt_time * flap_speed + INSTANCE_CUSTOM.x));
 		v.y += mix(-0.16 * w * w, 0.34 * w, up);
 		v.x *= mix(1.0, 0.78, up * w);
 	}

@@ -9,9 +9,9 @@
 // How grass (mst_grass.gdshader) should consume it:
 //   #include "res://addons/MarchingSquaresTerrain/shaders/pixel_wind.gdshaderinc"
 //   vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;               // vertex world position
-//   VERTEX += inverse(mat3(MODEL_MATRIX)) * pt_wind_offset(wp, top, TIME); // top: 0 root .. 1 tip
-//   ALBEDO *= 1.0 + pt_wind_gust(wp.xz, TIME) * 0.12;               // optional gust shimmer
-// Trees / props: pt_wind_offset(wp, height01 * 0.3, TIME) on canopy vertices.
+//   VERTEX += inverse(mat3(MODEL_MATRIX)) * pt_wind_offset(wp, top, pt_time); // top: 0 root .. 1 tip
+//   ALBEDO *= 1.0 + pt_wind_gust(wp.xz, pt_time) * 0.12;               // optional gust shimmer
+// Trees / props: pt_wind_offset(wp, height01 * 0.3, pt_time) on canopy vertices.
 global uniform vec4 pt_wind;
 
 // Travelling gust field 0..1 at a world XZ position.

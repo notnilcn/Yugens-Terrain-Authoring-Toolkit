@@ -22,6 +22,8 @@ use godot::classes::{
     Node3D, QuadMesh, ShaderMaterial, StandardMaterial3D, WorldEnvironment,
 };
 use godot::prelude::*;
+use crate::features::Feature;
+use crate::writes::ShaderParams;
 
 use super::particle_field::{self, ParticleLayers};
 use super::{Rng, active_camera, camera_focus, find_terrain, ground_height};
@@ -460,9 +462,11 @@ pub struct PixelWeather {
     presets: Array<Gd<PixelWeatherPreset>>,
     /// Light to flash and dim. Empty = first DirectionalLight3D among this node's siblings.
     #[export]
+    #[var(get = get_sun)]
     sun: Option<Gd<DirectionalLight3D>>,
     /// Environment graded when there is no PixelDayNight (running game only).
     #[export]
+    #[var(get = get_environment)]
     environment: Option<Gd<WorldEnvironment>>,
 
     #[export_group(name = "Precipitation")]
@@ -671,11 +675,18 @@ impl INode3D for PixelWeather {
             let name = self.target_name.clone();
             self.go(&name, true);
         }
-        self.base_mut().set_process(true);
+        crate::features::watch(&self.to_gd());
+        self._on_pixel_features_changed();
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Weather)
     }
 
     fn process(&mut self, delta: f64) {
-        let dt = (delta as f32).min(0.25);
+        // Transitions, lightning and snow cover advance with the shared clock (still while the
+        // editor's clock is paused).
+        let dt = (crate::clock::step(delta) as f32).min(0.25);
         if self.blend < 1.0 {
             self.blend = if self.transition_seconds <= 0.0 { 1.0 } else { (self.blend + dt / self.transition_seconds).min(1.0) };
         }
@@ -721,16 +732,22 @@ impl INode3D for PixelWeather {
     }
 
     fn exit_tree(&mut self) {
-        MIX.with(|m| m.set(None));
-        globals::set("pt_wet", &0.0f32.to_variant());
-        globals::set("pt_snow", &0.0f32.to_variant());
-        globals::set("pt_rain", &0.0f32.to_variant());
+        self.publish_clear();
         self.rain_sheets.detach();
-        self.restore_env();
     }
 }
 
 impl PixelWeather {
+    /// Clear weather for every consumer (sky, day/night, ground shaders) and the scene's own
+    /// environment back (leaving the tree, or the Weather feature switched off).
+    fn publish_clear(&mut self) {
+        MIX.with(|m| m.set(None));
+        globals::set("pt_wet", &0.0f32.to_variant());
+        globals::set("pt_snow", &0.0f32.to_variant());
+        globals::set("pt_rain", &0.0f32.to_variant());
+        self.restore_env();
+    }
+
     fn sibling<T: GodotClass + Inherits<Node>>(&self, explicit: &Option<Gd<T>>) -> Option<Gd<T>> {
         if let Some(n) = explicit
             && n.is_instance_valid()
@@ -839,7 +856,7 @@ impl PixelWeather {
             mm.set_instance_transform(i, Transform3D::IDENTITY);
             mm.set_instance_custom_data(i, Color::from_rgba(rng.next_f32(), rng.next_f32(), rng.next_f32(), rng.next_f32()));
         }
-        mm.set_visible_instance_count(0);
+        crate::writes::set_visible_instances(&mut mm, 0);
         // The snow box follows the view (up to 256 m); the shader clips flakes itself.
         let e = if snow { Vector3::splat(260.0) } else { self.area.abs() };
         mm.set_custom_aabb(Aabb::new(-e - Vector3::splat(2.0), (e + Vector3::splat(2.0)) * 2.0));
@@ -901,19 +918,19 @@ impl PixelWeather {
             }
             let count = ((amount.clamp(0.0, 1.0) * max as f32).round() as i32).min(max);
             if let Some(mut mm) = mi.get_multimesh() {
-                mm.set_visible_instance_count(count);
+                crate::writes::set_visible_instances(&mut mm, count);
             }
             mi.set_visible(count > 0);
             if count == 0 {
                 continue;
             }
-            mi.set_global_position(centre);
-            mat.set_shader_parameter("mode", &mode.to_variant());
-            mat.set_shader_parameter("area", &self.area.abs().to_variant());
-            mat.set_shader_parameter("color", &color.to_variant());
-            mat.set_shader_parameter("fall_speed", &speed.to_variant());
-            mat.set_shader_parameter("wind", &eff.fall_wind.to_variant());
-            mat.set_shader_parameter("texels", &texels.to_variant());
+            crate::writes::set_global_position(&mut mi, centre);
+            mat.param("mode", &mode.to_variant());
+            mat.param("area", &self.area.abs().to_variant());
+            mat.param("color", &color.to_variant());
+            mat.param("fall_speed", &speed.to_variant());
+            mat.param("wind", &eff.fall_wind.to_variant());
+            mat.param("texels", &texels.to_variant());
         }
     }
 
@@ -930,23 +947,23 @@ impl PixelWeather {
         let fill = (h * h) / (half_w * half_h).max(0.01);
         let count = ((amount * self.snow_flakes.max(0) as f32 * fill).round() as i32).clamp(0, SNOW_INSTANCES);
         if let Some(mut mm) = mi.get_multimesh() {
-            mm.set_visible_instance_count(count);
+            crate::writes::set_visible_instances(&mut mm, count);
         }
         mi.set_visible(count > 0);
         if count == 0 {
             return;
         }
         let area = Vector3::new(h, h * 0.75, h);
-        mi.set_global_position(focus + Vector3::new(0.0, h * 0.5, 0.0));
-        mat.set_shader_parameter("mode", &1.to_variant());
-        mat.set_shader_parameter("area", &area.to_variant());
-        mat.set_shader_parameter("color", &self.snow_color.to_variant());
-        mat.set_shader_parameter("fall_speed", &self.snow_speed.to_variant());
-        mat.set_shader_parameter("wind", &eff.fall_wind.to_variant());
-        mat.set_shader_parameter("texels", &self.flake_texels.clamp(1, 3).to_variant());
-        mat.set_shader_parameter("big_flakes", &self.snow_big_flakes.clamp(0.0, 1.0).to_variant());
-        mat.set_shader_parameter("sway", &self.snow_sway.max(0.0).to_variant());
-        mat.set_shader_parameter("focus_depth", &dist.to_variant());
+        crate::writes::set_global_position(&mut mi, focus + Vector3::new(0.0, h * 0.5, 0.0));
+        mat.param("mode", &1.to_variant());
+        mat.param("area", &area.to_variant());
+        mat.param("color", &self.snow_color.to_variant());
+        mat.param("fall_speed", &self.snow_speed.to_variant());
+        mat.param("wind", &eff.fall_wind.to_variant());
+        mat.param("texels", &self.flake_texels.clamp(1, 3).to_variant());
+        mat.param("big_flakes", &self.snow_big_flakes.clamp(0.0, 1.0).to_variant());
+        mat.param("sway", &self.snow_sway.max(0.0).to_variant());
+        mat.param("focus_depth", &dist.to_variant());
     }
 
     fn splash_instance(&self) -> (Gd<MultiMeshInstance3D>, Gd<ShaderMaterial>) {
@@ -963,7 +980,7 @@ impl PixelWeather {
             mm.set_instance_transform(i, Transform3D::IDENTITY);
             mm.set_instance_custom_data(i, Color::from_rgba(rng.next_f32(), rng.next_f32(), rng.next_f32(), rng.next_f32()));
         }
-        mm.set_visible_instance_count(0);
+        crate::writes::set_visible_instances(&mut mm, 0);
         let e = self.area.abs();
         mm.set_custom_aabb(Aabb::new(Vector3::new(-e.x - 2.0, -200.0, -e.z - 2.0), Vector3::new(e.x * 2.0 + 4.0, 400.0, e.z * 2.0 + 4.0)));
         let mut mi = MultiMeshInstance3D::new_alloc();
@@ -1029,18 +1046,18 @@ impl PixelWeather {
         let n = self.max_splashes.max(0);
         let count = ((amount * n as f32).ceil() as i32).min(n);
         if let Some(mut mm) = mi.get_multimesh() {
-            mm.set_visible_instance_count(count);
+            crate::writes::set_visible_instances(&mut mm, count);
         }
         mi.set_visible(count > 0);
         if count == 0 {
             return;
         }
-        mi.set_global_position(Vector3::new(centre.x, 0.0, centre.z));
-        mat.set_shader_parameter("area", &self.area.abs().to_variant());
-        mat.set_shader_parameter("rate", &self.splash_rate.to_variant());
-        mat.set_shader_parameter("texel", &self.rain_texel.max(0.005).to_variant());
-        mat.set_shader_parameter("radius", &self.splash_radius.clamp(1, 8).to_variant());
-        mat.set_shader_parameter("color", &self.rain_color.lerp(Color::WHITE, 0.2).to_variant());
+        crate::writes::set_global_position(&mut mi, Vector3::new(centre.x, 0.0, centre.z));
+        mat.param("area", &self.area.abs().to_variant());
+        mat.param("rate", &self.splash_rate.to_variant());
+        mat.param("texel", &self.rain_texel.max(0.005).to_variant());
+        mat.param("radius", &self.splash_radius.clamp(1, 8).to_variant());
+        mat.param("color", &self.rain_color.lerp(Color::WHITE, 0.2).to_variant());
     }
 
     /// `pt_wind` (pixel_wind.gdshaderinc): horizontal wind direction (x, z), strength (m/s:
@@ -1121,7 +1138,7 @@ impl PixelWeather {
             }
             im.surface_end();
             bolt.set_mesh(&im);
-            bolt.set_global_transform(Transform3D::IDENTITY);
+            crate::writes::set_global_transform(&mut bolt, Transform3D::IDENTITY);
             if let Some(mut m) = bolt.get_material_override().and_then(|m| m.try_cast::<StandardMaterial3D>().ok()) {
                 m.set_albedo(self.bolt_color);
             }
@@ -1200,6 +1217,26 @@ fn bolt_segments(rng: &mut Rng, a: Vector3, b: Vector3, width: f32, depth: u32, 
 
 #[godot_api]
 impl PixelWeather {
+    /// `sun`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_sun(&self) -> Option<Gd<DirectionalLight3D>> {
+        crate::util::live(&self.sun)
+    }
+
+    /// `environment`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_environment(&self) -> Option<Gd<WorldEnvironment>> {
+        crate::util::live(&self.environment)
+    }
+
+    /// Weather feature gate (`features::CALLBACK`): off = clear weather, no precipitation.
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if !super::gate(&self.to_gd(), Feature::Weather) {
+            self.publish_clear();
+        }
+    }
+
     /// Emitted (deferred) when a new weather is requested.
     #[signal]
     fn weather_changed(name: GString);

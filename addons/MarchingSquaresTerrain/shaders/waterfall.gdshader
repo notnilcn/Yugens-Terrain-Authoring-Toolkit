@@ -78,7 +78,7 @@ void vertex() {
 		// Spray: a puff rising from the base, growing and drifting, then respawning.
 		float phase = UV.x;
 		float size = UV.y;
-		float t = fract(TIME * spray_rate + phase);
+		float t = fract(pt_time * spray_rate + phase);
 		spray_t = t;
 		mat3 to_model = mat3(inverse(MODEL_MATRIX));
 		vec3 right = normalize(to_model * INV_VIEW_MATRIX[0].xyz);
@@ -100,8 +100,8 @@ void fragment() {
 	vec3 meta_n = (VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
 	if (part < 0.5) {
 		// Pool: calm, banded ripples drifting downstream-ish.
-		float n = pt_vnoise(world_pos.xz * ripple_scale + vec2(TIME * ripple_speed, TIME * ripple_speed * 0.6));
-		float n2 = pt_vnoise(world_pos.xz * ripple_scale * 2.1 - vec2(TIME * ripple_speed * 0.8, 0.0));
+		float n = pt_vnoise(world_pos.xz * ripple_scale + vec2(pt_time * ripple_speed, pt_time * ripple_speed * 0.6));
+		float n2 = pt_vnoise(world_pos.xz * ripple_scale * 2.1 - vec2(pt_time * ripple_speed * 0.8, 0.0));
 		float r = n * 0.65 + n2 * 0.35;
 		col = mix(water_color.rgb, deep_color.rgb, 0.35);
 		if (r > 0.7) {
@@ -114,9 +114,9 @@ void fragment() {
 		float colw = 1.0 / max(streak_density, 0.1);
 		float ci = floor(UV.x / colw);
 		float h = pt_hash(vec2(ci, 3.7));
-		float y = UV.y + TIME * fall_speed * (0.85 + 0.3 * h);
+		float y = UV.y + pt_time * fall_speed * (0.85 + 0.3 * h);
 		float n1 = pt_vnoise(vec2(ci * 1.37, y / max(streak_length, 0.05)));
-		float n2 = pt_vnoise(vec2(UV.x * 0.9 + TIME * 0.05, (UV.y + TIME * fall_speed * 0.92) * 0.45));
+		float n2 = pt_vnoise(vec2(UV.x * 0.9 + pt_time * 0.05, (UV.y + pt_time * fall_speed * 0.92) * 0.45));
 		float river = n1 * (0.55 + n2 * 0.9);
 		float lip = corner.x;
 		// Churn towards the base.
@@ -136,8 +136,8 @@ void fragment() {
 		meta_n = NORMAL;
 	} else if (part < 2.5) {
 		// Base foam: churning, fraying out towards the rim.
-		float f = pt_vnoise(world_pos.xz * 2.4 + vec2(TIME * foam_speed, -TIME * foam_speed * 0.7)) * 0.6
-				+ pt_vnoise(world_pos.xz * 1.1 - vec2(TIME * foam_speed * 0.5)) * 0.4;
+		float f = pt_vnoise(world_pos.xz * 2.4 + vec2(pt_time * foam_speed, -pt_time * foam_speed * 0.7)) * 0.6
+				+ pt_vnoise(world_pos.xz * 1.1 - vec2(pt_time * foam_speed * 0.5)) * 0.4;
 		float edge = corner.x;
 		if (f < 0.25 + edge * 0.5) {
 			discard;
@@ -148,8 +148,8 @@ void fragment() {
 		// Landing basin: a splash pool on the ground, churned white where the fall hits it and
 		// along a frayed foam rim.
 		float edge = corner.x;
-		float f = pt_vnoise(world_pos.xz * 2.6 + vec2(TIME * foam_speed, -TIME * foam_speed * 0.7)) * 0.6
-				+ pt_vnoise(world_pos.xz * 1.2 - vec2(TIME * foam_speed * 0.5)) * 0.4;
+		float f = pt_vnoise(world_pos.xz * 2.6 + vec2(pt_time * foam_speed, -pt_time * foam_speed * 0.7)) * 0.6
+				+ pt_vnoise(world_pos.xz * 1.2 - vec2(pt_time * foam_speed * 0.5)) * 0.4;
 		float ring = smoothstep(0.62, 0.9, edge);
 		if (edge > 0.8 && f < 0.3 + (edge - 0.8) * 2.5) {
 			discard;

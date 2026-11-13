@@ -52,7 +52,7 @@ float ground_at(vec2 xz) {
 void vertex() {
 	vec3 c = MODEL_MATRIX[3].xyz;
 	vec4 seed = INSTANCE_CUSTOM;
-	float t = TIME * rate + seed.w * 7.0;
+	float t = pt_time * rate + seed.w * 7.0;
 	cycle = floor(t);
 	life = fract(t);
 	vec2 size = area.xz * 2.0;

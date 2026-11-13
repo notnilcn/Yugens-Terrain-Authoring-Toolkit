@@ -84,6 +84,8 @@ const ACT_CAM_TOGGLE: &str = "camera_toggle";
 const ACT_WALK: &str = "player_walk";
 
 /// Heights above the feet (metres) of the occlusion rays: feet, knees, hips, chest, head.
+/// Occlusion probes per second (camera avoidance and x-ray); the camera easing runs per frame.
+const OCCLUSION_PROBE_HZ: f32 = 30.0;
 const BODY_RAYS: [f32; 5] = [0.2, 0.55, 0.9, 1.25, 1.6];
 /// The body origin sits at the capsule centre, 0.9 m above the feet (`player.tscn`).
 const FEET_BELOW_ORIGIN: f32 = 0.9;
@@ -304,6 +306,9 @@ pub struct MstDemoPlayer {
     /// Avoidance is holding the pitch up; seconds the user's pitch has been clear since.
     occ_raised: bool,
     occ_clear_time: f32,
+    /// Seconds to the next occlusion probe, and seconds gathered since the last one.
+    occ_probe_wait: f32,
+    occ_probe_dt: f32,
     /// Blocked body rays at the user's / shown pitch (last update).
     occ_points_base: u32,
     occ_points_shown: u32,
@@ -389,6 +394,8 @@ impl ICharacterBody3D for MstDemoPlayer {
             cur_occ: 0.0,
             occ_raised: false,
             occ_clear_time: 0.0,
+            occ_probe_wait: 0.0,
+            occ_probe_dt: 0.0,
             occ_points_base: 0,
             occ_points_shown: 0,
             xray_on: false,
@@ -790,10 +797,24 @@ impl MstDemoPlayer {
     /// `occlusion_release_delay` seconds.
     fn update_occlusion(&mut self, dt: f32) {
         let (base, yaw) = (self.cur_pitch, self.shown_yaw());
+        // The body-ray probes (physics rays plus terrain height marches, up to ~80 a frame while
+        // the view is raised) run at OCCLUSION_PROBE_HZ; the easing below runs every frame.
+        self.occ_probe_wait -= dt;
+        self.occ_probe_dt += dt;
+        let probe = self.occ_probe_wait <= 0.0;
+        if probe {
+            self.occ_probe_wait = 1.0 / OCCLUSION_PROBE_HZ;
+        }
+        let since_probe = self.occ_probe_dt;
+        if probe {
+            self.occ_probe_dt = 0.0;
+        }
         if !self.occlusion_avoid || !self.player_view {
             self.occ_raised = false;
             self.occ_target = 0.0;
             self.occ_points_base = 0;
+        } else if !probe {
+            // Between probes: keep the last target.
         } else if let Some(n) = self.blocked_count(base, yaw) {
             self.occ_points_base = n;
             if n >= self.trigger_points() {
@@ -802,7 +823,7 @@ impl MstDemoPlayer {
             } else if self.occ_raised {
                 // Hysteresis: hold the raised view a moment so walking along a ledge (rays
                 // flickering around the trigger) does not bob the camera.
-                self.occ_clear_time += dt;
+                self.occ_clear_time += since_probe;
                 if self.occ_clear_time >= self.occlusion_release_delay {
                     self.occ_raised = false;
                 }
@@ -820,8 +841,16 @@ impl MstDemoPlayer {
             self.cur_occ = self.occ_target;
         }
         // Both where the camera really is (it lags the shown pitch) and where it is heading.
-        let at_shown = self.blocked_count(self.shown_pitch(), yaw).unwrap_or(0);
-        self.occ_points_shown = self.blocked_for_camera().unwrap_or(0).max(at_shown);
+        if probe {
+            let shown = self.shown_pitch();
+            // Unraised view: the shown pitch is the base pitch just probed.
+            let at_shown = if shown == base && self.occlusion_avoid && self.player_view {
+                self.occ_points_base
+            } else {
+                self.blocked_count(shown, yaw).unwrap_or(0)
+            };
+            self.occ_points_shown = self.blocked_for_camera().unwrap_or(0).max(at_shown);
+        }
     }
 
     /// Lowest pitch at or above `base` (in 3° steps) where no body ray is blocked, plus the

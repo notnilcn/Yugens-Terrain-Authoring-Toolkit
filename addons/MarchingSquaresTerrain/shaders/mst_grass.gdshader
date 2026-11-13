@@ -100,7 +100,7 @@ void vertex() {
 	float top = 1.0 - UV.y;
 	vec3 sway = vec3(0.0);
 	if (animate_active) {
-		float t = TIME;
+		float t = pt_time;
 		if (animation_fps > 0.0) {
 			t = floor(t * animation_fps) / animation_fps;
 		}
@@ -155,7 +155,7 @@ void fragment() {
 	float top = 1.0 - UV.y;
 	ALBEDO = base_color * sprite.rgb * mix(1.0 - root_darken, 1.0 + tip_lighten, top);
 	ALBEDO = pt_weather_grass_snow(ALBEDO, top, snow_cover); // [PixelWeather hook]
-	ALBEDO = pt_fire_grass(ALBEDO, fire, top, blade_seed, TIME); // [PixelFireSystem hook]
+	ALBEDO = pt_fire_grass(ALBEDO, fire, top, blade_seed, pt_time); // [PixelFireSystem hook]
 	EMISSION = pt_fire_grass_glow(ALBEDO, fire);
 	if (fog.x < 0.5) {
 		float l = dot(ALBEDO, vec3(0.299, 0.587, 0.114));

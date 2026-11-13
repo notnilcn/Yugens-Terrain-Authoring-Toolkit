@@ -42,7 +42,7 @@ vec4 pt_fire_at(vec3 wp) {
 	return mix(a, b, t.y);
 }
 
-// Burnt ground, glowing embers under the flames and darker wet patches. `t` = TIME.
+// Burnt ground, glowing embers under the flames and darker wet patches. `t` = pt_time.
 vec3 pt_fire_surface(vec3 albedo, vec3 wp, bool wall, float t) {
 	if (!pt_fire_on() || wall) {
 		return albedo;

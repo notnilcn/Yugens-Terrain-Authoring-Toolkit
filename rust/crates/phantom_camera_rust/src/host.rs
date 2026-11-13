@@ -37,6 +37,7 @@ use godot::classes::{
     ClassDb, Engine, Node, Os,
 };
 use godot::prelude::*;
+use godot::builtin::math::ApproxEq;
 
 use crate::abi::InterpolationMode;
 use crate::manager::PhantomCameraManager;
@@ -1528,7 +1529,11 @@ impl PhantomCameraHost {
             let Some(mut camera) = self.camera_3d.clone() else {
                 return;
             };
-            camera.set_global_transform(self.active_pcam_3d_glob_transform);
+            // Change-only (Rust extra): an unchanged camera transform still reaches the
+            // RenderingServer and keeps the editor redrawing every frame.
+            if !camera.get_global_transform().approx_eq(&self.active_pcam_3d_glob_transform) {
+                camera.set_global_transform(self.active_pcam_3d_glob_transform);
+            }
             // parity: `:920-928` duplicates attributes/environment into the camera in
             // the editor only; omitted with the rest of the editor plumbing.
             let _ = active;

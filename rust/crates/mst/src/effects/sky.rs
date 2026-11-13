@@ -5,8 +5,10 @@ use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::{Camera3D, DirectionalLight3D, INode3D, MeshInstance3D, Node3D, PlaneMesh, ShaderMaterial};
 use godot::prelude::*;
 
-use crate::globals;
+use crate::features::{self, Feature};
 use crate::util::*;
+use crate::writes::{self, ShaderParams};
+use crate::{clock, globals};
 
 /// Direction to the sun when no light is assigned or found.
 fn default_sun_dir() -> Vector3 {
@@ -17,7 +19,9 @@ fn default_sun_dir() -> Vector3 {
 /// sun onto terrain, objects, grass and water; the `PixelRenderer` god rays shine through
 /// the gaps; and an optional flat cloud deck shows the clouds themselves.
 ///
-/// Updates every frame, in the editor too, so shadows can be previewed while authoring.
+/// Updates every frame, in the editor too, so shadows can be previewed while authoring (the
+/// clouds drift there only while the editor animates effects, see `clock`). The clouds follow
+/// the project's Clouds feature; the sun direction is published either way.
 /// Several PixelSky nodes may coexist: one drives the shared field per frame (see
 /// `cloud_camera_scope` and `effects::cloud_field`).
 #[derive(GodotClass)]
@@ -26,10 +30,12 @@ pub struct PixelSky {
     /// Light the clouds are projected from. Empty = first DirectionalLight3D among this
     /// node's siblings.
     #[export]
+    #[var(get = get_sun)]
     sun: Option<Gd<DirectionalLight3D>>,
     /// When set, this sky drives the cloud field only while this camera is the active one
     /// (two-camera scenes switch cloud fields with the camera). Empty = fallback provider.
     #[export]
+    #[var(get = get_cloud_camera_scope)]
     cloud_camera_scope: Option<Gd<Camera3D>>,
     /// Enables cloud shadows (and god rays, which need the cloud field).
     #[export]
@@ -108,14 +114,16 @@ impl INode3D for PixelSky {
         globals::ensure();
         self.to_gd().add_to_group("__pixel_sky");
         super::cloud_field::register_provider(&self.to_gd().upcast());
+        features::watch(&self.to_gd());
         self.base_mut().set_process(true);
         self.update_deck();
     }
 
     fn process(&mut self, delta: f64) {
+        let dt = clock::step(delta) as f32;
         // Wrap the offset so it never loses float precision in long sessions.
         let wind_scale = super::weather::mix().map(|m| m.p.wind_scale).unwrap_or(1.0);
-        self.offset += self.wind * wind_scale * delta as f32;
+        self.offset += self.wind * wind_scale * dt;
         if self.offset.x.abs() > 4096.0 || self.offset.y.abs() > 4096.0 {
             self.offset = Vector2::ZERO;
         }
@@ -128,14 +136,25 @@ impl INode3D for PixelSky {
         } else if active.is_none() {
             super::cloud_field::publish_neutral();
         }
+        let clouds = features::enabled(Feature::Clouds);
         if let Some(d) = self.deck.as_mut().filter(|d| d.is_instance_valid()) {
-            d.set_visible(active == Some(node.instance_id()));
+            d.set_visible(clouds && active == Some(node.instance_id()));
         }
         self.follow_camera();
     }
 
     fn exit_tree(&mut self) {
         super::cloud_field::unregister_provider(&self.to_gd().upcast());
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        let mut w = PackedStringArray::new();
+        if (self.clouds_enabled || self.deck_enabled)
+            && let Some(msg) = features::warning(Feature::Clouds)
+        {
+            w.push(&msg.replace("this node draws nothing", "there are no cloud shadows or deck (the sun direction is still published)"));
+        }
+        w
     }
 }
 
@@ -179,14 +198,15 @@ impl PixelSky {
         }
         let a = Vector4::new(coverage, softness, self.cloud_scale, shadow);
         let b = Vector4::new(self.offset.x, self.offset.y, self.cloud_height, self.bands.max(0) as f32);
-        let c = Vector4::new(if self.clouds_enabled { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0);
+        let clouds = self.clouds_enabled && features::enabled(Feature::Clouds);
+        let c = Vector4::new(if clouds { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0);
         globals::set("pt_cloud_a", &a.to_variant());
         globals::set("pt_cloud_b", &b.to_variant());
         globals::set("pt_cloud_c", &c.to_variant());
         if let Some(m) = &mut self.deck_mat {
-            m.set_shader_parameter("opacity", &opacity.to_variant());
-            m.set_shader_parameter("cloud_color", &deck.to_variant());
-            m.set_shader_parameter("shade_color", &deck_shade.to_variant());
+            m.param("opacity", &opacity.to_variant());
+            m.param("cloud_color", &deck.to_variant());
+            m.param("shade_color", &deck_shade.to_variant());
         }
     }
 
@@ -244,12 +264,30 @@ impl PixelSky {
             }
         };
         let s = self.deck_size.max(1.0);
-        deck.set_global_transform(Transform3D::new(Basis::from_scale(Vector3::new(s, 1.0, s)), centre));
+        writes::set_global_transform(&mut deck, Transform3D::new(Basis::from_scale(Vector3::new(s, 1.0, s)), centre));
     }
 }
 
 #[godot_api]
 impl PixelSky {
+    /// `sun`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_sun(&self) -> Option<Gd<DirectionalLight3D>> {
+        crate::util::live(&self.sun)
+    }
+
+    /// `cloud_camera_scope`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_cloud_camera_scope(&self) -> Option<Gd<Camera3D>> {
+        crate::util::live(&self.cloud_camera_scope)
+    }
+
+    /// The project's Clouds toggle changed (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        self.base_mut().update_configuration_warnings();
+    }
+
     #[func]
     fn set_deck_enabled(&mut self, v: bool) {
         self.deck_enabled = v;

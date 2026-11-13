@@ -30,8 +30,10 @@ use super::editor_preview::EditorHost;
 use super::object;
 use super::outline_palette::{self, PixelOutlinePalette};
 use super::palette::PixelPalette;
-use crate::globals;
+use crate::features::{self, Feature};
 use crate::util::*;
+use crate::writes::{self, ShaderParams};
+use crate::{clock, globals};
 
 const MARGIN: i32 = 4;
 /// Layers the 3D editor reserves for itself (Node3DEditor: MISC_TOOL 24, GIZMO_GRID 25,
@@ -82,6 +84,7 @@ pub struct PixelRenderer {
     fixed_height: i32,
     /// Camera to follow (empty = the viewport's current Camera3D, re-resolved every frame).
     #[export]
+    #[var(get = get_camera)]
     camera: Option<Gd<Camera3D>>,
     /// Snap orthographic cameras to the texel lattice (stable pixels). Perspective cameras are
     /// snapped too when they carry a `pixel_snap_distance` meta (the lattice on that plane).
@@ -177,6 +180,7 @@ pub struct PixelRenderer {
     #[export]
     auto_focus: bool,
     #[export]
+    #[var(get = get_focus_target)]
     focus_target: Option<Gd<Node3D>>,
 
     #[export_group(name = "Color")]
@@ -458,6 +462,7 @@ impl INode for PixelRenderer {
     fn ready(&mut self) {
         globals::ensure();
         globals::set_meta_layer(self.meta_layer as u32);
+        features::watch(&self.to_gd());
         self.push_object_defaults();
         self.base_mut().set_process_priority(10_000);
         self.base_mut().set_process(true);
@@ -466,7 +471,8 @@ impl INode for PixelRenderer {
         }
     }
 
-    fn process(&mut self, _delta: f64) {
+    fn process(&mut self, delta: f64) {
+        clock::tick(delta);
         if is_editor() {
             // Built lazily (also after the scene tab is switched back): never from a setter.
             let host_lost = self.pipeline.as_ref().is_some_and(|p| p.host.as_ref().is_some_and(|h| !h.is_valid()));
@@ -495,11 +501,31 @@ impl INode for PixelRenderer {
         if self.base().get_parent().is_some_and(|p| p.find_children_ex("*").type_("PixelRenderer").owned(false).done().len() > 1) {
             w.push("Only one PixelRenderer per scene is supported.");
         }
+        let gated = [(self.god_rays, Feature::GodRays), (self.outlines, Feature::Outlines), (self.extended_ids, Feature::OutlineIds)];
+        for (on, f) in gated {
+            if on && let Some(msg) = features::warning(f) {
+                w.push(&msg.replace("this node draws nothing", "this renderer skips it"));
+            }
+        }
         w
     }
 }
 
 impl PixelRenderer {
+    /// `god_rays` unless the project switched the God Rays feature off.
+    fn rays_on(&self) -> bool {
+        self.god_rays && features::enabled(Feature::GodRays)
+    }
+
+    fn outlines_on(&self) -> bool {
+        self.outlines && features::enabled(Feature::Outlines)
+    }
+
+    /// Whether the id pass renders (Anchor mode, `extended_ids` and the Outline Ids feature).
+    fn id_pass_on(&self) -> bool {
+        self.mode == 0 && self.extended_ids && features::enabled(Feature::OutlineIds)
+    }
+
     fn build(&mut self) {
         if self.pipeline.is_some() {
             return;
@@ -739,6 +765,7 @@ impl PixelRenderer {
 
     /// Pauses/resumes the low-res viewports (editor preview while the 3D screen is hidden).
     fn set_rendering(&mut self, on: bool) {
+        let (anchor, ids) = (self.mode == 0, self.id_pass_on());
         let Some(p) = &mut self.pipeline else { return };
         if p.rendering == on {
             return;
@@ -747,9 +774,8 @@ impl PixelRenderer {
         let mode = if on { UpdateMode::ALWAYS } else { UpdateMode::DISABLED };
         p.resolve_vp.set_update_mode(mode);
         p.color_vp.set_update_mode(mode);
-        let anchor = self.mode == 0;
         p.meta_vp.set_update_mode(if on && anchor { UpdateMode::ALWAYS } else { UpdateMode::DISABLED });
-        p.id_vp.set_update_mode(if on && anchor && self.extended_ids { UpdateMode::ALWAYS } else { UpdateMode::DISABLED });
+        p.id_vp.set_update_mode(if on && ids { UpdateMode::ALWAYS } else { UpdateMode::DISABLED });
         p.display_rect.set_visible(on);
     }
 
@@ -899,7 +925,9 @@ impl PixelRenderer {
         let editor_layers = if self.pipeline.as_ref().is_some_and(|p| p.host.is_some()) { EDITOR_ONLY_LAYERS } else { 0 };
         let cull = self.saved_cull_mask & !meta_mask & !editor_layers;
         let anchor = self.mode == 0;
-        let extended = self.extended_ids && anchor;
+        let extended = self.id_pass_on();
+        let god_rays = self.rays_on();
+        let outlines = self.outlines_on();
         let multiply = self.outline_palette.as_ref().is_some_and(|p| p.bind().is_multiply());
         self.push_object_defaults();
         let outline_tex = self.outline_texture();
@@ -915,9 +943,9 @@ impl PixelRenderer {
             (half.atan() * 2.0).to_degrees().min(179.0)
         };
 
-        let (ray_tint, ray_threshold) = if self.god_rays { self.ray_inputs() } else { (self.ray_color, 0.5) };
+        let (ray_tint, ray_threshold) = if god_rays { self.ray_inputs() } else { (self.ray_color, 0.5) };
         // The sheets' cloud mask for other effects (PixelParticleField dust in the shafts).
-        let rays_on = if self.god_rays { 1.0 } else { 0.0 };
+        let rays_on = if god_rays { 1.0 } else { 0.0 };
         globals::set("pt_rays_a", &Vector4::new(rays_on, ray_threshold, self.ray_sheet_cloud_softness, self.ray_gap_erosion).to_variant());
         globals::set("pt_rays_b", &Vector4::new(self.ray_cloud_shadow_strength, self.ray_sun_follow, self.ray_strength, 0.0).to_variant());
 
@@ -928,9 +956,9 @@ impl PixelRenderer {
             p.color_vp.set_size(src);
             p.meta_vp.set_size(src);
             p.id_vp.set_size(src);
-            p.resolve_mat.set_shader_parameter("source_size", &src.to_variant());
-            p.resolve_mat.set_shader_parameter("out_size", &res.to_variant());
-            p.upscale_mat.set_shader_parameter("source_size", &Vector2::new(res.x as f32, res.y as f32).to_variant());
+            p.resolve_mat.param("source_size", &src.to_variant());
+            p.resolve_mat.param("out_size", &res.to_variant());
+            p.upscale_mat.param("source_size", &Vector2::new(res.x as f32, res.y as f32).to_variant());
         }
         if p.rendering {
             let mode = if extended { UpdateMode::ALWAYS } else { UpdateMode::DISABLED };
@@ -942,34 +970,21 @@ impl PixelRenderer {
                 p.meta_vp.set_update_mode(mode);
             }
         }
-        for (cam3, kind) in [(&mut p.color_cam, 0), (&mut p.meta_cam, 1), (&mut p.id_cam, 2)] {
-            cam3.set_global_transform(snapped);
-            cam3.set_keep_aspect_mode(KeepAspect::HEIGHT);
-            cam3.set_near(near);
-            cam3.set_far(far);
-            if ortho {
-                cam3.set_projection(ProjectionType::ORTHOGONAL);
-                cam3.set_size(size_src.max(0.001));
-            } else {
-                cam3.set_projection(ProjectionType::PERSPECTIVE);
-                cam3.set_fov(fov_src);
+        let view = CameraView { transform: snapped, near, far, ortho, size: size_src.max(0.001), fov: fov_src };
+        view.apply(&mut p.color_cam, cull);
+        view.apply(&mut p.meta_cam, meta_mask);
+        view.apply(&mut p.id_cam, id_mask);
+        if p.color_cam.get_environment() != env {
+            match &env {
+                Some(e) => p.color_cam.set_environment(e),
+                None => p.color_cam.set_environment(Gd::<Environment>::null_arg()),
             }
-            if kind == 1 {
-                cam3.set_cull_mask(meta_mask);
-            } else if kind == 2 {
-                cam3.set_cull_mask(id_mask);
-            } else {
-                cam3.set_cull_mask(cull);
-                match &env {
-                    Some(e) => cam3.set_environment(e),
-                    None => cam3.set_environment(Gd::<Environment>::null_arg()),
-                }
-                match &attrs {
-                    Some(a) => cam3.set_attributes(a),
-                    None => cam3.set_attributes(Gd::<godot::classes::CameraAttributes>::null_arg()),
-                }
+        }
+        if p.color_cam.get_attributes() != attrs {
+            match &attrs {
+                Some(a) => p.color_cam.set_attributes(a),
+                None => p.color_cam.set_attributes(Gd::<godot::classes::CameraAttributes>::null_arg()),
             }
-            cam3.set_current(true);
         }
 
         // World lattice of resolve texel (0, 0) (see pixel_resolve.gdshader), mod 24 =
@@ -984,58 +999,58 @@ impl PixelRenderer {
         let shift = if self.smooth_scroll { Vector2::new(fx, -fy) } else { Vector2::ZERO };
 
         let m = &mut p.resolve_mat;
-        m.set_shader_parameter("lattice", &lattice.to_variant());
-        m.set_shader_parameter("max_pixel_size", &4.to_variant());
-        m.set_shader_parameter("outlines", &self.outlines.to_variant());
-        m.set_shader_parameter("outline_background", &self.outline_background.to_variant());
-        m.set_shader_parameter("depth_threshold", &self.depth_threshold.to_variant());
-        m.set_shader_parameter("normal_threshold", &self.normal_threshold.to_variant());
-        m.set_shader_parameter("outline_darken", &self.outline_darken.to_variant());
-        m.set_shader_parameter("highlight", &self.highlight.to_variant());
-        m.set_shader_parameter("use_id_tex", &extended.to_variant());
-        m.set_shader_parameter("low_res_mode", &(!anchor).to_variant());
-        m.set_shader_parameter("outline_multiply", &multiply.to_variant());
-        m.set_shader_parameter("id_edges", &self.id_edges.to_variant());
-        m.set_shader_parameter("fold_limit", &self.fold_limit.to_variant());
-        m.set_shader_parameter("ledge_wall", &self.ledge_walls.to_variant());
+        m.param("lattice", &lattice.to_variant());
+        m.param("max_pixel_size", &4.to_variant());
+        m.param("outlines", &outlines.to_variant());
+        m.param("outline_background", &self.outline_background.to_variant());
+        m.param("depth_threshold", &self.depth_threshold.to_variant());
+        m.param("normal_threshold", &self.normal_threshold.to_variant());
+        m.param("outline_darken", &self.outline_darken.to_variant());
+        m.param("highlight", &self.highlight.to_variant());
+        m.param("use_id_tex", &extended.to_variant());
+        m.param("low_res_mode", &(!anchor).to_variant());
+        m.param("outline_multiply", &multiply.to_variant());
+        m.param("id_edges", &self.id_edges.to_variant());
+        m.param("fold_limit", &self.fold_limit.to_variant());
+        m.param("ledge_wall", &self.ledge_walls.to_variant());
         if let Some(t) = &outline_tex {
-            m.set_shader_parameter("outline_palette", &t.to_variant());
+            m.param("outline_palette", &t.to_variant());
         }
         let lut = if self.palette_enabled { self.palette.as_mut().and_then(|pal| pal.bind_mut().lut_texture()) } else { None };
-        m.set_shader_parameter("palette_enabled", &lut.is_some().to_variant());
+        m.param("palette_enabled", &lut.is_some().to_variant());
         if let Some(l) = &lut {
-            m.set_shader_parameter("palette_lut", &l.to_variant());
+            m.param("palette_lut", &l.to_variant());
         }
-        m.set_shader_parameter("palette_mix", &self.palette_mix.to_variant());
-        m.set_shader_parameter("dither_enabled", &self.dither_enabled.to_variant());
-        m.set_shader_parameter("dither_spread", &self.dither_spread.to_variant());
-        m.set_shader_parameter("dither_size", &self.dither_size.to_variant());
-        m.set_shader_parameter("saturation", &self.saturation.to_variant());
-        m.set_shader_parameter("contrast", &self.contrast.to_variant());
-        m.set_shader_parameter("brightness", &self.brightness.to_variant());
-        m.set_shader_parameter("debug_view", &self.debug_view.to_variant());
-        m.set_shader_parameter("rays_enabled", &self.god_rays.to_variant());
-        if self.god_rays {
-            m.set_shader_parameter("ray_color", &ray_tint.to_variant());
-            m.set_shader_parameter("ray_strength", &(STABLE3D_RAY_STRENGTH * LDR_RAY_CALIBRATION * self.ray_strength).to_variant());
-            m.set_shader_parameter("ray_samples", &self.ray_samples.to_variant());
-            m.set_shader_parameter("ray_max_distance", &self.ray_max_distance.to_variant());
-            m.set_shader_parameter("ray_bands", &self.ray_bands.to_variant());
-            m.set_shader_parameter("ray_sheet_spacing", &self.ray_sheet_spacing.to_variant());
-            m.set_shader_parameter("ray_sheet_quantum", &self.ray_sheet_quantum.to_variant());
-            m.set_shader_parameter("ray_sheet_max_stack", &self.ray_sheet_max_stack.to_variant());
-            m.set_shader_parameter("ray_sheet_distance_falloff", &self.ray_sheet_distance_falloff.to_variant());
-            m.set_shader_parameter("ray_sheet_surface_fade", &self.ray_sheet_surface_fade.to_variant());
-            m.set_shader_parameter("ray_sheet_cloud_softness", &self.ray_sheet_cloud_softness.to_variant());
-            m.set_shader_parameter("ray_gap_erosion", &self.ray_gap_erosion.to_variant());
-            m.set_shader_parameter("ray_cloud_shadow_strength", &self.ray_cloud_shadow_strength.to_variant());
-            m.set_shader_parameter("ray_near_fade_start", &self.ray_near_fade_start.to_variant());
-            m.set_shader_parameter("ray_near_fade", &self.ray_near_fade.to_variant());
-            m.set_shader_parameter("ray_near_fade_power", &self.ray_near_fade_power.to_variant());
-            m.set_shader_parameter("ray_depth_cutoff", &self.ray_depth_cutoff.to_variant());
-            m.set_shader_parameter("ray_sun_follow", &self.ray_sun_follow.to_variant());
-            m.set_shader_parameter("ray_adaptation", &self.ray_adaptation.to_variant());
-            m.set_shader_parameter("ray_cloud_threshold", &ray_threshold.to_variant());
+        m.param("palette_mix", &self.palette_mix.to_variant());
+        m.param("dither_enabled", &self.dither_enabled.to_variant());
+        m.param("dither_spread", &self.dither_spread.to_variant());
+        m.param("dither_size", &self.dither_size.to_variant());
+        m.param("saturation", &self.saturation.to_variant());
+        m.param("contrast", &self.contrast.to_variant());
+        m.param("brightness", &self.brightness.to_variant());
+        m.param("debug_view", &self.debug_view.to_variant());
+        m.param("rays_enabled", &god_rays.to_variant());
+        if god_rays {
+            m.param("ray_color", &ray_tint.to_variant());
+            m.param("ray_strength", &(STABLE3D_RAY_STRENGTH * LDR_RAY_CALIBRATION * self.ray_strength).to_variant());
+            m.param("ray_samples", &self.ray_samples.to_variant());
+            m.param("ray_max_distance", &self.ray_max_distance.to_variant());
+            m.param("ray_bands", &self.ray_bands.to_variant());
+            m.param("ray_sheet_spacing", &self.ray_sheet_spacing.to_variant());
+            m.param("ray_sheet_quantum", &self.ray_sheet_quantum.to_variant());
+            m.param("ray_sheet_max_stack", &self.ray_sheet_max_stack.to_variant());
+            m.param("ray_sheet_distance_falloff", &self.ray_sheet_distance_falloff.to_variant());
+            m.param("ray_sheet_surface_fade", &self.ray_sheet_surface_fade.to_variant());
+            m.param("ray_sheet_cloud_softness", &self.ray_sheet_cloud_softness.to_variant());
+            m.param("ray_gap_erosion", &self.ray_gap_erosion.to_variant());
+            m.param("ray_cloud_shadow_strength", &self.ray_cloud_shadow_strength.to_variant());
+            m.param("ray_near_fade_start", &self.ray_near_fade_start.to_variant());
+            m.param("ray_near_fade", &self.ray_near_fade.to_variant());
+            m.param("ray_near_fade_power", &self.ray_near_fade_power.to_variant());
+            m.param("ray_depth_cutoff", &self.ray_depth_cutoff.to_variant());
+            m.param("ray_sun_follow", &self.ray_sun_follow.to_variant());
+            m.param("ray_adaptation", &self.ray_adaptation.to_variant());
+            m.param("ray_cloud_threshold", &ray_threshold.to_variant());
         }
         // The camera basis is also used by the outline pass (wall folds), so always set it.
         {
@@ -1047,17 +1062,17 @@ impl PixelRenderer {
                 let tv = (fov_src.to_radians() * 0.5).tan();
                 (right * (tv * aspect), up * tv)
             };
-            m.set_shader_parameter("cam_origin", &origin.to_variant());
-            m.set_shader_parameter("cam_right", &r.to_variant());
-            m.set_shader_parameter("cam_up", &u.to_variant());
-            m.set_shader_parameter("cam_forward", &(-back).to_variant());
-            m.set_shader_parameter("cam_ortho", &ortho.to_variant());
+            m.param("cam_origin", &origin.to_variant());
+            m.param("cam_right", &r.to_variant());
+            m.param("cam_up", &u.to_variant());
+            m.param("cam_forward", &(-back).to_variant());
+            m.param("cam_ortho", &ortho.to_variant());
         }
         let u = &mut p.upscale_mat;
-        u.set_shader_parameter("view_texels", &view_texels.to_variant());
-        u.set_shader_parameter("center", &Vector2::new(res.x as f32 * 0.5, res.y as f32 * 0.5).to_variant());
-        u.set_shader_parameter("shift", &shift.to_variant());
-        u.set_shader_parameter("sharp", &self.sharp_upscale.to_variant());
+        u.param("view_texels", &view_texels.to_variant());
+        u.param("center", &Vector2::new(res.x as f32 * 0.5, res.y as f32 * 0.5).to_variant());
+        u.param("shift", &shift.to_variant());
+        u.param("sharp", &self.sharp_upscale.to_variant());
 
         globals::set("pt_meta_depth_range", &self.depth_range.max(1.0).to_variant());
         globals::set("pt_texel_world", &texel.to_variant());
@@ -1066,6 +1081,25 @@ impl PixelRenderer {
 
 #[godot_api]
 impl PixelRenderer {
+    /// `camera`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_camera(&self) -> Option<Gd<Camera3D>> {
+        crate::util::live(&self.camera)
+    }
+
+    /// `focus_target`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_focus_target(&self) -> Option<Gd<Node3D>> {
+        crate::util::live(&self.focus_target)
+    }
+
+    /// A project feature toggle changed (`features::CALLBACK`): the passes follow on the next
+    /// sync; only the warnings need a refresh.
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        self.base_mut().update_configuration_warnings();
+    }
+
     #[func]
     fn set_enabled(&mut self, v: bool) {
         self.enabled = v;
@@ -1165,12 +1199,56 @@ impl PixelRenderer {
                 self.low_res.y,
                 self.texel_world,
                 cam,
-                if self.outlines { "on" } else { "off" },
-                if self.extended_ids { "0-255" } else { "0-7" },
+                if self.outlines_on() { "on" } else { "off" },
+                if self.id_pass_on() { "0-255" } else { "0-7" },
                 if self.palette_enabled { "on" } else { "off" },
-                if self.god_rays { "on" } else { "off" },
+                if self.rays_on() { "on" } else { "off" },
             )
             .as_str(),
         )
+    }
+}
+
+/// What the three pipeline cameras copy from the followed camera each frame.
+struct CameraView {
+    transform: Transform3D,
+    near: f32,
+    far: f32,
+    ortho: bool,
+    size: f32,
+    fov: f32,
+}
+
+impl CameraView {
+    /// Change-only: an unchanged camera sends nothing to the RenderingServer, so a still
+    /// editor preview lets the editor idle.
+    fn apply(&self, cam: &mut Gd<Camera3D>, cull_mask: u32) {
+        writes::set_global_transform(cam, self.transform);
+        if cam.get_keep_aspect_mode() != KeepAspect::HEIGHT {
+            cam.set_keep_aspect_mode(KeepAspect::HEIGHT);
+        }
+        if cam.get_near() != self.near {
+            cam.set_near(self.near);
+        }
+        if cam.get_far() != self.far {
+            cam.set_far(self.far);
+        }
+        let projection = if self.ortho { ProjectionType::ORTHOGONAL } else { ProjectionType::PERSPECTIVE };
+        if cam.get_projection() != projection {
+            cam.set_projection(projection);
+        }
+        if self.ortho {
+            if cam.get_size() != self.size {
+                cam.set_size(self.size);
+            }
+        } else if cam.get_fov() != self.fov {
+            cam.set_fov(self.fov);
+        }
+        if cam.get_cull_mask() != cull_mask {
+            cam.set_cull_mask(cull_mask);
+        }
+        if !cam.is_current() {
+            cam.set_current(true);
+        }
     }
 }

@@ -153,7 +153,7 @@ void vertex() {
 	sheet_right = vec3(1.0, 0.0, 0.0);
 	if (mode == 0) {
 		float range = n_layers * spacing;
-		float y_rel = i * spacing - fall_speed * TIME;
+		float y_rel = i * spacing - fall_speed * pt_time;
 		float w = floor(y_rel / range);
 		float y = y_rel - w * range;
 		sheet_id = i - w * n_layers;
@@ -189,8 +189,8 @@ void fragment() {
 	vec2 uv;
 	float v_stretch = 1.0;
 	if (mode == 0) {
-		vec2 push = gust > 0.0 ? pt_wind.xy * pt_wind_gust(wp.xz, TIME) * gust * pt_wind.z : vec2(0.0);
-		uv = (wp.xz - wind * TIME - push) / texel_size;
+		vec2 push = gust > 0.0 ? pt_wind.xy * pt_wind_gust(wp.xz, pt_time) * gust * pt_wind.z : vec2(0.0);
+		uv = (wp.xz - wind * pt_time - push) / texel_size;
 	} else {
 		float u = dot(wp, sheet_right);
 		float wr = dot(wind, sheet_right.xz);
@@ -198,10 +198,10 @@ void fragment() {
 		// texels vertically so a streak keeps its length in screen texels (and slow the
 		// flipbook by the same factor so the world fall speed stays the same).
 		v_stretch = 1.0 / clamp(length((-INV_VIEW_MATRIX[2].xyz).xz), 0.3, 1.0);
-		uv = vec2((u - wr * TIME + slant * wr * wp.y) / texel_size, (-wp.y - fall_speed * TIME) / (texel_size * v_stretch));
+		uv = vec2((u - wr * pt_time + slant * wr * wp.y) / texel_size, (-wp.y - fall_speed * pt_time) / (texel_size * v_stretch));
 	}
 	uv += vec2(pt_hash(vec2(id, 1.7)), pt_hash(vec2(3.1, id))) * float(tile);
-	int f = int(mod(floor(TIME * fps / v_stretch) + floor(pt_hash(vec2(id * 0.37, 9.2)) * float(frames)), float(max(frames, 1))));
+	int f = int(mod(floor(pt_time * fps / v_stretch) + floor(pt_hash(vec2(id * 0.37, 9.2)) * float(frames)), float(max(frames, 1))));
 
 	// Footprint taps: a sheet texel smaller than the screen texel must not be skipped.
 	vec2 fw = max(fwidth(uv), vec2(1e-4));

@@ -134,6 +134,11 @@ void fragment() {
 	if (void_w > 0.5) {
 		discard;
 	}
+	// The metadata and id passes only need the surface (normal, depth, flags), not its colour:
+	// skip the texturing, weather, fire and overlay work below (two of the three scene passes).
+	if (PT_IS_META || PT_IS_ID) {
+		PT_META_OUTPUT(wall ? face_n : NORMAL)
+	} else {
 
 	vec3 n = normalize(local_normal);
 	if (!wall) {
@@ -171,10 +176,10 @@ void fragment() {
 		}
 	}
 	vec3 rgb = col.rgb;
-	rgb = pt_water_caustics(pt_weather_surface(rgb, world_pos, n, wall, TIME), world_pos, TIME); // [PixelWeather/PixelWater hook]
-	rgb = pt_fire_surface(rgb, world_pos, wall, TIME); EMISSION = wall ? vec3(0.0) : pt_fire_glow(world_pos, TIME); // [PixelFireSystem hook]
+	rgb = pt_water_caustics(pt_weather_surface(rgb, world_pos, n, wall, pt_time), world_pos, pt_time); // [PixelWeather/PixelWater hook]
+	rgb = pt_fire_surface(rgb, world_pos, wall, pt_time); EMISSION = wall ? vec3(0.0) : pt_fire_glow(world_pos, pt_time); // [PixelFireSystem hook]
 	int dom = (w.x >= w.y && w.x >= w.z) ? m.x : (w.y >= w.z ? m.y : m.z);
-	rgb = mst_apply_cells(rgb, world_pos, local_pos.xz, mst_pixel_lattice(world_pos, INV_VIEW_MATRIX, FRAGCOORD.xy), TIME, wall);
+	rgb = mst_apply_cells(rgb, world_pos, local_pos.xz, mst_pixel_lattice(world_pos, INV_VIEW_MATRIX, FRAGCOORD.xy), pt_time, wall);
 	rgb = mst_apply_grid(rgb, local_pos.xz, -VERTEX.z, wall);
 	vec3 cursor_m = mst_cursor_mask(local_pos.xz);
 	rgb = mst_apply_cursor_mask(rgb, cursor_m);
@@ -182,8 +187,7 @@ void fragment() {
 	rgb = mst_debug_color(rgb, local_pos, n, dom, wall);
 	ALBEDO = rgb;
 	cloud = pt_cloud_shadow(world_pos);
-	vec3 meta_n = wall ? face_n : NORMAL;
-	PT_META_OUTPUT(meta_n)
+	} // colour pass
 }
 
 void light() {

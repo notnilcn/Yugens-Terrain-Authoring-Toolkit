@@ -11,4 +11,4 @@ tests/eval/
 addons/phantom_camera_rust/bin/
 # Demo-only player controller library (built by tools/build.*).
 demo/bin/
-.claude/
+#.claude/

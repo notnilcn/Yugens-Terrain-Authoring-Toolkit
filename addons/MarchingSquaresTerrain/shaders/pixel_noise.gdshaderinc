@@ -13,6 +13,9 @@ global uniform float pt_night;
 global uniform float pt_sun_light;  // sun light 0..1 vs daylight (PixelDayNight; 1 without one)
 global uniform vec4 pt_lod_fade;    // terrain LOD: focus.xz, fade end distance, band (0 = off)
 global uniform float pt_sun_low;    // 0 sun high .. 1 sun at / below the horizon (PixelDayNight; 0 without one)
+// Shared effect clock (clock.rs), used instead of TIME: seconds at runtime, frozen in the editor
+// unless effects animate there. A shader that reads TIME makes the editor redraw every frame.
+global uniform float pt_time;
 
 // 4x4 ordered dither threshold (0..1) of a pixel coordinate.
 float pt_bayer4(vec2 p) {

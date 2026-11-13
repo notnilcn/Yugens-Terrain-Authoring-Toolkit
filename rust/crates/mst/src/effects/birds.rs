@@ -17,8 +17,10 @@ use godot::classes::{ArrayMesh, INode3D, MultiMesh, MultiMeshInstance3D, Node, N
 use godot::prelude::*;
 
 use super::{Rng, active_camera, camera_focus, find_terrain, ground_height};
+use crate::features::Feature;
 use crate::globals;
 use crate::util::*;
+use crate::writes::{InstanceBuffer, ShaderParams};
 
 #[derive(Clone, Copy, PartialEq)]
 enum State {
@@ -147,6 +149,7 @@ pub struct PixelBirds {
     material: Option<Gd<ShaderMaterial>>,
     rng: Rng,
     /// Internal flock node (never saved).
+    buffer: InstanceBuffer,
     flock: Option<Gd<MultiMeshInstance3D>>,
     base: Base<Node3D>,
 }
@@ -189,6 +192,7 @@ impl INode3D for PixelBirds {
             rng: Rng(7),
             layers: 1,
             flock: None,
+            buffer: InstanceBuffer::default(),
             base,
         }
     }
@@ -200,19 +204,27 @@ impl INode3D for PixelBirds {
 
     fn ready(&mut self) {
         self.to_gd().add_to_group(globals::REFRESH_GROUP);
+        crate::features::watch(&self.to_gd());
         self.rebuild();
         self.refresh_pixel_settings();
-        self.base_mut().set_process(true);
+        super::gate(&self.to_gd(), Feature::Birds);
     }
 
     fn process(&mut self, delta: f64) {
+        let dt = (crate::clock::step(delta) as f32).min(0.1);
         if is_editor() && !self.preview_in_editor {
             return;
         }
-        let dt = (delta as f32).min(0.1);
-        self.simulate(dt);
-        self.upload();
+        // Paused editor clock: the flock holds still (nothing is uploaded, the editor idles).
+        if dt > 0.0 {
+            self.simulate(dt);
+            self.upload();
+        }
         self.sync_texels();
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Birds)
     }
 }
 
@@ -257,13 +269,14 @@ impl PixelBirds {
         if texel != self.texel {
             self.texel = texel;
             if let Some(mut m) = self.material.clone() {
-                m.set_shader_parameter("texel_size", &texel.to_variant());
+                m.param("texel_size", &texel.to_variant());
             }
         }
     }
 
     fn rebuild(&mut self) {
-        if !self.base().is_inside_tree() {
+        // Feature off: build nothing (the gate rebuilds when it is turned on).
+        if !self.base().is_inside_tree() || !crate::features::enabled(Feature::Birds) {
             return;
         }
         let n = self.count.max(1) as usize;
@@ -284,6 +297,7 @@ impl PixelBirds {
         mm.set_mesh(&bird_mesh());
         mm.set_instance_count(n as i32);
         self.flock().set_multimesh(&mm);
+        self.buffer.reset();
         if self.material.is_none() {
             self.material = Some(shader_material("bird.gdshader"));
         }
@@ -293,14 +307,14 @@ impl PixelBirds {
 
     fn update_material(&mut self) {
         let Some(mut m) = self.material.clone() else { return };
-        m.set_shader_parameter("color", &self.color.to_variant());
-        m.set_shader_parameter("tip_color", &self.tip_color.to_variant());
-        m.set_shader_parameter("min_texels", &self.min_texels.to_variant());
-        m.set_shader_parameter("max_texels", &self.max_texels.to_variant());
-        m.set_shader_parameter("texel_size", &self.texel.to_variant());
-        m.set_shader_parameter("span", &self.size.to_variant());
-        m.set_shader_parameter("flap_speed", &self.flap_speed.to_variant());
-        m.set_shader_parameter("pt_flags", &object_flags(1, self.outline, 0, true).to_variant());
+        m.param("color", &self.color.to_variant());
+        m.param("tip_color", &self.tip_color.to_variant());
+        m.param("min_texels", &self.min_texels.to_variant());
+        m.param("max_texels", &self.max_texels.to_variant());
+        m.param("texel_size", &self.texel.to_variant());
+        m.param("span", &self.size.to_variant());
+        m.param("flap_speed", &self.flap_speed.to_variant());
+        m.param("pt_flags", &object_flags(1, self.outline, 0, true).to_variant());
         if let Some(f) = &mut self.flock {
             f.set_material_override(&m);
         }
@@ -486,7 +500,8 @@ impl PixelBirds {
         let inv = if self.base().is_inside_tree() { self.base().get_global_transform().affine_inverse() } else { Transform3D::IDENTITY };
         let s = self.size;
         let hide = self.view.map(|(o, _)| (o, self.camera_clearance * 0.5));
-        for (i, b) in self.birds.iter().enumerate() {
+        self.buffer.clear();
+        for b in &self.birds {
             // Too close to the camera (e.g. a bird that just took off under it): hide.
             let s = match hide {
                 Some((o, r)) if b.state != State::Perched && (b.pos - o).length() < r => 0.0,
@@ -496,16 +511,15 @@ impl PixelBirds {
             let fwd = if flat.length_squared() > 1e-8 { flat.normalized() } else { Vector3::FORWARD };
             let right = Vector3::UP.cross(fwd).normalized();
             let basis = Basis::from_cols(right * s, Vector3::UP * s, fwd * s);
-            mm.set_instance_transform(i as i32, inv * Transform3D::new(basis, b.pos));
             let perched = if b.state == State::Perched { 1.0 } else { 0.0 };
             // Glide while descending to land or when steadily sinking.
             let glide = if matches!(b.state, State::Land(_)) || b.vel.y < -0.4 * self.speed { 1.0 } else { 0.0 };
-            mm.set_instance_custom_data(i as i32, Color::from_rgba(b.phase, perched, glide, 0.0));
+            self.buffer.push(inv * Transform3D::new(basis, b.pos), Color::from_rgba(b.phase, perched, glide, 0.0));
         }
         // Birds roam far from the node: cull with the whole flight area.
         let r = self.radius * 1.6 + 4.0;
         let a = self.altitude;
-        mm.set_custom_aabb(Aabb::new(Vector3::new(-r, -a - 4.0, -r), Vector3::new(2.0 * r, a + r, 2.0 * r)));
+        self.buffer.upload(&mut mm, Aabb::new(Vector3::new(-r, -a - 4.0, -r), Vector3::new(2.0 * r, a + r, 2.0 * r)));
     }
 }
 
@@ -595,6 +609,15 @@ impl PixelBirds {
         let mask = self.layers | globals::meta_mask();
         if let Some(f) = &mut self.flock {
             f.set_layer_mask(mask);
+        }
+    }
+
+    /// Birds feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if super::gate(&self.to_gd(), Feature::Birds) && self.get_flock().is_none() {
+            self.rebuild();
+            self.refresh_pixel_settings();
         }
     }
 

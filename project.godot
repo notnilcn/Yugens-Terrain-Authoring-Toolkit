@@ -24,6 +24,19 @@ PhantomCameraManager="*res://addons/phantom_camera_rust/phantom_camera_manager.t
 window/size/viewport_width=1280
 window/size/viewport_height=720
 
+[marching_squares_terrain]
+
+features/clouds=true
+features/god_rays=true
+features/water=true
+features/weather=true
+features/birds=true
+features/fireflies=true
+features/smoke=true
+features/fire=true
+features/particles=true
+features/light_volumes=true
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

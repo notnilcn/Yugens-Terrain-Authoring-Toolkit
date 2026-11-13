@@ -15,6 +15,8 @@ use godot::classes::image::Format;
 use godot::classes::mesh::{ArrayType, PrimitiveType};
 use godot::classes::{ArrayMesh, Camera3D, INode3D, Image, ImageTexture, MeshInstance3D, Node, Node3D, ShaderMaterial};
 use godot::prelude::*;
+use crate::features::Feature;
+use crate::writes::ShaderParams;
 use pt_core::flipbook::{self, Preset, Shape};
 
 use super::{active_camera, camera_focus, find_terrain, ground_height, weather};
@@ -115,7 +117,7 @@ impl ParticleLayers {
         let layers = mi.get_layer_mask() & !globals::meta_mask();
         mi.set_layer_mask(layers);
         mi.set_as_top_level(true);
-        mi.set_global_transform(Transform3D::IDENTITY);
+        crate::writes::set_global_transform(&mut mi, Transform3D::IDENTITY);
         mi.set_ignore_occlusion_culling(true);
         // The vertex shader places the sheets: one huge box keeps them from being culled.
         mi.set_custom_aabb(Aabb::new(Vector3::splat(-1.0e5), Vector3::splat(2.0e5)));
@@ -142,11 +144,11 @@ impl ParticleLayers {
         self.baked = Some(*p);
         let mat = self.mat.get_or_insert_with(|| shader_material("particle_field.gdshader"));
         if let Some(t) = &self.tex {
-            mat.set_shader_parameter("sheet", &t.to_variant());
+            mat.param("sheet", &t.to_variant());
         }
-        mat.set_shader_parameter("sheet_grid", &Vector2i::new(b.cols as i32, b.rows as i32).to_variant());
-        mat.set_shader_parameter("tile", &(b.size as i32).to_variant());
-        mat.set_shader_parameter("frames", &(b.frames as i32).to_variant());
+        mat.param("sheet_grid", &Vector2i::new(b.cols as i32, b.rows as i32).to_variant());
+        mat.param("tile", &(b.size as i32).to_variant());
+        mat.param("frames", &(b.frames as i32).to_variant());
     }
 
     pub fn texture(&self) -> Option<Gd<ImageTexture>> {
@@ -189,7 +191,7 @@ impl ParticleLayers {
             focus = Vector3::new(look.fade_center.x, focus.y, look.fade_center.z);
         }
         let Some(m) = &mut self.mat else { return };
-        let set = |m: &mut Gd<ShaderMaterial>, k: &str, v: Variant| m.set_shader_parameter(k, &v);
+        let set = |m: &mut Gd<ShaderMaterial>, k: &'static str, v: Variant| m.param(k, &v);
         set(m, "mode", (look.projection as i32).to_variant());
         set(m, "layers", n.to_variant());
         set(m, "spacing", look.spacing.max(0.01).to_variant());
@@ -539,10 +541,16 @@ impl INode3D for PixelParticleField {
         globals::ensure();
         let mut node = self.to_gd().upcast::<Node>();
         self.layers_draw.attach(&mut node, "Layers");
-        self.base_mut().set_process(true);
+        crate::features::watch(&self.to_gd());
+        super::gate(&self.to_gd(), Feature::Particles);
     }
 
-    fn process(&mut self, _delta: f64) {
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Particles)
+    }
+
+    fn process(&mut self, delta: f64) {
+        crate::clock::tick(delta);
         let fp = self.flipbook_params();
         self.layers_draw.set_flipbook(&fp);
         let look = self.look();
@@ -678,6 +686,12 @@ impl PixelParticleField {
 
 #[godot_api]
 impl PixelParticleField {
+    /// Particle Fields feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        super::gate(&self.to_gd(), Feature::Particles);
+    }
+
     #[func]
     fn set_preset(&mut self, v: i32) {
         let v = v.clamp(0, Preset::ALL.len() as i32 - 1);

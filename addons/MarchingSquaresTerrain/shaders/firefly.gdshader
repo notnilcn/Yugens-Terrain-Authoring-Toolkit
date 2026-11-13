@@ -2,6 +2,9 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
 
+// Shared effect clock (clock.rs), used instead of TIME so the editor can idle.
+global uniform float pt_time;
+
 global uniform float pt_night;
 
 uniform vec4 color : source_color = vec4(1.0, 0.9, 0.45, 1.0);
@@ -17,8 +20,8 @@ varying float glow;
 void vertex() {
 	float r = INSTANCE_CUSTOM.x * 6.2831;
 	vec3 base = MODEL_MATRIX[3].xyz;
-	vec3 off = vec3(sin(TIME * 0.7 + r), sin(TIME * 0.9 + r * 1.7) * 0.5, cos(TIME * 0.6 + r * 2.3)) * wander;
-	float blink = smoothstep(0.2, 0.9, sin(TIME * blink_speed + r * 3.0) * 0.5 + 0.5);
+	vec3 off = vec3(sin(pt_time * 0.7 + r), sin(pt_time * 0.9 + r * 1.7) * 0.5, cos(pt_time * 0.6 + r * 2.3)) * wander;
+	float blink = smoothstep(0.2, 0.9, sin(pt_time * blink_speed + r * 3.0) * 0.5 + 0.5);
 	glow = blink * mix(1.0, pt_night, night_only);
 	mat4 bb = mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], vec4(base + off, 1.0));
 	MODELVIEW_MATRIX = VIEW_MATRIX * bb * mat4(vec4(size, 0, 0, 0), vec4(0, size, 0, 0), vec4(0, 0, size, 0), vec4(0, 0, 0, 1));

@@ -15,6 +15,9 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
 
+// Shared effect clock (clock.rs), used instead of TIME so the editor can idle.
+global uniform float pt_time;
+
 uniform sampler2D depth_tex : hint_depth_texture, repeat_disable, filter_nearest;
 
 uniform vec4 color : source_color = vec4(1.0, 0.75, 0.4, 1.0);
@@ -97,7 +100,7 @@ void fragment() {
 	halo *= step(t_centre, dot(scene - frag, ray));
 	halo = lv_band(halo, levels, dither_width, th);
 
-	float fl = 1.0 - flicker * (0.5 + 0.5 * sin(TIME * 13.0) * sin(TIME * 7.3 + 1.7));
+	float fl = 1.0 - flicker * (0.5 + 0.5 * sin(pt_time * 13.0) * sin(pt_time * 7.3 + 1.7));
 	float vis = mix(1.0, mix(0.35, 1.0, pt_night), night_boost);
 	ALBEDO = color.rgb * (pool * intensity + halo * halo_intensity) * fl * vis;
 }

@@ -81,6 +81,13 @@ pub fn add_internal(parent: &mut Gd<impl Inherits<Node>>, child: &Gd<impl Inheri
     parent.upcast_mut::<Node>().add_child_ex(child).internal(InternalMode::FRONT).done();
 }
 
+/// An exported node reference as the inspector should see it: `None` once the node was freed
+/// (deleted in the editor). godot-rust panics when a freed object is returned to the engine,
+/// so exported node fields use this in their getter (`#[var(get = ...)]`).
+pub fn live<T: GodotClass>(n: &Option<Gd<T>>) -> Option<Gd<T>> {
+    n.as_ref().filter(|n| n.is_instance_valid()).cloned()
+}
+
 /// Frees a node if it is still valid.
 pub fn free_node(n: Option<Gd<impl Inherits<Node>>>) {
     if let Some(n) = n {

@@ -40,7 +40,7 @@ void vertex() {
 	jitter = INSTANCE_CUSTOM.rg;
 	if (wind_sway > 0.0) {
 		vec3 o = MODEL_MATRIX[3].xyz;
-		float t = TIME * wind_speed + dot(o.xz, vec2(0.13, 0.17));
+		float t = pt_time * wind_speed + dot(o.xz, vec2(0.13, 0.17));
 		float k = max(VERTEX.y, 0.0);
 		VERTEX.x += sin(t) * wind_sway * k * 0.5;
 		VERTEX.z += cos(t * 0.8) * wind_sway * k * 0.3;

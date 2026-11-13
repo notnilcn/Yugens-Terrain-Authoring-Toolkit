@@ -11,6 +11,15 @@ license = "MIT"
 godot = { version = "=0.5.5", features = ["api-4-7"] }
 pt_core = { path = "crates/pt_core" }
 
+# Debug builds are what the editor loads, so they must be fast: the addon crates get light
+# optimisation (opt-level 0 made editor brushing, the pixel pipeline sync and the demo player
+# several times slower), and only line tables are kept (full debug info made the library
+# ~390 MB, slow to load and to hot-reload). For a debugger session, build with
+# `CARGO_PROFILE_DEV_DEBUG=true tools/build.sh`.
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 opt-level = 2
 

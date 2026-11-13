@@ -266,6 +266,7 @@ pub struct MarchingSquaresTerrain {
     /// Centre of the full-detail area (e.g. the player). Empty: the point the active camera
     /// looks at on the terrain's base plane (or the camera itself when it looks up).
     #[export]
+    #[var(get = get_lod_focus)]
     lod_focus: Option<Gd<Node3D>>,
     /// Apply the ring in the editor too (off: the editor always shows full detail).
     #[export]
@@ -281,6 +282,7 @@ pub struct MarchingSquaresTerrain {
     map_window_radius: i32,
     /// Centre of the map window (e.g. the player). Empty: the LOD focus / camera target.
     #[export]
+    #[var(get = get_map_window_focus)]
     map_window_focus: Option<Gd<Node3D>>,
     /// Recentre the window when the focus is this close to its border (cells).
     #[export(range = (0.0, 512.0, 1.0, or_greater))]
@@ -555,6 +557,7 @@ impl INode3D for MarchingSquaresTerrain {
         globals::ensure();
         let mut gd = self.to_gd();
         gd.add_to_group(globals::REFRESH_GROUP);
+        crate::features::watch(&gd);
         self.ensure_resources();
         self.ensure_save_hook();
         self.update();
@@ -562,6 +565,7 @@ impl INode3D for MarchingSquaresTerrain {
     }
 
     fn process(&mut self, delta: f64) {
+        crate::clock::tick(delta);
         if is_editor() {
             self.poll_timer -= delta;
             if self.poll_timer <= 0.0 {
@@ -617,11 +621,21 @@ impl INode3D for MarchingSquaresTerrain {
         if self.store.chunks.is_empty() {
             w.push("The terrain has no chunks. Select the terrain and use the Chunks tool (or call add_chunk) to add one.");
         }
+        if self.grass_enabled
+            && let Some(msg) = crate::features::warning(crate::features::Feature::Grass)
+        {
+            w.push(&msg.replace("this node draws nothing", "the terrain draws no grass"));
+        }
         w
     }
 }
 
 impl MarchingSquaresTerrain {
+    /// `grass_enabled` unless the project switched the Grass feature off.
+    fn grass_on(&self) -> bool {
+        self.grass_enabled && crate::features::enabled(crate::features::Feature::Grass)
+    }
+
     pub fn store(&self) -> &TerrainStore {
         &self.store
     }
@@ -836,6 +850,7 @@ impl MarchingSquaresTerrain {
         if let Some(m) = &gmat {
             rs.material_set_param(m.get_rid(), "pt_flags", &gflags.to_variant());
         }
+        let grass_on = self.grass_on();
         for n in self.nodes.values_mut() {
             n.mesh.set_layer_mask(layers);
             n.mesh.set_cast_shadows_setting(shadows);
@@ -843,7 +858,7 @@ impl MarchingSquaresTerrain {
                 n.mesh.set_material_override(m);
             }
             n.grass.set_layer_mask(layers);
-            n.grass.set_visible(self.grass_enabled);
+            n.grass.set_visible(grass_on);
             if let Some(m) = &gmat {
                 n.grass.set_material_override(m);
             }
@@ -909,7 +924,7 @@ impl MarchingSquaresTerrain {
         let mut rebuilt = Array::<Vector2i>::new();
         if !self.baked.is_empty() && !self.columns_active() {
             let sig = self.bake_signature();
-            let need_grass = self.grass_enabled;
+            let need_grass = self.grass_on();
             let mut ready = Vec::new();
             existing.retain(|c| match self.baked.remove(c) {
                 Some(b) if b.signature == sig && (b.grass.is_some() || !need_grass) => {
@@ -934,7 +949,7 @@ impl MarchingSquaresTerrain {
         }
         let blend = BlendMode(self.blend_mode.clamp(0, 2) as u8);
         let gp = self.grass_params();
-        let grass_on = self.grass_enabled;
+        let grass_on = self.grass_on();
         if grass_on || !self.scatter.set.is_empty() || !self.cleared_cells.is_empty() {
             self.grass_water = self.collect_grass_water();
         }
@@ -1445,6 +1460,18 @@ impl MarchingSquaresTerrain {
 
 #[godot_api]
 impl MarchingSquaresTerrain {
+    /// `lod_focus`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_lod_focus(&self) -> Option<Gd<Node3D>> {
+        crate::util::live(&self.lod_focus)
+    }
+
+    /// `map_window_focus`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_map_window_focus(&self) -> Option<Gd<Node3D>> {
+        crate::util::live(&self.map_window_focus)
+    }
+
     /// Emitted after chunk meshes were rebuilt (e.g. to refresh navigation).
     #[signal]
     fn chunks_rebuilt(chunks: Array<Vector2i>);
@@ -1603,6 +1630,14 @@ impl MarchingSquaresTerrain {
         self.render_layers = v;
         self.need_instances = true;
     }
+    /// The project's Grass toggle changed (`features::CALLBACK`): re-mesh the grass.
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        self.need_instances = true;
+        self.mark_all_dirty();
+        self.base_mut().call_deferred("update_configuration_warnings", &[]);
+    }
+
     #[func]
     fn set_grass_enabled(&mut self, v: bool) {
         self.grass_enabled = v;
@@ -1710,7 +1745,7 @@ impl MarchingSquaresTerrain {
     /// chunks whose grass they change (PixelWater calls it, deferred, when its cells change).
     #[func]
     pub fn refresh_grass_water(&mut self) {
-        if !self.grass_enabled && self.scatter.set.is_empty() && self.cleared_cells.is_empty() && self.grass_water.is_empty() {
+        if !self.grass_on() && self.scatter.set.is_empty() && self.cleared_cells.is_empty() && self.grass_water.is_empty() {
             return;
         }
         let new = self.collect_grass_water();
@@ -1771,7 +1806,7 @@ impl MarchingSquaresTerrain {
         }
         if changed {
             self.refresh_grass_water();
-            if !self.grass_enabled {
+            if !self.grass_on() {
                 self.update();
             }
         }

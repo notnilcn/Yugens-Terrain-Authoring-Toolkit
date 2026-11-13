@@ -15,6 +15,7 @@ use godot::classes::object::ConnectFlags;
 use godot::classes::{INode3D, MeshInstance3D, Node, Node3D, PlaneMesh, ShaderMaterial};
 use godot::prelude::*;
 
+use crate::features::Feature;
 use crate::globals;
 use crate::util::*;
 
@@ -65,7 +66,7 @@ pub struct PixelWater {
     /// Terrain the raised water sits on (a hex / triangle `MarchingSquaresTerrain`); empty =
     /// the first one in the scene.
     #[export]
-    #[var(set = set_terrain)]
+    #[var(get = get_terrain, set = set_terrain)]
     terrain: Option<Gd<Node>>,
     /// Raised water (pools, rivers, lakes above the sea): one `(q, r, surface height)` per cell,
     /// heights in terrain-local units. Together with the sea plane this is one continuous
@@ -159,12 +160,14 @@ impl INode3D for PixelWater {
 
     fn ready(&mut self) {
         self.to_gd().add_to_group(globals::REFRESH_GROUP);
+        crate::features::watch(&self.to_gd());
         self.rebuild();
         self.refresh_pixel_settings();
-        self.base_mut().set_process(true);
+        self._on_pixel_features_changed();
     }
 
-    fn process(&mut self, _delta: f64) {
+    fn process(&mut self, delta: f64) {
+        crate::clock::tick(delta);
         if self.falls_dirty {
             self.rebuild_falls();
         }
@@ -179,6 +182,10 @@ impl INode3D for PixelWater {
 
     fn exit_tree(&mut self) {
         globals::set("pt_water_a", &Vector4::ZERO.to_variant());
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Water)
     }
 }
 
@@ -213,7 +220,7 @@ impl PixelWater {
 
     /// Re-finds the falls and rebuilds the pool / waterfall mesh (an internal child).
     fn rebuild_falls(&mut self) {
-        if !self.base().is_inside_tree() {
+        if !self.base().is_inside_tree() || !crate::features::enabled(Feature::Water) {
             return;
         }
         self.falls_dirty = false;
@@ -282,7 +289,7 @@ impl PixelWater {
                 n
             }
         };
-        node.set_global_transform(t3.get_global_transform());
+        crate::writes::set_global_transform(&mut node, t3.get_global_transform());
         match &falls.mesh {
             Some(m) => node.set_mesh(m),
             None => node.set_mesh(Gd::<godot::classes::Mesh>::null_arg()),
@@ -344,6 +351,22 @@ impl PixelWater {
 
 #[godot_api]
 impl PixelWater {
+    /// `terrain`, or `None` once that node was freed (`util::live`).
+    #[func]
+    fn get_terrain(&self) -> Option<Gd<Node>> {
+        crate::util::live(&self.terrain)
+    }
+
+    /// Water feature gate (`features::CALLBACK`): off = no surfaces, falls or caustics.
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if super::gate(&self.to_gd(), Feature::Water) {
+            self.falls_dirty = true;
+        } else {
+            globals::set("pt_water_a", &Vector4::ZERO.to_variant());
+        }
+    }
+
     /// Re-applies the metadata layer and per-object flags (called when the meta layer changes).
     #[func]
     fn refresh_pixel_settings(&mut self) {

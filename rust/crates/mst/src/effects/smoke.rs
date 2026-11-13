@@ -8,6 +8,8 @@ use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::multi_mesh::TransformFormat;
 use godot::classes::{INode3D, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh, ShaderMaterial};
 use godot::prelude::*;
+use crate::writes::ShaderParams;
+use crate::features::Feature;
 
 use super::light_volume::PixelLightVolume;
 use super::{Rng, weather};
@@ -166,14 +168,22 @@ impl INode3D for PixelSmoke {
         add_internal(&mut this, &light);
         self.light = Some(light);
         self.refresh_pixel_settings();
-        self.base_mut().set_process(true);
+        crate::features::watch(&self.to_gd());
+        super::gate(&self.to_gd(), Feature::Smoke);
     }
 
     fn process(&mut self, delta: f64) {
-        let dt = (delta as f32).min(0.1);
-        self.simulate(dt);
-        self.upload();
+        let dt = (crate::clock::step(delta) as f32).min(0.1);
+        // Paused editor clock: the plume holds still (nothing is uploaded).
+        if dt > 0.0 {
+            self.simulate(dt);
+            self.upload();
+        }
         self.update_light();
+    }
+
+    fn get_configuration_warnings(&self) -> PackedStringArray {
+        super::gate_warnings(Feature::Smoke)
     }
 }
 
@@ -191,14 +201,14 @@ impl PixelSmoke {
         mm.set_use_custom_data(true);
         mm.set_mesh(&quad);
         mm.set_instance_count(self.max_puffs.max(1));
-        mm.set_visible_instance_count(0);
+        crate::writes::set_visible_instances(&mut mm, 0);
         let mut mi = MultiMeshInstance3D::new_alloc();
         mi.set_name("Puffs");
         mi.set_multimesh(&mm);
         mi.set_cast_shadows_setting(ShadowCastingSetting::OFF);
         // Puffs are simulated in world space.
         mi.set_as_top_level(true);
-        mi.set_global_transform(Transform3D::IDENTITY);
+        crate::writes::set_global_transform(&mut mi, Transform3D::IDENTITY);
         if self.material.is_none() {
             self.material = Some(shader_material("puff.gdshader"));
         }
@@ -214,12 +224,12 @@ impl PixelSmoke {
 
     fn update_material(&mut self) {
         let Some(mut m) = self.material.clone() else { return };
-        m.set_shader_parameter("smoke_color", &self.smoke_color.to_variant());
-        m.set_shader_parameter("soot_color", &self.soot_color.to_variant());
-        m.set_shader_parameter("flame_color", &self.flame_color.to_variant());
-        m.set_shader_parameter("flame_core", &self.flame_color.lerp(Color::from_rgb(1.0, 0.95, 0.6), 0.6).to_variant());
-        m.set_shader_parameter("lumps", &(self.detail as f32).to_variant());
-        m.set_shader_parameter("pt_flags", &object_flags(1, self.outline, 0, true).to_variant());
+        m.param("smoke_color", &self.smoke_color.to_variant());
+        m.param("soot_color", &self.soot_color.to_variant());
+        m.param("flame_color", &self.flame_color.to_variant());
+        m.param("flame_core", &self.flame_color.lerp(Color::from_rgb(1.0, 0.95, 0.6), 0.6).to_variant());
+        m.param("lumps", &(self.detail as f32).to_variant());
+        m.param("pt_flags", &object_flags(1, self.outline, 0, true).to_variant());
     }
 
     /// World wind for the puffs (m/s).
@@ -333,7 +343,7 @@ impl PixelSmoke {
             lo = lo.coord_min(p.pos - Vector3::splat(s));
             hi = hi.coord_max(p.pos + Vector3::splat(s));
         }
-        mm.set_visible_instance_count(n as i32);
+        crate::writes::set_visible_instances(&mut mm, n as i32);
         if n > 0 {
             mm.set_custom_aabb(Aabb::new(lo, hi - lo));
         }
@@ -359,6 +369,15 @@ impl PixelSmoke {
 
 #[godot_api]
 impl PixelSmoke {
+    /// Smoke feature gate (`features::CALLBACK`).
+    #[func]
+    fn _on_pixel_features_changed(&mut self) {
+        if super::gate(&self.to_gd(), Feature::Smoke) {
+            // The gate showed the fire light: let update_light decide again.
+            self.light_state = None;
+        }
+    }
+
     /// Throws a ring of `count` dust puffs at a world position (build / destroy feedback).
     #[func]
     fn burst(&mut self, position: Vector3, count: i32) {

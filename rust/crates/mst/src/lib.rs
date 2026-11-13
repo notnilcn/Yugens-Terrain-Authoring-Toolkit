@@ -8,13 +8,16 @@
 use godot::init::{ExtensionLibrary, InitStage, gdextension};
 
 mod builder;
+mod clock;
 mod debug;
 mod editor;
 mod effects;
+mod features;
 pub mod globals;
 mod render;
 mod terrain;
 mod util;
+mod writes;
 
 struct MarchingSquaresTerrainExtension;
 
@@ -25,6 +28,16 @@ unsafe impl ExtensionLibrary for MarchingSquaresTerrainExtension {
             // Shaders reference these as `global uniform`s; registering them before any
             // scene loads means users never have to touch Project Settings.
             globals::ensure();
+            features::register_settings();
+        }
+    }
+
+    fn on_stage_deinit(stage: InitStage) {
+        if stage == InitStage::MainLoop {
+            // The change-only caches hold Variants / StringNames; dropping them from the
+            // thread-local destructors after the engine unloaded aborted every quit.
+            globals::clear_cache();
+            writes::clear_names();
         }
     }
 }
