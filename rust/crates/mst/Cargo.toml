@@ -1,0 +1,14 @@
+[package]
+name = "mst"
+description = "Godot 4.7 GDExtension: marching-squares terrain + 3D pixel-art renderer for the Compatibility renderer."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+name = "marching_squares_terrain"
+crate-type = ["cdylib"]
+
+[dependencies]
+godot.workspace = true
+pt_core.workspace = true

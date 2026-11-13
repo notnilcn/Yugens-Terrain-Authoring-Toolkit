@@ -1,0 +1,3 @@
+[gd_scene format=3 uid="uid://cxccefisys4v5"]
+
+[node name="PhantomCameraManager" type="PhantomCameraManager"]

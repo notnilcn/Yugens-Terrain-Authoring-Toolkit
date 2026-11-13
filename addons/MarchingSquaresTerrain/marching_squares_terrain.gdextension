@@ -1,0 +1,36 @@
+[configuration]
+entry_symbol = "marching_squares_terrain_init"
+compatibility_minimum = 4.7
+reloadable = true
+
+[libraries]
+windows.debug.x86_64 = "res://addons/MarchingSquaresTerrain/bin/marching_squares_terrain.dll"
+windows.release.x86_64 = "res://addons/MarchingSquaresTerrain/bin/marching_squares_terrain_release.dll"
+linux.debug.x86_64 = "res://addons/MarchingSquaresTerrain/bin/libmarching_squares_terrain.so"
+linux.release.x86_64 = "res://addons/MarchingSquaresTerrain/bin/libmarching_squares_terrain_release.so"
+macos.debug = "res://addons/MarchingSquaresTerrain/bin/libmarching_squares_terrain.dylib"
+macos.release = "res://addons/MarchingSquaresTerrain/bin/libmarching_squares_terrain_release.dylib"
+
+[icons]
+MarchingSquaresTerrain = "res://addons/MarchingSquaresTerrain/editor/icons/Marching_Squares_Terrain_Icon.svg"
+MarchingSquaresTerrainData = "res://addons/MarchingSquaresTerrain/editor/icons/Marching_Squares_Terrain_Chunk_Icon.svg"
+PixelBuilderMesh = "res://addons/MarchingSquaresTerrain/editor/icons/builder/builder_mesh.svg"
+PixelBuilderMeshData = "res://addons/MarchingSquaresTerrain/editor/icons/builder/builder_data.svg"
+PixelRenderer = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/renderer.svg"
+PixelObject = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/object.svg"
+PixelPalette = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/palette.svg"
+PixelOrbitCamera = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/camera.svg"
+PixelSky = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/sky.svg"
+PixelDayNight = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/day_night.svg"
+PixelWater = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/water.svg"
+PixelFireflies = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/fireflies.svg"
+PixelLightVolume = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/light_volume.svg"
+PixelDiagnostics = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/debug.svg"
+PixelWeather = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/weather.svg"
+PixelWeatherPreset = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/weather.svg"
+PixelBirds = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/birds.svg"
+PixelSmoke = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/smoke.svg"
+PixelParticleField = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/particles.svg"
+PixelFireSystem = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/fire.svg"
+MarchingSquaresErosion = "res://addons/MarchingSquaresTerrain/editor/icons/erosion.svg"
+MarchingSquaresWildFlowers = "res://addons/MarchingSquaresTerrain/editor/icons/wild_flowers.svg"

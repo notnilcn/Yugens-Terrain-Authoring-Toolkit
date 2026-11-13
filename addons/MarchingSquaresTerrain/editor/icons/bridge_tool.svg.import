@@ -4,16 +4,15 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bj357vtgiklw"
 path.s3tc="res://.godot/imported/bridge_tool.svg-07cce8928468522e1bb6f4a04e78a0a7.s3tc.ctex"
-path.etc2="res://.godot/imported/bridge_tool.svg-07cce8928468522e1bb6f4a04e78a0a7.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://addons/MarchingSquaresTerrain/editor/icons/bridge_tool.svg"
-dest_files=["res://.godot/imported/bridge_tool.svg-07cce8928468522e1bb6f4a04e78a0a7.s3tc.ctex", "res://.godot/imported/bridge_tool.svg-07cce8928468522e1bb6f4a04e78a0a7.etc2.ctex"]
+dest_files=["res://.godot/imported/bridge_tool.svg-07cce8928468522e1bb6f4a04e78a0a7.s3tc.ctex"]
 
 [params]
 

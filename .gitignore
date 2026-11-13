@@ -1,4 +1,14 @@
-# Godot 4+ specific ignores
 .godot/
-/android/
-addons/gut
+rust/target/
+# Built libraries (debug and *_release) are platform-specific and large (debug 150–300 MB each,
+# release ~23 MB per platform and commit): built by tools/build.* (--release / --all),
+# never committed. Ship them in release archives instead.
+addons/MarchingSquaresTerrain/bin/
+tests/captures/
+tests/eval/
+*.tmp
+# Demo-only Phantom Camera library (built by tools/build.*).
+addons/phantom_camera_rust/bin/
+# Demo-only player controller library (built by tools/build.*).
+demo/bin/
+.claude/

@@ -1,0 +1,450 @@
+[gd_scene format=3 uid="uid://b3102twgra21n"]
+
+[ext_resource type="MarchingSquaresTerrainData" path="res://demo/hex_island_data.res" id="1_bj2ra"]
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/mst_terrain.gdshader" id="2_uhwe7"]
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/mst_grass.gdshader" id="3_v8bhq"]
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/water.gdshader" id="4_jv7wc"]
+[ext_resource type="PackedScene" path="res://demo/assets/characters/Knight.fbx" id="5_fjd52"]
+[ext_resource type="PackedScene" path="res://demo/assets/characters/Barbarian.fbx" id="6_sjwl0"]
+[ext_resource type="PackedScene" path="res://demo/assets/characters/Mage.fbx" id="7_xh4vs"]
+[ext_resource type="PackedScene" path="res://demo/assets/characters/Rogue.fbx" id="8_1iviu"]
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/firefly.gdshader" id="9_6rs6u"]
+[ext_resource type="PackedScene" path="res://demo/player.tscn" id="10_prig"]
+[ext_resource type="PixelBuilderMeshData" path="res://demo/builder_demo_ruin.tres" id="11_ruin"]
+[ext_resource type="Texture2D" uid="uid://bvbrycwsngfkh" path="res://addons/MarchingSquaresTerrain/textures/ground/grass.png" id="mst_ground_grass"]
+[ext_resource type="Texture2D" uid="uid://1j5idkknr5l6" path="res://addons/MarchingSquaresTerrain/textures/ground/meadow.png" id="mst_ground_meadow"]
+[ext_resource type="Texture2D" uid="uid://co56gspvpq788" path="res://addons/MarchingSquaresTerrain/textures/ground/forest_floor.png" id="mst_ground_forest_floor"]
+[ext_resource type="Texture2D" uid="uid://8gl6vsoro8t4" path="res://addons/MarchingSquaresTerrain/textures/ground/sand.png" id="mst_ground_sand"]
+[ext_resource type="Texture2D" uid="uid://f00f52m3dubn" path="res://addons/MarchingSquaresTerrain/textures/ground/dirt.png" id="mst_ground_dirt"]
+[ext_resource type="Texture2D" uid="uid://5lw2huhld0sf" path="res://addons/MarchingSquaresTerrain/textures/ground/cliff.png" id="mst_ground_cliff"]
+[ext_resource type="Texture2D" uid="uid://e8vpk41q6v4l" path="res://addons/MarchingSquaresTerrain/textures/ground/dark_rock.png" id="mst_ground_dark_rock"]
+[ext_resource type="Texture2D" uid="uid://xyd1i4e24hvp" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="mst_ground_snow"]
+[ext_resource type="Texture2D" uid="uid://3u5h4fomm377" path="res://addons/MarchingSquaresTerrain/textures/ground/gravel.png" id="mst_ground_gravel"]
+[ext_resource type="Texture2D" uid="uid://pw7r4s5gqgpl" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="mst_ground_clay"]
+[ext_resource type="Texture2D" uid="uid://bw060wilfwlsv" path="res://addons/MarchingSquaresTerrain/textures/ground/moss.png" id="mst_ground_moss"]
+[ext_resource type="Texture2D" uid="uid://dc4ytl4ppvi1q" path="res://addons/MarchingSquaresTerrain/textures/ground/path.png" id="mst_ground_path"]
+[ext_resource type="Texture2D" uid="uid://bcxkv33ryvexo" path="res://addons/MarchingSquaresTerrain/textures/ground/plain.png" id="mst_ground_plain"]
+[ext_resource type="Texture2D" uid="uid://c2h7gapfc7rg5" path="res://addons/MarchingSquaresTerrain/textures/ground/void.png" id="mst_ground_void"]
+[ext_resource type="Texture2D" uid="uid://d1rdb7yfek625" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="mst_grass_sprite"]
+
+[sub_resource type="Environment" id="Environment_052rw"]
+background_mode = 1
+background_color = Color(0.5, 0.66499996, 0.875, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.6, 0.7, 1)
+ambient_light_energy = 0.6
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_c8aeu"]
+display_name = "Grass"
+texture = ExtResource("mst_ground_grass")
+pattern = 0
+tint = Color(0.43529412, 0.6039216, 0.2901961, 1)
+has_grass = true
+grass_sprite = ExtResource("mst_grass_sprite")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_n6ug1"]
+display_name = "Meadow"
+texture = ExtResource("mst_ground_meadow")
+pattern = 1
+tint = Color(0.5764706, 0.69803923, 0.34117648, 1)
+has_grass = true
+grass_sprite = ExtResource("mst_grass_sprite")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_00roj"]
+display_name = "Forest Floor"
+texture = ExtResource("mst_ground_forest_floor")
+pattern = 2
+tint = Color(0.29803923, 0.41960785, 0.22745098, 1)
+has_grass = true
+grass_sprite = ExtResource("mst_grass_sprite")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_y2nwi"]
+display_name = "Sand"
+texture = ExtResource("mst_ground_sand")
+pattern = 3
+tint = Color(0.8509804, 0.76862746, 0.56078434, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_ls6bm"]
+display_name = "Dirt"
+texture = ExtResource("mst_ground_dirt")
+pattern = 4
+tint = Color(0.54901963, 0.41568628, 0.28235295, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_j5i3s"]
+display_name = "Cliff"
+texture = ExtResource("mst_ground_cliff")
+pattern = 5
+tint = Color(0.627451, 0.54901963, 0.47058824, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_7lkep"]
+display_name = "Dark Rock"
+texture = ExtResource("mst_ground_dark_rock")
+pattern = 6
+tint = Color(0.41568628, 0.39215687, 0.3764706, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_4gm7k"]
+display_name = "Snow"
+texture = ExtResource("mst_ground_snow")
+pattern = 7
+tint = Color(0.93333334, 0.9490196, 0.95686275, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_b864q"]
+display_name = "Gravel"
+texture = ExtResource("mst_ground_gravel")
+pattern = 8
+tint = Color(0.6039216, 0.5803922, 0.5411765, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_csokv"]
+display_name = "Clay"
+texture = ExtResource("mst_ground_clay")
+pattern = 9
+tint = Color(0.6901961, 0.43137255, 0.29803923, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_5o5n5"]
+display_name = "Moss"
+texture = ExtResource("mst_ground_moss")
+pattern = 10
+tint = Color(0.37254903, 0.49803922, 0.23529412, 1)
+has_grass = true
+grass_sprite = ExtResource("mst_grass_sprite")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_bx2jk"]
+display_name = "Path"
+texture = ExtResource("mst_ground_path")
+pattern = 11
+tint = Color(0.7607843, 0.64705884, 0.4862745, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_pvuxt"]
+display_name = "Stone Tiles"
+texture = ExtResource("mst_ground_plain")
+tint = Color(0.65882355, 0.6431373, 0.6039216, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_opny1"]
+display_name = "Ash"
+texture = ExtResource("mst_ground_plain")
+tint = Color(0.33333334, 0.32156864, 0.30980393, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_dg7is"]
+display_name = "Ice"
+texture = ExtResource("mst_ground_plain")
+tint = Color(0.7254902, 0.8509804, 0.9019608, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_ila2o"]
+display_name = "Void"
+texture = ExtResource("mst_ground_void")
+pattern = 13
+tint = Color(1, 1, 1, 1)
+
+[sub_resource type="MarchingSquaresTexturePreset" id="MarchingSquaresTexturePreset_82xx5"]
+resource_name = "Textures"
+slots = Array[MarchingSquaresTextureSlot]([SubResource("MarchingSquaresTextureSlot_c8aeu"), SubResource("MarchingSquaresTextureSlot_n6ug1"), SubResource("MarchingSquaresTextureSlot_00roj"), SubResource("MarchingSquaresTextureSlot_y2nwi"), SubResource("MarchingSquaresTextureSlot_ls6bm"), SubResource("MarchingSquaresTextureSlot_j5i3s"), SubResource("MarchingSquaresTextureSlot_7lkep"), SubResource("MarchingSquaresTextureSlot_4gm7k"), SubResource("MarchingSquaresTextureSlot_b864q"), SubResource("MarchingSquaresTextureSlot_csokv"), SubResource("MarchingSquaresTextureSlot_5o5n5"), SubResource("MarchingSquaresTextureSlot_bx2jk"), SubResource("MarchingSquaresTextureSlot_pvuxt"), SubResource("MarchingSquaresTextureSlot_opny1"), SubResource("MarchingSquaresTextureSlot_dg7is"), SubResource("MarchingSquaresTextureSlot_ila2o")])
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_8xxu0"]
+render_priority = 0
+shader = ExtResource("2_uhwe7")
+shader_parameter/pt_flags = null
+shader_parameter/tints = null
+shader_parameter/scales = null
+shader_parameter/texture_world_size = null
+shader_parameter/blend_mode = null
+shader_parameter/blend_sharpness = null
+shader_parameter/blend_noise_scale = null
+shader_parameter/blend_noise_strength = null
+shader_parameter/use_ridge_texture = null
+shader_parameter/use_ledge_texture = null
+shader_parameter/ridge_threshold = null
+shader_parameter/ledge_threshold = null
+shader_parameter/rl_noise_scale = null
+shader_parameter/rl_noise_strength = null
+shader_parameter/slope_rock = 0.72
+shader_parameter/shore_enabled = true
+shader_parameter/shore_level = 0.45
+shader_parameter/shore_band = 0.7
+shader_parameter/shore_slot = 3
+shader_parameter/bands = null
+shader_parameter/shade_floor = null
+shader_parameter/wall_shade = null
+shader_parameter/wall_strata_height = 0.625
+shader_parameter/wall_strata_noise = 0.15
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tk56f"]
+render_priority = 0
+shader = ExtResource("3_v8bhq")
+shader_parameter/pt_flags = null
+shader_parameter/ground_tints = null
+shader_parameter/ground_scales = null
+shader_parameter/texture_world_size = null
+shader_parameter/grass_tints = null
+shader_parameter/tip_lighten = null
+shader_parameter/root_darken = null
+shader_parameter/billboard_mode = null
+shader_parameter/wind_strength = null
+shader_parameter/wind_speed = null
+shader_parameter/wind_scale = null
+shader_parameter/wind_direction = null
+shader_parameter/animation_fps = null
+shader_parameter/bands = null
+shader_parameter/shade_floor = null
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rkd2k"]
+render_priority = 0
+shader = ExtResource("4_jv7wc")
+shader_parameter/shallow_color = null
+shader_parameter/deep_color = null
+shader_parameter/foam_color = null
+shader_parameter/depth_scale = null
+shader_parameter/depth_bands = null
+shader_parameter/foam_width = null
+shader_parameter/foam_speed = null
+shader_parameter/wave_height = null
+shader_parameter/wave_speed = null
+shader_parameter/wave_scale = null
+shader_parameter/sparkle = null
+shader_parameter/bands = null
+shader_parameter/shade_floor = null
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_iruoj"]
+size = Vector2(240, 240)
+subdivide_width = 32
+subdivide_depth = 32
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yxj06"]
+render_priority = 0
+shader = ExtResource("9_6rs6u")
+shader_parameter/color = Color(1, 0.9, 0.45, 1)
+shader_parameter/size = 0.12
+shader_parameter/wander = 0.6
+shader_parameter/blink_speed = null
+shader_parameter/night_only = 1.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_82bka"]
+
+[sub_resource type="MultiMesh" id="MultiMesh_mfqgr"]
+transform_format = 1
+use_custom_data = true
+custom_aabb = AABB(-8.72, -2.22, -8.72, 17.44, 4.44, 17.44)
+instance_count = 48
+mesh = SubResource("QuadMesh_82bka")
+
+[sub_resource type="PixelPalette" id="PixelPalette_rsai4"]
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_tree"]
+display_name = "Tree"
+shape = 3
+shape_seed = 3
+density = 0.2
+scale_min = 0.85
+scale_max = 1.35
+ground_slots = 4
+slope_max = 25.0
+cluster_scale = 0.0
+wind_sway = 0.05
+seed = 11
+collision = 1
+collision_size = Vector3(0.4, 1, 0.4)
+collision_layer = 4
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_pine"]
+display_name = "Pine"
+shape = 4
+shape_seed = 5
+density = 0.08
+scale_min = 0.8
+scale_max = 1.5
+ground_slots = 2
+slope_max = 32.0
+cluster_scale = 18.0
+cluster_threshold = -0.15
+wind_sway = 0.03
+seed = 12
+collision = 1
+collision_size = Vector3(0.4, 1, 0.4)
+collision_layer = 4
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_bush"]
+display_name = "Bush"
+shape = 2
+shape_seed = 2
+density = 0.05
+scale_min = 0.6
+scale_max = 1.2
+ground_slots = 5
+slope_max = 30.0
+cluster_scale = 12.0
+cluster_threshold = -0.2
+align_to_normal = 0.3
+wind_sway = 0.04
+seed = 13
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_rock"]
+display_name = "Rock"
+shape = 1
+shape_seed = 7
+density = 0.025
+scale_min = 0.45
+scale_max = 1.2
+ground_slots = 11
+slope_max = 55.0
+align_to_normal = 0.8
+y_offset = -0.12
+hue_jitter = 0.01
+seed = 14
+collision = 1
+collision_size = Vector3(0.8, 1, 0.8)
+collision_layer = 4
+collision_min_scale = 0.8
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_flowers"]
+display_name = "Flowers"
+shape = 5
+shape_seed = 4
+density = 0.09
+scale_min = 0.8
+scale_max = 1.2
+ground_slots = 3
+slope_max = 25.0
+cluster_scale = 9.0
+cluster_threshold = 0.25
+align_to_normal = 0.6
+wind_sway = 0.06
+outline = false
+seed = 15
+
+[sub_resource type="PixelScatterItem" id="PixelScatterItem_pebbles"]
+display_name = "Pebbles (small hexes)"
+shape = 1
+shape_seed = 9
+density = 0.8
+scale_min = 0.22
+scale_max = 0.36
+per_cell_max = 2
+small_hexes = true
+ground_slots = 3
+slope_max = 20.0
+align_to_normal = 0.5
+y_offset = -0.05
+hue_jitter = 0.01
+seed = 16
+
+[node name="HexIsland" type="Node3D" unique_id=13368921]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1973318372]
+environment = SubResource("Environment_052rw")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=435429203]
+transform = Transform3D(0.8507166, 0.34833568, -0.39362875, 0, 0.748878, 0.662708, 0.5256247, -0.5637767, 0.6370829, 0, 0, 0)
+light_color = Color(1, 0.97, 0.9, 1)
+light_energy = 1.1
+shadow_enabled = true
+directional_shadow_max_distance = 120.0
+
+[node name="MarchingSquaresTerrain" type="MarchingSquaresTerrain" parent="." unique_id=67164118]
+data = ExtResource("1_bj2ra")
+grid_type = 3
+ring_radius = 2
+level_height = 2.5
+hex_edge_style = 3
+hex_edge_instanced = true
+lod_distance = 48.0
+texture_set = SubResource("MarchingSquaresTexturePreset_82xx5")
+terrain_material = SubResource("ShaderMaterial_8xxu0")
+grass_size = Vector2(0.55, 0.65)
+grass_material = SubResource("ShaderMaterial_tk56f")
+grass_min_height = 0.6
+scatter_items = Array[PixelScatterItem]([SubResource("PixelScatterItem_tree"), SubResource("PixelScatterItem_pine"), SubResource("PixelScatterItem_bush"), SubResource("PixelScatterItem_rock"), SubResource("PixelScatterItem_flowers"), SubResource("PixelScatterItem_pebbles")])
+
+[node name="GrassFire" type="PixelFireSystem" parent="MarchingSquaresTerrain" unique_id=1500700010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 9.85, 6)
+preview_in_editor = false
+
+[node name="PixelWater" type="PixelWater" parent="." unique_id=807881125]
+size = Vector2(240, 240)
+material = SubResource("ShaderMaterial_rkd2k")
+water_cells = PackedVector3Array(-1, 2, 10, 0, 2, 10, 0, 1, 10)
+waterfall_level_height = 0.5
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+layers = 524289
+material_override = SubResource("ShaderMaterial_rkd2k")
+cast_shadow = 0
+instance_shader_parameters/pt_flags = 0
+mesh = SubResource("PlaneMesh_iruoj")
+
+[node name="PixelSky" type="PixelSky" parent="." unique_id=594274798 node_paths=PackedStringArray("sun")]
+sun = NodePath("../Sun")
+coverage = 0.5
+cloud_scale = 0.03
+
+[node name="PixelDayNight" type="PixelDayNight" parent="." unique_id=486769572 node_paths=PackedStringArray("sun", "environment")]
+time_of_day = 0.4
+day_length_seconds = 300.0
+sun = NodePath("../Sun")
+environment = NodePath("../WorldEnvironment")
+process_priority = -10
+
+[node name="Characters" type="PixelObject" parent="." unique_id=1958540450]
+snap_to_texel = true
+
+[node name="Barbarian" type="Node3D" parent="Characters" unique_id=2107889562 instance=ExtResource("6_sjwl0")]
+transform = Transform3D(0.82782984, 0, 0.98656917, 0, 1.2878746, 0, -0.98656917, 0, 0.82782984, -2, 7.5, 6)
+
+[node name="Mage" type="Node3D" parent="Characters" unique_id=1572218756 instance=ExtResource("7_xh4vs")]
+transform = Transform3D(0.12701455, 0, 0.72033507, 0, 0.7314474, 0, -0.72033507, 0, 0.12701455, 4.2, 10, 2.6)
+
+[node name="Rogue" type="Node3D" parent="Characters" unique_id=1559529485 instance=ExtResource("8_1iviu")]
+transform = Transform3D(-0.27369544, 0, 0.7519721, 0, 0.800232, 0, -0.7519721, 0, -0.27369544, 6, 10, 7)
+
+[node name="BuilderRuin" type="PixelObject" parent="." unique_id=1500700020]
+
+[node name="Ruin" type="PixelBuilderMesh" parent="BuilderRuin" unique_id=1500700021]
+transform = Transform3D(0.76604444, 0, 0.6427876, 0, 1, 0, -0.6427876, 0, 0.76604444, 8, 10, 3.4641016)
+data = ExtResource("11_ruin")
+anchor_cell = Vector2i(3, 2)
+anchored = true
+
+[node name="PlayerRig" parent="." instance=ExtResource("10_prig")]
+
+[node name="Lantern" type="PixelLightVolume" parent="." unique_id=986444803]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 9.1, 9)
+
+[node name="Fireflies" type="PixelFireflies" parent="." unique_id=1125234400]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 4)
+material_override = SubResource("ShaderMaterial_yxj06")
+cast_shadow = 0
+multimesh = SubResource("MultiMesh_mfqgr")
+
+[node name="Camera" type="PixelOrbitCamera" parent="." unique_id=633589575]
+target = Vector3(0, 10, 4)
+ortho_size = 26.0
+transform = Transform3D(0.70710677, -0.5416752, 0.45451948, 0, 0.64278764, 0.76604444, -0.70710677, -0.5416752, 0.45451948, 18.180779, 40.641777, 22.180779)
+projection = 1
+current = true
+size = 26.0
+
+[node name="PixelRenderer" type="PixelRenderer" parent="." unique_id=57036734]
+pixel_size = 3
+palette = SubResource("PixelPalette_rsai4")
+god_rays = true
+ray_sheet_surface_fade = 100.0
+ray_dawn_dusk = 0.5
+process_priority = 10000
+
+[node name="PlayerSpawn" type="Marker3D" parent="." unique_id=951924455]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.5, 8)
+
+[node name="PixelDiagnostics" type="PixelDiagnostics" parent="." unique_id=687209648]
+layer = 100
+visible = false
+
+[node name="Weather" type="PixelWeather" parent="." unique_id=1500700001 node_paths=PackedStringArray("sun", "environment")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
+sun = NodePath("../Sun")
+environment = NodePath("../WorldEnvironment")
+
+[node name="Birds" type="PixelBirds" parent="." unique_id=1500700002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 2)
+
+[node name="Smoke" type="PixelSmoke" parent="." unique_id=1500700003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 10, 4)
+fire = true
+
+[node name="Dust" type="PixelParticleField" parent="." unique_id=1500700004]

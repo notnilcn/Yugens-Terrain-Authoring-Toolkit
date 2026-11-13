@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://c5jig175v6538"]
+
+[ext_resource type="PackedScene" uid="uid://cbpsgle077y8d" path="res://demo/assets/characters/Knight.fbx" id="2_knight"]
+[ext_resource type="PackedScene" uid="uid://d3cp68k2jejdc" path="res://demo/assets/characters/animations/Rig_Medium_Animations.glb" id="3_anims"]
+[ext_resource type="Shader" path="res://demo/xray_mask.gdshader" id="4_xmask"]
+[ext_resource type="Shader" path="res://demo/xray_silhouette.gdshader" id="5_xsil"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_arm"]
+radius = 0.25
+
+[node name="PlayerRig" type="Node3D"]
+
+[node name="Pixel" type="PixelObject" parent="."]
+snap_to_texel = true
+
+[node name="Player" type="MstDemoPlayer" parent="Pixel" node_paths=PackedStringArray("visual", "phantom_camera", "camera")]
+collision_layer = 2
+collision_mask = 5
+orbit_yaw_step_deg = 1.5
+floor_snap_length = 0.3
+visual = NodePath("Visual")
+animation_source = ExtResource("3_anims")
+phantom_camera = NodePath("../../PlayerPhantomCamera3D")
+camera = NodePath("../../MainCamera3D")
+xray_mask_shader = ExtResource("4_xmask")
+xray_shader = ExtResource("5_xsil")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Pixel/Player"]
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="Visual" type="Node3D" parent="Pixel/Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9, 0)
+
+[node name="Knight" parent="Pixel/Player/Visual" instance=ExtResource("2_knight")]
+transform = Transform3D(0.78, 0, 0, 0, 0.78, 0, 0, 0, 0.78, 0, 0, 0)
+
+[node name="CameraTarget" type="Node3D" parent="Pixel/Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[node name="PlayerPhantomCamera3D" type="PhantomCamera3D" parent="." node_paths=PackedStringArray("follow_target")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 38)
+priority = 10
+follow_mode = 6
+follow_target = NodePath("../Pixel/Player/CameraTarget")
+follow_damping = true
+follow_damping_value = Vector3(0.08, 0.08, 0.08)
+follow_distance = 38.0
+spring_length = 38.0
+collision_mask = 1
+shape = SubResource("SphereShape3D_arm")
+
+[node name="MainCamera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 38)
+top_level = true
+current = true
+fov = 15.0
+near = 0.1
+far = 400.0
+
+[node name="PhantomCameraHost" type="PhantomCameraHost" parent="MainCamera3D"]
+process_priority = 300
+process_physics_priority = 300

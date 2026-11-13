@@ -1,0 +1,17 @@
+# Demo-only gameplay classes (MstDemoPlayer). Built into demo/bin/ by tools/build.*; the
+# MarchingSquaresTerrain addon (crate `mst`) never depends on it, and it talks to both MST and
+# Phantom Camera only through dynamic calls, so either library can be absent.
+[package]
+name = "mst_demo"
+description = "Demo-only third-person player controller for the Marching Squares Terrain demo scenes."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "mst_demo"
+crate-type = ["cdylib"]
+
+[dependencies]
+godot.workspace = true

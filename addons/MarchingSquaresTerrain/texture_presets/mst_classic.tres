@@ -1,0 +1,130 @@
+[gd_resource type="MarchingSquaresTexturePreset" format=3 uid="uid://ck465g5blnj1i"]
+
+[ext_resource type="Texture2D" uid="uid://d1rdb7yfek625" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="1_16c2v"]
+[ext_resource type="Texture2D" uid="uid://bbfw6mwdih4rk" path="res://addons/MarchingSquaresTerrain/textures/ground/mst_noise.png" id="2_pbjds"]
+[ext_resource type="Texture2D" uid="uid://e8vpk41q6v4l" path="res://addons/MarchingSquaresTerrain/textures/ground/dark_rock.png" id="3_fmdym"]
+[ext_resource type="Texture2D" uid="uid://xyd1i4e24hvp" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="4_g6gjd"]
+[ext_resource type="Texture2D" uid="uid://3u5h4fomm377" path="res://addons/MarchingSquaresTerrain/textures/ground/gravel.png" id="5_kjwr1"]
+[ext_resource type="Texture2D" uid="uid://pw7r4s5gqgpl" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="6_ur37i"]
+[ext_resource type="Texture2D" uid="uid://bw060wilfwlsv" path="res://addons/MarchingSquaresTerrain/textures/ground/moss.png" id="7_1lyki"]
+[ext_resource type="Texture2D" uid="uid://dc4ytl4ppvi1q" path="res://addons/MarchingSquaresTerrain/textures/ground/path.png" id="8_rln2x"]
+[ext_resource type="Texture2D" uid="uid://bcxkv33ryvexo" path="res://addons/MarchingSquaresTerrain/textures/ground/plain.png" id="9_t2pj0"]
+[ext_resource type="Texture2D" uid="uid://c2h7gapfc7rg5" path="res://addons/MarchingSquaresTerrain/textures/ground/void.png" id="10_msa32"]
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_x4yux"]
+display_name = "Texture 1"
+texture = ExtResource("2_pbjds")
+pattern = 0
+tint = Color(0.39215687, 0.47058824, 0.31764707, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_iov71"]
+display_name = "Texture 2"
+texture = ExtResource("2_pbjds")
+pattern = 1
+tint = Color(0.32156864, 0.48235294, 0.38431373, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_w3qhj"]
+display_name = "Texture 3"
+texture = ExtResource("2_pbjds")
+pattern = 2
+tint = Color(0.37254903, 0.42352942, 0.29411766, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_gmej8"]
+display_name = "Texture 4"
+texture = ExtResource("2_pbjds")
+pattern = 3
+tint = Color(0.39215687, 0.4745098, 0.25490198, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_edb70"]
+display_name = "Texture 5"
+texture = ExtResource("2_pbjds")
+pattern = 4
+tint = Color(0.2901961, 0.49411765, 0.3647059, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_mxnaw"]
+display_name = "Texture 6"
+texture = ExtResource("2_pbjds")
+pattern = 5
+tint = Color(0.44313726, 0.44705883, 0.3647059, 1)
+has_grass = true
+grass_tint = Color(1, 1, 1, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_8moyp"]
+display_name = "Dark Rock"
+texture = ExtResource("3_fmdym")
+pattern = 6
+tint = Color(0.41568628, 0.39215687, 0.3764706, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_gytdc"]
+display_name = "Snow"
+texture = ExtResource("4_g6gjd")
+pattern = 7
+tint = Color(0.93333334, 0.9490196, 0.95686275, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_uoerk"]
+display_name = "Gravel"
+texture = ExtResource("5_kjwr1")
+pattern = 8
+tint = Color(0.6039216, 0.5803922, 0.5411765, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_ip8nv"]
+display_name = "Clay"
+texture = ExtResource("6_ur37i")
+pattern = 9
+tint = Color(0.6901961, 0.43137255, 0.29803923, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_5i1wo"]
+display_name = "Moss"
+texture = ExtResource("7_1lyki")
+pattern = 10
+tint = Color(0.37254903, 0.49803922, 0.23529412, 1)
+grass_tint = Color(1, 1.08, 0.86, 1)
+grass_sprite = ExtResource("1_16c2v")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_x60ka"]
+display_name = "Path"
+texture = ExtResource("8_rln2x")
+pattern = 11
+tint = Color(0.7607843, 0.64705884, 0.4862745, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_xde8c"]
+display_name = "Stone Tiles"
+texture = ExtResource("9_t2pj0")
+tint = Color(0.65882355, 0.6431373, 0.6039216, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_7pu5n"]
+display_name = "Ash"
+texture = ExtResource("9_t2pj0")
+tint = Color(0.33333334, 0.32156864, 0.30980393, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_l2yhe"]
+display_name = "Ice"
+texture = ExtResource("9_t2pj0")
+tint = Color(0.7254902, 0.8509804, 0.9019608, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_ys6fv"]
+display_name = "Void"
+texture = ExtResource("10_msa32")
+pattern = 13
+tint = Color(1, 1, 1, 1)
+
+[resource]
+resource_name = "MST Classic"
+preset_name = "MST Classic"
+slots = Array[MarchingSquaresTextureSlot]([SubResource("MarchingSquaresTextureSlot_x4yux"), SubResource("MarchingSquaresTextureSlot_iov71"), SubResource("MarchingSquaresTextureSlot_w3qhj"), SubResource("MarchingSquaresTextureSlot_gmej8"), SubResource("MarchingSquaresTextureSlot_edb70"), SubResource("MarchingSquaresTextureSlot_mxnaw"), SubResource("MarchingSquaresTextureSlot_8moyp"), SubResource("MarchingSquaresTextureSlot_gytdc"), SubResource("MarchingSquaresTextureSlot_uoerk"), SubResource("MarchingSquaresTextureSlot_ip8nv"), SubResource("MarchingSquaresTextureSlot_5i1wo"), SubResource("MarchingSquaresTextureSlot_x60ka"), SubResource("MarchingSquaresTextureSlot_xde8c"), SubResource("MarchingSquaresTextureSlot_7pu5n"), SubResource("MarchingSquaresTextureSlot_l2yhe"), SubResource("MarchingSquaresTextureSlot_ys6fv")])

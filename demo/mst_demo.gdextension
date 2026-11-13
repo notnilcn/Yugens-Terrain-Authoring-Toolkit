@@ -1,0 +1,12 @@
+[configuration]
+entry_symbol = "mst_demo_init"
+compatibility_minimum = 4.7
+reloadable = true
+
+[libraries]
+windows.debug.x86_64 = "res://demo/bin/mst_demo.dll"
+windows.release.x86_64 = "res://demo/bin/mst_demo_release.dll"
+linux.debug.x86_64 = "res://demo/bin/libmst_demo.so"
+linux.release.x86_64 = "res://demo/bin/libmst_demo_release.so"
+macos.debug = "res://demo/bin/libmst_demo.dylib"
+macos.release = "res://demo/bin/libmst_demo_release.dylib"

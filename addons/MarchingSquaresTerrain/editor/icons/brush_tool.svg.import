@@ -4,16 +4,15 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfma47u8sue4m"
 path.s3tc="res://.godot/imported/brush_tool.svg-4c517cb7c1aedb65eeb7f66b4bf69081.s3tc.ctex"
-path.etc2="res://.godot/imported/brush_tool.svg-4c517cb7c1aedb65eeb7f66b4bf69081.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://addons/MarchingSquaresTerrain/editor/icons/brush_tool.svg"
-dest_files=["res://.godot/imported/brush_tool.svg-4c517cb7c1aedb65eeb7f66b4bf69081.s3tc.ctex", "res://.godot/imported/brush_tool.svg-4c517cb7c1aedb65eeb7f66b4bf69081.etc2.ctex"]
+dest_files=["res://.godot/imported/brush_tool.svg-4c517cb7c1aedb65eeb7f66b4bf69081.s3tc.ctex"]
 
 [params]
 
