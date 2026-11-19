@@ -1,0 +1,8 @@
+[package]
+name = "pt_core"
+description = "Engine-free core of the Marching Squares Terrain addon: grids, meshing, brushes, grass scatter, palettes, metadata packing."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]

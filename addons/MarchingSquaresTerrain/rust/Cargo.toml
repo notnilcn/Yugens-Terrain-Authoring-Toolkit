@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = ["crates/pt_core", "crates/mst"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+godot = { version = "=0.5.5", features = ["api-4-7"] }
+pt_core = { path = "crates/pt_core" }
+
+# Debug builds are what the editor loads, so they must be fast: the addon crates get light
+# optimisation (opt-level 0 made editor brushing and the pixel pipeline sync several times
+# slower), and only line tables are kept (full debug info made the library ~390 MB, slow to
+# load and to hot-reload). For a debugger session build with
+# `CARGO_PROFILE_DEV_DEBUG=true cargo build`.
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# Meshing runs on every brush stroke; keep it fast in debug editor builds too.
+[profile.dev.package.pt_core]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

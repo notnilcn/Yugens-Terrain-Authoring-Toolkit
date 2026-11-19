@@ -1,0 +1,4 @@
+# Built by tools/build.sh in the consuming repo (platform-specific, large).
+bin/
+# Cargo output when the addon is built standalone from rust/.
+rust/target/

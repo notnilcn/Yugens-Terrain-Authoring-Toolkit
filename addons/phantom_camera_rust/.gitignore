@@ -1,0 +1,2 @@
+# Built GDExtension libraries (tools/build.* of the host project installs them here).
+bin/
