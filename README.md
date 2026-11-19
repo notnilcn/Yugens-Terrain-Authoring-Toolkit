@@ -1,62 +1,97 @@
-# Yūgen's Terrain Authoring Toolkit
-The public version of the Marching Squares Terrain plugin for godot.
+# Marching Squares Terrain (pixel edition)
 
-This project is an effort to create a simple to use and powerfull terrain authoring tool inside godot aimed at level based small to medium sized stylized 3d games. However, the plugin featured in this project can be used for a wide variety of games and experimentation is encouraged! As of right now the plugin has the following features:
+**Sculpt, paint and play 3D pixel-art terrain in Godot 4.7 — one dependency-free Rust
+GDExtension for the Compatibility (OpenGL 3.3) renderer.**
 
-* Elevate and lower terrain based on cells in a chunk grid
-* Level terrain to a user-set height
-* Smooth terrain depending on the average height of neighbouring cells
-* Create a bridge between two points by drawing a line between them
-* Paint up to 15(+1) custom textures onto the terrain
-* Paint a mask map that determines whether selected cells should draw `MultiMeshInstance3d` grass instances
-* Get debug information for selected cells
-* Change the internal marching squares algorithm vertex merge threshold value resulting in smoother or blockier terrain
-* Change global terrain settings like the default wall texture, texture blend mode, grass animation fps and more...
+![The hex island demo](docs/images/island.png)
 
-For more in-depth documentation, please refer to the _documentation_ folder in the addon.
+Marching Squares Terrain merges *Yūgen's Terrain Authoring Toolkit* (marching-squares terrain)
+with a 3D pixel-art pipeline into one addon. Terrain, grass, props and water come out as
+crisp, outlined, world-locked pixel art with no wiring: add a terrain, add a `PixelRenderer`,
+press play. Square, triangle and hex grids; reference-style sculpting; foliage painting;
+sky, weather, day/night, water and fire effects.
 
-For community showcases, feature requests and bug reporting, please refer to the [discord](https://discord.gg/ZSeYkTCgft).
-A bug can also be reported by opening a new issue thread in the issues tab of this github project.
+## Install / build
 
-## Install Guide
+You need Godot 4.7 and Rust 1.88+.
 
-To install the plugin, simply download or clone the latest stable version of this project and copy the plugin from this project's addon folder into your own. Make sure to turn on the plugin in godot by going into the project settings and under "plugins" checking the checkbox next to the plugin's name.
+```bash
+git clone --recursive <this repo> && cd <repo>
+tools/build.sh            # builds the addon + demo libraries into their bin/ folders
+                          # (Windows: powershell -File tools/build.ps1)
+godot -e --path .         # open the project
+```
 
-Watch the [YouTube](https://www.youtube.com/playlist?list=PLXcmz5ZRdiyTpf_Jk9gGNb9QQ6Hus8xiP) videos to get started with the plugin!!!
+The libraries are not committed on `rust-rewrite`; build them once per platform. Godot locks
+them while it runs, so close the editor before rebuilding. To use the addon in your own project,
+copy `addons/MarchingSquaresTerrain/` (with its built `bin/`) and set the project to the
+Compatibility renderer — there is no plugin to enable. The addon's Rust sources ship inside
+that folder under `rust/` if you want to inspect or rebuild them.
 
-## Known Issues
+### Release branch: no build needed
 
-1. Smooth texture blending breaks at certain elevated/lowered cell edge cases
-2. d3d12 doesn't load terrain material properly when in game on some devices -> set the renderer to vulkan for the time being if possible on your device
-3. Some maps turn black or white in game
+The [`release` branch](https://github.com/notnilcn/Yugens-Terrain-Authoring-Toolkit-rust/tree/release)
+commits the built Windows x86_64 libraries at the paths the `.gdextension` files load, so the
+project opens and plays without a Rust toolchain:
 
-## Supported Pipelines
+```bash
+git clone -b release --recursive <this repo> && cd <repo>
+godot -e --path .        # press F5 for the demo
+```
 
-As of right now the plugin only supports `Forward+` and limited `Compatibility` rendering with both `Mobile` and `Web` rendering not supported.
+`release/README.md` lists exactly what is committed there and how to refresh it. Linux and macOS
+still build their own libraries with `tools/build.sh`.
 
-Which one you should use is dependent on your personal project but also your GPU as some GPU's work better with `Forward+` than `Compatibility`.
+## Open the demo
 
-## PR Workflow
+`demo/hex_island.tscn` is the main scene: a hex island with cliffs, a waterfall, a village
+ruin, birds, weather and a knight to walk around. Press **F5** to play it.
 
-Please target and base your PR's on `public-testing` instead of `main` otherwise we cannot review or aprove them!
+![Playing the demo](docs/images/play.png)
 
-Also make sure to give a good description of what your PR fixes or adds so we don't have to go through all the files unnecessarily.
+| Play | |
+|---|---|
+| `W` `A` `S` `D` | move (hold `Shift` to walk) |
+| `Space` | jump |
+| mouse drag / arrow keys | orbit the camera |
+| mouse wheel | zoom |
+| `F3` | diagnostics overlay (fps, weather / time-of-day buttons, debug views) |
+| `F1` | show the controls hint again |
 
-## Credits
+`demo/courtyard.tscn` is a smaller scene after robert-k's godot-3d-pixel-art demo. It has a
+fountain, pillars and round trees on a flat meadow, a fox to play with the same controls, and
+`PixelSunShafts` light shafts cut by the sun's shadows, under a dusk sky.
 
-Developed by [Yūgen](https://www.youtube.com/@yugen_seishin) and originally forked from [Jackachulian](https://github.com/jackachulian/jackachulian) on github.
+![The courtyard demo](docs/images/courtyard.png)
 
-Collaborators (v1.1.0 ONWARDS):
-* [DanTrz](https://github.com/DanTrz)
-* [powertomato](https://github.com/powertomato)
-* [santarl](https://github.com/santarl)
+## Quickstart: sculpt → paint foliage → play
 
-A special thanks to DanTrz (creator of the TileMapLayer3D plugin), powertomato and santarl for co-authoring big parts of the plugin since the 1.0 release. They have been amazing contributors to the project and awesome people to work with!
+Select **MarchingSquaresTerrain** in the demo (or add one to a new 3D scene). A labelled
+toolbar appears on the left of the 3D view, the active tool's settings along the bottom, and a
+one-line help for the tool at the bottom-left of the view.
 
-Contributors:
-* [Dylearn](https://www.youtube.com/@Dylearn)
-* [AtSaturn](https://www.youtube.com/@AtPlayerSaturn)
-* My lifelong best friends!
+![The terrain editor](docs/images/editor.png)
 
-###
-A big thanks to the above people for giving helpful insights, discussing certain features and thinking together about math related problems. Without them I couldn't have finished the plugin as fast as I have.
+1. **Sculpt** — pick **Brush** (`1`). Click (or drag) on the terrain to select cells, then
+   drag the selection up or down. `Shift` adds cells, `Ctrl` removes, `RMB`/`Esc` clears.
+   **Smooth** (`3`) rounds things off (*Smooth Mode*: Terraced keeps steps, Sloped makes
+   ramps); **Level** (`2`) flattens; **Stamp** drops mountains and craters. Every stroke is
+   one `Ctrl+Z`.
+2. **Paint foliage** — pick **Foliage** (`5`), choose Grass, Tree, Rock… in the palette on the
+   right (`Ctrl`/`Shift`+click for several) and paint with LMB; RMB erases. `Shift`+wheel
+   resizes the brush. **Paint** (`6`) paints ground textures the same way.
+3. **Play** — press **F5** (the demo) or, in your own scene, add a **PixelRenderer** and a
+   `Camera3D` and press **F6**. The world renders as low-res pixel art; your UI stays sharp.
+
+New terrain from scratch: add a `MarchingSquaresTerrain`, pick **Chunks** (`8`) and click the
+green `+` to add chunks, then sculpt as above. **Settings** (`9`) holds grid type, cell size,
+texture blending, grass and storage options.
+
+## Learn more
+
+* [docs/reference.md](docs/reference.md) — the full manual: every node and resource, all editor
+  tools, storage modes, the level builder, effects, custom shaders, hex grids and the game API.
+* [docs/testing.md](docs/testing.md) — unit tests, headless checks and the windowed editor
+  checks.
+* [CREDITS.md](CREDITS.md) — sources and licences. MIT licensed (the demo-only Phantom Camera
+  port is GPL-3.0).

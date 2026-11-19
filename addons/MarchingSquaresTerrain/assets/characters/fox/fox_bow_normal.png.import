@@ -1,0 +1,44 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://ch888den3yuli"
+path.s3tc="res://.godot/imported/fox_bow_normal.png-c1001a95fe5e03e245f54eb00608551a.s3tc.ctex"
+metadata={
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
+}
+generator_parameters={
+"md5": "3c299d6fecf4b01cdd0bbb0efa3dbb33"
+}
+
+[deps]
+
+source_file="res://addons/MarchingSquaresTerrain/assets/characters/fox/fox_bow_normal.png"
+dest_files=["res://.godot/imported/fox_bow_normal.png-c1001a95fe5e03e245f54eb00608551a.s3tc.ctex"]
+
+[params]
+
+compress/mode=2
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
+compress/hdr_compression=1
+compress/normal_map=1
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=1
+roughness/src_normal="res://addons/MarchingSquaresTerrain/assets/characters/fox/fox_bow_normal.png"
+process/channel_remap/red=0
+process/channel_remap/green=1
+process/channel_remap/blue=2
+process/channel_remap/alpha=3
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=0
