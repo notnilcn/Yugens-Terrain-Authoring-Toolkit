@@ -1774,11 +1774,16 @@ impl MarchingSquaresTerrainPlugin {
         if self.visible && self.state.tool == Tool::VertexPaint {
             self.sync_texture_panel();
         }
+        // The toolbar's Grid toggle mirrors `show_grid_in_editor` (Settings → Display, Inspector).
+        self.sync_grid_toggle();
         let own = self.settings_version.take();
         if own.is_some() && own == self.terrain_undo_version() {
             return;
         }
-        if self.visible && self.state.tool == Tool::TerrainSettings {
+        if self.visible
+            && matches!(self.state.tool, Tool::TerrainSettings | Tool::ChunkManager)
+        {
+            // Settings values, or the chunk count / list after an add / remove undo.
             self.rebuild_strip();
         }
     }
