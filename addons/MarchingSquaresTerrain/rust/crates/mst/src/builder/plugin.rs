@@ -671,7 +671,16 @@ impl IEditorPlugin for PixelBuilderPlugin {
             return if r { stop } else { pass };
         }
         if let Ok(key) = event.clone().try_cast::<InputEventKey>() {
-            return if self.on_key(&key) { stop } else { pass };
+            if !self.on_key(&key) {
+                return pass;
+            }
+            // STOP alone does not end a key event's propagation: the editor's own shortcuts
+            // (`shortcut_input`) still ran, so `H` (cycle mode) also ran Godot's
+            // "Toggle Selected Node(s) Visibility" and hid the mesh being edited every other press.
+            if let Some(mut vp) = self.base().get_viewport() {
+                vp.set_input_as_handled();
+            }
+            return stop;
         }
         if self.tool == Tool::Shape
             && let Some(r) = self.shape_event(&camera, &event)
@@ -2390,13 +2399,13 @@ impl PixelBuilderPlugin {
         }
     }
 
-    /// H: Object → Vertex → Edge → Face → Object.
+    /// H: Object → Face → Edge → Vertex → Object (the documented 1→2→3→4 order).
     fn cycle_mode(&mut self) {
         let next = match self.mode {
-            Mode::Object => Mode::Vertex,
-            Mode::Vertex => Mode::Edge,
-            Mode::Edge => Mode::Face,
-            Mode::Face => Mode::Object,
+            Mode::Object => Mode::Face,
+            Mode::Face => Mode::Edge,
+            Mode::Edge => Mode::Vertex,
+            Mode::Vertex => Mode::Object,
         };
         self.assign_setting(next);
     }
