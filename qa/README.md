@@ -139,6 +139,8 @@ Ctrl+Z, or one Ctrl+Z reverting more than one stroke.
 
 ## Screenshots and findings
 
+See [`SCREENSHOTS.md`](SCREENSHOTS.md) for the per-area index, counts and the key evidence.
+
 - Screenshots: `qa/screenshots/<area>/NN-short-description.png`. Take one **before** and one
   **after** for each visual change; one extra for each defect.
 - Findings: `qa/findings/<area>.md`, one section per finding:

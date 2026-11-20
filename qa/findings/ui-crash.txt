@@ -1,0 +1,40 @@
+Editor crash at 1024x600 with Level/Smooth/Tint (session uiresize)
+Source: /tmp/opencode/qa/sessions/uiresize/editor.log (4.7 MB, 105,978 lines)
+Reproduced 5x; first OOM at line 14 after a clean 13-line startup.
+
+--- first 24 lines ---
+Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards balanced)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards balanced)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards balanced)
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.6 (Core Profile) Mesa 26.1.6-1pop0~1787580452~24.04~a5619ea - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+
+MST QA harness listening on 127.0.0.1:8814
+WARNING: Missing .uid file for path "res://tools/tutorial_build.gd". The file was re-created from cache.
+     at: _process_file_system (editor/file_system/editor_file_system.cpp:1391)
+WARNING: Missing .uid file for path "res://tutorial/orbit_camera.gd". The file was re-created from cache.
+     at: _process_file_system (editor/file_system/editor_file_system.cpp:1391)
+Failed method: Container::_sort_children. Message queue out of memory. Message queue out of memory. Try increasing 'memory/limits/message_queue/max_size_mb' in project settings.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+
+--- OOM occurrences ---
+14:Failed method: Container::_sort_children. Message queue out of memory. Message queue out of memory. Try increasing 'memory/limits/message_queue/max_size_mb' in project settings.
+52997:Failed method: CanvasItem::_redraw_callback. Message queue out of memory. Message queue out of memory. Try increasing 'memory/limits/message_queue/max_size_mb' in project settings.
+
+--- tail ---
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting a callback.
+Object was deleted while awaiting 
