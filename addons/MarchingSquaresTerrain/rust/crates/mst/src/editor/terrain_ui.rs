@@ -1551,6 +1551,10 @@ impl MarchingSquaresTerrainPlugin {
         d.set_access(Access::FILESYSTEM);
         d.add_filter("*.tscn ; Original scene (reads grid settings + data_directory)");
         d.add_filter("*.res ; MSTChunkData (metadata.res)");
+        // The dialog's real minimum (its path bar and file list need ~500 px): reported as its
+        // min_size instead of silently clamping a smaller request.
+        let k = ui_kit::editor_scale();
+        d.set_min_size(Vector2i::new((500.0 * k) as i32, (300.0 * k) as i32));
         let on = self.cb("on_import_mst_path").bind(&[d.to_variant()]);
         d.connect("file_selected", &on);
         d.connect("dir_selected", &on);
@@ -2113,9 +2117,14 @@ impl MarchingSquaresTerrainPlugin {
         dlg.set_title("Save Preset");
         // The dialog closes itself only after a valid name was saved (`on_export_confirmed`).
         dlg.set_hide_on_ok(false);
-        dlg.set_size(Vector2i::new(
-            (420.0 * ui_kit::editor_scale()) as i32,
-            (170.0 * ui_kit::editor_scale()) as i32,
+        dlg.set_cancel_button_text("Cancel");
+        // An honest minimum (what the name field and the two-line target path need), and the
+        // size the dialog had when it was last closed.
+        let k = ui_kit::editor_scale();
+        dlg.set_min_size(Vector2i::new((340.0 * k) as i32, (140.0 * k) as i32));
+        dlg.set_size(remembered_size(
+            SAVE_PRESET_SIZE_META,
+            Vector2i::new((420.0 * k) as i32, (150.0 * k) as i32),
         ));
         let mut v = VBoxContainer::new_alloc();
         let mut l = Label::new_alloc();
@@ -2129,8 +2138,11 @@ impl MarchingSquaresTerrainPlugin {
         le.set_text(current.as_deref().unwrap_or("new_texture_preset"));
         le.select_all();
         v.add_child(&le);
-        // Target file on two short lines (the full path on one line made the dialog 558 px wide).
+        // Target file on two short lines (the full path on one line made the dialog 558 px wide);
+        // clipped rather than widening the dialog's minimum.
         let mut file = Label::new_alloc();
+        file.set_clip_text(true);
+        file.set_text_overrun_behavior(godot::classes::text_server::OverrunBehavior::TRIM_ELLIPSIS);
         file.set_modulate(ui_kit::DIM_MODULATE);
         v.add_child(&file);
         dlg.add_child(&v);
@@ -2143,11 +2155,14 @@ impl MarchingSquaresTerrainPlugin {
         let (on_ok, on_cancel) = (
             self.cb("on_export_confirmed")
                 .bind(&[le.to_variant(), dlg.to_variant()]),
-            Callable::from_object_method(&dlg, "queue_free"),
+            self.cb("on_export_closed").bind(&[dlg.to_variant()]),
         );
         dlg.connect("confirmed", &on_ok);
+        // Cancel, Esc and the title bar's X.
         dlg.connect("canceled", &on_cancel);
         base.add_child(&dlg);
+        // Centered at the stored size (`popup_centered` keeps the current size unless the
+        // content needs more).
         dlg.popup_centered();
         le.grab_focus();
     }
@@ -2247,6 +2262,31 @@ pub(super) struct SlotUi {
     pub has_grass: Option<Gd<CheckBox>>,
     pub grass_tint: Option<Gd<ColorPickerButton>>,
     pub sprite: Option<Gd<EditorResourcePicker>>,
+}
+
+/// Editor project metadata key remembering the Save Preset dialog size.
+pub(super) const SAVE_PRESET_SIZE_META: &str = "save_preset_dialog_size";
+
+/// Size stored under `key` (editor project metadata), else `fallback`.
+pub(super) fn remembered_size(key: &str, fallback: Vector2i) -> Vector2i {
+    EditorInterface::singleton()
+        .get_editor_settings()
+        .and_then(|es| {
+            es.get_project_metadata_ex(TOOLBAR_META.0, key)
+                .default(&Variant::nil())
+                .done()
+                .try_to::<Vector2i>()
+                .ok()
+        })
+        .filter(|s| s.x > 0 && s.y > 0)
+        .unwrap_or(fallback)
+}
+
+/// Stores a dialog size for [`remembered_size`].
+pub(super) fn remember_size(key: &str, size: Vector2i) {
+    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
+        es.set_project_metadata(TOOLBAR_META.0, key, &size.to_variant());
+    }
 }
 
 fn snake_case(s: &str) -> String {

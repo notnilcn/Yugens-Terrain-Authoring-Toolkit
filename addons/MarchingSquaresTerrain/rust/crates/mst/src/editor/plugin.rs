@@ -2033,8 +2033,16 @@ impl MarchingSquaresTerrainPlugin {
             // Stays open (hide_on_ok is off); the dialog already says why.
             return;
         }
+        super::terrain_ui::remember_size(super::terrain_ui::SAVE_PRESET_SIZE_META, dialog.get_size());
         dialog.queue_free();
         self.export_preset(name, false);
+    }
+
+    /// Save Preset closed without saving (Cancel, Esc, X): remember its size.
+    #[func]
+    fn on_export_closed(&mut self, mut dialog: Gd<godot::classes::ConfirmationDialog>) {
+        super::terrain_ui::remember_size(super::terrain_ui::SAVE_PRESET_SIZE_META, dialog.get_size());
+        dialog.queue_free();
     }
 
     #[func]
