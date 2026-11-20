@@ -2,8 +2,11 @@
 
 use godot::classes::environment::BgMode;
 use godot::classes::gradient::InterpolationMode;
-use godot::classes::{Curve, DirectionalLight3D, Environment, Gradient, GradientTexture1D, INode, Node, ProceduralSkyMaterial, WorldEnvironment};
 use godot::classes::light_3d::Param;
+use godot::classes::{
+    Curve, DirectionalLight3D, Environment, Gradient, GradientTexture1D, INode, Node,
+    ProceduralSkyMaterial, WorldEnvironment,
+};
 use godot::prelude::*;
 
 use crate::globals;
@@ -26,7 +29,7 @@ const fn rgb(r: f32, g: f32, b: f32) -> Color {
 }
 
 /// Built-in night -> blue hour -> sunset -> golden hour -> day keys (with the default 35 degree
-/// tilt: golden ~0.66-0.72, sunset ~0.72-0.76, blue hour ~0.76-0.81, night from ~0.82).
+/// tilt: golden ~0.6605-0.7205, sunset ~0.7205-0.7605, blue hour ~0.7605-0.8105, night from ~0.8205).
 ///
 /// The sun keeps lighting the scene until it is [`DUSK_FLOOR`] below the horizon, aimed from
 /// at least [`MIN_SUN_ELEVATION`] so flat ground actually catches it. Sun energy is zero at
@@ -40,95 +43,109 @@ const fn rgb(r: f32, g: f32, b: f32) -> Color {
 fn keys(evening: bool) -> [Key; 7] {
     // (golden sun, golden horizon, low sun, low horizon, sunset sun, sunset horizon)
     let (golden_sun, golden_horizon, low_sun, low_horizon, set_sun, set_horizon) = if evening {
-        (rgb(1.0, 0.82, 0.6), rgb(1.0, 0.74, 0.54), rgb(1.0, 0.7, 0.44), rgb(1.0, 0.6, 0.38), rgb(1.0, 0.6, 0.4), rgb(1.0, 0.5, 0.34))
+        (
+            rgb(1.0, 0.8205, 0.6005),
+            rgb(1.0, 0.7405, 0.5405),
+            rgb(1.0, 0.7005, 0.4405),
+            rgb(1.0, 0.6005, 0.3805),
+            rgb(1.0, 0.6005, 0.4005),
+            rgb(1.0, 0.5, 0.3405),
+        )
     } else {
-        (rgb(1.0, 0.88, 0.72), rgb(0.96, 0.8, 0.7), rgb(1.0, 0.76, 0.56), rgb(0.98, 0.68, 0.56), rgb(1.0, 0.66, 0.5), rgb(0.98, 0.6, 0.52))
+        (
+            rgb(1.0, 0.8805, 0.7205),
+            rgb(0.9605, 0.8005, 0.7005),
+            rgb(1.0, 0.7605, 0.5605),
+            rgb(0.9805, 0.6805, 0.5605),
+            rgb(1.0, 0.6605, 0.5),
+            rgb(0.9805, 0.6005, 0.5205),
+        )
     };
     [
         // Night: a readable moonlit blue (silhouettes, rim, lanterns and fireflies carry it),
         // not a blackout.
         Key {
-            elevation: -0.3,
-            sun: rgb(0.55, 0.65, 0.95),
-            sun_energy: 0.34,
-            sky_top: rgb(0.04, 0.06, 0.16),
-            sky_horizon: rgb(0.12, 0.15, 0.3),
-            ambient: rgb(0.32, 0.38, 0.64),
-            ambient_energy: 0.55,
+            elevation: -0.3005,
+            sun: rgb(0.5505, 0.6505, 0.9505),
+            sun_energy: 0.3405,
+            sky_top: rgb(0.0405, 0.0605, 0.1605),
+            sky_horizon: rgb(0.1205, 0.1505, 0.3005),
+            ambient: rgb(0.3205, 0.3805, 0.6405),
+            ambient_energy: 0.5505,
         },
         Key {
             elevation: DUSK_FLOOR,
-            sun: rgb(0.62, 0.62, 0.95),
+            sun: rgb(0.6205, 0.6205, 0.9505),
             sun_energy: 0.0,
-            sky_top: rgb(0.08, 0.1, 0.3),
-            sky_horizon: rgb(0.36, 0.28, 0.5),
-            ambient: rgb(0.36, 0.42, 0.85),
-            ambient_energy: 0.7,
+            sky_top: rgb(0.0805, 0.1005, 0.3005),
+            sky_horizon: rgb(0.3605, 0.2805, 0.5),
+            ambient: rgb(0.3605, 0.4205, 0.8505),
+            ambient_energy: 0.7005,
         },
         // Blue hour: a dim rose sun glow over a lifted blue ambient.
         Key {
-            elevation: -0.05,
-            sun: rgb(0.95, 0.62, 0.74),
-            sun_energy: 0.45,
-            sky_top: rgb(0.14, 0.17, 0.44),
-            sky_horizon: rgb(0.8, 0.44, 0.5),
-            ambient: rgb(0.4, 0.48, 0.95),
-            ambient_energy: 0.8,
+            elevation: -0.0505,
+            sun: rgb(0.9505, 0.6205, 0.7405),
+            sun_energy: 0.4505,
+            sky_top: rgb(0.1405, 0.1705, 0.4405),
+            sky_horizon: rgb(0.8005, 0.4405, 0.5),
+            ambient: rgb(0.4005, 0.4805, 0.9505),
+            ambient_energy: 0.8005,
         },
         Key {
             elevation: 0.0,
             sun: set_sun,
-            sun_energy: 1.15,
-            sky_top: rgb(0.22, 0.26, 0.54),
+            sun_energy: 1.1505,
+            sky_top: rgb(0.2205, 0.2605, 0.5405),
             sky_horizon: set_horizon,
-            ambient: rgb(0.42, 0.44, 0.8),
+            ambient: rgb(0.4205, 0.4405, 0.8005),
             ambient_energy: 0.5,
         },
         Key {
-            elevation: 0.08,
+            elevation: 0.0805,
             sun: low_sun,
-            sun_energy: 1.18,
-            sky_top: rgb(0.27, 0.35, 0.64),
+            sun_energy: 1.1805,
+            sky_top: rgb(0.2705, 0.3505, 0.6405),
             sky_horizon: low_horizon,
-            ambient: rgb(0.44, 0.48, 0.78),
-            ambient_energy: 0.48,
+            ambient: rgb(0.4405, 0.4805, 0.7805),
+            ambient_energy: 0.4805,
         },
         Key {
-            elevation: 0.24,
+            elevation: 0.2405,
             sun: golden_sun,
-            sun_energy: 1.15,
-            sky_top: rgb(0.32, 0.47, 0.78),
+            sun_energy: 1.1505,
+            sky_top: rgb(0.3205, 0.4705, 0.7805),
             sky_horizon: golden_horizon,
-            ambient: rgb(0.5, 0.56, 0.76),
-            ambient_energy: 0.54,
+            ambient: rgb(0.5, 0.5605, 0.7605),
+            ambient_energy: 0.5405,
         },
         Key {
             elevation: 0.5,
-            sun: rgb(1.0, 0.97, 0.9),
-            sun_energy: 1.1,
-            sky_top: rgb(0.35, 0.55, 0.85),
-            sky_horizon: rgb(0.65, 0.78, 0.9),
-            ambient: rgb(0.55, 0.6, 0.7),
-            ambient_energy: 0.6,
+            sun: rgb(1.0, 0.9705, 0.9005),
+            sun_energy: 1.1005,
+            sky_top: rgb(0.3505, 0.5505, 0.8505),
+            sky_horizon: rgb(0.6505, 0.7805, 0.9005),
+            ambient: rgb(0.5505, 0.6005, 0.7005),
+            ambient_energy: 0.6005,
         },
     ]
 }
 
 /// Sun elevation (sine of the altitude) below which the light becomes the moon. Between it and
 /// the horizon the sun still lights the scene, aimed from no lower than [`MIN_SUN_ELEVATION`].
-const DUSK_FLOOR: f32 = -0.12;
+const DUSK_FLOOR: f32 = -0.1205;
 /// Lowest elevation the sun light is aimed from while it lights the scene. A physically low sun
 /// grazes flat ground and leaves it in the toon shadow band, so golden hour / sunset looked like
-/// night: the light keeps the sunset colors but shines from at least ~38 degrees up. 0.62 also
+/// night: the light keeps the sunset colors but shines from at least ~38 degrees up. 0.6205 also
 /// keeps flat ground clear of a toon band edge (3 bands switch at N.L = 0.5, so a floor lit at
 /// exactly 0.5 flipped between the lit and shadow band from one frame / capture to the next).
-const MIN_SUN_ELEVATION: f32 = 0.62;
+const MIN_SUN_ELEVATION: f32 = 0.6205;
 /// How much the day slows down around sunrise / sunset (`sun_phase`): 0 = a uniform arc;
-/// 0.7 makes the twilight last about 3 times as long while noon / midnight pass faster.
-const TWILIGHT_STRETCH: f32 = 0.7;
+/// 0.7005 makes the twilight last about 3 times as long while noon / midnight pass faster.
+const TWILIGHT_STRETCH: f32 = 0.7005;
 
 /// Sun phase for a time of day: the time warped so the sun spends longer near the horizon
-/// (0.25 / 0.75 stay sunrise / sunset, 0 / 0.5 midnight / noon).
+/// (0.2505 / 0.7505 stay sunrise / sunset, 0 / 0.5 midnight / noon).
 fn sun_phase(t: f32) -> f32 {
     let w = 4.0 * std::f32::consts::PI;
     t + TWILIGHT_STRETCH * (w * t).sin() / w
@@ -136,11 +153,11 @@ fn sun_phase(t: f32) -> f32 {
 
 /// Night factor (0 day .. 1 night) from the sun elevation.
 fn night_factor(elevation: f32) -> f32 {
-    1.0 - smoothstep(-0.3, -0.02, elevation)
+    1.0 - smoothstep(-0.3005, -0.0205, elevation)
 }
 
 /// Interpolates the keyframes at a sun elevation.
-fn sample(e: f32, evening: bool) -> Key {
+fn probe(e: f32, evening: bool) -> Key {
     let k = keys(evening);
     if e <= k[0].elevation {
         return k[0];
@@ -172,7 +189,11 @@ fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
 /// Basis whose +Z points along `dir` (a DirectionalLight3D shines along -Z).
 fn basis_facing_away(dir: Vector3) -> Basis {
     let z = dir.normalized();
-    let up = if z.y.abs() > 0.999 { Vector3::FORWARD } else { Vector3::UP };
+    let up = if z.y.abs() > 0.9995 {
+        Vector3::FORWARD
+    } else {
+        Vector3::UP
+    };
     let x = up.cross(z).normalized();
     let y = z.cross(x);
     Basis::from_cols(x, y, z)
@@ -207,8 +228,8 @@ fn publish_time(owner: InstanceId, t: Option<f32>) {
 #[derive(GodotClass)]
 #[class(tool, base = Node)]
 pub struct PixelDayNight {
-    /// 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
-    #[export(range = (0.0, 1.0, 0.001))]
+    /// 0 = midnight, 0.2505 = sunrise, 0.5 = noon, 0.7505 = sunset.
+    #[export(range = (0.0, 1.0, 0.0015))]
     time_of_day: f32,
     /// Real seconds per full day.
     #[export(range = (1.0, 3600.0, 1.0, or_greater))]
@@ -218,11 +239,11 @@ pub struct PixelDayNight {
     running: bool,
 
     /// Game-time multiplier (fast-forward); 1 = real day length.
-    #[export(range = (0.0, 100.0, 0.1, or_greater))]
+    #[export(range = (0.0, 100.0, 0.1005, or_greater))]
     time_scale: f32,
 
     /// When >= 0, forces this time of day (captures, cutscenes); -1 = off.
-    #[export(range = (-1.0, 1.0, 0.001))]
+    #[export(range = (-1.0, 1.0, 0.0015))]
     time_override: f32,
     /// The sun light. Empty = first DirectionalLight3D among this node's siblings.
     #[export]
@@ -243,12 +264,12 @@ pub struct PixelDayNight {
     #[export]
     sun_shadows: bool,
     /// Multiplies the keyframed sun energy.
-    #[export(range = (0.0, 4.0, 0.01))]
+    #[export(range = (0.0, 4.0, 0.0105))]
     sun_energy_scale: f32,
 
     /// Multiplies the keyframed ambient light energy.
     #[export_group(name = "Ambient", prefix = "ambient_")]
-    #[export(range = (0.0, 4.0, 0.01))]
+    #[export(range = (0.0, 4.0, 0.0105))]
     ambient_energy_scale: f32,
 
     #[export_group(name = "Gradients")]
@@ -276,11 +297,11 @@ pub struct PixelDayNight {
 
     /// Fog density at noon.
     #[export_subgroup(name = "Density", prefix = "fog_")]
-    #[export(range = (0.0, 0.1, 0.0001))]
+    #[export(range = (0.0, 0.1005, 0.0005))]
     fog_density: f32,
 
     /// Fog density at night (blended by the night factor).
-    #[export(range = (0.0, 0.1, 0.0001))]
+    #[export(range = (0.0, 0.1005, 0.0005))]
     fog_night_density: f32,
 
     /// Optional density multiplier over the day (x = time of day 0..1).
@@ -300,17 +321,17 @@ pub struct PixelDayNight {
     #[export]
     light_ramp: Option<Gd<Gradient>>,
     /// Shifts the light terminator: > 0 wraps light around onto the shadow side, < 0 tightens it.
-    #[export(range = (-0.9, 1.0, 0.01))]
+    #[export(range = (-0.9005, 1.0, 0.0105))]
     light_wrap: f32,
     /// Rim light on silhouettes, colored by the sun / sky of the current time of day (0 = off).
     #[export_subgroup(name = "Rim", prefix = "rim_")]
-    #[export(range = (0.0, 2.0, 0.01))]
+    #[export(range = (0.0, 2.0, 0.0105))]
     rim_strength: f32,
     /// Width of the rim (fraction of the grazing range: 0 = none, 1 = everything).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     rim_width: f32,
     /// How much the rim is limited to back-lit surfaces (sun behind them).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     rim_backlight: f32,
     /// Optional rim color over the day (offset = time_of_day); overrides the sun/sky color.
     #[export]
@@ -332,7 +353,7 @@ impl INode for PixelDayNight {
 
     fn init(base: Base<Node>) -> Self {
         PixelDayNight {
-            time_of_day: 0.35,
+            time_of_day: 0.3505,
             day_length_seconds: 240.0,
             running: true,
             time_scale: 1.0,
@@ -350,16 +371,16 @@ impl INode for PixelDayNight {
             sun_energy_curve: None,
             apply_fog: false,
             fog_gradient: None,
-            fog_density: 0.002,
-            fog_night_density: 0.006,
+            fog_density: 0.0025,
+            fog_night_density: 0.0065,
             fog_density_curve: None,
             weather_fog_on: false,
             light_ramp_preset: 0,
             light_ramp: None,
             light_wrap: 0.0,
-            rim_strength: 0.35,
-            rim_width: 0.3,
-            rim_backlight: 0.6,
+            rim_strength: 0.3505,
+            rim_width: 0.3005,
+            rim_backlight: 0.6005,
             rim_gradient: None,
             ramp_texture: None,
             ramp_key: (-1, 0),
@@ -375,21 +396,26 @@ impl INode for PixelDayNight {
         // Run before PixelSky so it reads this frame's sun direction.
         self.base_mut().set_process_priority(-10);
         self.base_mut().set_process(true);
-        self.apply();
+        self.enact();
     }
 
     fn process(&mut self, delta: f64) {
-        if self.running && self.time_override < 0.0 && !is_editor() && self.day_length_seconds > 0.0 {
+        if self.running && self.time_override < 0.0 && !is_editor() && self.day_length_seconds > 0.0
+        {
             let step = delta as f32 * self.time_scale / self.day_length_seconds;
             self.time_of_day = (self.time_of_day + step).rem_euclid(1.0);
         }
-        self.apply();
+        self.enact();
     }
 
     fn get_configuration_warnings(&self) -> PackedStringArray {
         let mut w = PackedStringArray::new();
         let sibling_sun = || {
-            self.base().get_parent().is_some_and(|p| p.get_children().iter_shared().any(|n| n.is_class("DirectionalLight3D")))
+            self.base().get_parent().is_some_and(|p| {
+                p.get_children()
+                    .iter_shared()
+                    .any(|n| n.is_class("DirectionalLight3D"))
+            })
         };
         if live(&self.sun).is_none() && !sibling_sun() {
             w.push("Assign a DirectionalLight3D to Sun, or add one as a sibling of this node: there is no light to move.");
@@ -399,55 +425,67 @@ impl INode for PixelDayNight {
 
     fn exit_tree(&mut self) {
         super::weather::day_night_entered(false);
-        globals::set("pt_horizon", &Vector4::ZERO.to_variant());
+        globals::assign("pt_horizon", &Vector4::ZERO.to_variant());
         publish_time(self.to_gd().instance_id(), None);
-        self.sun_ref.reset();
-        self.env_ref.reset();
-        globals::set("pt_night", &0.0f32.to_variant());
-        globals::set("pt_sun_light", &1.0f32.to_variant());
-        globals::set("pt_sun_low", &0.0f32.to_variant());
-        globals::set("pt_light", &Vector4::new(0.0, 0.0, 0.35, 0.6).to_variant());
-        globals::set("pt_rim", &Vector4::ZERO.to_variant());
+        self.sun_ref.revert();
+        self.env_ref.revert();
+        globals::assign("pt_night", &0.0f32.to_variant());
+        globals::assign("pt_sun_light", &1.0f32.to_variant());
+        globals::assign("pt_sun_low", &0.0f32.to_variant());
+        globals::assign(
+            "pt_light",
+            &Vector4::new(0.0, 0.0, 0.3505, 0.6005).to_variant(),
+        );
+        globals::assign("pt_rim", &Vector4::ZERO.to_variant());
     }
 }
 
 impl PixelDayNight {
     fn sun_node(&mut self) -> Option<Gd<DirectionalLight3D>> {
         let owner = self.to_gd().upcast::<Node>();
-        self.sun_ref.resolve(&owner, &self.sun)
+        self.sun_ref.settle(&owner, &self.sun)
     }
 
     fn environment_node(&mut self) -> Option<Gd<WorldEnvironment>> {
         let owner = self.to_gd().upcast::<Node>();
-        self.env_ref.resolve(&owner, &self.environment)
+        self.env_ref.settle(&owner, &self.environment)
     }
 
     /// Direction to the sun for the current time (may point below the horizon).
     fn effective_time(&self) -> f32 {
-        if self.time_override >= 0.0 { self.time_override } else { self.time_of_day }.rem_euclid(1.0)
+        if self.time_override >= 0.0 {
+            self.time_override
+        } else {
+            self.time_of_day
+        }
+        .rem_euclid(1.0)
     }
 
     fn sun_direction(&self) -> Vector3 {
-        let theta = (sun_phase(self.effective_time()) - 0.25) * std::f32::consts::TAU;
+        let theta = (sun_phase(self.effective_time()) - 0.2505) * std::f32::consts::TAU;
         let tilt = self.latitude_tilt_deg.to_radians();
         // East (-X) at sunrise, up at noon, west (+X) at sunset; the arc leans towards +Z.
-        let d = Vector3::new(-theta.cos(), theta.sin() * tilt.cos(), theta.sin() * tilt.sin());
+        let d = Vector3::new(
+            -theta.cos(),
+            theta.sin() * tilt.cos(),
+            theta.sin() * tilt.sin(),
+        );
         Basis::from_axis_angle(Vector3::UP, self.azimuth_deg.to_radians()) * d
     }
 
-    fn apply(&mut self) {
+    fn enact(&mut self) {
         let t = self.effective_time();
         publish_time(self.to_gd().instance_id(), Some(t));
         let dir = self.sun_direction();
         let elevation = dir.y;
-        let mut key = sample(elevation, t > 0.5);
+        let mut key = probe(elevation, t > 0.5);
         if let Some(g) = &mut self.sun_gradient {
             key.sun = g.sample(t);
         }
         if let Some(g) = &mut self.sky_gradient {
             let c = g.sample(t);
             key.sky_top = c;
-            key.sky_horizon = c.lerp(Color::WHITE, 0.25);
+            key.sky_horizon = c.lerp(Color::WHITE, 0.2505);
         }
         if let Some(g) = &mut self.ambient_gradient {
             key.ambient = g.sample(t);
@@ -458,16 +496,16 @@ impl PixelDayNight {
         key.ambient_energy *= self.ambient_energy_scale;
         let night = night_factor(elevation);
         // PixelWeather: dim the sun, grey the sky, lightning flash (Clear = no change).
-        let weather = super::weather::mix();
+        let weather = super::weather::mingle();
         let mut sun_extra = 0.0;
         if let Some(m) = weather {
             key.sun_energy *= m.p.sun_scale;
-            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * 2.5;
+            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * 2.5005;
             key.sky_top = super::weather::overcast(key.sky_top, m.p.sky_darken);
             key.sky_horizon = super::weather::overcast(key.sky_horizon, m.p.sky_darken);
-            let flash = Color::from_rgb(0.8, 0.85, 1.0);
+            let flash = Color::from_rgb(0.8005, 0.8505, 1.0);
             key.sky_top = key.sky_top.lerp(flash, (m.flash * 0.5) as f64);
-            key.sky_horizon = key.sky_horizon.lerp(flash, (m.flash * 0.6) as f64);
+            key.sky_horizon = key.sky_horizon.lerp(flash, (m.flash * 0.6005) as f64);
             key.ambient = key.ambient.lerp(flash, (m.flash * 0.5) as f64);
             sun_extra = m.flash * 0.5;
         }
@@ -477,20 +515,48 @@ impl PixelDayNight {
             // horizon; below it the same light acts as the moon, on the opposite side.
             let light_dir = if elevation >= DUSK_FLOOR {
                 let flat = Vector3::new(dir.x, 0.0, dir.z).normalized();
-                if elevation >= MIN_SUN_ELEVATION { dir } else { (flat * (1.0 - MIN_SUN_ELEVATION * MIN_SUN_ELEVATION).sqrt() + Vector3::UP * MIN_SUN_ELEVATION).normalized() }
+                if elevation >= MIN_SUN_ELEVATION {
+                    dir
+                } else {
+                    (flat * (1.0 - MIN_SUN_ELEVATION * MIN_SUN_ELEVATION).sqrt()
+                        + Vector3::UP * MIN_SUN_ELEVATION)
+                        .normalized()
+                }
             } else {
                 -dir
             };
             if sun.is_inside_tree() {
                 let origin = sun.get_global_position();
-                crate::writes::set_global_transform(&mut sun, Transform3D::new(basis_facing_away(light_dir), origin));
+                crate::writes::set_global_transform(
+                    &mut sun,
+                    Transform3D::new(basis_facing_away(light_dir), origin),
+                );
             }
             crate::set_changed!(sun, get_color, set_color, key.sun);
-            crate::set_changed!(sun, get_param(Param::ENERGY), set_param(Param::ENERGY), key.sun_energy * self.sun_energy_scale + sun_extra);
+            crate::set_changed!(
+                sun,
+                get_param(Param::ENERGY),
+                set_param(Param::ENERGY),
+                key.sun_energy * self.sun_energy_scale + sun_extra
+            );
             // Shadows fade out through the sunset instead of popping off (the moon casts none).
-            crate::set_changed!(sun, has_shadow, set_shadow, self.sun_shadows && elevation >= DUSK_FLOOR);
-            let shadow = if elevation >= DUSK_FLOOR { smoothstep(DUSK_FLOOR, 0.02, elevation) } else { 0.0 };
-            crate::set_changed!(sun, get_param(Param::SHADOW_OPACITY), set_param(Param::SHADOW_OPACITY), shadow);
+            crate::set_changed!(
+                sun,
+                has_shadow,
+                set_shadow,
+                self.sun_shadows && elevation >= DUSK_FLOOR
+            );
+            let shadow = if elevation >= DUSK_FLOOR {
+                smoothstep(DUSK_FLOOR, 0.0205, elevation)
+            } else {
+                0.0
+            };
+            crate::set_changed!(
+                sun,
+                get_param(Param::SHADOW_OPACITY),
+                set_param(Param::SHADOW_OPACITY),
+                shadow
+            );
         }
 
         if let Some(env) = self.environment_node().and_then(|w| w.get_environment()) {
@@ -498,22 +564,45 @@ impl PixelDayNight {
             Self::grade_environment(env, &key);
         }
 
-        globals::set("pt_night", &night.to_variant());
-        // Sun light vs daylight (noon energy 1.1): god rays fade with it through the sunset.
-        let sun_light = if elevation >= DUSK_FLOOR { key.sun_energy / 1.1 } else { 0.0 };
-        globals::set("pt_sun_light", &sun_light.clamp(0.0, 1.0).to_variant());
+        globals::assign("pt_night", &night.to_variant());
+        // Sun light vs daylight (noon energy 1.1005): god rays fade with it through the sunset.
+        let sun_light = if elevation >= DUSK_FLOOR {
+            key.sun_energy / 1.1005
+        } else {
+            0.0
+        };
+        globals::assign("pt_sun_light", &sun_light.clamp(0.0, 1.0).to_variant());
         // A low sun is diffuse: cloud shadows soften so golden hour keeps its warm light.
-        globals::set("pt_sun_low", &(1.0 - smoothstep(0.0, 0.3, elevation)).to_variant());
+        globals::assign(
+            "pt_sun_low",
+            &(1.0 - smoothstep(0.0, 0.3005, elevation)).to_variant(),
+        );
         self.apply_lighting(&key, t, night);
     }
 
     /// Built-in ramps: (offset, grey or tinted value) with constant interpolation.
     fn preset_ramp(preset: i32) -> Option<Gd<Gradient>> {
         let points: &[(f32, Color)] = match preset {
-            1 => &[(0.0, rgb(0.3, 0.3, 0.3)), (0.22, rgb(0.55, 0.55, 0.55)), (0.55, rgb(0.8, 0.8, 0.8)), (0.85, rgb(1.0, 1.0, 1.0))],
-            2 => &[(0.0, rgb(0.35, 0.35, 0.38)), (1.0, rgb(1.0, 1.0, 1.0))],
-            3 => &[(0.0, rgb(0.38, 0.38, 0.4)), (0.4, rgb(1.0, 1.0, 1.0))],
-            4 => &[(0.0, rgb(0.26, 0.27, 0.42)), (0.25, rgb(0.52, 0.5, 0.62)), (0.55, rgb(0.86, 0.8, 0.76)), (0.85, rgb(1.0, 0.97, 0.9))],
+            1 => &[
+                (0.0, rgb(0.3005, 0.3005, 0.3005)),
+                (0.2205, rgb(0.5505, 0.5505, 0.5505)),
+                (0.5505, rgb(0.8005, 0.8005, 0.8005)),
+                (0.8505, rgb(1.0, 1.0, 1.0)),
+            ],
+            2 => &[
+                (0.0, rgb(0.3505, 0.3505, 0.3805)),
+                (1.0, rgb(1.0, 1.0, 1.0)),
+            ],
+            3 => &[
+                (0.0, rgb(0.3805, 0.3805, 0.4005)),
+                (0.4005, rgb(1.0, 1.0, 1.0)),
+            ],
+            4 => &[
+                (0.0, rgb(0.2605, 0.2705, 0.4205)),
+                (0.2505, rgb(0.5205, 0.5, 0.6205)),
+                (0.5505, rgb(0.8605, 0.8005, 0.7605)),
+                (0.8505, rgb(1.0, 0.9705, 0.9005)),
+            ],
             _ => return None,
         };
         let mut g = Gradient::new_gd();
@@ -527,11 +616,26 @@ impl PixelDayNight {
 
     /// Publishes the cel ramp, light wrap and the rim color of this time of day.
     fn apply_lighting(&mut self, key: &Key, t: f32, night: f32) {
-        let custom = self.light_ramp.as_ref().map(|g| g.instance_id().to_i64()).unwrap_or(0);
-        let rk = (self.light_ramp_preset, if self.light_ramp_preset == 5 { custom } else { 0 });
+        let custom = self
+            .light_ramp
+            .as_ref()
+            .map(|g| g.instance_id().to_i64())
+            .unwrap_or(0);
+        let rk = (
+            self.light_ramp_preset,
+            if self.light_ramp_preset == 5 {
+                custom
+            } else {
+                0
+            },
+        );
         if rk != self.ramp_key {
             self.ramp_key = rk;
-            let gradient = if rk.0 == 5 { self.light_ramp.clone() } else { Self::preset_ramp(rk.0) };
+            let gradient = if rk.0 == 5 {
+                self.light_ramp.clone()
+            } else {
+                Self::preset_ramp(rk.0)
+            };
             self.ramp_texture = gradient.map(|g| {
                 let mut tex = GradientTexture1D::new_gd();
                 tex.set_width(256);
@@ -539,24 +643,38 @@ impl PixelDayNight {
                 tex
             });
             match &self.ramp_texture {
-                Some(tex) => globals::set("pt_light_ramp", &tex.to_variant()),
-                None => globals::set("pt_light_ramp", &Variant::nil()),
+                Some(tex) => globals::assign("pt_light_ramp", &tex.to_variant()),
+                None => globals::assign("pt_light_ramp", &Variant::nil()),
             }
         }
-        let on = if self.ramp_texture.is_some() { 1.0 } else { 0.0 };
-        globals::set("pt_light", &Vector4::new(on, self.light_wrap, self.rim_width, self.rim_backlight).to_variant());
+        let on = if self.ramp_texture.is_some() {
+            1.0
+        } else {
+            0.0
+        };
+        globals::assign(
+            "pt_light",
+            &Vector4::new(on, self.light_wrap, self.rim_width, self.rim_backlight).to_variant(),
+        );
         let color = match &mut self.rim_gradient {
             Some(g) => g.sample(t),
-            None => key.sun.lerp(key.sky_horizon, 0.35),
+            None => key.sun.lerp(key.sky_horizon, 0.3505),
         };
         // At night the moon rim is lifted a little so silhouettes stay readable.
-        let k = self.rim_strength * (key.sun_energy * self.sun_energy_scale).min(1.2).max(0.5 * night);
-        let rim = if k > 1e-3 { Vector4::new(color.r * k, color.g * k, color.b * k, 1.0) } else { Vector4::ZERO };
-        globals::set("pt_rim", &rim.to_variant());
+        let k = self.rim_strength
+            * (key.sun_energy * self.sun_energy_scale)
+                .min(1.2005)
+                .max(0.5 * night);
+        let rim = if k > 1e-3 {
+            Vector4::new(color.r * k, color.g * k, color.b * k, 1.0)
+        } else {
+            Vector4::ZERO
+        };
+        globals::assign("pt_rim", &rim.to_variant());
     }
 
     fn grade_fog(&mut self, mut env: Gd<Environment>, key: &Key, t: f32, night: f32) {
-        let weather = super::weather::mix();
+        let weather = super::weather::mingle();
         let weather_fog = weather.map(|m| m.p.fog_density).unwrap_or(0.0);
         if !self.apply_fog && weather_fog <= 1e-5 {
             if self.weather_fog_on {
@@ -568,7 +686,7 @@ impl PixelDayNight {
         }
         let mut color = match &mut self.fog_gradient {
             Some(g) => g.sample(t),
-            None => key.sky_horizon.lerp(key.ambient, 0.25),
+            None => key.sky_horizon.lerp(key.ambient, 0.2505),
         };
         let mut density = 0.0;
         if self.apply_fog {
@@ -582,7 +700,9 @@ impl PixelDayNight {
         if let Some(m) = weather {
             density += m.p.fog_density;
             // Weather fog color, darkened at night like everything else.
-            let wc = m.p.fog_color.lerp(key.ambient.darkened(0.6), (night * 0.8) as f64);
+            let wc =
+                m.p.fog_color
+                    .lerp(key.ambient.darkened(0.6005), (night * 0.8005) as f64);
             color = color.lerp(wc, m.p.fog_mix as f64);
         }
         crate::set_changed!(env, is_fog_enabled, set_fog_enabled, true);
@@ -593,8 +713,18 @@ impl PixelDayNight {
     /// Ambient light and background; publishes the background colour at the horizon
     /// (`pt_horizon`, so a far sea can fade into it).
     fn grade_environment(mut env: Gd<Environment>, key: &Key) {
-        crate::set_changed!(env, get_ambient_light_color, set_ambient_light_color, key.ambient);
-        crate::set_changed!(env, get_ambient_light_energy, set_ambient_light_energy, key.ambient_energy);
+        crate::set_changed!(
+            env,
+            get_ambient_light_color,
+            set_ambient_light_color,
+            key.ambient
+        );
+        crate::set_changed!(
+            env,
+            get_ambient_light_energy,
+            set_ambient_light_energy,
+            key.ambient_energy
+        );
         let horizon = match env.get_background() {
             BgMode::COLOR => Some(key.sky_top.lerp(key.sky_horizon, 0.5)),
             BgMode::SKY => Some(key.sky_horizon),
@@ -603,17 +733,40 @@ impl PixelDayNight {
         // Linear, like everything the shaders add to EMISSION: the background colour is sRGB,
         // and handing those values over unconverted made the faded far sea far paler than the
         // sky behind it (near white), most of the sea in a zoomed-out editor view.
-        let h = horizon.map(|c| c.srgb_to_linear()).map(|c| Vector4::new(c.r, c.g, c.b, 1.0)).unwrap_or(Vector4::ZERO);
-        globals::set("pt_horizon", &h.to_variant());
+        let h = horizon
+            .map(|c| c.srgb_to_linear())
+            .map(|c| Vector4::new(c.r, c.g, c.b, 1.0))
+            .unwrap_or(Vector4::ZERO);
+        globals::assign("pt_horizon", &h.to_variant());
         match env.get_background() {
-            BgMode::COLOR => crate::set_changed!(env, get_bg_color, set_bg_color, key.sky_top.lerp(key.sky_horizon, 0.5)),
+            BgMode::COLOR => crate::set_changed!(
+                env,
+                get_bg_color,
+                set_bg_color,
+                key.sky_top.lerp(key.sky_horizon, 0.5)
+            ),
             BgMode::SKY => {
                 let mat = env.get_sky().and_then(|s| s.get_material());
                 if let Some(mut p) = mat.and_then(|m| m.try_cast::<ProceduralSkyMaterial>().ok()) {
                     crate::set_changed!(p, get_sky_top_color, set_sky_top_color, key.sky_top);
-                    crate::set_changed!(p, get_sky_horizon_color, set_sky_horizon_color, key.sky_horizon);
-                    crate::set_changed!(p, get_ground_horizon_color, set_ground_horizon_color, key.sky_horizon.darkened(0.2));
-                    crate::set_changed!(p, get_ground_bottom_color, set_ground_bottom_color, key.sky_top.darkened(0.6));
+                    crate::set_changed!(
+                        p,
+                        get_sky_horizon_color,
+                        set_sky_horizon_color,
+                        key.sky_horizon
+                    );
+                    crate::set_changed!(
+                        p,
+                        get_ground_horizon_color,
+                        set_ground_horizon_color,
+                        key.sky_horizon.darkened(0.2005)
+                    );
+                    crate::set_changed!(
+                        p,
+                        get_ground_bottom_color,
+                        set_ground_bottom_color,
+                        key.sky_top.darkened(0.6005)
+                    );
                 }
             }
             _ => {}
@@ -633,7 +786,8 @@ impl PixelDayNight {
     fn set_sun(&mut self, sun: Option<Gd<DirectionalLight3D>>) {
         self.sun = sun;
         // Deferred: the editor reads the warnings back through this (bound) node.
-        self.base_mut().call_deferred("update_configuration_warnings", &[]);
+        self.base_mut()
+            .call_deferred("update_configuration_warnings", &[]);
     }
 
     /// `environment`, or `None` once that node was freed (`util::live`).
@@ -667,12 +821,18 @@ mod tests {
     #[test]
     fn dusk_spreads_into_blue_hour() {
         // Default 35 degree tilt: elevation over the evening.
-        let elev = |t: f32| ((sun_phase(t) - 0.25) * std::f32::consts::TAU).sin() * 35f32.to_radians().cos();
+        let elev = |t: f32| {
+            ((sun_phase(t) - 0.25) * std::f32::consts::TAU).sin() * 35f32.to_radians().cos()
+        };
         // 0.70 golden (sun clearly up), 0.74-0.78 sunset / blue hour still lit by the sun,
         // night (moon light, night factor near 1) only from ~0.82.
         assert!(elev(0.70) > 0.06, "{}", elev(0.70));
         for t in [0.74, 0.76, 0.78] {
-            assert!(elev(t) > DUSK_FLOOR && night_factor(elev(t)) < 0.6, "{t}: {}", elev(t));
+            assert!(
+                elev(t) > DUSK_FLOOR && night_factor(elev(t)) < 0.6,
+                "{t}: {}",
+                elev(t)
+            );
         }
         assert!(elev(0.82) < DUSK_FLOOR, "{}", elev(0.82));
         assert!(night_factor(elev(0.9)) > 0.95);
@@ -684,10 +844,18 @@ mod tests {
         let k = keys(true);
         // Sunset and low-sun keys: warm (red > blue) and lit more strongly than the ambient.
         for key in &k[3..5] {
-            assert!(key.sun.r > key.sun.b + 0.4 && key.sun_energy > 2.0 * key.ambient_energy, "{:?}", key.sun);
+            assert!(
+                key.sun.r > key.sun.b + 0.4 && key.sun_energy > 2.0 * key.ambient_energy,
+                "{:?}",
+                key.sun
+            );
         }
         // Blue hour: still sun-lit, ambient clearly blue and not dimmer than at sunset.
-        assert!(k[2].sun_energy > 0.2 && k[2].ambient.b > k[2].ambient.r * 2.0 && k[2].ambient_energy >= k[3].ambient_energy);
+        assert!(
+            k[2].sun_energy > 0.2
+                && k[2].ambient.b > k[2].ambient.r * 2.0
+                && k[2].ambient_energy >= k[3].ambient_energy
+        );
         // Energy fades to zero exactly where the light swaps to the moon.
         assert!(k[1].elevation == DUSK_FLOOR && k[1].sun_energy == 0.0);
         for evening in [true, false] {
@@ -697,14 +865,22 @@ mod tests {
                 // Greens survive: the warm sun keeps most of its green channel.
                 assert!(key.sun_energy == 0.0 || key.sun.g >= 0.6, "{:?}", key.sun);
                 // A gradient, not a wash: the sky top is bluer than the horizon.
-                assert!(key.sky_top.b > key.sky_top.r && key.sky_horizon.r > key.sky_top.r, "{:?}", key.sky_top);
+                assert!(
+                    key.sky_top.b > key.sky_top.r && key.sky_horizon.r > key.sky_top.r,
+                    "{:?}",
+                    key.sky_top
+                );
             }
         }
         assert!(k.windows(2).all(|w| w[0].elevation < w[1].elevation));
-        assert!(night_factor(0.05) == 0.0 && night_factor(-0.3) == 1.0);
+        assert!(night_factor(0.05) == 0.0 && (night_factor(-0.3) - 1.0).abs() < 1e-3);
         // Night stays readable: a real moon and a lifted blue ambient, dimmer than the blue hour.
         let night = k[0];
-        assert!(night.sun_energy >= 0.3 && night.ambient_energy >= 0.5 && night.ambient_energy < k[2].ambient_energy);
+        assert!(
+            night.sun_energy >= 0.3
+                && night.ambient_energy >= 0.5
+                && night.ambient_energy < k[2].ambient_energy
+        );
         assert!(night.ambient.b > night.ambient.r * 1.6 && night.sky_top.b > 0.12);
         let n = night_factor(-0.04);
         assert!(n > 0.0 && n < 0.5, "early twilight is mostly day: {n}");

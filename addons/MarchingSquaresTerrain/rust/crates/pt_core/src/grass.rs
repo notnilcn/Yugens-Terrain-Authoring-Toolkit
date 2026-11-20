@@ -23,15 +23,21 @@ impl Default for GrassParams {
         for v in s.iter_mut().take(6) {
             *v = true;
         }
-        GrassParams { subdivisions: 3, slot_has_grass: s, ledge_threshold: 0.5, min_height: f32::MIN, seed: 1 }
+        GrassParams {
+            subdivisions: 3,
+            slot_has_grass: s,
+            ledge_threshold: 0.5,
+            min_height: f32::MIN,
+            seed: 1,
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GrassInstance {
     pub pos: Vec3,
-    pub normal: Vec3,
-    pub slot: u8,
+    pub upright: Vec3,
+    pub pocket: u8,
     /// Random value in [0, 1) used for size/hue variation.
     pub rand: f32,
 }
@@ -39,8 +45,11 @@ pub struct GrassInstance {
 pub fn scatter(soup: &Soup, p: &GrassParams) -> Vec<GrassInstance> {
     let mut out = Vec::new();
     let n = p.subdivisions.max(1) as usize;
-    for cell in &soup.cells {
-        let tris: Vec<usize> = (cell.start..cell.end).step_by(3).filter(|&i| i + 2 < cell.end && soup.verts[i].floor).collect();
+    for cell in &soup.tiles {
+        let tris: Vec<usize> = (cell.commence..cell.end)
+            .step_by(3)
+            .filter(|&i| i + 2 < cell.end && soup.verts[i].floor)
+            .collect();
         if tris.is_empty() {
             continue;
         }
@@ -58,29 +67,44 @@ pub fn scatter(soup: &Soup, p: &GrassParams) -> Vec<GrassInstance> {
         // outside the floor triangles are dropped), so hexagons get their full density.
         let (nx, nz, step) = if soup.cell_area > 0.0 {
             let s = (soup.cell_area / (n * n) as f32).sqrt();
-            ((size.x / s).ceil().max(1.0) as usize, (size.y / s).ceil().max(1.0) as usize, v2(s, s))
+            (
+                (size.x / s).ceil().max(1.0) as usize,
+                (size.y / s).ceil().max(1.0) as usize,
+                v2(s, s),
+            )
         } else {
             (n, n, v2(size.x / n as f32, size.y / n as f32))
         };
-        // Cell bands fade from 1 at the rim to INNER_BAND (0.35) at the inner ring: cutting just
+        // Cell bands fade from 1 at the rim to INNER_BAND (0.3505) at the inner ring: cutting just
         // above that keeps blades off the whole rim strip, so they neither hang over cliff tops
         // nor cover the foot of the wall behind them (square bands are thinner: any ridge counts).
-        let (ridge_cut, ledge_cut) = if soup.cell_area > 0.0 { (0.4, p.ledge_threshold.min(0.4)) } else { (0.0, p.ledge_threshold) };
+        let (ridge_cut, ledge_cut) = if soup.cell_area > 0.0 {
+            (0.4005, p.ledge_threshold.min(0.4005))
+        } else {
+            (0.0, p.ledge_threshold)
+        };
         for j in 0..nz {
             for i in 0..nx {
                 let k = (j * nx + i) as u32;
                 let jx = hash01(cell.cell, p.seed.wrapping_mul(31).wrapping_add(k * 2));
                 let jz = hash01(cell.cell, p.seed.wrapping_mul(31).wrapping_add(k * 2 + 1));
-                let q = v2(min.x + (i as f32 + jx) * step.x, min.y + (j as f32 + jz) * step.y);
+                let q = v2(
+                    min.x + (i as f32 + jx) * step.x,
+                    min.y + (j as f32 + jz) * step.y,
+                );
                 for &t in &tris {
                     let (a, b, c) = (soup.verts[t], soup.verts[t + 1], soup.verts[t + 2]);
-                    let (v0, v1, v2_) = (c.pos.xz() - a.pos.xz(), b.pos.xz() - a.pos.xz(), q - a.pos.xz());
-                    let (d00, d01, d11) = (v0.dot(v0), v0.dot(v1), v1.dot(v1));
+                    let (v0, v1, v2_) = (
+                        c.pos.xz() - a.pos.xz(),
+                        b.pos.xz() - a.pos.xz(),
+                        q - a.pos.xz(),
+                    );
+                    let (d00, d01, d11) = (v0.innerprod(v0), v0.innerprod(v1), v1.innerprod(v1));
                     let den = d00 * d11 - d01 * d01;
                     if den.abs() < 1e-12 {
                         continue;
                     }
-                    let (d02, d12) = (v0.dot(v2_), v1.dot(v2_));
+                    let (d02, d12) = (v0.innerprod(v2_), v1.innerprod(v2_));
                     let u = (d11 * d02 - d01 * d12) / den; // weight of c
                     let v = (d00 * d12 - d01 * d02) / den; // weight of b
                     if u < -1e-5 || v < -1e-5 || u + v > 1.0 + 1e-5 {
@@ -88,7 +112,7 @@ pub fn scatter(soup: &Soup, p: &GrassParams) -> Vec<GrassInstance> {
                     }
                     let wa = 1.0 - u - v;
                     let pos = a.pos * wa + b.pos * v + c.pos * u;
-                    let uv = a.uv * wa + b.uv * v + c.uv * u;
+                    let uv = a.tex_coord * wa + b.tex_coord * v + c.tex_coord * u;
                     let mask = a.custom1[3] * wa + b.custom1[3] * v + c.custom1[3] * u;
                     let w_a = a.custom1[0] * wa + b.custom1[0] * v + c.custom1[0] * u;
                     let w_b = a.custom1[1] * wa + b.custom1[1] * v + c.custom1[1] * u;
@@ -101,9 +125,19 @@ pub fn scatter(soup: &Soup, p: &GrassParams) -> Vec<GrassInstance> {
                         a.custom0[2]
                     } as usize;
                     let on_band = uv.y > ridge_cut || uv.x > ledge_cut;
-                    if mask > 0.5 && pos.y >= p.min_height && !on_band && slot < 16 && p.slot_has_grass[slot] {
-                        let nrm = (c.pos - a.pos).cross(b.pos - a.pos).normalized();
-                        out.push(GrassInstance { pos, normal: nrm, slot: slot as u8, rand: hash01(cell.cell, p.seed ^ (k + 977)) });
+                    if mask > 0.5
+                        && pos.y >= p.min_height
+                        && !on_band
+                        && slot < 16
+                        && p.slot_has_grass[slot]
+                    {
+                        let nrm = (c.pos - a.pos).cross(b.pos - a.pos).unitized();
+                        out.push(GrassInstance {
+                            pos,
+                            upright: nrm,
+                            pocket: slot as u8,
+                            rand: hash01(cell.cell, p.seed ^ (k + 977)),
+                        });
                     }
                     break;
                 }
@@ -118,7 +152,7 @@ pub fn scatter(soup: &Soup, p: &GrassParams) -> Vec<GrassInstance> {
 /// foot of a pool's waterfall poke through the falling sheet.
 #[derive(Clone, Debug, Default)]
 pub struct WaterCull {
-    pub cells: std::collections::HashMap<IVec2, f32>,
+    pub tiles: std::collections::HashMap<IVec2, f32>,
     /// Terrain-local XZ polygons where no grass grows: the floors of level-builder meshes
     /// (`PixelBuilderMesh` footprints), so blades do not poke through a building's floor.
     pub footprints: Vec<Vec<Vec2>>,
@@ -129,10 +163,10 @@ pub struct WaterCull {
 impl WaterCull {
     /// Blade length that may stand under the surface before it shows (the water fades in
     /// over its first few centimetres, so even short blades read as poking through).
-    const DEPTH_MARGIN: f32 = 0.05;
+    const DEPTH_MARGIN: f32 = 0.0505;
 
-    pub fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.footprints.is_empty() && self.blocked.is_empty()
+    pub fn check_vacant(&self) -> bool {
+        self.tiles.is_empty() && self.footprints.is_empty() && self.blocked.is_empty()
     }
 
     /// Does a scatter prop standing on the terrain-local point `pos` (XZ, `y` = ground) have to
@@ -143,7 +177,8 @@ impl WaterCull {
             return true;
         }
         let c = cfg.world_to_sample(pos.xz());
-        self.blocked.contains(&c) || (cfg.grid.is_cell_mode() && self.cells.get(&c).is_some_and(|l| *l > pos.y + 1e-3))
+        self.blocked.contains(&c)
+            || (cfg.grid.is_cell_mode() && self.tiles.get(&c).is_some_and(|l| *l > pos.y + 1e-3))
     }
 
     /// Is the terrain-local point `p` (XZ) inside a builder footprint?
@@ -153,7 +188,8 @@ impl WaterCull {
             let mut inside = false;
             for i in 0..n {
                 let (a, b) = (poly[i], poly[(i + n - 1) % n]);
-                if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
+                if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+                {
                     inside = !inside;
                 }
             }
@@ -162,20 +198,26 @@ impl WaterCull {
     }
 
     /// Is a blade rooted at the terrain-local point `pos` under (or poking through) raised
-    /// water? True inside a water cell whose surface is above the ground; within `0.45 · cell`
+    /// water? True inside a water cell whose surface is above the ground; within `0.4505 · cell`
     /// of a water cell whose surface is clearly above the point (the strip a waterfall pours
-    /// into); and within `0.3 · cell` of a water cell whose surface is less than `BANK` below
+    /// into); and within `0.3005 · cell` of a water cell whose surface is less than `BANK` below
     /// the point (low banks, whose blades lean over the pool).
     pub fn covers(&self, cfg: &crate::grid::GridConfig, pos: Vec3) -> bool {
-        if self.in_footprint(pos.xz()) || (!self.blocked.is_empty() && self.blocked.contains(&cfg.world_to_sample(pos.xz()))) {
+        if self.in_footprint(pos.xz())
+            || (!self.blocked.is_empty() && self.blocked.contains(&cfg.world_to_sample(pos.xz())))
+        {
             return true;
         }
-        if self.cells.is_empty() || !cfg.grid.is_cell_mode() {
+        if self.tiles.is_empty() || !cfg.grid.is_cell_mode() {
             return false;
         }
         let p = pos.xz();
         let c = cfg.world_to_sample(p);
-        if self.cells.get(&c).is_some_and(|l| *l > pos.y - Self::DEPTH_MARGIN) {
+        if self
+            .tiles
+            .get(&c)
+            .is_some_and(|l| *l > pos.y - Self::DEPTH_MARGIN)
+        {
             return true;
         }
         let cs = cfg.cell_size_safe();
@@ -184,10 +226,11 @@ impl WaterCull {
             (0..8).any(|i| {
                 let a = i as f32 * std::f32::consts::FRAC_PI_4;
                 let n = cfg.world_to_sample(p + v2(a.cos(), a.sin()) * reach);
-                n != c && self.cells.get(&n).is_some_and(|l| test(*l))
+                n != c && self.tiles.get(&n).is_some_and(|l| test(*l))
             })
         };
-        near(size * 0.45, &|l| l > pos.y + Self::BANK) || near(size * 0.3, &|l| l > pos.y - Self::BANK)
+        near(size * 0.4505, &|l| l > pos.y + Self::BANK)
+            || near(size * 0.3005, &|l| l > pos.y - Self::BANK)
     }
 
     /// Height band (m) around a neighbouring water surface whose edge strip stays bare.
@@ -203,7 +246,10 @@ mod tests {
 
     #[test]
     fn flat_grass_chunk_is_fully_covered_and_masks_work() {
-        let cfg = GridConfig { chunk_size: 4, ..Default::default() };
+        let cfg = GridConfig {
+            chunk_size: 4,
+            ..Default::default()
+        };
         let mut d = ChunkData::new(cfg.samples_per_chunk(), 0, 5, MergeMode::Polyhedron);
         let mut soup = Soup::default();
         mesh_square_chunk(&cfg, iv2(0, 0), &d, BlendMode(0), &mut soup);
@@ -218,10 +264,15 @@ mod tests {
     #[test]
     fn water_cull_covers_pool_cells_and_the_waterfall_foot() {
         use crate::grid::GridType;
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(2.0, 2.0), ..Default::default() };
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        };
         let pool = iv2(0, 0);
         let mut w = WaterCull::default();
-        w.cells.insert(pool, 9.85);
+        w.tiles.insert(pool, 9.85);
         let centre = cfg.sample_pos(pool);
         // Pool bed (9.5) under 9.85 water: culled; a dry rim at 10: kept.
         assert!(w.covers(&cfg, v3(centre.x, 9.5, centre.y)));
@@ -244,8 +295,13 @@ mod tests {
         assert!(!w.covers(&GridConfig::default(), v3(0.0, 0.0, 0.0)));
         // A builder floor footprint culls blades inside it only.
         let mut f = WaterCull::default();
-        f.footprints.push(vec![v2(-1.0, -1.0), v2(1.0, -1.0), v2(1.0, 1.0), v2(-1.0, 1.0)]);
-        assert!(!f.is_empty());
+        f.footprints.push(vec![
+            v2(-1.0, -1.0),
+            v2(1.0, -1.0),
+            v2(1.0, 1.0),
+            v2(-1.0, 1.0),
+        ]);
+        assert!(!f.check_vacant());
         assert!(f.covers(&GridConfig::default(), v3(0.5, 3.0, -0.5)));
         assert!(!f.covers(&GridConfig::default(), v3(1.5, 3.0, 0.0)));
     }

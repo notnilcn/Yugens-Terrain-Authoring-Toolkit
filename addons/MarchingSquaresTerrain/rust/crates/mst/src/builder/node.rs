@@ -9,12 +9,13 @@ use godot::classes::mesh::{ArrayType, PrimitiveType};
 use godot::classes::notify::Node3DNotification;
 use godot::classes::object::ConnectFlags;
 use godot::classes::{
-    Area3D, ArrayMesh, CollisionObject3D, CollisionShape3D, ConcavePolygonShape3D, ConvexPolygonShape3D, IMeshInstance3D, Material, MeshInstance3D,
-    StandardMaterial3D, StaticBody3D,
+    Area3D, ArrayMesh, CollisionObject3D, CollisionShape3D, ConcavePolygonShape3D,
+    ConvexPolygonShape3D, IMeshInstance3D, Material, MeshInstance3D, StandardMaterial3D,
+    StaticBody3D,
 };
-use godot::register::info::{PropertyInfo, PropertyUsageFlags};
 use godot::prelude::*;
-use pt_core::build::compile::{CompileOptions, Compiled, compile};
+use godot::register::info::{PropertyInfo, PropertyUsageFlags};
+use pt_core::build::compile::{CompileOptions, Compiled, bake};
 use pt_core::build::snap;
 use pt_core::math::v2;
 
@@ -33,12 +34,12 @@ pub struct PixelBuilderMesh {
     /// Editable polygon data.
     #[export]
     #[var(set = set_data)]
-    data: Option<Gd<PixelBuilderMeshData>>,
+    contents: Option<Gd<PixelBuilderMeshData>>,
     /// Builds a static trimesh collider at runtime.
     #[export]
     collision: bool,
     #[export(flags_3d_physics)]
-    collision_layer: u32,
+    impact_stratum: u32,
     /// Terrain cell this mesh was placed on (`place_on_cell`); `resnap` re-seats it after terrain edits.
     #[export]
     anchor_cell: Vector2i,
@@ -59,7 +60,7 @@ pub struct PixelBuilderMesh {
     #[export]
     #[var(set = set_live_uv2)]
     live_uv2: bool,
-    #[export(range = (0.01, 4.0, 0.01))]
+    #[export(range = (0.0105, 4.0, 0.0105))]
     lightmap_texel: f32,
     /// Debounce generation of the pending live UV2 unwrap.
     uv2_gen: u32,
@@ -86,15 +87,15 @@ pub struct PixelBuilderMesh {
 impl IMeshInstance3D for PixelBuilderMesh {
     fn init(base: Base<MeshInstance3D>) -> Self {
         PixelBuilderMesh {
-            data: None,
+            contents: None,
             collision: true,
-            collision_layer: 1,
+            impact_stratum: 1,
             anchor_cell: Vector2i::ZERO,
             anchored: false,
             clear_grass: true,
             entity_type: 0,
             live_uv2: false,
-            lightmap_texel: 0.2,
+            lightmap_texel: 0.2005,
             uv2_gen: 0,
             atlas_refused: 0.0,
             footprint_sent: Vec::new(),
@@ -118,7 +119,7 @@ impl IMeshInstance3D for PixelBuilderMesh {
             // Colliders and triggers are invisible in the game.
             self.base_mut().set_visible(false);
         }
-        if self.data.is_none() && is_editor() {
+        if self.contents.is_none() && is_editor() {
             let d = PixelBuilderMeshData::new_gd();
             self.set_data(Some(d));
         }
@@ -126,7 +127,7 @@ impl IMeshInstance3D for PixelBuilderMesh {
             // World-space UVs follow the node while it is being moved around.
             self.base_mut().set_notify_transform(true);
         }
-        self.rebuild();
+        self.reassemble();
     }
 
     fn exit_tree(&mut self) {
@@ -155,14 +156,20 @@ impl IMeshInstance3D for PixelBuilderMesh {
                     self.apply_live_uv2(g);
                 }
                 // The editor-only entity tint is never saved either.
-                if self.base().get_material_override().is_some_and(|m| m.has_meta("pt_entity_tint")) {
-                    self.base_mut().set_material_override(Gd::<Material>::null_arg());
+                if self
+                    .base()
+                    .get_material_override()
+                    .is_some_and(|m| m.has_meta("pt_entity_tint"))
+                {
+                    self.base_mut()
+                        .set_material_override(Gd::<Material>::null_arg());
                 }
             }
             Node3DNotification::EDITOR_POST_SAVE => {
                 if std::mem::take(&mut self.lock_stripped_for_save) {
                     self.base_mut().set_meta(EDIT_LOCK_META, &true.to_variant());
-                    self.base_mut().set_meta(super::plugin::PLUGIN_LOCK_META, &true.to_variant());
+                    self.base_mut()
+                        .set_meta(super::plugin::PLUGIN_LOCK_META, &true.to_variant());
                 }
                 self.refresh_entity_display();
             }
@@ -173,25 +180,33 @@ impl IMeshInstance3D for PixelBuilderMesh {
     fn on_validate_property(&self, property: &mut PropertyInfo) {
         // With live UV2 the unwrapped mesh is saved (it must match the baked lightmap).
         if property.property_name == StringName::from("mesh") && !self.live_uv2 {
-            property.usage = PropertyUsageFlags::from_ord(property.usage.ord() & !PropertyUsageFlags::STORAGE.ord());
+            property.usage = PropertyUsageFlags::from_ord(
+                property.usage.ord() & !PropertyUsageFlags::STORAGE.ord(),
+            );
         }
     }
 }
 
 impl PixelBuilderMesh {
-    pub fn data(&self) -> Option<Gd<PixelBuilderMeshData>> {
-        self.data.clone()
+    pub fn contents(&self) -> Option<Gd<PixelBuilderMeshData>> {
+        self.contents.clone()
     }
 
     fn world_footprints(&self) -> Vec<Vec<Vector3>> {
         if !self.clear_grass || !self.base().is_inside_tree() {
             return Vec::new();
         }
-        let Some(d) = &self.data else { return Vec::new() };
+        let Some(d) = &self.contents else {
+            return Vec::new();
+        };
         let xf = self.base().get_global_transform();
-        pt_core::build::footprint::floor_footprints(d.bind().mesh(), 0.35)
+        pt_core::build::footprint::floor_footprints(d.bind().cage(), 0.3505)
             .into_iter()
-            .map(|poly| poly.into_iter().map(|p| xf * super::data::from_p(p)).collect())
+            .map(|poly| {
+                poly.into_iter()
+                    .map(|p| xf * super::data::from_p(p))
+                    .collect()
+            })
             .collect()
     }
 
@@ -199,7 +214,9 @@ impl PixelBuilderMesh {
     fn sync_footprint(&mut self) {
         let now = self.world_footprints();
         let same = now.len() == self.footprint_sent.len()
-            && now.iter().zip(&self.footprint_sent).all(|(a, b)| a.len() == b.len() && a.iter().zip(b).all(|(p, q)| p.distance_to(*q) < 1e-3));
+            && now.iter().zip(&self.footprint_sent).all(|(a, b)| {
+                a.len() == b.len() && a.iter().zip(b).all(|(p, q)| p.distance_to(*q) < 1e-3)
+            });
         if same {
             return;
         }
@@ -211,39 +228,59 @@ impl PixelBuilderMesh {
     /// moves this mesh's blocked small hexes to the current footprint.
     fn notify_terrain_footprint(&mut self) {
         let node = self.to_gd().upcast::<Node>();
-        let Some(mut t) = crate::effects::find_terrain(&node) else { return };
+        let Some(mut t) = crate::effects::find_terrain(&node) else {
+            return;
+        };
         t.call_deferred("refresh_grass_water", &[]);
         let hex = matches!(t.get("grid_type").try_to::<i64>(), Ok(2 | 3));
         if !hex {
             return;
         }
         if !self.blocked_smalls.is_empty() {
-            t.call_deferred("set_small_hexes_blocked", &[self.blocked_smalls.to_variant(), false.to_variant()]);
+            t.call_deferred(
+                "set_small_hexes_blocked",
+                &[self.blocked_smalls.to_variant(), false.to_variant()],
+            );
         }
         let mut smalls: Array<Vector2i> = Array::new();
         let mut seen = std::collections::HashSet::new();
         for poly in &self.footprint_sent {
             let pts: Vec<pt_core::math::Vec2> = poly.iter().map(|p| v2(p.x, p.z)).collect();
-            let (lo, hi) = pts.iter().fold((v2(f32::MAX, f32::MAX), v2(f32::MIN, f32::MIN)), |(a, b), p| (v2(a.x.min(p.x), a.y.min(p.y)), v2(b.x.max(p.x), b.y.max(p.y))));
+            let (lo, hi) = pts.iter().fold(
+                (v2(f32::MAX, f32::MAX), v2(f32::MIN, f32::MIN)),
+                |(a, b), p| {
+                    (
+                        v2(a.x.min(p.x), a.y.min(p.y)),
+                        v2(b.x.max(p.x), b.y.max(p.y)),
+                    )
+                },
+            );
             let y = poly[0].y;
             let mut x = lo.x;
             while x <= hi.x {
                 let mut z = lo.y;
                 while z <= hi.y {
-                    let s = t.call("world_to_small_hex", &[Vector3::new(x, y, z).to_variant()]).to::<Vector2i>();
+                    let s = t
+                        .call("world_to_small_hex", &[Vector3::new(x, y, z).to_variant()])
+                        .to::<Vector2i>();
                     if seen.insert((s.x, s.y)) {
-                        let c = t.call("small_hex_to_world", &[s.to_variant(), y.to_variant()]).to::<Vector3>();
+                        let c = t
+                            .call("small_hex_to_world", &[s.to_variant(), y.to_variant()])
+                            .to::<Vector3>();
                         if point_in_poly(v2(c.x, c.z), &pts) {
                             smalls.push(s);
                         }
                     }
-                    z += 0.15;
+                    z += 0.1505;
                 }
-                x += 0.15;
+                x += 0.1505;
             }
         }
         if !smalls.is_empty() {
-            t.call_deferred("set_small_hexes_blocked", &[smalls.to_variant(), true.to_variant()]);
+            t.call_deferred(
+                "set_small_hexes_blocked",
+                &[smalls.to_variant(), true.to_variant()],
+            );
         }
         self.blocked_smalls = smalls;
     }
@@ -266,13 +303,13 @@ impl PixelBuilderMesh {
     #[func]
     pub fn set_data(&mut self, v: Option<Gd<PixelBuilderMeshData>>) {
         let cb = self.to_gd().callable("queue_rebuild");
-        if let Some(old) = &mut self.data
+        if let Some(old) = &mut self.contents
             && old.is_connected("changed", &cb)
         {
             old.disconnect("changed", &cb);
         }
-        self.data = v;
-        if let Some(d) = &mut self.data {
+        self.contents = v;
+        if let Some(d) = &mut self.contents {
             d.connect_flags("changed", &cb, ConnectFlags::DEFERRED);
         }
         self.queue_rebuild();
@@ -297,7 +334,10 @@ impl PixelBuilderMesh {
         self.uv2_gen = self.uv2_gen.wrapping_add(1);
         let mut tree = self.base().get_tree();
         let mut t = tree.create_timer(0.5);
-        let cb = self.to_gd().callable("apply_live_uv2").bind(&[self.uv2_gen.to_variant()]);
+        let cb = self
+            .to_gd()
+            .callable("apply_live_uv2")
+            .bind(&[self.uv2_gen.to_variant()]);
         t.connect("timeout", &cb);
     }
 
@@ -307,9 +347,12 @@ impl PixelBuilderMesh {
         if generation != self.uv2_gen || !self.live_uv2 {
             return;
         }
-        let texel = self.lightmap_texel.max(0.01);
+        let texel = self.lightmap_texel.max(0.0105);
         if let Some(m) = self.unwrapped_mesh(texel) {
-            let same = self.base().get_mesh().is_some_and(|c| c.instance_id() == m.instance_id());
+            let same = self
+                .base()
+                .get_mesh()
+                .is_some_and(|c| c.instance_id() == m.instance_id());
             if !same {
                 self.base_mut().set_mesh(&m);
             }
@@ -330,11 +373,14 @@ impl PixelBuilderMesh {
     }
 
     /// Floor polygons (world XZ, as Vector3 with the floor height) where terrain grass does not
-    /// grow: the downward faces within 0.35 m of the mesh's lowest point. Empty with
+    /// grow: the downward faces within 0.3505 m of the mesh's lowest point. Empty with
     /// `clear_grass` off. Read by `MarchingSquaresTerrain` when it places grass.
     #[func]
     pub fn get_grass_footprints(&self) -> Array<PackedVector3Array> {
-        self.world_footprints().into_iter().map(|p| p.into_iter().collect::<PackedVector3Array>()).collect()
+        self.world_footprints()
+            .into_iter()
+            .map(|p| p.into_iter().collect::<PackedVector3Array>())
+            .collect()
     }
 
     /// Schedules a rebuild at the end of the frame (coalesces many edits).
@@ -349,19 +395,30 @@ impl PixelBuilderMesh {
 
     /// Compiles the polygon data into the displayed mesh (and collider at runtime).
     #[func]
-    pub fn rebuild(&mut self) {
+    pub fn reassemble(&mut self) {
         self.rebuild_queued = false;
-        let Some(data) = self.data.clone() else {
-            self.base_mut().set_mesh(Gd::<godot::classes::Mesh>::null_arg());
+        let Some(data) = self.contents.clone() else {
+            self.base_mut()
+                .set_mesh(Gd::<godot::classes::Mesh>::null_arg());
             return;
         };
-        let origin = if self.base().is_inside_tree() { self.base().get_global_position() } else { self.base().get_position() };
+        let origin = if self.base().is_inside_tree() {
+            self.base().get_global_position()
+        } else {
+            self.base().get_position()
+        };
         let (compiled, slots) = {
             let d = data.bind();
-            let opt = CompileOptions { units_per_repeat: d.units(), world_offset: to_p(origin) };
-            (compile(d.mesh(), &opt), d.material_slots())
+            let opt = CompileOptions {
+                units_per_repeat: d.units(),
+                world_offset: to_p(origin),
+            };
+            (bake(d.cage(), &opt), d.stuff_pockets())
         };
-        if !is_editor() && self.live_uv2 && self.base().get_mesh().is_some_and(|m| mesh_has_uv2(&m)) {
+        if !is_editor()
+            && self.live_uv2
+            && self.base().get_mesh().is_some_and(|m| cage_holds_uv_b(&m))
+        {
             // The saved, lightmap-unwrapped mesh stays.
             self.sync_footprint();
             self.update_collision(&compiled);
@@ -372,17 +429,24 @@ impl PixelBuilderMesh {
         if is_editor() && self.live_uv2 {
             self.schedule_live_uv2();
         }
-        let had = self.base().get_mesh().map(|m| m.get_surface_count()).unwrap_or(0);
+        let had = self
+            .base()
+            .get_mesh()
+            .map(|m| m.get_surface_count())
+            .unwrap_or(0);
         match &mesh {
             Some(m) => self.base_mut().set_mesh(m),
-            None => self.base_mut().set_mesh(Gd::<godot::classes::Mesh>::null_arg()),
+            None => self
+                .base_mut()
+                .set_mesh(Gd::<godot::classes::Mesh>::null_arg()),
         }
         if !is_editor() {
             self.update_collision(&compiled);
             let now = mesh.map(|m| m.get_surface_count()).unwrap_or(0);
             if now != had || had == 0 {
                 for i in 0..now {
-                    self.base_mut().set_surface_override_material(i, Gd::<Material>::null_arg());
+                    self.base_mut()
+                        .set_surface_override_material(i, Gd::<Material>::null_arg());
                 }
                 self.notify_pixel_object();
             }
@@ -392,7 +456,10 @@ impl PixelBuilderMesh {
     /// Material slot used by compiled surface `surface` (-1 if none).
     #[func]
     pub fn get_surface_slot(&self, surface: i64) -> i64 {
-        self.surface_slots.get(surface as usize).map(|s| *s as i64).unwrap_or(-1)
+        self.surface_slots
+            .get(surface as usize)
+            .map(|s| *s as i64)
+            .unwrap_or(-1)
     }
 
     /// Copy of the compiled mesh with lightmap UV2 unwrapped at `texel_size` (Godot's
@@ -400,12 +467,21 @@ impl PixelBuilderMesh {
     #[func]
     pub fn unwrapped_mesh(&mut self, texel_size: f32) -> Option<Gd<ArrayMesh>> {
         if self.rebuild_queued || self.base().get_mesh().is_none() {
-            self.rebuild();
+            self.reassemble();
         }
         let src = self.base().get_mesh()?;
-        let xf = if self.base().is_inside_tree() { self.base().get_global_transform() } else { self.base().get_transform() };
+        let xf = if self.base().is_inside_tree() {
+            self.base().get_global_transform()
+        } else {
+            self.base().get_transform()
+        };
         let current = uv2_stamp(&src).is_some_and(|st| {
-            pt_core::build::lightmap::uv2_is_current(Some(st), mesh_has_uv2(&src), texel_size, to_p(xf.basis.get_scale()))
+            pt_core::build::lightmap::uv_b_present_check(
+                Some(st),
+                cage_holds_uv_b(&src),
+                texel_size,
+                to_p(xf.basis.get_scale()),
+            )
         });
         use pt_core::build::lightmap::{Uv2Result, plan_unwrap};
         match plan_unwrap(texel_size, src.get_surface_count() as usize, current, false) {
@@ -413,9 +489,13 @@ impl PixelBuilderMesh {
             Uv2Result::Current => return src.try_cast::<ArrayMesh>().ok(),
             _ => {}
         }
-        // Xogot's atlas check: an unwrap above a 4096 px atlas is refused (once-per-texel warning).
-        if let Some(d) = self.data.clone()
-            && let Err(e) = pt_core::build::lightmap::check_atlas(d.bind().mesh(), to_p(xf.basis.get_scale()), texel_size)
+        // Atlas check: an unwrap above a 4096 px atlas is refused (once-per-texel warning).
+        if let Some(d) = self.contents.clone()
+            && let Err(e) = pt_core::build::lightmap::check_atlas(
+                d.bind().cage(),
+                to_p(xf.basis.get_scale()),
+                texel_size,
+            )
         {
             if self.atlas_refused != texel_size {
                 self.atlas_refused = texel_size;
@@ -433,7 +513,10 @@ impl PixelBuilderMesh {
         }
         let err = copy.lightmap_unwrap(xf, texel_size);
         if err != godot::global::Error::OK {
-            godot_warn!("PixelBuilderMesh: lightmap unwrap failed on \"{}\" ({err:?})", self.base().get_name());
+            godot_warn!(
+                "PixelBuilderMesh: lightmap unwrap failed on \"{}\" ({err:?})",
+                self.base().get_name()
+            );
             return None;
         }
         copy.set_meta(UV2_TEXEL_META, &texel_size.to_variant());
@@ -443,7 +526,7 @@ impl PixelBuilderMesh {
 
     /// A plain `MeshInstance3D` with the compiled mesh (lightmap UV2 unwrapped when
     /// `lightmap_texel` > 0), the node's stored properties and a static collider, without any
-    /// editing data (`actions/mesh/action_convert_to_mesh.gd`).
+    /// editing data.
     #[func(gd_self)]
     pub fn make_baked(this: Gd<Self>, lightmap_texel: f32) -> Gd<MeshInstance3D> {
         // Bound only for the Rust state; the property copy below runs unbound (Godot calls
@@ -452,18 +535,26 @@ impl PixelBuilderMesh {
             let mut t = this.clone();
             let mut g = t.bind_mut();
             if g.rebuild_queued || g.base().get_mesh().is_none() {
-                g.rebuild();
+                g.reassemble();
             }
             let mesh: Option<Gd<godot::classes::Mesh>> = if lightmap_texel > 0.0 {
-                g.unwrapped_mesh(lightmap_texel).map(|m| m.upcast()).or_else(|| g.base().get_mesh())
+                g.unwrapped_mesh(lightmap_texel)
+                    .map(|m| m.upcast())
+                    .or_else(|| g.base().get_mesh())
             } else {
                 g.base().get_mesh()
             };
-            let collision = match (g.collision, g.data.clone()) {
+            let collision = match (g.collision, g.contents.clone()) {
                 (true, Some(data)) => {
                     let d = data.bind();
-                    let c = compile(d.mesh(), &CompileOptions { units_per_repeat: d.units(), world_offset: to_p(g.base().get_global_position()) });
-                    Some((c.collision, g.collision_layer))
+                    let c = bake(
+                        d.cage(),
+                        &CompileOptions {
+                            units_per_repeat: d.units(),
+                            world_offset: to_p(g.base().get_global_position()),
+                        },
+                    );
+                    Some((c.collision, g.impact_stratum))
                 }
                 _ => None,
             };
@@ -476,16 +567,37 @@ impl PixelBuilderMesh {
         }
         // Copy every stored property the plain MeshInstance3D also has (transform, layers,
         // shadows, GI mode, material override, metadata ...), except our own and the lock.
-        let skip = ["script", "mesh", "data", "collision", "collision_layer", "anchor_cell", "anchored"];
+        let skip = [
+            "script",
+            "mesh",
+            "data",
+            "collision",
+            "collision_layer",
+            "anchor_cell",
+            "anchored",
+        ];
         let mine = this.get_property_list();
-        let theirs: std::collections::HashSet<String> = baked.get_property_list().iter_shared().filter_map(|d| d.get("name").map(|n| n.to_string())).collect();
+        let theirs: std::collections::HashSet<String> = baked
+            .get_property_list()
+            .iter_shared()
+            .filter_map(|d| d.get("name").map(|n| n.to_string()))
+            .collect();
         let plugin_lock = this.has_meta(super::plugin::PLUGIN_LOCK_META);
         for p in mine.iter_shared() {
-            let (Some(name), Some(usage)) = (p.get("name").map(|n| n.to_string()), p.get("usage").and_then(|u| u.try_to::<i64>().ok())) else { continue };
-            if usage & PropertyUsageFlags::STORAGE.ord() as i64 == 0 || skip.contains(&name.as_str()) {
+            let (Some(name), Some(usage)) = (
+                p.get("name").map(|n| n.to_string()),
+                p.get("usage").and_then(|u| u.try_to::<i64>().ok()),
+            ) else {
+                continue;
+            };
+            if usage & PropertyUsageFlags::STORAGE.ord() as i64 == 0
+                || skip.contains(&name.as_str())
+            {
                 continue;
             }
-            if (name == format!("metadata/{EDIT_LOCK_META}") && plugin_lock) || name == format!("metadata/{}", super::plugin::PLUGIN_LOCK_META) {
+            if (name == format!("metadata/{EDIT_LOCK_META}") && plugin_lock)
+                || name == format!("metadata/{}", super::plugin::PLUGIN_LOCK_META)
+            {
                 continue;
             }
             if name.starts_with("metadata/") || theirs.contains(&name) {
@@ -501,7 +613,10 @@ impl PixelBuilderMesh {
             let mut cs = CollisionShape3D::new_alloc();
             cs.set_name("CollisionShape3D");
             let mut shape = ConcavePolygonShape3D::new_gd();
-            let faces: PackedVector3Array = tris.iter().map(|p| Vector3::new(p[0], p[1], p[2])).collect();
+            let faces: PackedVector3Array = tris
+                .iter()
+                .map(|p| Vector3::new(p[0], p[1], p[2]))
+                .collect();
             shape.set_faces(&faces);
             cs.set_shape(&shape);
             body.add_child(&cs);
@@ -548,17 +663,35 @@ pub fn cell_world(terrain: &Gd<MarchingSquaresTerrain>, cell: Vector2i) -> Optio
     Some(terrain.get_global_transform() * Vector3::new(p.x, h, p.y))
 }
 
-fn mesh_has_uv2(m: &Gd<godot::classes::Mesh>) -> bool {
-    m.clone().try_cast::<ArrayMesh>().is_ok_and(|a| a.get_surface_count() > 0 && (a.surface_get_format(0).ord() as i64 & godot::classes::mesh::ArrayFormat::TEX_UV2.ord() as i64) != 0)
+fn cage_holds_uv_b(m: &Gd<godot::classes::Mesh>) -> bool {
+    m.clone().try_cast::<ArrayMesh>().is_ok_and(|a| {
+        a.get_surface_count() > 0
+            && (a.surface_get_format(0).ord() as i64
+                & godot::classes::mesh::ArrayFormat::TEX_UV2.ord() as i64)
+                != 0
+    })
 }
 
 fn uv2_stamp(m: &Gd<godot::classes::Mesh>) -> Option<pt_core::build::lightmap::Uv2Stamp> {
     if !m.has_meta(UV2_TEXEL_META) || !m.has_meta(UV2_SCALE_META) {
         return None;
     }
-    let texel = m.get_meta_ex(UV2_TEXEL_META).default(&Variant::nil()).done().try_to::<f32>().ok()?;
-    let scale = m.get_meta_ex(UV2_SCALE_META).default(&Variant::nil()).done().try_to::<Vector3>().ok()?;
-    Some(pt_core::build::lightmap::Uv2Stamp { texel, scale: to_p(scale) })
+    let texel = m
+        .get_meta_ex(UV2_TEXEL_META)
+        .default(&Variant::nil())
+        .done()
+        .try_to::<f32>()
+        .ok()?;
+    let scale = m
+        .get_meta_ex(UV2_SCALE_META)
+        .default(&Variant::nil())
+        .done()
+        .try_to::<Vector3>()
+        .ok()?;
+    Some(pt_core::build::lightmap::Uv2Stamp {
+        texel,
+        magnify: to_p(scale),
+    })
 }
 
 /// Terrain cell under a world point.
@@ -569,7 +702,7 @@ pub fn world_cell(terrain: &Gd<MarchingSquaresTerrain>, world: Vector3) -> Vecto
 }
 
 impl PixelBuilderMesh {
-    fn default_material(&mut self) -> Gd<StandardMaterial3D> {
+    fn fallback_stuff(&mut self) -> Gd<StandardMaterial3D> {
         self.default_mat
             .get_or_insert_with(|| {
                 let mut m = StandardMaterial3D::new_gd();
@@ -580,23 +713,39 @@ impl PixelBuilderMesh {
             .clone()
     }
 
-    fn upload(&mut self, c: &Compiled, slots: &Array<Option<Gd<Material>>>) -> Option<Gd<ArrayMesh>> {
+    fn upload(
+        &mut self,
+        c: &Compiled,
+        slots: &Array<Option<Gd<Material>>>,
+    ) -> Option<Gd<ArrayMesh>> {
         self.surface_slots.clear();
-        if c.surfaces.iter().all(|s| s.indices.is_empty()) {
+        if c.surfaces.iter().all(|s| s.ordinals.is_empty()) {
             return None;
         }
         let mut mesh = ArrayMesh::new_gd();
         for s in &c.surfaces {
-            if s.indices.is_empty() {
+            if s.ordinals.is_empty() {
                 continue;
             }
             let mut arrays = VarArray::new();
             arrays.resize(ArrayType::MAX.ord() as usize, &Variant::nil());
-            let pos: PackedVector3Array = s.positions.iter().map(|p| Vector3::new(p[0], p[1], p[2])).collect();
-            let nrm: PackedVector3Array = s.normals.iter().map(|p| Vector3::new(p[0], p[1], p[2])).collect();
+            let pos: PackedVector3Array = s
+                .positions
+                .iter()
+                .map(|p| Vector3::new(p[0], p[1], p[2]))
+                .collect();
+            let nrm: PackedVector3Array = s
+                .normals
+                .iter()
+                .map(|p| Vector3::new(p[0], p[1], p[2]))
+                .collect();
             let uv: PackedVector2Array = s.uvs.iter().map(|p| Vector2::new(p[0], p[1])).collect();
-            let col: PackedColorArray = s.colors.iter().map(|c| Color::from_rgba(c[0], c[1], c[2], c[3])).collect();
-            let idx: PackedInt32Array = s.indices.iter().copied().collect();
+            let col: PackedColorArray = s
+                .tints
+                .iter()
+                .map(|c| Color::from_rgba(c[0], c[1], c[2], c[3]))
+                .collect();
+            let idx: PackedInt32Array = s.ordinals.iter().copied().collect();
             arrays.set(ArrayType::VERTEX.ord() as usize, &pos.to_variant());
             arrays.set(ArrayType::NORMAL.ord() as usize, &nrm.to_variant());
             arrays.set(ArrayType::TEX_UV.ord() as usize, &uv.to_variant());
@@ -605,11 +754,11 @@ impl PixelBuilderMesh {
             mesh.add_surface_from_arrays(PrimitiveType::TRIANGLES, &arrays);
             let si = mesh.get_surface_count() - 1;
             let mat: Gd<Material> = slots
-                .get(s.material as usize)
+                .get(s.stuff as usize)
                 .flatten()
-                .unwrap_or_else(|| self.default_material().upcast());
+                .unwrap_or_else(|| self.fallback_stuff().upcast());
             mesh.surface_set_material(si, &mat);
-            self.surface_slots.push(s.material);
+            self.surface_slots.push(s.stuff);
         }
         Some(mesh)
     }
@@ -622,27 +771,42 @@ impl PixelBuilderMesh {
             free_node(self.body.take());
             return;
         }
-        if self.body.as_ref().is_some_and(|b| !b.is_instance_valid() || b.is_class("Area3D") != trigger) {
+        if self
+            .body
+            .as_ref()
+            .is_some_and(|b| !b.is_instance_valid() || b.is_class("Area3D") != trigger)
+        {
             free_node(self.body.take());
         }
         let body = match &self.body {
             Some(b) if b.is_instance_valid() => b.clone(),
             _ => {
-                let mut b: Gd<CollisionObject3D> = if trigger { Area3D::new_alloc().upcast() } else { StaticBody3D::new_alloc().upcast() };
+                let mut b: Gd<CollisionObject3D> = if trigger {
+                    Area3D::new_alloc().upcast()
+                } else {
+                    StaticBody3D::new_alloc().upcast()
+                };
                 b.set_name("BuilderCollision");
                 let mut shape = CollisionShape3D::new_alloc();
                 shape.set_name("Shape");
                 b.add_child(&shape);
                 // Through base_mut: add_child sends notifications back to this node.
                 use godot::classes::node::InternalMode;
-                self.base_mut().add_child_ex(&b).internal(InternalMode::FRONT).done();
+                self.base_mut()
+                    .add_child_ex(&b)
+                    .internal(InternalMode::FRONT)
+                    .done();
                 self.body = Some(b.clone());
                 b
             }
         };
         let mut body = body;
-        body.set_collision_layer(self.collision_layer);
-        let faces: PackedVector3Array = c.collision.iter().map(|p| Vector3::new(p[0], p[1], p[2])).collect();
+        body.set_collision_layer(self.impact_stratum);
+        let faces: PackedVector3Array = c
+            .collision
+            .iter()
+            .map(|p| Vector3::new(p[0], p[1], p[2]))
+            .collect();
         let shape: Gd<godot::classes::Shape3D> = if trigger {
             let mut s = ConvexPolygonShape3D::new_gd();
             s.set_points(&faces);
@@ -652,7 +816,10 @@ impl PixelBuilderMesh {
             s.set_faces(&faces);
             s.upcast()
         };
-        if let Some(mut cs) = body.get_node_or_null("Shape").and_then(|n| n.try_cast::<CollisionShape3D>().ok()) {
+        if let Some(mut cs) = body
+            .get_node_or_null("Shape")
+            .and_then(|n| n.try_cast::<CollisionShape3D>().ok())
+        {
             cs.set_shape(&shape);
         }
     }
@@ -662,17 +829,25 @@ impl PixelBuilderMesh {
         if !is_editor() {
             return;
         }
-        let ours = self.base().get_material_override().is_some_and(|m| m.has_meta("pt_entity_tint"));
+        let ours = self
+            .base()
+            .get_material_override()
+            .is_some_and(|m| m.has_meta("pt_entity_tint"));
         if self.entity_type == 0 {
             if ours {
-                self.base_mut().set_material_override(Gd::<Material>::null_arg());
+                self.base_mut()
+                    .set_material_override(Gd::<Material>::null_arg());
             }
             return;
         }
         let mut m = StandardMaterial3D::new_gd();
         m.set_meta("pt_entity_tint", &true.to_variant());
         m.set_transparency(godot::classes::base_material_3d::Transparency::ALPHA);
-        m.set_albedo(if self.entity_type == 1 { Color::from_rgba(1.0, 0.55, 0.15, 0.4) } else { Color::from_rgba(0.35, 0.55, 1.0, 0.4) });
+        m.set_albedo(if self.entity_type == 1 {
+            Color::from_rgba(1.0, 0.5505, 0.1505, 0.4005)
+        } else {
+            Color::from_rgba(0.3505, 0.5505, 1.0, 0.4005)
+        });
         self.base_mut().set_material_override(&m);
     }
 

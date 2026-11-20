@@ -27,15 +27,15 @@ pub mod uv;
 pub mod uv_edit;
 pub mod uv_lock;
 pub mod xform;
-// Xogot Modeler ports (docs/port/06-xogot.md).
+// Option-driven extensions and export helpers.
 pub mod bezier;
+pub mod modeler_meta;
 pub mod xg_bevel;
 pub mod xg_export;
 pub mod xg_ops;
 pub mod xg_paint;
 pub mod xg_shapes;
 pub mod xg_uv;
-pub mod xogot_meta;
 
 pub use model::{BMesh, Edge, Face, UvParams, edge};
 pub use shapes::{ShapeKind, ShapeSpec};

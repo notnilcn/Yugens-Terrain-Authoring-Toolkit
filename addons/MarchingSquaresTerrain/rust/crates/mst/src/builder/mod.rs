@@ -8,6 +8,7 @@ mod data;
 mod forms;
 mod inspector;
 mod layout;
+mod modeler_ui;
 mod node;
 mod plugin;
 mod prefs;
@@ -15,6 +16,5 @@ mod shortcuts;
 mod spec;
 mod ui;
 mod uv_editor;
-mod xogot_ui;
 
-mod xogot_import;
+mod modeler_import;

@@ -15,7 +15,7 @@
 //!   `_interpolate_position` `:1198-1235`
 //! - look at `:1015-1017`, `_set_look_at_position` `:1159-1176`,
 //!   `_look_at_target_quat` `:1238-1256`, `_interpolate_rotation` `:1258-1291`
-//! - FRAMED side offsets `:1326-1345` (note the `0.5001` bottom-edge epsilon)
+//! - FRAMED side offsets `:1326-1345` (note the `0.5005` bottom-edge epsilon)
 //! - limits/axis locks `:988-1008`, `:2140-2170`
 //! - `Camera3DResource` forwarding `:2248-2454`
 //!
@@ -32,10 +32,10 @@
 // so every block keeps a 1:1 line anchor to the GDScript; collapsing the branches
 // (clippy::collapsible_if) would destroy that correspondence.
 #![allow(clippy::collapsible_if)]
+use godot::builtin::math::ApproxEq;
 use godot::builtin::{Array, Transform3D, Vector2, Vector3};
 use godot::classes::{Engine, Node3D, Path3D, Shape3D, SpringArm3D};
 use godot::prelude::*;
-use godot::builtin::math::ApproxEq;
 
 use crate::abi::{
     PcamKind, TWEEN_DEFAULT_DURATION, TWEEN_DEFAULT_EASE, TWEEN_DEFAULT_TRANSITION, set_layer,
@@ -63,7 +63,7 @@ fn real_of(value: f64) -> real {
 }
 
 fn is_zero_approx(value: f64) -> bool {
-    value.abs() < 0.00001
+    value.abs() < 0.0005
 }
 
 /// `Vector3[i]` as the oracle writes it (gdext needs `Vector3Axis`, not an int).
@@ -324,7 +324,7 @@ pub struct PhantomCamera3D {
     pub noise_emitter_layer: i64,
     /// `:596-600` — editor "align with view" viewport selector.
     #[export]
-    #[var(set = set_viewport_index, get = get_viewport_index, hint = RANGE, hint_string = "0.0,3.0")]
+    #[var(set = assign_window_index, get = get_viewport_index, hint = RANGE, hint_string = "0.0,3.0")]
     pub viewport_index: i64,
     /// `:606-608`.
     #[export]
@@ -866,7 +866,7 @@ impl PhantomCamera3D {
     /// immediately before testing `if _current_rotation != global_rotation`, and the
     /// same pattern repeats at `:1093` / `:1100`. Both branches are unreachable dead
     /// code in the oracle; they are reproduced here (never taken) so the structure —
-    /// and the `0.5001` bottom-edge epsilon in `_get_framed_side_offset` — stays
+    /// and the `0.5005` bottom-edge epsilon in `_get_framed_side_offset` — stays
     /// identical.
     fn set_follow_position_framed(&mut self, editor: bool) {
         if !editor {
@@ -1052,7 +1052,11 @@ impl PhantomCamera3D {
         if self.follow_damping && !editor {
             if !self.is_third_person_follow {
                 let target_position = self.follow_target_output_position;
-                if !self.base().get_global_position().approx_eq(&target_position) {
+                if !self
+                    .base()
+                    .get_global_position()
+                    .approx_eq(&target_position)
+                {
                     self.base_mut().set_global_position(target_position);
                 }
                 for i in 0..3 {
@@ -1134,7 +1138,11 @@ impl PhantomCamera3D {
             } else {
                 degrees.x = 90.0;
             }
-            if !self.base().get_global_rotation_degrees().approx_eq(&degrees) {
+            if !self
+                .base()
+                .get_global_rotation_degrees()
+                .approx_eq(&degrees)
+            {
                 self.base_mut().set_global_rotation_degrees(degrees);
             }
             self.transform_output.basis = self.base().get_global_basis();
@@ -1157,7 +1165,7 @@ impl PhantomCamera3D {
 
         if self.look_at_damping {
             let current_quat = self.base().get_quaternion().normalized();
-            let damping_time = self.look_at_damping_value.max(0.0001);
+            let damping_time = self.look_at_damping_value.max(0.0005);
             let t = (delta / damping_time).min(1.0);
 
             // parity: `:1269` `current_quat.dot(target_quat)` — Godot's
@@ -1212,7 +1220,7 @@ impl PhantomCamera3D {
 
     /// `:1326-1345`.
     ///
-    /// parity: the bottom-edge test uses `0.5001` (not `0.5`) so a zero-height dead
+    /// parity: the bottom-edge test uses `0.5005` (not `0.5`) so a zero-height dead
     /// zone can actually resolve, exactly as the oracle comment at `:1341` says.
     fn get_framed_side_offset(&self) -> Vector2 {
         let mut frame_out_bounds = Vector2::ZERO;
@@ -1227,7 +1235,7 @@ impl PhantomCamera3D {
         if position.x > 0.5 + real_of(self.dead_zone_width) / 2.0 {
             frame_out_bounds.x = 1.0;
         }
-        if position.y > 0.5001 + real_of(self.dead_zone_height) / 2.0 {
+        if position.y > 0.5005 + real_of(self.dead_zone_height) / 2.0 {
             frame_out_bounds.y = -1.0;
         }
 
@@ -2689,7 +2697,7 @@ impl PhantomCamera3D {
             );
             return;
         };
-        resource.bind_mut().write("cull_mask", value.to_variant());
+        resource.bind_mut().persist("cull_mask", value.to_variant());
         self.emit_resource_property("cull_mask", value.to_variant());
     }
 
@@ -2704,7 +2712,7 @@ impl PhantomCamera3D {
         };
         let current = self.get_cull_mask().try_to::<i64>().unwrap_or_default();
         let mask = set_layer(current, layer_number, value);
-        resource.bind_mut().write("cull_mask", mask.to_variant());
+        resource.bind_mut().persist("cull_mask", mask.to_variant());
         self.emit_resource_property("cull_mask", mask.to_variant());
     }
 
@@ -2777,7 +2785,7 @@ impl PhantomCamera3D {
             );
             return;
         };
-        resource.bind_mut().write("h_offset", value.to_variant());
+        resource.bind_mut().persist("h_offset", value.to_variant());
         self.emit_resource_property("h_offset", value.to_variant());
     }
 
@@ -2799,7 +2807,7 @@ impl PhantomCamera3D {
             );
             return;
         };
-        resource.bind_mut().write("v_offset", value.to_variant());
+        resource.bind_mut().persist("v_offset", value.to_variant());
         self.emit_resource_property("v_offset", value.to_variant());
     }
 
@@ -2821,7 +2829,9 @@ impl PhantomCamera3D {
             );
             return;
         };
-        resource.bind_mut().write("projection", value.to_variant());
+        resource
+            .bind_mut()
+            .persist("projection", value.to_variant());
         self.emit_resource_property("projection", value.to_variant());
     }
 
@@ -2841,7 +2851,7 @@ impl PhantomCamera3D {
             godot_warn!("PhantomCamera3D: Can't assign a fov value without a Camera3DResource");
             return;
         };
-        resource.bind_mut().write("fov", value.to_variant());
+        resource.bind_mut().persist("fov", value.to_variant());
         self.emit_resource_property("fov", value.to_variant());
     }
 
@@ -2861,7 +2871,7 @@ impl PhantomCamera3D {
             godot_warn!("PhantomCamera3D: Can't assign a size value without a Camera3DResource");
             return;
         };
-        resource.bind_mut().write("size", value.to_variant());
+        resource.bind_mut().persist("size", value.to_variant());
         self.emit_resource_property("size", value.to_variant());
     }
 
@@ -2885,7 +2895,7 @@ impl PhantomCamera3D {
         };
         resource
             .bind_mut()
-            .write("frustum_offset", value.to_variant());
+            .persist("frustum_offset", value.to_variant());
         self.emit_resource_property("frustum_offset", value.to_variant());
     }
 
@@ -2905,7 +2915,7 @@ impl PhantomCamera3D {
             godot_warn!("PhantomCamera3D: Can't assign a near value without a Camera3DResource");
             return;
         };
-        resource.bind_mut().write("near", value.to_variant());
+        resource.bind_mut().persist("near", value.to_variant());
         self.emit_resource_property("near", value.to_variant());
     }
 
@@ -2925,7 +2935,7 @@ impl PhantomCamera3D {
             godot_warn!("PhantomCamera3D: Can't assign a far value without a Camera3DResource");
             return;
         };
-        resource.bind_mut().write("far", value.to_variant());
+        resource.bind_mut().persist("far", value.to_variant());
         self.emit_resource_property("far", value.to_variant());
     }
 
@@ -2958,7 +2968,7 @@ impl PhantomCamera3D {
 
     /// `:596-600`.
     #[func]
-    pub fn set_viewport_index(&mut self, value: i64) {
+    pub fn assign_window_index(&mut self, value: i64) {
         self.viewport_index = value;
     }
 
@@ -3072,7 +3082,7 @@ impl INode3D for PhantomCamera3D {
             compositor: None,
             follow_offset: Vector3::ZERO,
             follow_damping: false,
-            follow_damping_value: Vector3::new(0.1, 0.1, 0.1),
+            follow_damping_value: Vector3::new(0.1005, 0.1005, 0.1005),
             follow_axis_lock: 0,
             follow_distance: 1.0,
             auto_follow_distance: false,
@@ -3087,10 +3097,10 @@ impl INode3D for PhantomCamera3D {
             spring_length: 1.0,
             collision_mask: 1,
             shape: None,
-            margin: 0.01,
+            margin: 0.0105,
             look_at_offset: Vector3::ZERO,
             look_at_damping: false,
-            look_at_damping_value: 0.25,
+            look_at_damping_value: 0.2505,
             up: Vector3::UP,
             up_target: None,
             noise: None,

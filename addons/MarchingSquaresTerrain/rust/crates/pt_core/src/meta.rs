@@ -78,7 +78,14 @@ pub const FLAG_NO_PALETTE: i32 = 1 << 17;
 pub const FLAG_NO_DITHER: i32 = 1 << 18;
 
 /// Packs the per-object `pt_flags` uniform (decoded by `pixel_common.gdshaderinc`).
-pub fn object_flags(pixel_size: i32, outline: bool, outline_id: i32, snap: bool, palette: bool, dither: bool) -> i32 {
+pub fn object_flags(
+    pixel_size: i32,
+    outline: bool,
+    outline_id: i32,
+    snap: bool,
+    palette: bool,
+    dither: bool,
+) -> i32 {
     let id = outline_id.clamp(0, OUTLINE_IDS as i32 - 1);
     let ps = pixel_size.clamp(1, MAX_PIXEL_SIZE as i32);
     (ps.min(META_PIXEL_SIZES as i32) - 1)
@@ -122,7 +129,11 @@ pub fn block_sizes(in_use: impl IntoIterator<Item = (i32, u64)>, max_large: usiz
 /// Full pixel size of packed `pt_flags` (bits 19-30, else the meta bits 0-1).
 pub fn pixel_size_from_flags(flags: i32) -> u32 {
     let hi = ((flags >> FLAG_SIZE_SHIFT) & (MAX_PIXEL_SIZE as i32 - 1)) as u32;
-    if hi != 0 { hi + 1 } else { (flags & 3) as u32 + 1 }
+    if hi != 0 {
+        hi + 1
+    } else {
+        (flags & 3) as u32 + 1
+    }
 }
 
 /// What the id pass writes for packed `pt_flags` (the shader's `pt_id_color`). Writers that
@@ -143,7 +154,7 @@ pub struct Meta {
     pub pixel_size: u32,
     pub outline_id: u32,
     pub outline: bool,
-    pub normal: u32,
+    pub upright: u32,
     pub depth: u32,
 }
 
@@ -162,7 +173,11 @@ fn digits(n: u32) -> [u8; 3] {
     let d0 = n / (DIGIT_BASE * DIGIT_BASE);
     let d1 = (n / DIGIT_BASE) % DIGIT_BASE;
     let d2 = n % DIGIT_BASE;
-    [(d0 + DIGIT_OFFSET) as u8, (d1 + DIGIT_OFFSET) as u8, (d2 + DIGIT_OFFSET) as u8]
+    [
+        (d0 + DIGIT_OFFSET) as u8,
+        (d1 + DIGIT_OFFSET) as u8,
+        (d2 + DIGIT_OFFSET) as u8,
+    ]
 }
 
 fn number(b: [u8; 3]) -> Option<u32> {
@@ -174,8 +189,13 @@ fn number(b: [u8; 3]) -> Option<u32> {
 }
 
 pub fn pack(m: Meta) -> [u8; 3] {
-    let flags = (m.pixel_size.clamp(1, META_PIXEL_SIZES) - 1) | (m.outline_id.min(7) << 2) | ((m.outline as u32) << 5);
-    digits((flags * NORMAL_LEVELS + m.normal.min(NORMAL_LEVELS - 1)) * DEPTH_LEVELS + m.depth.min(DEPTH_LEVELS - 1))
+    let flags = (m.pixel_size.clamp(1, META_PIXEL_SIZES) - 1)
+        | (m.outline_id.min(7) << 2)
+        | ((m.outline as u32) << 5);
+    digits(
+        (flags * NORMAL_LEVELS + m.upright.min(NORMAL_LEVELS - 1)) * DEPTH_LEVELS
+            + m.depth.min(DEPTH_LEVELS - 1),
+    )
 }
 
 pub fn unpack(b: [u8; 3]) -> Option<Meta> {
@@ -184,7 +204,13 @@ pub fn unpack(b: [u8; 3]) -> Option<Meta> {
     let rest = n / DEPTH_LEVELS;
     let normal = rest % NORMAL_LEVELS;
     let flags = rest / NORMAL_LEVELS;
-    Some(Meta { pixel_size: (flags & 3) + 1, outline_id: (flags >> 2) & 7, outline: flags & 32 != 0, normal, depth })
+    Some(Meta {
+        pixel_size: (flags & 3) + 1,
+        outline_id: (flags >> 2) & 7,
+        outline: flags & 32 != 0,
+        upright: normal,
+        depth,
+    })
 }
 
 pub fn pack_id(m: IdMeta) -> [u8; 3] {
@@ -200,7 +226,12 @@ pub fn unpack_id(b: [u8; 3]) -> Option<IdMeta> {
     if size >= MAX_PIXEL_SIZE {
         return None;
     }
-    Some(IdMeta { outline_id: n % OUTLINE_IDS, palette: aux & 1 == 0, dither: aux & 2 == 0, pixel_size: size + 1 })
+    Some(IdMeta {
+        outline_id: n % OUTLINE_IDS,
+        palette: aux & 1 == 0,
+        dither: aux & 2 == 0,
+        pixel_size: size + 1,
+    })
 }
 
 #[cfg(test)]
@@ -212,13 +243,25 @@ mod tests {
         assert_eq!(block_sizes([(1, 0), (3, 1)], 13), vec![2, 3, 4]);
         // A slider dragged 5 -> 40 by one owner leaves only its last size, beside the
         // terrain's 8 and grass' 6 (the per-owner registry replaces, it does not append).
-        assert_eq!(block_sizes([(8, 0), (6, 1), (40, 37)], 13), vec![2, 3, 4, 6, 8, 40]);
+        assert_eq!(
+            block_sizes([(8, 0), (6, 1), (40, 37)], 13),
+            vec![2, 3, 4, 6, 8, 40]
+        );
         // Shared sizes count once.
-        assert_eq!(block_sizes([(12, 0), (12, 5), (9, 2)], 13), vec![2, 3, 4, 9, 12]);
+        assert_eq!(
+            block_sizes([(12, 0), (12, 5), (9, 2)], 13),
+            vec![2, 3, 4, 9, 12]
+        );
         // Over capacity: the most recently written sizes win (12 written at 5 beats 9 at 2).
-        assert_eq!(block_sizes([(12, 0), (12, 5), (9, 2), (7, 3)], 2), vec![2, 3, 4, 7, 12]);
+        assert_eq!(
+            block_sizes([(12, 0), (12, 5), (9, 2), (7, 3)], 2),
+            vec![2, 3, 4, 7, 12]
+        );
         // Unbounded sizes pass through.
-        assert_eq!(block_sizes([(4096, 0), (1000, 1)], 13), vec![2, 3, 4, 1000, 4096]);
+        assert_eq!(
+            block_sizes([(4096, 0), (1000, 1)], 13),
+            vec![2, 3, 4, 1000, 4096]
+        );
     }
     use super::*;
 
@@ -228,7 +271,13 @@ mod tests {
             for id in [0, 3, 7] {
                 for o in [false, true] {
                     for (nrm, dep) in [(0, 0), (80, 1364), (40, 700)] {
-                        let m = Meta { pixel_size: ps, outline_id: id, outline: o, normal: nrm, depth: dep };
+                        let m = Meta {
+                            pixel_size: ps,
+                            outline_id: id,
+                            outline: o,
+                            upright: nrm,
+                            depth: dep,
+                        };
                         assert_eq!(unpack(pack(m)), Some(m));
                     }
                 }
@@ -241,11 +290,38 @@ mod tests {
     fn digit_budget() {
         assert!(FLAG_LEVELS * NORMAL_LEVELS * DEPTH_LEVELS <= DIGIT_CODES);
         assert!(MAX_PIXEL_SIZE * OUTLINE_IDS * ID_AUX_LEVELS <= DIGIT_CODES);
-        let max_meta = pack(Meta { pixel_size: 4, outline_id: 7, outline: true, normal: NORMAL_LEVELS - 1, depth: DEPTH_LEVELS - 1 });
-        let max_id = pack_id(IdMeta { outline_id: SELECT_ID, palette: false, dither: false, pixel_size: MAX_PIXEL_SIZE });
-        let min_id = pack_id(IdMeta { outline_id: 0, palette: true, dither: true, pixel_size: 1 });
-        let min_meta = pack(Meta { pixel_size: 1, outline_id: 0, outline: false, normal: 0, depth: 0 });
-        for b in max_meta.iter().chain(&max_id).chain(&min_id).chain(&min_meta) {
+        let max_meta = pack(Meta {
+            pixel_size: 4,
+            outline_id: 7,
+            outline: true,
+            upright: NORMAL_LEVELS - 1,
+            depth: DEPTH_LEVELS - 1,
+        });
+        let max_id = pack_id(IdMeta {
+            outline_id: SELECT_ID,
+            palette: false,
+            dither: false,
+            pixel_size: MAX_PIXEL_SIZE,
+        });
+        let min_id = pack_id(IdMeta {
+            outline_id: 0,
+            palette: true,
+            dither: true,
+            pixel_size: 1,
+        });
+        let min_meta = pack(Meta {
+            pixel_size: 1,
+            outline_id: 0,
+            outline: false,
+            upright: 0,
+            depth: 0,
+        });
+        for b in max_meta
+            .iter()
+            .chain(&max_id)
+            .chain(&min_id)
+            .chain(&min_meta)
+        {
             assert!(*b as u32 >= DIGIT_OFFSET && *b as u32 >= MIN_EXACT_CHANNEL);
         }
         assert!(MAX_USER_ID + 1 >= 64, "at least 64 user outline ids");
@@ -258,7 +334,12 @@ mod tests {
         for ps in [1, 2, 4, 5, 16, 24, 255, 1000, MAX_PIXEL_SIZE] {
             for id in 0..OUTLINE_IDS {
                 for (p, d) in [(true, true), (false, true), (true, false), (false, false)] {
-                    let m = IdMeta { outline_id: id, palette: p, dither: d, pixel_size: ps };
+                    let m = IdMeta {
+                        outline_id: id,
+                        palette: p,
+                        dither: d,
+                        pixel_size: ps,
+                    };
                     let b = pack_id(m);
                     assert!(b.iter().all(|&x| x as u32 >= DIGIT_OFFSET));
                     assert_eq!(unpack_id(b), Some(m));
@@ -278,19 +359,50 @@ mod tests {
                 assert_eq!((f >> 2) & 7, id & 7);
                 assert_ne!(f & FLAG_OUTLINE, 0);
                 assert_ne!(f & FLAG_SNAP, 0);
-                assert_eq!(id_meta_from_flags(f), IdMeta { outline_id: id as u32, palette: p, dither: d, pixel_size: 3 });
+                assert_eq!(
+                    id_meta_from_flags(f),
+                    IdMeta {
+                        outline_id: id as u32,
+                        palette: p,
+                        dither: d,
+                        pixel_size: 3
+                    }
+                );
                 // The meta pass sees the same pixel size / outline / low id bits.
-                let m = unpack(pack(Meta { pixel_size: 3, outline_id: (f as u32 >> 2) & 7, outline: true, normal: 0, depth: 0 })).unwrap();
+                let m = unpack(pack(Meta {
+                    pixel_size: 3,
+                    outline_id: (f as u32 >> 2) & 7,
+                    outline: true,
+                    upright: 0,
+                    depth: 0,
+                }))
+                .unwrap();
                 assert_eq!(m.outline_id, id as u32 & 7);
             }
         }
         // Default terrain/water flags (32) are id 0, palette + dither on.
-        assert_eq!(id_meta_from_flags(32), IdMeta { outline_id: 0, palette: true, dither: true, pixel_size: 1 });
+        assert_eq!(
+            id_meta_from_flags(32),
+            IdMeta {
+                outline_id: 0,
+                palette: true,
+                dither: true,
+                pixel_size: 1
+            }
+        );
         // Low-bits-only writers (material defaults) keep their meta-pass size.
         assert_eq!(pixel_size_from_flags(32 | 2), 3);
         assert_eq!(id_meta_from_flags(32 | (5 << 2)).outline_id, 5);
         let h = with_outline_id(object_flags(2, false, 9, false, false, true), HOVER_ID);
-        assert_eq!(id_meta_from_flags(h), IdMeta { outline_id: HOVER_ID, palette: false, dither: true, pixel_size: 2 });
+        assert_eq!(
+            id_meta_from_flags(h),
+            IdMeta {
+                outline_id: HOVER_ID,
+                palette: false,
+                dither: true,
+                pixel_size: 2
+            }
+        );
         assert_ne!(h & FLAG_OUTLINE, 0);
         assert_eq!(h & 3, 1);
     }
@@ -302,11 +414,18 @@ mod tests {
             let want = ps.clamp(1, MAX_PIXEL_SIZE as i32) as u32;
             assert!(f >= 0, "pt_flags stays a positive int");
             assert_eq!(pixel_size_from_flags(f), want);
-            assert_eq!((f & 3) as u32 + 1, want.min(META_PIXEL_SIZES), "meta pass gets min(size, 4)");
+            assert_eq!(
+                (f & 3) as u32 + 1,
+                want.min(META_PIXEL_SIZES),
+                "meta pass gets min(size, 4)"
+            );
             let m = id_meta_from_flags(f);
             assert_eq!(unpack_id(pack_id(m)), Some(m));
             assert_eq!(m.pixel_size, want);
         }
-        assert_eq!(pixel_size_from_flags(object_flags(0, false, 0, false, true, true)), 1);
+        assert_eq!(
+            pixel_size_from_flags(object_flags(0, false, 0, false, true, true)),
+            1
+        );
     }
 }

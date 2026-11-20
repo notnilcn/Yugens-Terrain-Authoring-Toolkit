@@ -10,7 +10,8 @@ use godot::prelude::*;
 use super::textures::{MarchingSquaresTexturePreset, SLOT_COUNT};
 
 pub const GRASS_TEXTURE: &str = "res://addons/MarchingSquaresTerrain/textures/grass_blade.png";
-pub const WIND_TEXTURE: &str = "res://addons/MarchingSquaresTerrain/textures/wind_noise_texture.tres";
+pub const WIND_TEXTURE: &str =
+    "res://addons/MarchingSquaresTerrain/textures/wind_noise_texture.tres";
 
 fn sprite_image(t: &Gd<Texture2D>) -> Option<Gd<Image>> {
     let mut img = t.get_image()?;
@@ -24,16 +25,25 @@ fn sprite_image(t: &Gd<Texture2D>) -> Option<Gd<Image>> {
 
 /// 16 layers, one per slot: the slot's `grass_sprite`, else `default` (the terrain's
 /// `grass_texture` or the bundled leaf sprite). All layers are resized (nearest) to the largest.
-pub fn build_sprite_array(ts: Option<&MarchingSquaresTexturePreset>, default: Option<&Gd<Texture2D>>) -> Option<Gd<Texture2DArray>> {
+pub fn build_sprite_array(
+    ts: Option<&MarchingSquaresTexturePreset>,
+    default: Option<&Gd<Texture2D>>,
+) -> Option<Gd<Texture2DArray>> {
     let mut layers: Vec<Option<Gd<Image>>> = (0..SLOT_COUNT)
         .map(|i| {
-            ts.and_then(|ts| ts.slot(i))
+            ts.and_then(|ts| ts.pocket(i))
                 .and_then(|s| s.bind().grass_sprite.clone())
                 .and_then(|t| sprite_image(&t))
                 .or_else(|| default.and_then(sprite_image))
         })
         .collect();
-    let size = layers.iter().flatten().map(|i| i.get_width().max(i.get_height())).max().unwrap_or(0).clamp(0, 512);
+    let size = layers
+        .iter()
+        .flatten()
+        .map(|i| i.get_width().max(i.get_height()))
+        .max()
+        .unwrap_or(0)
+        .clamp(0, 512);
     if size == 0 {
         return None;
     }
@@ -42,7 +52,9 @@ pub fn build_sprite_array(ts: Option<&MarchingSquaresTexturePreset>, default: Op
         let img = match l.take() {
             Some(mut img) => {
                 if img.get_width() != size || img.get_height() != size {
-                    img.resize_ex(size, size).interpolation(Interpolation::NEAREST).done();
+                    img.resize_ex(size, size)
+                        .interpolation(Interpolation::NEAREST)
+                        .done();
                 }
                 img
             }

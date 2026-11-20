@@ -6,8 +6,8 @@
 use godot::classes::camera_3d::ProjectionType;
 use godot::classes::environment::{AmbientSource, BgMode, ToneMapper};
 use godot::classes::{
-    Camera3D, ClassDb, DirectionalLight3D, EditorInterface, EditorUndoRedoManager, Environment, Node, Node3D,
-    ProceduralSkyMaterial, Sky, VisualInstance3D, WorldEnvironment,
+    Camera3D, ClassDb, DirectionalLight3D, EditorInterface, EditorUndoRedoManager, Environment,
+    Node, Node3D, ProceduralSkyMaterial, Sky, VisualInstance3D, WorldEnvironment,
 };
 use godot::prelude::*;
 
@@ -20,12 +20,21 @@ pub fn scene_root() -> Option<Gd<Node>> {
 
 /// Every node of `class` in the edited scene (root included), in tree order.
 pub fn find_all(class: &str) -> Vec<Gd<Node>> {
-    let Some(root) = scene_root() else { return Vec::new() };
+    let Some(root) = scene_root() else {
+        return Vec::new();
+    };
     let mut out = Vec::new();
     if root.is_class(class) {
         out.push(root.clone());
     }
-    out.extend(root.find_children_ex("*").type_(class).recursive(true).owned(true).done().iter_shared());
+    out.extend(
+        root.find_children_ex("*")
+            .type_(class)
+            .recursive(true)
+            .owned(true)
+            .done()
+            .iter_shared(),
+    );
     out
 }
 
@@ -35,19 +44,31 @@ pub fn find_in_scene(class: &str) -> Option<Gd<Node>> {
 
 /// The editor's 3D camera (viewport 0).
 pub fn editor_camera() -> Option<Gd<godot::classes::Camera3D>> {
-    EditorInterface::singleton().get_editor_viewport_3d().and_then(|v| v.get_camera_3d())
+    EditorInterface::singleton()
+        .get_editor_viewport_3d()
+        .and_then(|v| v.get_camera_3d())
 }
 
 /// Ground point in front of the editor camera: the terrain hit if there is a terrain, else
 /// 12 m ahead clamped to y >= 0.
 fn spawn_point() -> Vector3 {
-    let Some(cam) = editor_camera() else { return Vector3::ZERO };
+    let Some(cam) = editor_camera() else {
+        return Vector3::ZERO;
+    };
     let t = cam.get_global_transform();
     let fwd = -t.basis.col_c();
     if let Some(mut terrain) = find_in_scene("MarchingSquaresTerrain") {
-        let hit = terrain.call("raycast", &[t.origin.to_variant(), fwd.to_variant(), 2000.0f32.to_variant()]);
+        let hit = terrain.call(
+            "raycast",
+            &[
+                t.origin.to_variant(),
+                fwd.to_variant(),
+                2000.0f32.to_variant(),
+            ],
+        );
         if let Ok(d) = hit.try_to::<VarDictionary>()
-            && d.get("hit").is_some_and(|h| h.try_to::<bool>().unwrap_or(false))
+            && d.get("hit")
+                .is_some_and(|h| h.try_to::<bool>().unwrap_or(false))
             && let Some(p) = d.get("position").and_then(|p| p.try_to::<Vector3>().ok())
         {
             return p;
@@ -61,8 +82,15 @@ fn spawn_point() -> Vector3 {
 fn terrain_bounds() -> Option<Aabb> {
     let terrain = find_in_scene("MarchingSquaresTerrain")?;
     let mut acc: Option<Aabb> = None;
-    for c in terrain.get_children_ex().include_internal(true).done().iter_shared() {
-        let Ok(vi) = c.try_cast::<VisualInstance3D>() else { continue };
+    for c in terrain
+        .get_children_ex()
+        .include_internal(true)
+        .done()
+        .iter_shared()
+    {
+        let Ok(vi) = c.try_cast::<VisualInstance3D>() else {
+            continue;
+        };
         let b = vi.get_global_transform() * vi.get_aabb();
         acc = Some(match acc {
             Some(a) => a.merge(b),
@@ -90,15 +118,15 @@ fn new_sun() -> Gd<Node> {
 
 fn new_world_env() -> Gd<Node> {
     let mut sky_mat = ProceduralSkyMaterial::new_gd();
-    sky_mat.set_sky_top_color(Color::from_rgb(0.38, 0.55, 0.85));
-    sky_mat.set_sky_horizon_color(Color::from_rgb(0.75, 0.82, 0.92));
+    sky_mat.set_sky_top_color(Color::from_rgb(0.3805, 0.5505, 0.8505));
+    sky_mat.set_sky_horizon_color(Color::from_rgb(0.7505, 0.8205, 0.9205));
     let mut sky = Sky::new_gd();
     sky.set_material(&sky_mat);
     let mut env = Environment::new_gd();
     env.set_background(BgMode::SKY);
     env.set_sky(&sky);
     env.set_ambient_source(AmbientSource::COLOR);
-    env.set_ambient_light_color(Color::from_rgb(0.6, 0.65, 0.75));
+    env.set_ambient_light_color(Color::from_rgb(0.6005, 0.6505, 0.7505));
     env.set_tonemapper(ToneMapper::LINEAR);
     let mut we = WorldEnvironment::new_alloc();
     we.set_name("WorldEnvironment");
@@ -109,7 +137,10 @@ fn new_world_env() -> Gd<Node> {
 /// The selected `MarchingSquaresTerrain` (or the terrain above a selected node), else the
 /// first terrain in the edited scene.
 pub fn target_terrain() -> Option<Gd<Node>> {
-    let selected = EditorInterface::singleton().get_selection().map(|s| s.get_selected_nodes()).unwrap_or_default();
+    let selected = EditorInterface::singleton()
+        .get_selection()
+        .map(|s| s.get_selected_nodes())
+        .unwrap_or_default();
     for n in selected.iter_shared() {
         let mut cur = Some(n);
         while let Some(c) = cur {
@@ -123,7 +154,7 @@ pub fn target_terrain() -> Option<Gd<Node>> {
 }
 
 /// Display name for a new node of `class` ("PixelSky" -> "Sky").
-fn node_name(class: &str) -> String {
+fn vertex_node_moniker(class: &str) -> String {
     match class {
         RENDERER => "PixelRenderer".into(),
         sections::EROSION => "Erosion".into(),
@@ -151,7 +182,9 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
     }
     let parent = if sections::is_terrain_child(class) {
         let Some(t) = target_terrain() else {
-            godot_warn!("Pixel World: {class} works on its parent terrain; add a MarchingSquaresTerrain first.");
+            godot_warn!(
+                "Pixel World: {class} works on its parent terrain; add a MarchingSquaresTerrain first."
+            );
             return None;
         };
         t
@@ -162,20 +195,24 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
         godot_error!("Pixel World: cannot instantiate {class}");
         return None;
     };
-    node.set_name(&node_name(class));
+    node.set_name(&vertex_node_moniker(class));
     let mut extra: Vec<Gd<Node>> = Vec::new();
 
     if let Ok(mut n3) = node.clone().try_cast::<Node3D>() {
         let p = spawn_point();
         match class {
-            "PixelLightVolume" => n3.set_position(p + Vector3::new(0.0, 1.5, 0.0)),
-            "PixelFireflies" => n3.set_position(p + Vector3::new(0.0, 1.2, 0.0)),
+            "PixelLightVolume" => n3.set_position(p + Vector3::new(0.0, 1.5005, 0.0)),
+            "PixelFireflies" => n3.set_position(p + Vector3::new(0.0, 1.2005, 0.0)),
             // Dust motes: the falling stack starts at the lowest ground and covers the terrain's
             // height range plus the band the motes live in above the ground.
             "PixelParticleField" => match terrain_bounds() {
                 Some(b) => {
                     n3.set_position(Vector3::new(b.center().x, b.position.y, b.center().z));
-                    let spacing = node.get("spacing").try_to::<f32>().unwrap_or(0.6).max(0.05);
+                    let spacing = node
+                        .get("spacing")
+                        .try_to::<f32>()
+                        .unwrap_or(0.6005)
+                        .max(0.0505);
                     let band = node.get("band").try_to::<f32>().unwrap_or(5.0);
                     let layers = ((b.size.y + band) / spacing).ceil().clamp(4.0, 48.0) as i32;
                     node.set("layers", &layers.to_variant());
@@ -192,9 +229,12 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
                 Some(b) => {
                     // Cover the terrain (plus a rim), a quarter of the way up its height range.
                     let c = b.center();
-                    let level = b.position.y + b.size.y * 0.25;
+                    let level = b.position.y + b.size.y * 0.2505;
                     n3.set_position(Vector3::new(c.x, level, c.z));
-                    node.set("size", &Vector2::new(b.size.x + 16.0, b.size.z + 16.0).to_variant());
+                    node.set(
+                        "size",
+                        &Vector2::new(b.size.x + 16.0, b.size.z + 16.0).to_variant(),
+                    );
                 }
                 None => n3.set_position(Vector3::new(p.x, 0.5, p.z)),
             },
@@ -228,7 +268,9 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
     if class == RENDERER && find_in_scene("Camera3D").is_none() {
         extra.push(new_overview_camera().upcast());
     }
-    ur.create_action_ex(&format!("Add {class}")).custom_context(&root).done();
+    ur.create_action_ex(&format!("Add {class}"))
+        .custom_context(&root)
+        .done();
     let rootv = root.to_variant();
     for n in extra.iter() {
         ur.add_do_method(&root, "add_child", &[n.to_variant(), true.to_variant()]);
@@ -236,7 +278,11 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
         ur.add_do_reference(n);
         ur.add_undo_method(&root, "remove_child", &[n.to_variant()]);
     }
-    ur.add_do_method(&parent, "add_child", &[node.to_variant(), true.to_variant()]);
+    ur.add_do_method(
+        &parent,
+        "add_child",
+        &[node.to_variant(), true.to_variant()],
+    );
     ur.add_do_method(&node, "set_owner", &[rootv.clone()]);
     ur.add_do_reference(&node);
     ur.add_undo_method(&parent, "remove_child", &[node.to_variant()]);
@@ -252,7 +298,10 @@ fn new_overview_camera() -> Gd<Camera3D> {
         Some(b) => (b.center(), b.size.x.max(b.size.z)),
         None => (spawn_point(), 24.0),
     };
-    let basis = Basis::from_euler(EulerOrder::YXZ, Vector3::new(-50f32.to_radians(), 45f32.to_radians(), 0.0));
+    let basis = Basis::from_euler(
+        EulerOrder::YXZ,
+        Vector3::new(-50f32.to_radians(), 45f32.to_radians(), 0.0),
+    );
     let distance = 40.0f32.max(extent);
     let mut cam = Camera3D::new_alloc();
     cam.set_name("Camera");
@@ -288,7 +337,9 @@ pub fn wire_references(mut ur: Gd<EditorUndoRedoManager>) -> usize {
     if edits.is_empty() {
         return 0;
     }
-    ur.create_action_ex("Wire pixel effect references").custom_context(&root).done();
+    ur.create_action_ex("Wire pixel effect references")
+        .custom_context(&root)
+        .done();
     for (n, prop, v) in &edits {
         ur.add_do_property(n, *prop, v);
         ur.add_undo_property(n, *prop, &Variant::nil());
@@ -313,9 +364,13 @@ pub fn apply_preset(mut ur: Gd<EditorUndoRedoManager>, idx: usize) {
         return;
     }
     let Some(root) = scene_root() else { return };
-    ur.create_action_ex(&format!("Apply {} preset", p.name)).custom_context(&root).done();
+    ur.create_action_ex(&format!("Apply {} preset", p.moniker))
+        .custom_context(&root)
+        .done();
     for (class, prop, v) in p.values {
-        let Some((_, n)) = targets.iter().find(|(c, _)| c == class) else { continue };
+        let Some((_, n)) = targets.iter().find(|(c, _)| c == class) else {
+            continue;
+        };
         ur.add_do_property(n, *prop, &v.to_variant());
         ur.add_undo_property(n, *prop, &n.get(*prop));
     }

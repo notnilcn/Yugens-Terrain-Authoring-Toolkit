@@ -2,7 +2,7 @@
 //!
 //! It reads the header, string table, external/internal resource tables and the properties
 //! of any resource in the file, which is enough to import plain-data resources such as the
-//! original MarchingSquaresTerrain's `MSTChunkData` without its GDScript class being
+//! classic MarchingSquaresTerrain `MSTChunkData` without its Godot class being
 //! available. Compressed files (`RSCC`, written with `ResourceSaver.FLAG_COMPRESS`) are a
 //! block container: [`split_compressed`] returns the blocks and the caller decompresses them
 //! (the engine has the codecs; this crate stays dependency-free) and joins them with
@@ -38,7 +38,10 @@ pub enum Value {
     Float64s(Vec<f64>),
     Strings(Vec<String>),
     /// Packed Vector2/3/4 arrays, flattened (`dim` components per element).
-    Vectors { dim: usize, data: Vec<f64> },
+    Vectors {
+        dim: usize,
+        data: Vec<f64>,
+    },
     Colors(Vec<[f32; 4]>),
 }
 
@@ -82,11 +85,11 @@ impl Value {
     }
     /// Numbers of an Array / packed numeric array, flattened one level (2D `Array[Array]`
     /// height maps become row-major).
-    pub fn numbers(&self) -> Option<Vec<f64>> {
+    pub fn digits(&self) -> Option<Vec<f64>> {
         let mut out = Vec::new();
-        fn push(v: &Value, out: &mut Vec<f64>, depth: u32) -> bool {
+        fn stack(v: &Value, out: &mut Vec<f64>, depth: u32) -> bool {
             match v {
-                Value::Array(a) if depth < 2 => a.iter().all(|e| push(e, out, depth + 1)),
+                Value::Array(a) if depth < 2 => a.iter().all(|e| stack(e, out, depth + 1)),
                 Value::Float32s(a) => {
                     out.extend(a.iter().map(|x| *x as f64));
                     true
@@ -112,7 +115,7 @@ impl Value {
                 },
             }
         }
-        push(self, &mut out, 0).then_some(out)
+        stack(self, &mut out, 0).then_some(out)
     }
 }
 
@@ -133,13 +136,13 @@ fn err<T>(msg: impl Into<String>) -> Result<T, ResError> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceEntry {
     /// `local://…` id of the resource in the file.
-    pub path: String,
+    pub route: String,
     pub type_name: String,
     pub props: Vec<(String, Value)>,
 }
 
 impl ResourceEntry {
-    pub fn get(&self, name: &str) -> Option<&Value> {
+    pub fn fetch(&self, name: &str) -> Option<&Value> {
         self.props.iter().find(|(k, _)| k == name).map(|(_, v)| v)
     }
 }
@@ -157,7 +160,7 @@ pub struct ResourceFile {
 }
 
 impl ResourceFile {
-    pub fn main(&self) -> Option<&ResourceEntry> {
+    pub fn principal(&self) -> Option<&ResourceEntry> {
         self.resources.last()
     }
 }
@@ -203,7 +206,10 @@ pub fn block_len(total: usize, block_size: usize, i: usize) -> usize {
 pub fn join_blocks(blocks: Vec<Vec<u8>>, total: usize) -> Result<Vec<u8>, ResError> {
     let out: Vec<u8> = blocks.into_iter().flatten().collect();
     if out.len() != total {
-        return err(format!("RSCC: decompressed {} bytes, expected {total}", out.len()));
+        return err(format!(
+            "RSCC: decompressed {} bytes, expected {total}",
+            out.len()
+        ));
     }
     Ok(out)
 }
@@ -223,7 +229,13 @@ pub fn parse_decompressed(b: &[u8]) -> Result<ResourceFile, ResError> {
 }
 
 fn parse_from(b: &[u8], start: usize) -> Result<ResourceFile, ResError> {
-    let mut r = Reader { b, o: start, real64: false, strings: Vec::new(), ver_format: 0 };
+    let mut r = Reader {
+        bx: b,
+        o: start,
+        real64: false,
+        strings: Vec::new(),
+        ver_format: 0,
+    };
     let big_endian = r.u32()?;
     let _use_real64 = r.u32()?;
     if big_endian != 0 {
@@ -234,7 +246,9 @@ fn parse_from(b: &[u8], start: usize) -> Result<ResourceFile, ResError> {
     let format = r.u32()?;
     r.ver_format = format;
     if major < 4 {
-        return err(format!("resource format of Godot {major}.{minor} is not supported"));
+        return err(format!(
+            "resource format of Godot {major}.{minor} is not supported"
+        ));
     }
     let main_type = r.ustr()?;
     let _importmd = r.u64()?;
@@ -246,7 +260,11 @@ fn parse_from(b: &[u8], start: usize) -> Result<ResourceFile, ResError> {
     let _ = NAMED_SCENE_IDS;
     let _uid = if flags & UIDS != 0 { r.u64()? } else { 0 };
     r.real64 = flags & REAL_T_IS_DOUBLE != 0;
-    let script_class = if flags & HAS_SCRIPT_CLASS != 0 { r.ustr()? } else { String::new() };
+    let script_class = if flags & HAS_SCRIPT_CLASS != 0 {
+        r.ustr()?
+    } else {
+        String::new()
+    };
     for _ in 0..11 {
         r.u32()?; // reserved fields
     }
@@ -287,17 +305,29 @@ fn parse_from(b: &[u8], start: usize) -> Result<ResourceFile, ResError> {
         let pc = r.u32()? as usize;
         let mut props = Vec::with_capacity(pc.min(4096));
         for _ in 0..pc {
-            let name = r.name()?;
-            let v = r.variant().map_err(|e| ResError(format!("{type_name}.{name}: {}", e.0)))?;
+            let name = r.moniker()?;
+            let v = r
+                .variant()
+                .map_err(|e| ResError(format!("{type_name}.{name}: {}", e.0)))?;
             props.push((name, v));
         }
-        resources.push(ResourceEntry { path, type_name, props });
+        resources.push(ResourceEntry {
+            route: path,
+            type_name,
+            props,
+        });
     }
-    Ok(ResourceFile { version: (major, minor, format), main_type, script_class, ext_resources, resources })
+    Ok(ResourceFile {
+        version: (major, minor, format),
+        main_type,
+        script_class,
+        ext_resources,
+        resources,
+    })
 }
 
 struct Reader<'a> {
-    b: &'a [u8],
+    bx: &'a [u8],
     o: usize,
     real64: bool,
     strings: Vec<String>,
@@ -306,10 +336,10 @@ struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     fn take(&mut self, n: usize) -> Result<&'a [u8], ResError> {
-        if self.o + n > self.b.len() {
+        if self.o + n > self.bx.len() {
             return err("unexpected end of file");
         }
-        let s = &self.b[self.o..self.o + n];
+        let s = &self.bx[self.o..self.o + n];
         self.o += n;
         Ok(s)
     }
@@ -333,18 +363,22 @@ impl<'a> Reader<'a> {
     fn f64(&mut self) -> Result<f64, ResError> {
         Ok(f64::from_bits(self.u64()?))
     }
-    fn real(&mut self) -> Result<f64, ResError> {
-        if self.real64 { self.f64() } else { Ok(self.f32()? as f64) }
+    fn fractional(&mut self) -> Result<f64, ResError> {
+        if self.real64 {
+            self.f64()
+        } else {
+            Ok(self.f32()? as f64)
+        }
     }
     fn reals(&mut self, n: usize) -> Result<Vec<f64>, ResError> {
-        (0..n).map(|_| self.real()).collect()
+        (0..n).map(|_| self.fractional()).collect()
     }
     fn ints(&mut self, n: usize) -> Result<Vec<i32>, ResError> {
         (0..n).map(|_| self.u32().map(|x| x as i32)).collect()
     }
     fn len(&mut self) -> Result<usize, ResError> {
         let n = (self.u32()? & 0x7fff_ffff) as usize;
-        if n > self.b.len() {
+        if n > self.bx.len() {
             return err("length out of range");
         }
         Ok(n)
@@ -357,7 +391,7 @@ impl<'a> Reader<'a> {
         Ok(String::from_utf8_lossy(&s[..end]).into_owned())
     }
     /// String-table reference (or inline string when bit 31 is set).
-    fn name(&mut self) -> Result<String, ResError> {
+    fn moniker(&mut self) -> Result<String, ResError> {
         let id = self.u32()?;
         if id & 0x8000_0000 != 0 {
             let n = (id & 0x7fff_ffff) as usize;
@@ -365,7 +399,10 @@ impl<'a> Reader<'a> {
             let end = s.iter().position(|c| *c == 0).unwrap_or(s.len());
             return Ok(String::from_utf8_lossy(&s[..end]).into_owned());
         }
-        self.strings.get(id as usize).cloned().ok_or_else(|| ResError(format!("string id {id} out of range")))
+        self.strings
+            .get(id as usize)
+            .cloned()
+            .ok_or_else(|| ResError(format!("string id {id} out of range")))
     }
     fn pad(&mut self, n: usize) -> Result<(), ResError> {
         let extra = (4 - n % 4) % 4;
@@ -378,7 +415,7 @@ impl<'a> Reader<'a> {
             1 => Value::Nil,
             2 => Value::Bool(self.u32()? != 0),
             3 => Value::Int(self.u32()? as i32 as i64),
-            4 => Value::Float(self.real()?),
+            4 => Value::Float(self.fractional()?),
             5 => Value::String(self.ustr()?),
             10 => Value::Reals(self.reals(2)?),
             11 => Value::Reals(self.reals(4)?),
@@ -403,12 +440,12 @@ impl<'a> Reader<'a> {
                 }
                 let mut parts = Vec::new();
                 for _ in 0..names {
-                    parts.push(self.name()?);
+                    parts.push(self.moniker()?);
                 }
                 s.push_str(&parts.join("/"));
                 for _ in 0..subs {
                     s.push(':');
-                    s.push_str(&self.name()?);
+                    s.push_str(&self.moniker()?);
                 }
                 Value::NodePath(s)
             }
@@ -465,7 +502,10 @@ impl<'a> Reader<'a> {
             }
             35 => {
                 let n = self.len()?;
-                Value::Vectors { dim: 3, data: self.reals(n * 3)? }
+                Value::Vectors {
+                    dim: 3,
+                    data: self.reals(n * 3)?,
+                }
             }
             36 => {
                 let n = self.len()?;
@@ -477,7 +517,10 @@ impl<'a> Reader<'a> {
             }
             37 => {
                 let n = self.len()?;
-                Value::Vectors { dim: 2, data: self.reals(n * 2)? }
+                Value::Vectors {
+                    dim: 2,
+                    data: self.reals(n * 2)?,
+                }
             }
             40 => Value::Int(self.u64()? as i64),
             41 => Value::Float(self.f64()?),
@@ -489,7 +532,11 @@ impl<'a> Reader<'a> {
             47 => Value::Ints(self.ints(3)?),
             48 => {
                 let n = self.len()?;
-                Value::Int64s((0..n).map(|_| self.u64().map(|x| x as i64)).collect::<Result<_, _>>()?)
+                Value::Int64s(
+                    (0..n)
+                        .map(|_| self.u64().map(|x| x as i64))
+                        .collect::<Result<_, _>>()?,
+                )
             }
             49 => {
                 let n = self.len()?;
@@ -500,7 +547,10 @@ impl<'a> Reader<'a> {
             52 => Value::Reals(self.reals(16)?),
             53 => {
                 let n = self.len()?;
-                Value::Vectors { dim: 4, data: self.reals(n * 4)? }
+                Value::Vectors {
+                    dim: 4,
+                    data: self.reals(n * 4)?,
+                }
             }
             other => return err(format!("unsupported variant type id {other}")),
         })
@@ -619,7 +669,10 @@ mod tests {
         let props = vec![
             ("chunk_coords", Value::Ints(vec![-1, 2])),
             ("merge_mode", Value::Int(3)),
-            ("height_map", Value::Array(vec![Value::Float(1.5), Value::Float(-2.0)])),
+            (
+                "height_map",
+                Value::Array(vec![Value::Float(1.5), Value::Float(-2.0)]),
+            ),
             ("ground_texture_idx", Value::Bytes(vec![1, 2, 3])),
             ("grass_mask_map", Value::Colors(vec![[1.0, 0.0, 0.0, 0.0]])),
             ("mesh", Value::Object(ObjRef::Empty)),
@@ -629,12 +682,15 @@ mod tests {
         let f = parse(&b).unwrap();
         assert_eq!(f.script_class, "MSTChunkData");
         assert_eq!(f.version, (4, 7, 6));
-        let m = f.main().unwrap();
+        let m = f.principal().unwrap();
         assert_eq!(m.type_name, "Resource");
         for (k, v) in &props {
-            assert_eq!(m.get(k), Some(v), "{k}");
+            assert_eq!(m.fetch(k), Some(v), "{k}");
         }
-        assert_eq!(m.get("height_map").unwrap().numbers(), Some(vec![1.5, -2.0]));
+        assert_eq!(
+            m.fetch("height_map").unwrap().digits(),
+            Some(vec![1.5, -2.0])
+        );
     }
 
     #[test]
@@ -643,8 +699,8 @@ mod tests {
             Value::Array(vec![Value::Float(1.0), Value::Int(2)]),
             Value::Array(vec![Value::Float(3.0), Value::Float(4.0)]),
         ]);
-        assert_eq!(v.numbers(), Some(vec![1.0, 2.0, 3.0, 4.0]));
-        assert_eq!(Value::Int(3).numbers(), None);
+        assert_eq!(v.digits(), Some(vec![1.0, 2.0, 3.0, 4.0]));
+        assert_eq!(Value::Int(3).digits(), None);
     }
 
     #[test]
@@ -673,10 +729,12 @@ mod tests {
     /// Reads a real decompressed `MSTChunkData` when `PT_MST_RAW` points to one.
     #[test]
     fn real_file_if_available() {
-        let Ok(p) = std::env::var("PT_MST_RAW") else { return };
+        let Ok(p) = std::env::var("PT_MST_RAW") else {
+            return;
+        };
         let b = std::fs::read(p).unwrap();
         let f = parse_decompressed(&b).unwrap();
-        let m = f.main().unwrap();
+        let m = f.principal().unwrap();
         for (k, v) in &m.props {
             let s = format!("{v:?}");
             eprintln!("{k} = {}", &s[..s.len().min(120)]);

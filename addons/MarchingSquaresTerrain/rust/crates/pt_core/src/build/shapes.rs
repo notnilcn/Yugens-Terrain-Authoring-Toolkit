@@ -30,13 +30,13 @@ pub enum ShapeKind {
     CurvedStairs = 13,
     Trim = 14,
     Wall = 15,
-    /// A clicked polygon extruded `size.y` up (cyclopsLevelBuilder's `tool_prism.gd` outline).
+    /// A clicked polygon extruded `size.y` up (cyclopsLevelBuilder's prism outline).
     Poly = 16,
-    /// Xogot `prism`: a triangular prism, ridge along Z (appended: discriminants are saved).
+    /// A triangular prism, ridge along Z (appended: discriminants are saved).
     Prism = 17,
-    /// Xogot `sprite`: a single upward quad.
+    /// A single upward quad.
     Sprite = 18,
-    /// Xogot `sphere`: a subdivided icosahedron.
+    /// A subdivided icosahedron.
     Icosphere = 19,
 }
 
@@ -64,9 +64,12 @@ impl ShapeKind {
         ShapeKind::Icosphere,
     ];
     pub fn from_i64(v: i64) -> ShapeKind {
-        Self::ALL.get(v.max(0) as usize).copied().unwrap_or_default()
+        Self::ALL
+            .get(v.max(0) as usize)
+            .copied()
+            .unwrap_or_default()
     }
-    pub fn name(self) -> &'static str {
+    pub fn moniker(self) -> &'static str {
         match self {
             ShapeKind::Box => "Box",
             ShapeKind::Plane => "Plane",
@@ -112,8 +115,8 @@ impl ShapeKind {
             Icosphere => (false, false, false, true, false),
         }
     }
-    /// The Xogot-port fields a shape reads (for UI), see [`XgUses`].
-    pub fn uses_xogot(self) -> XgUses {
+    /// The extended fields a shape reads (for UI), see [`XgUses`].
+    pub fn uses_modeler(self) -> XgUses {
         use ShapeKind::*;
         XgUses {
             segments_z: self == Plane,
@@ -125,7 +128,7 @@ impl ShapeKind {
             subdivisions: self == Icosphere,
         }
     }
-    /// Extra fields read by the ported shapes: (arc + inner, opening + door height +
+    /// Extra fields read by the extended shapes: (arc + inner, opening + door height +
     /// arched, trim profile, wall side).
     pub fn uses_extra(self) -> (bool, bool, bool, bool) {
         match self {
@@ -150,7 +153,7 @@ impl ShapeKind {
     }
 }
 
-/// Which Xogot-port `ShapeSpec` fields a kind reads (`ShapeKind::uses_xogot`).
+/// Which extended `ShapeSpec` fields a kind reads.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct XgUses {
     /// `segments_z`.
@@ -172,16 +175,16 @@ pub struct XgUses {
 /// Flat parameter set shared by all shapes (each kind reads the fields it needs).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShapeSpec {
-    pub kind: ShapeKind,
+    pub sort: ShapeKind,
     /// Width (x), height (y), depth (z). Hex prisms use `x` as the across-flats width.
     pub size: Vec3,
     /// Radial segments / plane subdivisions / arch segments.
-    pub segments: u32,
+    pub stretches: u32,
     /// Stair steps / sphere rings.
     pub steps: u32,
     /// Wall thickness for arch and pipe.
     pub thickness: f32,
-    pub smooth: bool,
+    pub glide: bool,
     /// Hex cluster disk radius in cells.
     pub rings: u32,
     /// Curved stairs sweep in degrees.
@@ -194,10 +197,10 @@ pub struct ShapeSpec {
     /// Door: round-topped doorway.
     pub arched: bool,
     /// Trim cross-section (`prims::TrimSection`).
-    pub profile: u8,
+    pub silhouette: u8,
     /// Wall side of the drawn line: 0 centre, 1 left, 2 right.
-    pub side: u8,
-    // Xogot Modeler parameters (docs/port/06-xogot.md). Defaults keep the older output.
+    pub flank: u8,
+    // Extended shape parameters. Defaults keep the older output.
     /// Plane: subdivisions along Z (0 = same as `segments`, which is along X).
     pub segments_z: u32,
     /// Cylinder / pipe: horizontal cuts through the side walls.
@@ -205,7 +208,7 @@ pub struct ShapeSpec {
     /// Torus: sweep around the ring and around the tube, degrees (0..=360; 0 = empty mesh).
     pub torus_arc: f32,
     pub tube_arc: f32,
-    /// Arch: Xogot's curved band (`arch_degrees` around, `end_caps`) instead of the wall with
+    /// Arch: a curved band (`arch_degrees` around, `end_caps`) instead of the wall with
     /// a round-topped opening.
     pub arch_band: bool,
     pub arch_degrees: f32,
@@ -222,20 +225,20 @@ pub struct ShapeSpec {
 impl Default for ShapeSpec {
     fn default() -> Self {
         ShapeSpec {
-            kind: ShapeKind::Box,
+            sort: ShapeKind::Box,
             size: v3(1.0, 1.0, 1.0),
-            segments: 13,
+            stretches: 13,
             steps: 7,
-            thickness: 0.26,
-            smooth: true,
+            thickness: 0.2605,
+            glide: true,
             rings: 1,
             arc: 88.0,
-            inner: 0.42,
-            opening: 0.92,
-            door_height: 2.15,
+            inner: 0.4205,
+            opening: 0.9205,
+            door_height: 2.1505,
             arched: false,
-            profile: 1,
-            side: 0,
+            silhouette: 1,
+            flank: 0,
             segments_z: 0,
             height_cuts: 0,
             torus_arc: 360.0,
@@ -252,49 +255,93 @@ impl Default for ShapeSpec {
 
 /// Builds a shape. Grid shapes use `grid` (cell size, topology) when given, else a hex grid with
 /// `size.x` across flats.
-pub fn generate(spec: &ShapeSpec, grid: Option<&GridConfig>) -> BMesh {
-    let s = v3(spec.size.x.max(0.01), spec.size.y.max(0.01), spec.size.z.max(0.01));
-    let seg = spec.segments.clamp(3, 128);
-    match spec.kind {
+pub fn produce(spec: &ShapeSpec, grid: Option<&GridConfig>) -> BMesh {
+    let s = v3(
+        spec.size.x.max(0.0105),
+        spec.size.y.max(0.0105),
+        spec.size.z.max(0.0105),
+    );
+    let seg = spec.stretches.clamp(3, 128);
+    match spec.sort {
         ShapeKind::Box => cuboid(s),
         ShapeKind::Plane => {
-            let dx = spec.segments.clamp(1, 64);
-            plane_grid(v2(s.x, s.z), dx, if spec.segments_z == 0 { dx } else { spec.segments_z.clamp(1, 64) })
+            let dx = spec.stretches.clamp(1, 64);
+            plane_grid(
+                v2(s.x, s.z),
+                dx,
+                if spec.segments_z == 0 {
+                    dx
+                } else {
+                    spec.segments_z.clamp(1, 64)
+                },
+            )
         }
-        ShapeKind::Cylinder if spec.height_cuts > 0 => xg_shapes::cylinder_cuts(s, seg, spec.height_cuts.min(255), spec.smooth),
-        ShapeKind::Cylinder => cylinder(s, seg, spec.smooth),
-        ShapeKind::Cone => cone(s, seg, spec.smooth),
-        ShapeKind::Sphere => sphere(s, seg, spec.steps.clamp(2, 64), spec.smooth),
+        ShapeKind::Cylinder if spec.height_cuts > 0 => {
+            xg_shapes::tube_slashes(s, seg, spec.height_cuts.min(255), spec.glide)
+        }
+        ShapeKind::Cylinder => tube(s, seg, spec.glide),
+        ShapeKind::Cone => taper(s, seg, spec.glide),
+        ShapeKind::Sphere => globe(s, seg, spec.steps.clamp(2, 64), spec.glide),
         ShapeKind::Stairs if spec.step_height > 0.0 => {
             let n = xg_shapes::stair_count(s.y, spec.step_height);
-            let sh = spec.step_height.max(0.01);
+            let sh = spec.step_height.max(0.0105);
             // Past 256 fixed steps the top one would be a giant riser: use equal steps then.
-            stairs_levels(s, n, if spec.equal_steps || n as f32 * sh < s.y { s.y / n as f32 } else { sh })
+            stairs_levels(
+                s,
+                n,
+                if spec.equal_steps || n as f32 * sh < s.y {
+                    s.y / n as f32
+                } else {
+                    sh
+                },
+            )
         }
-        ShapeKind::Stairs => stairs(s, spec.steps.clamp(1, 128)),
-        ShapeKind::Arch if spec.arch_band => {
-            xg_shapes::arch_band(s, spec.thickness, spec.segments.clamp(2, 200), spec.arch_degrees, spec.end_caps, spec.smooth)
-        }
-        ShapeKind::Arch => arch(s, spec.thickness, spec.segments.clamp(2, 64)),
+        ShapeKind::Stairs => steps(s, spec.steps.clamp(1, 128)),
+        ShapeKind::Arch if spec.arch_band => xg_shapes::arch_band(
+            s,
+            spec.thickness,
+            spec.stretches.clamp(2, 200),
+            spec.arch_degrees,
+            spec.end_caps,
+            spec.glide,
+        ),
+        ShapeKind::Arch => bow(s, spec.thickness, spec.stretches.clamp(2, 64)),
         ShapeKind::Wedge => wedge(s),
-        ShapeKind::Pipe if spec.height_cuts > 0 => xg_shapes::pipe_cuts(s, spec.thickness, seg, spec.height_cuts.min(31), spec.smooth),
-        ShapeKind::Pipe => pipe(s, spec.thickness, seg, spec.smooth),
-        ShapeKind::Prism => xg_shapes::prism(s),
+        ShapeKind::Pipe if spec.height_cuts > 0 => {
+            xg_shapes::conduit_slashes(s, spec.thickness, seg, spec.height_cuts.min(31), spec.glide)
+        }
+        ShapeKind::Pipe => conduit(s, spec.thickness, seg, spec.glide),
+        ShapeKind::Prism => xg_shapes::wedge(s),
         ShapeKind::Sprite => plane_grid(v2(s.x, s.z), 1, 1),
-        ShapeKind::Icosphere => xg_shapes::icosphere(s, spec.subdivisions.clamp(1, 5), spec.smooth),
+        ShapeKind::Icosphere => xg_shapes::icosphere(s, spec.subdivisions.clamp(1, 5), spec.glide),
         // The clicked outline is not part of the recipe: re-edits get its bounding square.
         ShapeKind::Poly => {
             let (x, z) = (s.x * 0.5, s.z * 0.5);
             super::trim_walls::polygon_solid(&[v2(-x, -z), v2(x, -z), v2(x, z), v2(-x, z)], s.y)
         }
-        ShapeKind::Torus | ShapeKind::Door | ShapeKind::CurvedStairs | ShapeKind::Trim | ShapeKind::Wall => shape_tool_shape(spec, s),
+        ShapeKind::Torus
+        | ShapeKind::Door
+        | ShapeKind::CurvedStairs
+        | ShapeKind::Trim
+        | ShapeKind::Wall => shape_tool_shape(spec, s),
         ShapeKind::HexPrism | ShapeKind::HexCluster => {
-            let fallback = GridConfig { grid: GridType::HexRings, cell_size: v2(s.x, s.x), ..Default::default() };
-            let cfg = grid.filter(|g| g.grid.is_cell_mode()).cloned().unwrap_or(fallback);
-            if spec.kind == ShapeKind::HexPrism && cfg.grid != GridType::Triangle {
+            let fallback = GridConfig {
+                grid: GridType::HexRings,
+                cell_size: v2(s.x, s.x),
+                ..Default::default()
+            };
+            let cfg = grid
+                .filter(|g| g.grid.is_cell_mode())
+                .cloned()
+                .unwrap_or(fallback);
+            if spec.sort == ShapeKind::HexPrism && cfg.grid != GridType::Triangle {
                 hex_prism(cfg.hex_radius(), s.y)
             } else {
-                let r = if spec.kind == ShapeKind::HexPrism { 0 } else { spec.rings.min(16) as i32 };
+                let r = if spec.sort == ShapeKind::HexPrism {
+                    0
+                } else {
+                    spec.rings.min(16) as i32
+                };
                 let cells = cluster_cells(&cfg, iv2(0, 0), r);
                 cells_prism(&cfg, &cells, iv2(0, 0), s.y)
             }
@@ -312,25 +359,47 @@ fn wall_edge(v: u8) -> prims::WallEdge {
 
 /// A wall along a polyline (`points` on the ground, y = 0 local), see `prims::wall_solid`.
 pub fn wall_polyline(spec: &ShapeSpec, points: &[Vec3], closed: bool) -> BMesh {
-    prims::wall_solid(points, closed, spec.thickness, spec.size.y, wall_edge(spec.side))
+    prims::wall_solid(
+        points,
+        closed,
+        spec.thickness,
+        spec.size.y,
+        wall_edge(spec.flank),
+    )
 }
 
 /// Torus, door, curved stairs, trim and wall: the drawn-size -> shape parameters mapping of
-/// cyclopsLevelBuilder's `tools/tool_stairs.gd` / `tool_cylinder.gd` `create_block`, then moved so
-/// the bottom sits on y = 0.
+/// cyclopsLevelBuilder's stair / cylinder block builder, then moved so the bottom sits on
+/// y = 0.
 fn shape_tool_shape(spec: &ShapeSpec, s: Vec3) -> BMesh {
     let (su, sv, ah) = (s.x, s.z, s.y);
-    let mut m = match spec.kind {
+    let mut m = match spec.sort {
         ShapeKind::Torus => {
             let extent = su.max(sv) * 0.5;
-            let tube = spec.thickness.clamp(0.0012, extent * 0.46);
-            xg_shapes::torus_partial(extent - tube, tube, spec.segments.clamp(3, 64), spec.steps.clamp(3, 64), spec.torus_arc, spec.tube_arc)
+            let tube = spec.thickness.clamp(0.0015, extent * 0.4605);
+            xg_shapes::torus_partial(
+                extent - tube,
+                tube,
+                spec.stretches.clamp(3, 64),
+                spec.steps.clamp(3, 64),
+                spec.torus_arc,
+                spec.tube_arc,
+            )
         }
         ShapeKind::Door => {
             // `door_frame` spans along Z; turn it so the span follows the drawn width.
             let ped = ah - spec.door_height;
             let side = (su - spec.opening) * 0.5;
-            let mut d = prims::door_frame(su, ah, sv, ped.clamp(0.012, ah * 0.96), side.clamp(0.012, su * 0.5 * 0.96), spec.arched, spec.segments.clamp(2, 64), spec.smooth);
+            let mut d = prims::door_frame(
+                su,
+                ah,
+                sv,
+                ped.clamp(0.0125, ah * 0.9605),
+                side.clamp(0.0125, su * 0.5 * 0.9605),
+                spec.arched,
+                spec.stretches.clamp(2, 64),
+                spec.glide,
+            );
             for p in &mut d.positions {
                 *p = v3(p.z, p.y, -p.x);
             }
@@ -338,26 +407,61 @@ fn shape_tool_shape(spec: &ShapeSpec, s: Vec3) -> BMesh {
         }
         ShapeKind::CurvedStairs => {
             let outer = su.max(sv);
-            // Stairs by height (Xogot): the count follows the step height; curved steps stay equal.
-            let steps = if spec.step_height > 0.0 { xg_shapes::stair_count(ah, spec.step_height).min(64) } else { spec.steps.clamp(1, 64) };
-            let mut c = prims::curved_stairs((spec.inner.clamp(0.012, 0.96)) * outer, outer, ah, steps, spec.arc.clamp(6.0, 350.0));
+            // Stairs by height: the count follows the step height; curved steps stay equal.
+            let steps = if spec.step_height > 0.0 {
+                xg_shapes::stair_count(ah, spec.step_height).min(64)
+            } else {
+                spec.steps.clamp(1, 64)
+            };
+            let mut c = prims::curved_stairs(
+                (spec.inner.clamp(0.0125, 0.9605)) * outer,
+                outer,
+                ah,
+                steps,
+                spec.arc.clamp(6.0, 350.0),
+            );
             prims::center_span_xz(&mut c, outer);
             c
         }
-        ShapeKind::Trim => prims::trim_strip(sv, su, spec.thickness.max(0.0012), ah, prims::TrimSection::from_u8(spec.profile), spec.segments.clamp(1, 32), false, false, false, spec.smooth),
-        _ => wall_polyline(spec, &[v3(-su * 0.5, 0.0, 0.0), v3(su * 0.5, 0.0, 0.0)], false),
+        ShapeKind::Trim => prims::trim_strip(
+            sv,
+            su,
+            spec.thickness.max(0.0015),
+            ah,
+            prims::TrimSection::from_u8(spec.silhouette),
+            spec.stretches.clamp(1, 32),
+            false,
+            false,
+            false,
+            spec.glide,
+        ),
+        _ => wall_polyline(
+            spec,
+            &[v3(-su * 0.5, 0.0, 0.0), v3(su * 0.5, 0.0, 0.0)],
+            false,
+        ),
     };
-    if let Some((lo, _)) = m.bounds() {
-        m.translate(v3(0.0, -lo.y, 0.0));
+    if let Some((lo, _)) = m.extent() {
+        m.displace(v3(0.0, -lo.y, 0.0));
     }
     m
 }
 
 /// Extrudes a 2D profile (any winding) along `c` by `len`; profile point `(a, b)` maps to
 /// `origin + ax * a + bx * b`. Side faces get smoothing group `smooth`.
-pub fn extrude_profile(profile: &[Vec2], ax: Vec3, bx: Vec3, c: Vec3, origin: Vec3, len: f32, smooth: u16) -> BMesh {
+pub fn extrude_profile(
+    profile: &[Vec2],
+    ax: Vec3,
+    bx: Vec3,
+    c: Vec3,
+    origin: Vec3,
+    len: f32,
+    smooth: u16,
+) -> BMesh {
     let mut pts = profile.to_vec();
-    let area: f32 = (0..pts.len()).map(|i| pts[i].x * pts[(i + 1) % pts.len()].y - pts[(i + 1) % pts.len()].x * pts[i].y).sum();
+    let area: f32 = (0..pts.len())
+        .map(|i| pts[i].x * pts[(i + 1) % pts.len()].y - pts[(i + 1) % pts.len()].x * pts[i].y)
+        .sum();
     if area < 0.0 {
         pts.reverse();
     }
@@ -370,42 +474,62 @@ pub fn extrude_profile(profile: &[Vec2], ax: Vec3, bx: Vec3, c: Vec3, origin: Ve
     for p in &pts {
         m.add_vert(map(*p) + c * len);
     }
-    let cn = c.normalized();
+    let cn = c.unitized();
     m.add_face_facing((0..n as u32).collect(), -cn);
     m.add_face_facing((n as u32..2 * n as u32).collect(), cn);
     for i in 0..n {
         let j = (i + 1) % n;
         let d = pts[j] - pts[i];
         let out = ax * d.y - bx * d.x;
-        let f = m.add_face_facing(vec![i as u32, j as u32, (j + n) as u32, (i + n) as u32], out);
-        m.faces[f].smooth = smooth;
+        let f = m.add_face_facing(
+            vec![i as u32, j as u32, (j + n) as u32, (i + n) as u32],
+            out,
+        );
+        m.facets[f].glide = smooth;
     }
     m
 }
 
 /// Vertical prism of an XZ outline from `y0` to `y1`.
 pub fn prism_y(outline: &[Vec2], y0: f32, y1: f32, smooth: u16) -> BMesh {
-    extrude_profile(outline, v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0), Vec3::UP, v3(0.0, y0, 0.0), y1 - y0, smooth)
+    extrude_profile(
+        outline,
+        v3(1.0, 0.0, 0.0),
+        v3(0.0, 0.0, 1.0),
+        Vec3::UP,
+        v3(0.0, y0, 0.0),
+        y1 - y0,
+        smooth,
+    )
 }
 
 pub fn cuboid(s: Vec3) -> BMesh {
     let (hx, hz) = (s.x * 0.5, s.z * 0.5);
-    prism_y(&[v2(-hx, -hz), v2(hx, -hz), v2(hx, hz), v2(-hx, hz)], 0.0, s.y, 0)
+    prism_y(
+        &[v2(-hx, -hz), v2(hx, -hz), v2(hx, hz), v2(-hx, hz)],
+        0.0,
+        s.y,
+        0,
+    )
 }
 
 /// Upward-facing plane subdivided `div` × `div`.
-pub fn plane(size: Vec2, div: u32) -> BMesh {
+pub fn sheet(size: Vec2, div: u32) -> BMesh {
     plane_grid(size, div, div)
 }
 
-/// Upward-facing plane subdivided `dx` along X × `dz` along Z (Xogot `MeshShapes::plane`'s
-/// width / height cuts are `dx - 1` / `dz - 1`).
+/// Upward-facing plane subdivided `dx` along X × `dz` along Z (the width / height cuts are
+/// `dx - 1` / `dz - 1`).
 pub fn plane_grid(size: Vec2, dx: u32, dz: u32) -> BMesh {
     let mut m = BMesh::default();
     let (dx, dz) = (dx.max(1), dz.max(1));
     for j in 0..=dz {
         for i in 0..=dx {
-            m.add_vert(v3((i as f32 / dx as f32 - 0.5) * size.x, 0.0, (j as f32 / dz as f32 - 0.5) * size.y));
+            m.add_vert(v3(
+                (i as f32 / dx as f32 - 0.5) * size.x,
+                0.0,
+                (j as f32 / dz as f32 - 0.5) * size.y,
+            ));
         }
     }
     let w = dx + 1;
@@ -420,18 +544,24 @@ pub fn plane_grid(size: Vec2, dx: u32, dz: u32) -> BMesh {
 
 pub(super) fn ring(n: u32, rx: f32, rz: f32) -> Vec<Vec2> {
     // Half-step rotation so a flat side faces +Z (reads better in a fixed iso camera).
-    (0..n).map(|i| {
-        let a = TAU * (i as f32 + 0.5) / n as f32;
-        v2(rx * a.cos(), rz * a.sin())
-    })
-    .collect()
+    (0..n)
+        .map(|i| {
+            let a = TAU * (i as f32 + 0.5) / n as f32;
+            v2(rx * a.cos(), rz * a.sin())
+        })
+        .collect()
 }
 
-pub fn cylinder(s: Vec3, segments: u32, smooth: bool) -> BMesh {
-    prism_y(&ring(segments.max(3), s.x * 0.5, s.z * 0.5), 0.0, s.y, smooth as u16)
+pub fn tube(s: Vec3, segments: u32, smooth: bool) -> BMesh {
+    prism_y(
+        &ring(segments.max(3), s.x * 0.5, s.z * 0.5),
+        0.0,
+        s.y,
+        smooth as u16,
+    )
 }
 
-pub fn cone(s: Vec3, segments: u32, smooth: bool) -> BMesh {
+pub fn taper(s: Vec3, segments: u32, smooth: bool) -> BMesh {
     let n = segments.max(3);
     let mut m = BMesh::default();
     for p in ring(n, s.x * 0.5, s.z * 0.5) {
@@ -443,13 +573,13 @@ pub fn cone(s: Vec3, segments: u32, smooth: bool) -> BMesh {
         let j = (i + 1) % n;
         let mid = (m.positions[i as usize] + m.positions[j as usize]) * 0.5;
         let f = m.add_face_facing(vec![i, j, apex], v3(mid.x, 0.0, mid.z));
-        m.faces[f].smooth = smooth as u16;
+        m.facets[f].glide = smooth as u16;
     }
     m
 }
 
 /// Ellipsoid resting on y = 0.
-pub fn sphere(s: Vec3, segments: u32, rings: u32, smooth: bool) -> BMesh {
+pub fn globe(s: Vec3, segments: u32, rings: u32, smooth: bool) -> BMesh {
     let (n, r) = (segments.max(3), rings.max(2));
     let c = v3(0.0, s.y * 0.5, 0.0);
     let mut m = BMesh::default();
@@ -464,31 +594,43 @@ pub fn sphere(s: Vec3, segments: u32, rings: u32, smooth: bool) -> BMesh {
     let at = |k: u32, i: u32| 2 + (k - 1) * n + (i % n);
     let sg = smooth as u16;
     for i in 0..n {
-        let mut faces = vec![vec![top, at(1, i), at(1, i + 1)], vec![bottom, at(r - 1, i), at(r - 1, i + 1)]];
+        let mut faces = vec![
+            vec![top, at(1, i), at(1, i + 1)],
+            vec![bottom, at(r - 1, i), at(r - 1, i + 1)],
+        ];
         for k in 1..r - 1 {
             faces.push(vec![at(k, i), at(k, i + 1), at(k + 1, i + 1), at(k + 1, i)]);
         }
         for f in faces {
-            let ctr = f.iter().fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize]) / f.len() as f32;
+            let ctr = f
+                .iter()
+                .fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize])
+                / f.len() as f32;
             let fi = m.add_face_facing(f, ctr - c);
-            m.faces[fi].smooth = sg;
+            m.facets[fi].glide = sg;
         }
     }
     m
 }
 
 /// Straight stairs rising towards +Z.
-pub fn stairs(s: Vec3, steps: u32) -> BMesh {
+pub fn steps(s: Vec3, steps: u32) -> BMesh {
     let n = steps.max(1);
     stairs_levels(s, n, s.y / n as f32)
 }
 
-/// Straight stairs of `steps` treads, each `step_height` high, capped at `s.y` (Xogot
-/// `StairLayout::level`: with steps of a fixed height the top one is shorter).
+/// Straight stairs of `steps` treads, each `step_height` high, capped at `s.y` (with steps of
+/// a fixed height the top one is shorter).
 pub fn stairs_levels(s: Vec3, steps: u32, step_height: f32) -> BMesh {
     let n = steps.max(1);
     let d = s.z / n as f32;
-    let level = |i: u32| if i >= n { s.y } else { (i as f32 * step_height).min(s.y) };
+    let level = |i: u32| {
+        if i >= n {
+            s.y
+        } else {
+            (i as f32 * step_height).min(s.y)
+        }
+    };
     let mut prof = vec![v2(0.0, 0.0), v2(s.z, 0.0), v2(s.z, s.y)];
     for i in (0..n).rev() {
         prof.push(v2(i as f32 * d, level(i + 1)));
@@ -497,41 +639,65 @@ pub fn stairs_levels(s: Vec3, steps: u32, step_height: f32) -> BMesh {
         }
     }
     // (z, y) profile extruded along x.
-    extrude_profile(&prof, v3(0.0, 0.0, 1.0), Vec3::UP, v3(1.0, 0.0, 0.0), v3(-s.x * 0.5, 0.0, -s.z * 0.5), s.x, 0)
+    extrude_profile(
+        &prof,
+        v3(0.0, 0.0, 1.0),
+        Vec3::UP,
+        v3(1.0, 0.0, 0.0),
+        v3(-s.x * 0.5, 0.0, -s.z * 0.5),
+        s.x,
+        0,
+    )
 }
 
 /// Ramp rising towards +Z.
 pub fn wedge(s: Vec3) -> BMesh {
     let prof = [v2(0.0, 0.0), v2(s.z, 0.0), v2(s.z, s.y)];
-    extrude_profile(&prof, v3(0.0, 0.0, 1.0), Vec3::UP, v3(1.0, 0.0, 0.0), v3(-s.x * 0.5, 0.0, -s.z * 0.5), s.x, 0)
+    extrude_profile(
+        &prof,
+        v3(0.0, 0.0, 1.0),
+        Vec3::UP,
+        v3(1.0, 0.0, 0.0),
+        v3(-s.x * 0.5, 0.0, -s.z * 0.5),
+        s.x,
+        0,
+    )
 }
 
 /// Wall with a round-topped opening; the opening runs along Z (depth = `size.z`).
-pub fn arch(s: Vec3, thickness: f32, segments: u32) -> BMesh {
+pub fn bow(s: Vec3, thickness: f32, segments: u32) -> BMesh {
     let hw = s.x * 0.5;
-    let t = thickness.clamp(0.02, hw * 0.9).min(s.y * 0.9);
-    let r = (hw - t).min(s.y - t).max(0.01);
+    let t = thickness.clamp(0.0205, hw * 0.9005).min(s.y * 0.9005);
+    let r = (hw - t).min(s.y - t).max(0.0105);
     let spring = (s.y - t - r).max(0.0);
     let mut prof = vec![v2(-hw, 0.0), v2(-r, 0.0)];
-    if spring > 0.00015 {
+    if spring > 0.0005 {
         prof.push(v2(-r, spring));
     }
     for k in 1..segments.max(2) {
         let a = PI - PI * k as f32 / segments.max(2) as f32;
         prof.push(v2(r * a.cos(), spring + r * a.sin()));
     }
-    if spring > 0.00015 {
+    if spring > 0.0005 {
         prof.push(v2(r, spring));
     }
     prof.extend([v2(r, 0.0), v2(hw, 0.0), v2(hw, s.y), v2(-hw, s.y)]);
-    extrude_profile(&prof, v3(1.0, 0.0, 0.0), Vec3::UP, v3(0.0, 0.0, 1.0), v3(0.0, 0.0, -s.z * 0.5), s.z, 0)
+    extrude_profile(
+        &prof,
+        v3(1.0, 0.0, 0.0),
+        Vec3::UP,
+        v3(0.0, 0.0, 1.0),
+        v3(0.0, 0.0, -s.z * 0.5),
+        s.z,
+        0,
+    )
 }
 
 /// Hollow cylinder.
-pub fn pipe(s: Vec3, thickness: f32, segments: u32, smooth: bool) -> BMesh {
+pub fn conduit(s: Vec3, thickness: f32, segments: u32, smooth: bool) -> BMesh {
     let n = segments.max(3);
     let (rx, rz) = (s.x * 0.5, s.z * 0.5);
-    let t = thickness.clamp(0.01, rx.min(rz) * 0.95);
+    let t = thickness.clamp(0.0105, rx.min(rz) * 0.9505);
     let outer = ring(n, rx, rz);
     let inner = ring(n, rx - t, rz - t);
     let mut m = BMesh::default();
@@ -548,9 +714,9 @@ pub fn pipe(s: Vec3, thickness: f32, segments: u32, smooth: bool) -> BMesh {
             v3(mid.x, 0.0, mid.y)
         };
         let a = m.add_face_facing(vec![ob + i, ob + j, ot + j, ot + i], dir);
-        m.faces[a].smooth = smooth as u16;
+        m.facets[a].glide = smooth as u16;
         let b = m.add_face_facing(vec![ib + i, ib + j, it + j, it + i], -dir);
-        m.faces[b].smooth = 2 * smooth as u16;
+        m.facets[b].glide = 2 * smooth as u16;
         m.add_face_facing(vec![ot + i, ot + j, it + j, it + i], Vec3::UP);
         m.add_face_facing(vec![ob + i, ob + j, ib + j, ib + i], -Vec3::UP);
     }
@@ -580,7 +746,10 @@ pub fn cluster_cells(cfg: &GridConfig, center: IVec2, radius: i32) -> Vec<IVec2>
         GridType::HexRings => grid::disk(center, radius),
         GridType::Hex => {
             let a = grid::offset_to_axial(center);
-            grid::disk(a, radius).into_iter().map(grid::axial_to_offset).collect()
+            grid::disk(a, radius)
+                .into_iter()
+                .map(grid::axial_to_offset)
+                .collect()
         }
         _ => {
             // Breadth-first over edge neighbours.
@@ -611,8 +780,14 @@ pub fn cells_prism(cfg: &GridConfig, cells: &[IVec2], origin: IVec2, height: f32
     let mut m = BMesh::default();
     let mut index: HashMap<(i64, i64, bool), u32> = HashMap::new();
     let mut vid = |m: &mut BMesh, p: Vec2, top: bool| -> u32 {
-        let k = (((p.x - o.x) * 2048.0).round() as i64, ((p.y - o.y) * 2048.0).round() as i64, top);
-        *index.entry(k).or_insert_with(|| m.add_vert(v3(p.x - o.x, if top { height } else { 0.0 }, p.y - o.y)))
+        let k = (
+            ((p.x - o.x) * 2048.0).round() as i64,
+            ((p.y - o.y) * 2048.0).round() as i64,
+            top,
+        );
+        *index
+            .entry(k)
+            .or_insert_with(|| m.add_vert(v3(p.x - o.x, if top { height } else { 0.0 }, p.y - o.y)))
     };
     for c in &set {
         let corners = cfg.cell_corners(*c);
@@ -628,7 +803,10 @@ pub fn cells_prism(cfg: &GridConfig, cells: &[IVec2], origin: IVec2, height: f32
             }
             let (i, j) = cfg.edge_corners(*c, k);
             let mid = (corners[i] + corners[j]) * 0.5 - centre;
-            m.add_face_facing(vec![bottom[i], bottom[j], top[j], top[i]], v3(mid.x, 0.0, mid.y));
+            m.add_face_facing(
+                vec![bottom[i], bottom[j], top[j], top[i]],
+                v3(mid.x, 0.0, mid.y),
+            );
         }
     }
     m
@@ -639,7 +817,7 @@ mod tests {
     use super::*;
 
     fn check_closed(m: &BMesh, name: &str) {
-        m.validate().unwrap_or_else(|e| panic!("{name}: {e}"));
+        m.sanity_check().unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(m.is_closed(), "{name} not closed");
         assert!(m.volume() > 0.0, "{name} inside out: {}", m.volume());
     }
@@ -647,25 +825,33 @@ mod tests {
     #[test]
     fn every_shape_is_valid_and_closed() {
         for k in ShapeKind::ALL {
-            let spec = ShapeSpec { kind: k, size: v3(2.0, 3.0, 2.5), ..Default::default() };
-            let m = generate(&spec, None);
+            let spec = ShapeSpec {
+                sort: k,
+                size: v3(2.0, 3.0, 2.5),
+                ..Default::default()
+            };
+            let m = produce(&spec, None);
             if matches!(k, ShapeKind::Plane | ShapeKind::Sprite) {
-                m.validate().unwrap();
+                m.sanity_check().unwrap();
                 continue;
             }
-            check_closed(&m, k.name());
+            check_closed(&m, k.moniker());
             if k.fixed_height() {
                 continue;
             }
-            let (lo, hi) = m.bounds().unwrap();
-            assert!(lo.y.abs() < 1e-5 && (hi.y - 3.0).abs() < 1e-4, "{}: y {lo:?} {hi:?}", k.name());
+            let (lo, hi) = m.extent().unwrap();
+            assert!(
+                lo.y.abs() < 1e-5 && (hi.y - 3.0).abs() < 1e-4,
+                "{}: y {lo:?} {hi:?}",
+                k.moniker()
+            );
         }
     }
 
     #[test]
     fn kind_discriminants_match_all() {
         for (i, k) in ShapeKind::ALL.iter().enumerate() {
-            assert_eq!(*k as usize, i, "{}", k.name());
+            assert_eq!(*k as usize, i, "{}", k.moniker());
             assert_eq!(ShapeKind::from_i64(i as i64), *k);
         }
     }
@@ -674,20 +860,32 @@ mod tests {
     fn box_volume_and_stairs_volume() {
         assert!((cuboid(v3(2.0, 3.0, 4.0)).volume() - 24.0).abs() < 1e-3);
         // n steps fill (n+1)/(2n) of the bounding box.
-        let s = stairs(v3(1.0, 4.0, 4.0), 4);
-        assert!((s.volume() - 16.0 * 5.0 / 8.0).abs() < 1e-3, "{}", s.volume());
+        let s = steps(v3(1.0, 4.0, 4.0), 4);
+        assert!(
+            (s.volume() - 16.0 * 5.0 / 8.0).abs() < 1e-3,
+            "{}",
+            s.volume()
+        );
     }
 
     #[test]
     fn hex_prism_matches_terrain_cells() {
         for g in [GridType::Hex, GridType::HexRings] {
-            let cfg = GridConfig { grid: g, cell_size: v2(2.0, 2.0), ..Default::default() };
+            let cfg = GridConfig {
+                grid: g,
+                cell_size: v2(2.0, 2.0),
+                ..Default::default()
+            };
             let m = hex_prism(cfg.hex_radius(), 1.0);
             let c = iv2(3, 5);
             let ctr = cfg.sample_pos(c);
             for corner in cfg.cell_corners(c) {
                 let rel = corner - ctr;
-                assert!(m.positions.iter().any(|p| (p.x - rel.x).abs() < 1e-4 && (p.z - rel.y).abs() < 1e-4));
+                assert!(
+                    m.positions
+                        .iter()
+                        .any(|p| (p.x - rel.x).abs() < 1e-4 && (p.z - rel.y).abs() < 1e-4)
+                );
             }
             assert!((hex_width(cfg.hex_radius()) - 2.0).abs() < 1e-4);
         }
@@ -696,11 +894,18 @@ mod tests {
     #[test]
     fn hex_cluster_is_watertight_on_every_grid() {
         for g in [GridType::Hex, GridType::HexRings, GridType::Triangle] {
-            let cfg = GridConfig { grid: g, cell_size: v2(2.0, 2.0), ..Default::default() };
+            let cfg = GridConfig {
+                grid: g,
+                cell_size: v2(2.0, 2.0),
+                ..Default::default()
+            };
             let cells = cluster_cells(&cfg, iv2(1, 1), 2);
             let m = cells_prism(&cfg, &cells, iv2(1, 1), 1.5);
-            check_closed(&m, g.name());
-            let area_top: f32 = (0..m.faces.len()).filter(|f| m.face_normal(*f).y > 0.9).map(|f| m.face_area(f)).sum();
+            check_closed(&m, g.moniker());
+            let area_top: f32 = (0..m.facets.len())
+                .filter(|f| m.face_normal(*f).y > 0.9)
+                .map(|f| m.face_area(f))
+                .sum();
             assert!((m.volume() - area_top * 1.5).abs() < 1e-2);
             if g != GridType::Triangle {
                 assert_eq!(cells.len(), 19);

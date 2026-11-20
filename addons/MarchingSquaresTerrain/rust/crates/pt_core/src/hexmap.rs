@@ -35,21 +35,24 @@ pub struct MapWindow {
 
 impl MapWindow {
     pub fn new(origin: IVec2, size: IVec2) -> MapWindow {
-        MapWindow { origin, size: iv2(size.x.max(0), size.y.max(0)) }
+        MapWindow {
+            origin,
+            size: iv2(size.x.max(0), size.y.max(0)),
+        }
     }
     pub fn len(&self) -> usize {
         (self.size.x.max(0) * self.size.y.max(0)) as usize
     }
-    pub fn is_empty(&self) -> bool {
+    pub fn check_vacant(&self) -> bool {
         self.len() == 0
     }
-    pub fn contains(&self, c: IVec2) -> bool {
+    pub fn holds(&self, c: IVec2) -> bool {
         let d = c - self.origin;
         d.x >= 0 && d.y >= 0 && d.x < self.size.x && d.y < self.size.y
     }
     /// Texel index of a cell (row-major), `None` outside.
-    pub fn index(&self, c: IVec2) -> Option<usize> {
-        self.contains(c).then(|| {
+    pub fn ordinal(&self, c: IVec2) -> Option<usize> {
+        self.holds(c).then(|| {
             let d = c - self.origin;
             (d.y * self.size.x + d.x) as usize
         })
@@ -59,7 +62,7 @@ impl MapWindow {
         let w = self.size.x.max(1) as usize;
         self.origin + iv2((i % w) as i32, (i / w) as i32)
     }
-    pub fn cells(&self) -> impl Iterator<Item = IVec2> + '_ {
+    pub fn tiles(&self) -> impl Iterator<Item = IVec2> + '_ {
         (0..self.len()).map(|i| self.cell(i))
     }
     /// Smallest window holding every cell of `cells`, grown by `pad` on every side.
@@ -100,7 +103,7 @@ pub fn chunks_window(store: &TerrainStore, pad: i32) -> MapWindow {
 /// One decoded texel of the combined map.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CellTexel {
-    pub height: f32,
+    pub stature: f32,
     pub water: f32,
     pub floor: u8,
     pub wall: u8,
@@ -110,7 +113,12 @@ pub struct CellTexel {
 /// Packs a texel (`None` = missing cell).
 pub fn pack(t: Option<CellTexel>) -> [f32; 4] {
     match t {
-        Some(t) => [t.height, t.water, t.floor as f32, t.wall as f32 + if t.grass { 16.0 } else { 0.0 }],
+        Some(t) => [
+            t.stature,
+            t.water,
+            t.floor as f32,
+            t.wall as f32 + if t.grass { 16.0 } else { 0.0 },
+        ],
         None => [0.0, NO_WATER, 15.0, MISSING],
     }
 }
@@ -121,16 +129,26 @@ pub fn unpack(v: [f32; 4]) -> Option<CellTexel> {
         return None;
     }
     let a = v[3].round().max(0.0) as u32;
-    Some(CellTexel { height: v[0], water: v[1], floor: v[2].round().clamp(0.0, 15.0) as u8, wall: (a % 16) as u8, grass: a >= 16 })
+    Some(CellTexel {
+        stature: v[0],
+        water: v[1],
+        floor: v[2].round().clamp(0.0, 15.0) as u8,
+        wall: (a % 16) as u8,
+        grass: a >= 16,
+    })
 }
 
 /// The combined RGBA map of a window (row-major texels, see the module docs). `water(cell)`
 /// gives the water surface of a cell (`None` = dry).
-pub fn build_cell_map(store: &TerrainStore, w: MapWindow, water: &dyn Fn(IVec2) -> Option<f32>) -> Vec<[f32; 4]> {
-    w.cells()
+pub fn build_cell_map(
+    store: &TerrainStore,
+    w: MapWindow,
+    water: &dyn Fn(IVec2) -> Option<f32>,
+) -> Vec<[f32; 4]> {
+    w.tiles()
         .map(|c| {
-            pack(store.sample(c).map(|s| CellTexel {
-                height: s.height,
+            pack(store.probe(c).map(|s| CellTexel {
+                stature: s.stature,
                 water: water(c).unwrap_or(NO_WATER),
                 floor: s.floor,
                 wall: s.wall,
@@ -142,12 +160,16 @@ pub fn build_cell_map(store: &TerrainStore, w: MapWindow, water: &dyn Fn(IVec2) 
 
 /// Heights of a window (`missing` where no chunk stores the cell).
 pub fn height_map(store: &TerrainStore, w: MapWindow, missing: f32) -> Vec<f32> {
-    w.cells().map(|c| store.height(c).unwrap_or(missing)).collect()
+    w.tiles()
+        .map(|c| store.stature(c).unwrap_or(missing))
+        .collect()
 }
 
 /// Floor slots (biome / texture-array slice) of a window, 255 where missing.
 pub fn biome_map(store: &TerrainStore, w: MapWindow) -> Vec<u8> {
-    w.cells().map(|c| store.sample(c).map(|s| s.floor).unwrap_or(255)).collect()
+    w.tiles()
+        .map(|c| store.probe(c).map(|s| s.floor).unwrap_or(255))
+        .collect()
 }
 
 /// Writes heights from a window-shaped buffer into the store (cells without a chunk and
@@ -159,7 +181,7 @@ pub fn apply_heights(store: &mut TerrainStore, w: MapWindow, values: &[f32]) -> 
             continue;
         }
         let c = w.cell(i);
-        if store.height(c).is_some_and(|h| (h - v).abs() > 1e-6) && store.set_height(c, *v) {
+        if store.stature(c).is_some_and(|h| (h - v).abs() > 1e-6) && store.set_height(c, *v) {
             for t in store.chunks_affected_by(c) {
                 if !touched.contains(&t) {
                     touched.push(t);
@@ -178,7 +200,7 @@ pub fn apply_biomes(store: &mut TerrainStore, w: MapWindow, values: &[u8]) -> Ve
             continue;
         }
         let c = w.cell(i);
-        if store.sample(c).is_some_and(|s| s.floor != *v) {
+        if store.probe(c).is_some_and(|s| s.floor != *v) {
             for t in store.edit_sample(c, |d, k| d.floor_tex[k] = *v) {
                 if !touched.contains(&t) {
                     touched.push(t);
@@ -197,7 +219,7 @@ pub fn apply_biomes(store: &mut TerrainStore, w: MapWindow, values: &[u8]) -> Ve
 /// Whether the window must move to keep `center` at least `margin` cells from its border
 /// (recentre-on-demand for a window following the player).
 pub fn needs_recenter(w: MapWindow, center: IVec2, margin: i32) -> bool {
-    if w.is_empty() {
+    if w.check_vacant() {
         return true;
     }
     let d = center - w.origin;
@@ -212,7 +234,13 @@ mod tests {
     use crate::grid::GridConfig;
 
     fn rings(wrap_period: i32) -> TerrainStore {
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(6.0, 6.0), wrap_period, ..Default::default() };
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(6.0, 6.0),
+            wrap_period,
+            ..Default::default()
+        };
         let mut s = TerrainStore::new(cfg);
         s.add_chunk(iv2(0, 0), MergeMode::Polyhedron);
         s
@@ -223,17 +251,17 @@ mod tests {
         let w = MapWindow::new(iv2(-3, 2), iv2(5, 4));
         assert_eq!(w.len(), 20);
         for i in 0..w.len() {
-            assert_eq!(w.index(w.cell(i)), Some(i));
+            assert_eq!(w.ordinal(w.cell(i)), Some(i));
         }
-        assert_eq!(w.index(iv2(2, 2)), None);
+        assert_eq!(w.ordinal(iv2(2, 2)), None);
         let d = window_around(GridType::HexRings, iv2(4, -1), 3);
         assert_eq!((d.origin, d.size), (iv2(1, -4), iv2(7, 7)));
         for c in crate::grid::disk(iv2(4, -1), 3) {
-            assert!(d.contains(c));
+            assert!(d.holds(c));
         }
         let o = window_around(GridType::Hex, iv2(5, 3), 2);
         for a in crate::grid::disk(offset_to_axial(iv2(5, 3)), 2) {
-            assert!(o.contains(axial_to_offset(a)));
+            assert!(o.holds(axial_to_offset(a)));
         }
     }
 
@@ -249,13 +277,16 @@ mod tests {
         let w = chunks_window(&s, 1);
         assert_eq!((w.origin, w.size), (iv2(-3, -3), iv2(7, 7)));
         let map = build_cell_map(&s, w, &|c| (c == iv2(0, 0)).then_some(4.0));
-        let t0 = unpack(map[w.index(iv2(0, 0)).unwrap()]).unwrap();
-        assert_eq!((t0.height, t0.water), (3.5, 4.0));
-        let t1 = unpack(map[w.index(iv2(1, 0)).unwrap()]).unwrap();
-        assert_eq!((t1.floor, t1.wall, t1.grass, t1.water), (7, 4, true, NO_WATER));
+        let t0 = unpack(map[w.ordinal(iv2(0, 0)).unwrap()]).unwrap();
+        assert_eq!((t0.stature, t0.water), (3.5, 4.0));
+        let t1 = unpack(map[w.ordinal(iv2(1, 0)).unwrap()]).unwrap();
+        assert_eq!(
+            (t1.floor, t1.wall, t1.grass, t1.water),
+            (7, 4, true, NO_WATER)
+        );
         // Outside the chunk disk: missing.
-        assert!(unpack(map[w.index(iv2(2, 2)).unwrap()]).is_none());
-        assert_eq!(biome_map(&s, w)[w.index(iv2(1, 0)).unwrap()], 7);
+        assert!(unpack(map[w.ordinal(iv2(2, 2)).unwrap()]).is_none());
+        assert_eq!(biome_map(&s, w)[w.ordinal(iv2(1, 0)).unwrap()], 7);
     }
 
     #[test]
@@ -265,11 +296,21 @@ mod tests {
         let hs: Vec<f32> = (0..w.len()).map(|i| i as f32).collect();
         let t = apply_heights(&mut s, w, &hs);
         assert_eq!(t, vec![iv2(0, 0)]);
-        assert_eq!(height_map(&s, w, -1.0), hs.iter().enumerate().map(|(i, h)| if s.height(w.cell(i)).is_some() { *h } else { -1.0 }).collect::<Vec<_>>());
-        assert_eq!(s.height(iv2(0, 0)), Some(4.0));
+        assert_eq!(
+            height_map(&s, w, -1.0),
+            hs.iter()
+                .enumerate()
+                .map(|(i, h)| if s.stature(w.cell(i)).is_some() {
+                    *h
+                } else {
+                    -1.0
+                })
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(s.stature(iv2(0, 0)), Some(4.0));
         let bs = vec![9u8; w.len()];
         apply_biomes(&mut s, w, &bs);
-        assert_eq!(s.sample(iv2(1, -1)).unwrap().floor, 9);
+        assert_eq!(s.probe(iv2(1, -1)).unwrap().floor, 9);
         // A second identical upload touches nothing.
         assert!(apply_heights(&mut s, w, &hs).is_empty());
     }
@@ -281,9 +322,12 @@ mod tests {
         s.set_height(iv2(0, 0), 2.0);
         let w = window_around(GridType::HexRings, iv2(19, 0), 1);
         let map = build_cell_map(&s, w, &|_| None);
-        let t = unpack(map[w.index(iv2(19, 0)).unwrap()]).expect("wrapped cell exists");
-        assert_eq!(t.height, 2.0);
-        assert!(w.cells().all(|c| s.sample(c).is_some()), "no hole anywhere on a one-patch torus");
+        let t = unpack(map[w.ordinal(iv2(19, 0)).unwrap()]).expect("wrapped cell exists");
+        assert_eq!(t.stature, 2.0);
+        assert!(
+            w.tiles().all(|c| s.probe(c).is_some()),
+            "no hole anywhere on a one-patch torus"
+        );
     }
 
     #[test]

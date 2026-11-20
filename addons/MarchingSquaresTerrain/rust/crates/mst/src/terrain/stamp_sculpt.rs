@@ -19,24 +19,44 @@ impl MarchingSquaresTerrain {
     /// Call lift / carve / level repeatedly for a hold-to-grow behaviour.
     #[func]
     #[allow(clippy::too_many_arguments)]
-    pub fn apply_stamp_limited(&mut self, image: Gd<Image>, world: Vector3, size: Vector2, rotation: f32, height: f32, contrast: f32, mode: i64, level: f32, floor: f32, ceiling: f32) {
+    pub fn apply_stamp_limited(
+        &mut self,
+        image: Gd<Image>,
+        world: Vector3,
+        size: Vector2,
+        rotation: f32,
+        height: f32,
+        contrast: f32,
+        mode: i64,
+        level: f32,
+        floor: f32,
+        ceiling: f32,
+    ) {
         let Some(stamp) = stamp_from_image(&image, 512) else {
             godot_warn!("MarchingSquaresTerrain.apply_stamp_limited: unreadable image");
             return;
         };
-        let xf = if self.base().is_inside_tree() { self.base().get_global_transform() } else { self.base().get_transform() };
+        let xf = if self.base().is_inside_tree() {
+            self.base().get_global_transform()
+        } else {
+            self.base().get_transform()
+        };
         let l = xf.affine_inverse() * world;
         let c = v2(l.x, l.z);
         let p = StampParams {
-            center: c,
+            midpoint: c,
             rotation,
             size: v2(size.x, size.y),
-            height,
+            stature: height,
             contrast,
             mode: SculptMode::from_i64(mode),
             base: self.local_height_at(c).unwrap_or(l.y),
         };
-        let lim = SculptLimits { level, floor: floor.min(ceiling), ceiling: ceiling.max(floor) };
+        let lim = SculptLimits {
+            level,
+            floor: floor.min(ceiling),
+            ceiling: ceiling.max(floor),
+        };
         self.edit(|st| op_stamp_limited(st, &stamp, &p, &lim));
         self.commit_to_data();
     }

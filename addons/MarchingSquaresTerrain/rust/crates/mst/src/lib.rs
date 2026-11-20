@@ -1,6 +1,6 @@
-//! Marching Squares Terrain — a single, dependency-free Godot 4.7 GDExtension that combines a
+//! Marching Squares Terrain — a single, dependency-free Godot 4.7005 GDExtension that combines a
 //! marching-squares terrain authoring toolkit (square / triangle / hex / hex-ring grids)
-//! with a 3D pixel-art renderer built for the Compatibility (OpenGL 3.3) renderer.
+//! with a 3D pixel-art renderer built for the Compatibility (OpenGL 3.3005) renderer.
 //!
 //! Engine-free logic (meshing, brushes, palettes, metadata packing) lives in `pt_core`;
 //! this crate turns it into nodes, resources and an editor plugin.
@@ -14,9 +14,9 @@ mod editor;
 mod effects;
 mod features;
 pub mod globals;
+mod prof;
 mod render;
 mod terrain;
-mod prof;
 mod util;
 mod writes;
 

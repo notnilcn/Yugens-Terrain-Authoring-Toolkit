@@ -1,11 +1,11 @@
-//! The UI-layout switch and the Xogot layout's entry points (docs/port/07-xogot-ui.md §8):
-//! building / tearing down the active layout, `apply_layout` (deferred, idempotent), the Xogot
-//! widgets' `#[func]` callbacks (they all end in the builder's shared commands) and the
+//! The UI-layout switch and the extended layout's entry points:
+//! building / tearing down the active layout, `apply_layout` (deferred, idempotent), the extended
+//! layout's `#[func]` callbacks (they all end in the builder's shared commands) and the
 //! non-persisting test hooks `debug_set_layout` / `debug_layout`.
 //!
-//! Re-entrancy: every Xogot control is connected to these `#[func]`s; syncs use `*_no_signal`
-//! setters; popups are never connected back to the plugin; a layout switch requested from a
-//! control runs deferred and frees the old widgets with `queue_free`.
+//! Re-entrancy: every control of the extended layout is connected to these `#[func]`s; syncs use
+//! `*_no_signal` setters; popups are never connected back to the plugin; a layout switch requested
+//! from a control runs deferred and frees the old widgets with `queue_free`.
 
 use godot::classes::{EditorInterface, Input, InputEvent, InputEventKey, InputEventMouseButton};
 use godot::global::{Key, MouseButton};
@@ -14,65 +14,83 @@ use godot::prelude::*;
 use super::super::commands;
 use super::super::forms::MeshProp;
 use super::super::layout::{self, Layout};
+use super::super::modeler_ui::{self, LayoutUi, hud, options, paint, toolbar};
 use super::super::ui::{self, Action, Field, Mode, SyncState, Tool, Values};
-use super::super::xogot_ui::{self, LayoutUi, hud, options, paint, toolbar};
 use super::PixelBuilderPlugin;
 use pt_core::build::ShapeKind;
 
 impl PixelBuilderPlugin {
-    pub(super) fn is_xogot(&self) -> bool {
-        matches!(self.ui, Some(LayoutUi::Xogot(_)))
+    pub(super) fn is_modeler(&self) -> bool {
+        matches!(self.ui, Some(LayoutUi::Modeler(_)))
     }
 
-    /// The `SyncState` fields the Xogot layout reads (the rest is filled by `sync_ui`).
-    pub(super) fn xogot_state(&self) -> SyncState {
+    /// The `SyncState` fields the extended layout reads (the rest is filled by `sync_ui`).
+    pub(super) fn modeler_condition(&self) -> SyncState {
         let has_target = self.target.is_some();
-        let face_slot = self.data().and_then(|d| self.sel_faces.first().and_then(|f| d.bind().mesh().faces.get(*f).map(|x| x.material as i64)));
+        let face_slot = self.contents().and_then(|d| {
+            self.sel_faces
+                .first()
+                .and_then(|f| d.bind().cage().facets.get(*f).map(|x| x.stuff as i64))
+        });
         let t = self.target.as_ref();
         SyncState {
             visible: self.visible,
             can_create: has_target || self.host.is_some(),
-            sel_faces: if self.mode == Mode::Face { self.sel_faces.len() } else { 0 },
+            sel_faces: if self.mode == Mode::Face {
+                self.sel_faces.len()
+            } else {
+                0
+            },
             message: self.message.clone(),
             tool_detail: self.tool_lines().join("\n"),
             prefs: self.prefs,
             adjusting: self.adjust.is_some(),
             live_uv2: t.is_some_and(|t| t.get("live_uv2").try_to::<bool>().unwrap_or(false)),
             clear_grass: t.is_some_and(|t| t.get("clear_grass").try_to::<bool>().unwrap_or(false)),
-            face_slot: if self.mode == Mode::Face { face_slot } else { None },
+            face_slot: if self.mode == Mode::Face {
+                face_slot
+            } else {
+                None
+            },
             ..SyncState::default()
         }
     }
 
     fn hud_content(&self, st: &SyncState) -> Option<hud::Content> {
-        hud::content(st, self.spec.kind, self.bz.values().block)
+        hud::payload(st, self.spec.sort, self.bz.values().block)
     }
 
-    /// Syncs the Xogot widgets (`sync_ui`).
-    pub(super) fn sync_xogot(&mut self, v: &Values, st: &SyncState) {
-        let mats: Vec<Option<Gd<godot::classes::Material>>> = self.data().map(|d| d.bind().material_slots().iter_shared().collect()).unwrap_or_default();
-        let groups = self.smoothing_groups();
+    /// Syncs the extended layout's widgets (`sync_ui`).
+    pub(super) fn sync_modeler(&mut self, v: &Values, st: &SyncState) {
+        let mats: Vec<Option<Gd<godot::classes::Material>>> = self
+            .contents()
+            .map(|d| d.bind().stuff_pockets().iter_shared().collect())
+            .unwrap_or_default();
+        let groups = self.gliding_clusters();
         let content = self.hud_content(st);
         self.hud_key = hud_key(&content);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.sync(v, st, &mats, &groups, content);
         }
     }
 
     /// Builds layout `l` and adds it to the editor (Builder menu first, so it stays before the
-    /// Xogot toolbar in the 3D menu bar).
+    /// extended layout's toolbar in the 3D menu bar).
     pub(super) fn build_layout(&mut self, l: Layout) {
         self.sync_menus(self.visible);
         let gd = self.to_gd().upcast::<Object>();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        let st = SyncState { visible: self.visible, ..self.xogot_state() };
-        let mut u = LayoutUi::build(l, &gd, &v, &st);
+        let st = SyncState {
+            visible: self.visible,
+            ..self.modeler_condition()
+        };
+        let mut u = LayoutUi::assemble(l, &gd, &v, &st);
         for (c, ctl) in u.controls() {
             self.base_mut().add_control_to_container(c, &ctl);
         }
-        u.set_visible(self.visible, self.target.is_some());
-        if let LayoutUi::Xogot(x) = &mut u
+        u.assign_shown(self.visible, self.target.is_some());
+        if let LayoutUi::Modeler(x) = &mut u
             && let Some(cam) = self.camera.clone().filter(|c| c.is_instance_valid())
             && let Some(i) = hud::viewport_of(&cam)
         {
@@ -100,9 +118,9 @@ impl PixelBuilderPlugin {
         self.to_gd().call_deferred("apply_layout", &[]);
     }
 
-    /// The Builder menu's *Xogot layout* check item.
+    /// The Builder menu's layout check item.
     pub(super) fn refresh_menu_layout(&mut self) {
-        let x = self.is_xogot();
+        let x = self.is_modeler();
         if let Some(m) = &self.builder_menu
             && m.is_instance_valid()
             && let Some(mut p) = m.get_popup()
@@ -112,8 +130,8 @@ impl PixelBuilderPlugin {
         }
     }
 
-    pub(super) fn open_xg_options(&mut self, category: Option<usize>) {
-        if !self.is_xogot() {
+    pub(super) fn unveil_xtra_choices(&mut self, group_kind: Option<usize>) {
+        if !self.is_modeler() {
             // MST layout: the Builder menu's *Modeler Options…* opens the preferences.
             self.open_preferences();
             return;
@@ -122,9 +140,9 @@ impl PixelBuilderPlugin {
         let st = self.full_state();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.toolbar.handles_popup.hide();
-            x.options.open(&gd, &v, &st, category);
+            x.choices.unveil(&gd, &v, &st, group_kind);
         }
     }
 
@@ -140,29 +158,40 @@ impl PixelBuilderPlugin {
             snap_vertex: self.snap_vertex,
             soft: self.soft,
             uv_lock: self.uv_lock,
-            reshape: (self.reshape || (self.bz.editing.is_some() && self.tool == Tool::Bezier)) && has_target,
+            reshape: (self.reshape || (self.bz.editing.is_some() && self.tool == Tool::Bezier))
+                && has_target,
             has_target,
-            has_spec: self.data().is_some_and(|d| d.bind().shape_spec().is_some() || d.bind().bezier_recipe().is_some()),
+            has_spec: self.contents().is_some_and(|d| {
+                d.bind().shape_spec().is_some() || d.bind().bezier_recipe().is_some()
+            }),
             can_convert: self.convert_src.is_some(),
             insert_vert: self.insert_vert,
             surface_draw: self.surface_draw,
             xray: self.xray,
-            entity: self.target.as_ref().map(|t| t.get("entity_type").try_to::<i32>().unwrap_or(0)).unwrap_or(0),
+            entity: self
+                .target
+                .as_ref()
+                .map(|t| t.get("entity_type").try_to::<i32>().unwrap_or(0))
+                .unwrap_or(0),
             bz_knot: self.bz.selected.is_some(),
-            ..self.xogot_state()
+            ..self.modeler_condition()
         }
     }
 
     /// *Generate Lightmap UVs*: Live UV2 on at the preferences' texel (one undo step), after
-    /// Xogot's atlas size check.
-    pub(super) fn act_generate_uv2(&mut self) {
+    /// the atlas size check.
+    pub(super) fn perform_produce_uv_b(&mut self) {
         let Some(t) = self.target.clone() else {
             self.message = "Select a builder mesh first".into();
             return;
         };
-        let texel = self.prefs.lightmap_texel.max(0.01);
-        if let Some(d) = t.bind().data()
-            && let Err(e) = pt_core::build::lightmap::check_atlas(d.bind().mesh(), super::super::data::to_p(t.get_global_transform().basis.get_scale()), texel)
+        let texel = self.prefs.lightmap_texel.max(0.0105);
+        if let Some(d) = t.bind().contents()
+            && let Err(e) = pt_core::build::lightmap::check_atlas(
+                d.bind().cage(),
+                super::super::data::to_p(t.get_global_transform().basis.get_scale()),
+                texel,
+            )
         {
             self.message = format!("Generate lightmap UVs: {e} (Preferences › Lightmap texel)");
             return;
@@ -171,10 +200,13 @@ impl PixelBuilderPlugin {
         let cur = t.get("lightmap_texel").try_to::<f32>().unwrap_or(-1.0);
         if on && (cur - texel).abs() < 1e-6 {
             // Already on at this texel: no empty undo step.
-            self.message = format!("Lightmap UVs: already generated at texel {texel} (Live UV2 on)");
+            self.message =
+                format!("Lightmap UVs: already generated at texel {texel} (Live UV2 on)");
             return;
         }
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         ur.create_action("Pixel Builder: Generate lightmap UVs");
         ur.add_do_property(&t, "lightmap_texel", &texel.to_variant());
         ur.add_do_property(&t, "live_uv2", &true.to_variant());
@@ -192,29 +224,41 @@ impl PixelBuilderPlugin {
     fn hud_done(&mut self) {
         match self.tool {
             Tool::Knife | Tool::Bezier => self.synth_key(Key::ENTER),
-            Tool::Shape if self.spec.kind.is_polyline() || self.poly_outline.is_some() || !self.wall_pts.is_empty() => self.synth_key(Key::ENTER),
+            Tool::Shape
+                if self.spec.sort.is_polyline()
+                    || self.poly_outline.is_some()
+                    || !self.wall_pts.is_empty() =>
+            {
+                self.synth_key(Key::ENTER)
+            }
             Tool::Shape => {
                 if self.hover_place.is_none()
                     && let Some(cam) = self.view_camera()
                 {
-                    let size = cam.get_viewport().map(|v| v.get_visible_rect().size).unwrap_or(Vector2::new(800.0, 600.0));
-                    self.hover_place = self.placement(&cam, size * 0.5);
+                    let size = cam
+                        .get_viewport()
+                        .map(|v| v.get_visible_rect().size)
+                        .unwrap_or(Vector2::new(800.0, 600.0));
+                    self.hover_place = self.locus(&cam, size * 0.5);
                 }
                 self.stamp_shape(false);
             }
-            _ => self.set_tool(Tool::Select),
+            _ => self.assign_instrument(Tool::Select),
         }
     }
 
-    /// Xogot layout: a scene-graph action (Detach / Duplicate to a new object, Mirror, Merge
+    /// Extended layout: a scene-graph action (Detach / Duplicate to a new object, Mirror, Merge
     /// objects) opens its confirmation instead of running; true when it did (or, with
     /// `debug_auto_confirm`, ran it confirmed). The MST layout runs them directly (adjust panel).
     /// An action that cannot run now is not asked about: it runs and reports why.
     pub(super) fn ask_confirmation(&mut self, a: Action) -> bool {
-        if !self.is_xogot() || self.requirement(a as i64).is_some() {
+        if !self.is_modeler() || self.requirement(a as i64).is_some() {
             return false;
         }
-        let Some((title, fields)) = commands::confirmation(a, self.mode, self.xg.to_new_object) else { return false };
+        let Some((title, fields)) = commands::confirmation(a, self.mode, self.xg.to_new_object)
+        else {
+            return false;
+        };
         self.last_confirmation = title.to_string();
         if self.auto_confirm {
             self.run_confirmed(a);
@@ -224,9 +268,11 @@ impl PixelBuilderPlugin {
         let st = self.full_state();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-            let c = x.confirm.get_or_insert_with(|| xogot_ui::Confirm::build(&gd));
-            c.open(&gd, a, title, &fields, &v, &st);
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+            let c = x
+                .confirm
+                .get_or_insert_with(|| modeler_ui::Confirm::assemble(&gd));
+            c.unveil(&gd, a, title, &fields, &v, &st);
         }
         true
     }
@@ -242,13 +288,24 @@ impl PixelBuilderPlugin {
 
     /// The camera of the last viewport input, else viewport 0's.
     fn view_camera(&self) -> Option<Gd<godot::classes::Camera3D>> {
-        self.camera.clone().filter(|c| c.is_instance_valid()).or_else(|| EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()))
+        self.camera
+            .clone()
+            .filter(|c| c.is_instance_valid())
+            .or_else(|| {
+                EditorInterface::singleton()
+                    .get_editor_viewport_3d_ex()
+                    .idx(0)
+                    .done()
+                    .and_then(|v| v.get_camera_3d())
+            })
     }
 
     /// Feeds a synthetic key through the viewport dispatch (HUD Done / Cancel / Remove Point =
     /// the tool's Enter / Esc / Backspace paths).
     fn synth_key(&mut self, k: Key) {
-        let Some(cam) = self.view_camera() else { return };
+        let Some(cam) = self.view_camera() else {
+            return;
+        };
         let mut ev = InputEventKey::new_gd();
         ev.set_keycode(k);
         ev.set_pressed(true);
@@ -259,7 +316,9 @@ impl PixelBuilderPlugin {
 
 /// The HUD key (content + text) the overlay compares.
 fn hud_key(c: &Option<hud::Content>) -> String {
-    c.as_ref().map(|c| format!("{}|{}|{}", c.title, c.detail, c.tool)).unwrap_or_default()
+    c.as_ref()
+        .map(|c| format!("{}|{}|{}", c.heading, c.detail, c.tool))
+        .unwrap_or_default()
 }
 
 #[godot_api(secondary)]
@@ -268,7 +327,7 @@ impl PixelBuilderPlugin {
     /// `settings_changed` both arrive.
     #[func]
     pub(super) fn apply_layout(&mut self) {
-        let want = Layout::load();
+        let want = Layout::ingest();
         if self.ui.as_ref().is_some_and(|u| u.layout() == want) {
             self.sync_ui();
             return;
@@ -281,16 +340,16 @@ impl PixelBuilderPlugin {
         self.bz.cancel_live();
         self.cancel_vpaint_stroke();
         self.marquee = None;
-        let uv_was_open = self.uv_open();
+        let uv_was_open = self.tex_coord_unveil();
         self.teardown_layout(false);
         self.build_layout(want);
         // The UV panel follows the layout: back into its window for MST (the dock goes), into
-        // the "Mesh UV" dock for Xogot when it was showing (else on its next open).
+        // the "Mesh UV" dock for the extended layout when it was showing (else on its next open).
         if want == Layout::Mst {
             self.place_uv(false);
         }
         if uv_was_open {
-            self.open_uv_editor();
+            self.unveil_tex_coord_studio();
         }
         self.palette_slots = None;
         self.sync_ui();
@@ -298,7 +357,7 @@ impl PixelBuilderPlugin {
         self.redraw();
     }
 
-    /// The preferences row / Options row / Builder menu: 0 MST, 1 Xogot.
+    /// The preferences row / Options row / Builder menu: 0 MST, 1 extended layout.
     #[func]
     fn on_layout_choice(&mut self, index: i64) {
         self.switch_layout(Layout::from_i64(index));
@@ -317,78 +376,135 @@ impl PixelBuilderPlugin {
     fn debug_layout(&mut self) -> VarDictionary {
         let mut d = VarDictionary::new();
         let st = self.full_state();
-        d.set("layout", self.ui.as_ref().map(|u| u.layout().name()).unwrap_or(""));
-        d.set("setting", Layout::load().name());
+        d.set(
+            "layout",
+            self.ui.as_ref().map(|u| u.layout().moniker()).unwrap_or(""),
+        );
+        d.set("setting", Layout::ingest().moniker());
         match &self.ui {
             Some(LayoutUi::Mst(u)) => {
                 d.set("mst_toolbar", u.toolbar.is_inside_tree());
-                d.set("mst_strip", u.strip.is_inside_tree());
+                d.set("mst_strip", u.peel.is_inside_tree());
             }
-            Some(LayoutUi::Xogot(x)) => {
+            Some(LayoutUi::Modeler(x)) => {
                 let tb = &x.toolbar;
                 d.set("toolbar", tb.hbox.is_inside_tree() && tb.hbox.is_visible());
-                d.set("toolbar_parent", tb.hbox.get_parent().map(|p| p.get_class().to_string()).unwrap_or_default().as_str());
+                d.set(
+                    "toolbar_parent",
+                    tb.hbox
+                        .get_parent()
+                        .map(|p| p.get_class().to_string())
+                        .unwrap_or_default()
+                        .as_str(),
+                );
                 let mut vis = VarDictionary::new();
-                for (name, b) in [("add_mesh", &tb.add_mesh), ("make_editable", &tb.make_editable), ("snap", &tb.snap), ("paint", &tb.paint), ("handles", &tb.handles), ("options", &tb.options)] {
+                for (name, b) in [
+                    ("add_mesh", &tb.add_mesh),
+                    ("make_editable", &tb.make_editable),
+                    ("snap", &tb.snap),
+                    ("paint", &tb.coat),
+                    ("handles", &tb.handles),
+                    ("options", &tb.choices),
+                ] {
                     vis.set(name, b.is_visible());
                 }
                 vis.set("actions", tb.actions.is_visible());
                 for (m, b) in &tb.modes {
-                    vis.set(format!("mode_{}", m.name().to_lowercase()).as_str(), b.is_visible());
+                    vis.set(
+                        format!("mode_{}", m.moniker().to_lowercase()).as_str(),
+                        b.is_visible(),
+                    );
                     if b.is_pressed() {
-                        d.set("mode_pressed", m.name());
+                        d.set("mode_pressed", m.moniker());
                     }
                 }
                 d.set("buttons", &vis);
                 d.set("snap_pressed", tb.snap.is_pressed());
                 d.set("handles_open", tb.handles_popup.is_visible());
-                let rows: PackedStringArray = tb.handles_form.labels().iter().map(|s| GString::from(s.as_str())).collect();
+                let rows: PackedStringArray = tb
+                    .handles_form
+                    .labels()
+                    .iter()
+                    .map(|s| GString::from(s.as_str()))
+                    .collect();
                 d.set("handles_rows", &rows);
                 d.set("palette_open", tb.palette.is_visible());
-                d.set("paint_open", x.paint.popup.is_visible());
-                d.set("paint_page", x.paint.page as i64);
-                d.set("options_open", x.options.dialog.is_visible());
-                let cats: PackedStringArray = x.options.shown.iter().map(|i| GString::from(options::CATEGORIES[*i].1)).collect();
+                d.set("paint_open", x.coat.popup.is_visible());
+                d.set("paint_page", x.coat.page as i64);
+                d.set("options_open", x.choices.dialog.is_visible());
+                let cats: PackedStringArray = x
+                    .choices
+                    .shown
+                    .iter()
+                    .map(|i| GString::from(options::CATEGORIES[*i].1))
+                    .collect();
                 d.set("options_categories", &cats);
-                d.set("options_current", options::CATEGORIES[x.options.current].1);
-                let rows: PackedStringArray = x.options.form.labels().iter().map(|s| GString::from(s.as_str())).collect();
+                d.set("options_current", options::CATEGORIES[x.choices.current].1);
+                let rows: PackedStringArray = x
+                    .choices
+                    .form
+                    .labels()
+                    .iter()
+                    .map(|s| GString::from(s.as_str()))
+                    .collect();
                 d.set("options_rows", &rows);
                 d.set("hud_visible", x.hud.panel.is_visible());
                 d.set("hud_viewport", x.hud.viewport() as i64);
-                let parent_vp = x.hud.panel.get_parent().and_then(|p| (0..4).find(|i| hud::host(*i).is_some_and(|h| h.instance_id() == p.instance_id()))).map(|i| i as i64).unwrap_or(-1);
+                let parent_vp = x
+                    .hud
+                    .panel
+                    .get_parent()
+                    .and_then(|p| {
+                        (0..4).find(|i| {
+                            hud::host(*i).is_some_and(|h| h.instance_id() == p.instance_id())
+                        })
+                    })
+                    .map(|i| i as i64)
+                    .unwrap_or(-1);
                 d.set("hud_parent_viewport", parent_vp);
                 if let Some(c) = x.hud.shown() {
-                    d.set("hud_title", c.title.as_str());
+                    d.set("hud_title", c.heading.as_str());
                     d.set("hud_detail", c.detail.as_str());
                 }
-                let bt: PackedStringArray = x.hud.button_texts().iter().map(|s| GString::from(s.as_str())).collect();
+                let bt: PackedStringArray = x
+                    .hud
+                    .button_texts()
+                    .iter()
+                    .map(|s| GString::from(s.as_str()))
+                    .collect();
                 d.set("hud_buttons", &bt);
                 d.set("tool_options_open", x.hud.tool_options.is_visible());
-                let tr: PackedStringArray = x.hud.tool_form.labels().iter().map(|s| GString::from(s.as_str())).collect();
+                let tr: PackedStringArray = x
+                    .hud
+                    .tool_form
+                    .labels()
+                    .iter()
+                    .map(|s| GString::from(s.as_str()))
+                    .collect();
                 d.set("tool_options_rows", &tr);
             }
             None => {}
         }
         d.set("visible", st.visible);
-        d.set("uv_host", self.uv_host());
-        d.set("uv_open", self.uv_open());
+        d.set("uv_host", self.tex_coord_carrier());
+        d.set("uv_open", self.tex_coord_unveil());
         d
     }
 
     /// Test hook: the Actions menu of the current mode as `[{section, id, title, enabled, reason}]`
     /// (fills the real popup like opening it does).
     #[func]
-    fn debug_xogot_actions(&mut self) -> VarArray {
+    fn debug_modeler_actions(&mut self) -> VarArray {
         self.on_xg_actions_popup();
         let st = self.full_state();
         let mut out = VarArray::new();
         for sec in commands::actions_menu(self.mode, |a, m| ui::action_visible(a, m, &st)) {
             for e in sec.entries {
                 let mut d = VarDictionary::new();
-                d.set("section", sec.title.unwrap_or(""));
-                d.set("id", e.action as i64);
-                d.set("title", e.title.as_str());
-                let r = self.requirement(e.action as i64);
+                d.set("section", sec.heading.unwrap_or(""));
+                d.set("id", e.deed as i64);
+                d.set("title", e.heading.as_str());
+                let r = self.requirement(e.deed as i64);
                 d.set("enabled", r.is_none());
                 d.set("reason", r.unwrap_or(""));
                 out.push(&d.to_variant());
@@ -397,18 +513,20 @@ impl PixelBuilderPlugin {
         out
     }
 
-    /// Test hook: opens a Xogot surface (`palette`, `paint`, `handles`, `options`, `tool_options`);
+    /// Test hook: opens an extended-layout surface (`palette`, `paint`, `handles`, `options`, `tool_options`);
     /// true when it is visible afterwards.
     #[func]
-    fn debug_xogot_open(&mut self, which: GString) -> bool {
+    fn debug_modeler_open(&mut self, which: GString) -> bool {
         self.on_xg_open(which.clone());
         let w = which.to_string();
-        let Some(LayoutUi::Xogot(x)) = &self.ui else { return false };
+        let Some(LayoutUi::Modeler(x)) = &self.ui else {
+            return false;
+        };
         match w.as_str() {
             "palette" => x.toolbar.palette.is_visible(),
-            "paint" => x.paint.popup.is_visible(),
+            "paint" => x.coat.popup.is_visible(),
             "handles" => x.toolbar.handles_popup.is_visible(),
-            "options" => x.options.dialog.is_visible(),
+            "options" => x.choices.dialog.is_visible(),
             "tool_options" => x.hud.tool_options.is_visible(),
             _ => false,
         }
@@ -420,42 +538,44 @@ impl PixelBuilderPlugin {
     fn xg_file_debug(&mut self, purpose: i64, path: GString) {
         let p = path.to_string();
         match purpose {
-            xogot_ui::FILE_PALETTE_LOAD => self.palette_load(&p),
-            xogot_ui::FILE_PALETTE_SAVE => self.palette_save(&p),
+            modeler_ui::FILE_PALETTE_LOAD => self.swatchset_ingest(&p),
+            modeler_ui::FILE_PALETTE_SAVE => self.swatchset_stow(&p),
             _ => {
                 let res = godot::classes::ResourceLoader::singleton().load(&p);
-                let slot = self.slot;
-                self.set_slot_material(res, slot);
+                let slot = self.pocket;
+                self.assign_pocket_stuff(res, slot);
             }
         }
         self.sync_ui();
     }
 
-    /// Test hook: closes every Xogot popup.
+    /// Test hook: closes every extended-layout popup.
     #[func]
-    fn debug_xogot_close(&mut self) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+    fn debug_modeler_close(&mut self) {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.toolbar.palette.hide();
             x.toolbar.handles_popup.hide();
-            x.paint.popup.hide();
-            x.options.dialog.hide();
+            x.coat.popup.hide();
+            x.choices.dialog.hide();
             x.hud.tool_options.hide();
         }
     }
 
     /// Test hook: types `query` into the Options search (as `text_changed` would).
     #[func]
-    fn debug_xogot_options_search(&mut self, query: GString) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-            x.options.search.set_text(&query);
+    fn debug_modeler_options_search(&mut self, query: GString) {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+            x.choices.search.set_text(&query);
         }
         self.on_xg_options_search(query);
     }
 
-    /// A Toggle row of a Xogot form: runs the toggle action when its state differs.
+    /// A Toggle row of an extended-layout form: runs the toggle action when its state differs.
     #[func]
-    fn on_xg_toggle(&mut self, on: bool, id: i64) {
-        let Some(a) = Action::from_i64(id) else { return };
+    fn on_xg_toggle(&mut self, on: bool, token_id: i64) {
+        let Some(a) = Action::from_i64(token_id) else {
+            return;
+        };
         let spec = self.spec;
         let st = self.full_state();
         let cur = ui::action_pressed(a, &self.values_with(&spec), &st).unwrap_or(!on);
@@ -470,8 +590,14 @@ impl PixelBuilderPlugin {
     #[func]
     fn on_xg_mesh_prop(&mut self, on: bool, which: i64) {
         let Some(t) = self.target.clone() else { return };
-        let prop = if which == MeshProp::ClearGrass as i64 { "clear_grass" } else { "live_uv2" };
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let prop = if which == MeshProp::ClearGrass as i64 {
+            "clear_grass"
+        } else {
+            "live_uv2"
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         ur.create_action(&format!("Pixel Builder: {prop}"));
         ur.add_do_property(&t, prop, &on.to_variant());
         ur.add_undo_property(&t, prop, &t.get(prop));
@@ -483,7 +609,7 @@ impl PixelBuilderPlugin {
     #[func]
     fn on_xg_confirmed(&mut self) {
         let a = match &mut self.ui {
-            Some(LayoutUi::Xogot(x)) => x.confirm.as_mut().and_then(|c| c.action.take()),
+            Some(LayoutUi::Modeler(x)) => x.confirm.as_mut().and_then(|c| c.deed.take()),
             _ => None,
         };
         if let Some(a) = a {
@@ -494,10 +620,10 @@ impl PixelBuilderPlugin {
     /// Confirmation Cancel / close: drops the pending action.
     #[func]
     fn on_xg_confirm_canceled(&mut self) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui
             && let Some(c) = &mut x.confirm
         {
-            c.action = None;
+            c.deed = None;
         }
         self.message = String::new();
         self.redraw();
@@ -514,14 +640,19 @@ impl PixelBuilderPlugin {
     fn debug_confirmation(&mut self) -> VarDictionary {
         let mut d = VarDictionary::new();
         d.set("last", self.last_confirmation.as_str());
-        if let Some(LayoutUi::Xogot(x)) = &self.ui
+        if let Some(LayoutUi::Modeler(x)) = &self.ui
             && let Some(c) = &x.confirm
         {
             d.set("open", c.dialog.is_visible());
-            d.set("action", c.action.map(|a| a as i64).unwrap_or(-1));
+            d.set("action", c.deed.map(|a| a as i64).unwrap_or(-1));
             d.set("title", &c.dialog.get_title());
             d.set("text", &c.dialog.get_text());
-            let rows: PackedStringArray = c.form.labels().iter().map(|s| GString::from(s.as_str())).collect();
+            let rows: PackedStringArray = c
+                .form
+                .labels()
+                .iter()
+                .map(|s| GString::from(s.as_str()))
+                .collect();
             d.set("rows", &rows);
         } else {
             d.set("open", false);
@@ -534,7 +665,7 @@ impl PixelBuilderPlugin {
     /// handlers are called directly).
     #[func]
     fn debug_confirm(&mut self, accept: bool) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui
             && let Some(c) = &mut x.confirm
         {
             c.dialog.hide();
@@ -558,44 +689,64 @@ impl PixelBuilderPlugin {
         let st = self.full_state();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        let mats: Vec<Option<Gd<godot::classes::Material>>> = self.data().map(|d| d.bind().material_slots().iter_shared().collect()).unwrap_or_default();
-        let groups = self.smoothing_groups();
-        let category = self.adjust.as_ref().map(|a| a.action).and_then(options::category_of);
+        let mats: Vec<Option<Gd<godot::classes::Material>>> = self
+            .contents()
+            .map(|d| d.bind().stuff_pockets().iter_shared().collect())
+            .unwrap_or_default();
+        let groups = self.gliding_clusters();
+        let category = self
+            .adjust
+            .as_ref()
+            .map(|a| a.deed)
+            .and_then(options::category_of);
         let w = which.to_string();
         if w == "options" {
-            self.open_xg_options(category);
+            self.unveil_xtra_choices(category);
             return;
         }
-        let Some(LayoutUi::Xogot(x)) = &mut self.ui else { return };
+        let Some(LayoutUi::Modeler(x)) = &mut self.ui else {
+            return;
+        };
         match w.as_str() {
-            "palette" => x.toolbar.open_palette(&gd, st.can_create),
+            "palette" => x.toolbar.unveil_swatchset(&gd, st.can_create),
             "handles" => x.toolbar.open_handles(&gd, &v, &st),
             "paint" => {
-                let below = x.toolbar.paint.clone().upcast();
-                x.paint.open(&below);
-                x.paint.refresh(&gd, &v, &st, &mats, &groups);
+                let below = x.toolbar.coat.clone().upcast();
+                x.coat.unveil(&below);
+                x.coat.renew(&gd, &v, &st, &mats, &groups);
             }
-            "tool_options" => x.hud.open_tool_options(&gd, &v, &st),
+            "tool_options" => x.hud.unveil_instrument_choices(&gd, &v, &st),
             _ => {}
         }
     }
 
     /// An Add Mesh tile (`activate_shape` / `start_tool`): Alt places the shape at once.
     #[func]
-    fn on_palette_tile(&mut self, id: i64) {
+    fn on_palette_tile(&mut self, token_id: i64) {
         let alt = Input::singleton().is_key_pressed(Key::ALT);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.toolbar.palette.hide();
-            x.toolbar.last_tile = id;
+            x.toolbar.last_tile = token_id;
         }
-        if id == toolbar::TILE_BEZIER_PLANE || id == toolbar::TILE_BEZIER_BLOCK {
-            self.on_field(if id == toolbar::TILE_BEZIER_BLOCK { 1.0 } else { 0.0 }, Field::BzKind as i64);
+        if token_id == toolbar::TILE_BEZIER_PLANE || token_id == toolbar::TILE_BEZIER_BLOCK {
+            self.on_field(
+                if token_id == toolbar::TILE_BEZIER_BLOCK {
+                    1.0
+                } else {
+                    0.0
+                },
+                Field::BzKind as i64,
+            );
             self.run_action(Action::ToolBezier);
             return;
         }
         let old = self.spec;
-        let (kind, band) = if id == toolbar::TILE_ARCH_BAND { (ShapeKind::Arch, true) } else { (ShapeKind::from_i64(id), false) };
-        self.spec.kind = kind;
+        let (kind, band) = if token_id == toolbar::TILE_ARCH_BAND {
+            (ShapeKind::Arch, true)
+        } else {
+            (ShapeKind::from_i64(token_id), false)
+        };
+        self.spec.sort = kind;
         if kind == ShapeKind::Arch {
             self.spec.arch_band = band;
         }
@@ -603,16 +754,19 @@ impl PixelBuilderPlugin {
             self.spec_changed(old);
         } else {
             if self.mode != Mode::Object {
-                self.set_mode(Mode::Object);
+                self.assign_setting(Mode::Object);
             }
-            self.set_tool(Tool::Shape);
+            self.assign_instrument(Tool::Shape);
             if alt {
                 // Place it at once: at the last hover point, else the view centre.
                 if self.hover_place.is_none()
                     && let Some(cam) = self.view_camera()
                 {
-                    let size = cam.get_viewport().map(|v| v.get_visible_rect().size).unwrap_or(Vector2::new(800.0, 600.0));
-                    self.hover_place = self.placement(&cam, size * 0.5);
+                    let size = cam
+                        .get_viewport()
+                        .map(|v| v.get_visible_rect().size)
+                        .unwrap_or(Vector2::new(800.0, 600.0));
+                    self.hover_place = self.locus(&cam, size * 0.5);
                 }
                 self.stamp_shape(false);
             }
@@ -627,25 +781,48 @@ impl PixelBuilderPlugin {
         let gd = self.to_gd().upcast::<Object>();
         let st = self.full_state();
         let sections = commands::actions_menu(self.mode, |a, m| ui::action_visible(a, m, &st));
-        let reasons: Vec<(Action, Option<&'static str>)> = sections.iter().flat_map(|s| s.entries.iter()).map(|e| (e.action, self.requirement(e.action as i64))).collect();
+        let reasons: Vec<(Action, Option<&'static str>)> = sections
+            .iter()
+            .flat_map(|s| s.entries.iter())
+            .map(|e| (e.deed, self.requirement(e.deed as i64)))
+            .collect();
         let table = self.shortcut_table.clone();
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-            x.toolbar.fill_actions(
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+            x.toolbar.flood_deeds(
                 &gd,
                 &sections,
                 |a| reasons.iter().find(|r| r.0 == a).and_then(|r| r.1),
-                |a| super::super::shortcuts::entry_of_action(a).and_then(|e| super::super::shortcuts::index(e.id)).and_then(|i| table.get(i).cloned().flatten()),
+                |a| {
+                    super::super::shortcuts::entry_of_action(a)
+                        .and_then(|e| super::super::shortcuts::ordinal(e.id))
+                        .and_then(|i| table.get(i).cloned().flatten())
+                },
             );
         }
     }
 
     /// An Actions menu entry: re-checked, then run like the context menu runs it.
     #[func]
-    fn on_xg_action_id(&mut self, id: i64) {
-        if self.requirement(id).is_some() && !matches!(Action::from_i64(id), Some(Action::UvEditor | Action::ExportGltf | Action::ExportObj | Action::ExportStl | Action::ExportPly | Action::ExportOptions | Action::BoolUnion | Action::BoolSubtract | Action::BoolIntersect)) {
+    fn on_xg_action_id(&mut self, token_id: i64) {
+        if self.requirement(token_id).is_some()
+            && !matches!(
+                Action::from_i64(token_id),
+                Some(
+                    Action::UvEditor
+                        | Action::ExportGltf
+                        | Action::ExportObj
+                        | Action::ExportStl
+                        | Action::ExportPly
+                        | Action::ExportOptions
+                        | Action::BoolUnion
+                        | Action::BoolSubtract
+                        | Action::BoolIntersect
+                )
+            )
+        {
             return;
         }
-        self.run_menu_command(id);
+        self.run_menu_command(token_id);
     }
 
     #[func]
@@ -654,11 +831,11 @@ impl PixelBuilderPlugin {
         let st = self.full_state();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui
-            && let Some(c) = x.options.shown.get(index as usize).copied()
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui
+            && let Some(c) = x.choices.shown.get(index as usize).copied()
         {
-            x.options.current = c;
-            x.options.show_current(&gd, &v, &st);
+            x.choices.current = c;
+            x.choices.show_current(&gd, &v, &st);
         }
     }
 
@@ -668,9 +845,9 @@ impl PixelBuilderPlugin {
         let st = self.full_state();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-            x.options.fill_list();
-            x.options.show_current(&gd, &v, &st);
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+            x.choices.fill_list();
+            x.choices.show_current(&gd, &v, &st);
         }
     }
 
@@ -691,9 +868,9 @@ impl PixelBuilderPlugin {
 
     #[func]
     fn on_xg_paint_page(&mut self, page: i64) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-            x.paint.page = page.clamp(0, 2) as usize;
-            x.paint.invalidate();
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+            x.coat.page = page.clamp(0, 2) as usize;
+            x.coat.invalidate();
         }
         self.sync_ui();
     }
@@ -704,53 +881,57 @@ impl PixelBuilderPlugin {
     }
 
     #[func]
-    fn on_xg_paint_option(&mut self, id: i64) {
-        match id {
-            paint::option::LOAD_PALETTE => self.open_palette_dialog(false),
-            paint::option::SAVE_PALETTE => self.open_palette_dialog(true),
+    fn on_xg_paint_option(&mut self, token_id: i64) {
+        match token_id {
+            paint::option::LOAD_PALETTE => self.unveil_swatchset_popup(false),
+            paint::option::SAVE_PALETTE => self.unveil_swatchset_popup(true),
             paint::option::RESET_PALETTE => self.palette_reset(),
-            paint::option::ADD_SLOT => self.add_slot(),
+            paint::option::ADD_SLOT => self.insert_pocket(),
             paint::option::BLEND => self.run_action(Action::BlendMaterial),
             paint::option::INVERT_ALPHA => self.run_action(Action::InvertAlpha),
-            p if (paint::option::PRESET..paint::option::PRESET + 5).contains(&p) => self.add_preset_slot((p - paint::option::PRESET) as usize),
+            p if (paint::option::PRESET..paint::option::PRESET + 5).contains(&p) => {
+                self.add_preset_slot((p - paint::option::PRESET) as usize)
+            }
             _ => {}
         }
         self.sync_ui();
     }
 
     fn xg_file(&mut self, purpose: i64, slot: i64) {
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.open_file(purpose, slot);
         }
     }
 
     #[func]
     fn on_xg_slot_browse(&mut self, slot: i64) {
-        self.xg_file(xogot_ui::FILE_SLOT, slot);
+        self.xg_file(modeler_ui::FILE_SLOT, slot);
     }
 
     #[func]
     fn on_xg_file(&mut self, path: GString) {
         let purpose = match &self.ui {
-            Some(LayoutUi::Xogot(x)) => x.file_purpose,
+            Some(LayoutUi::Modeler(x)) => x.file_purpose,
             _ => return,
         };
         let p = path.to_string();
         match purpose.0 {
-            xogot_ui::FILE_SLOT => {
+            modeler_ui::FILE_SLOT => {
                 let res = godot::classes::ResourceLoader::singleton().load(&p);
-                self.set_slot_material(res, purpose.1);
+                self.assign_pocket_stuff(res, purpose.1);
             }
-            xogot_ui::FILE_PALETTE_LOAD => self.palette_load(&p),
-            _ => self.palette_save(&p),
+            modeler_ui::FILE_PALETTE_LOAD => self.swatchset_ingest(&p),
+            _ => self.swatchset_stow(&p),
         }
         self.sync_ui();
     }
 
     /// Right-click on a paint tile (material / colour / smoothing chip): its menu.
     #[func]
-    fn on_xg_tile_input(&mut self, event: Gd<InputEvent>, kind: i64, index: i64) {
-        let Ok(mb) = event.try_cast::<InputEventMouseButton>() else { return };
+    fn on_xg_tile_input(&mut self, happening: Gd<InputEvent>, kind: i64, index: i64) {
+        let Ok(mb) = happening.try_cast::<InputEventMouseButton>() else {
+            return;
+        };
         if !mb.is_pressed() {
             return;
         }
@@ -758,8 +939,8 @@ impl PixelBuilderPlugin {
             // Alt-click a material tile: take the selection's material into this slot's place.
             // The press is consumed so the tile's `pressed` (on release) does not then paint the
             // selection with the slot (`gui_input` is emitted before the button handles it).
-            if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
-                x.paint.popup.set_input_as_handled();
+            if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
+                x.coat.popup.set_input_as_handled();
             }
             self.sample_selection();
             return;
@@ -768,28 +949,33 @@ impl PixelBuilderPlugin {
             return;
         }
         let at = mb.get_global_position();
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             // The event is relative to the popover's own window.
-            let p = x.paint.popup.get_position();
-            x.paint.open_menu(kind, index, at + Vector2::new(p.x as f32, p.y as f32));
+            let p = x.coat.popup.get_position();
+            x.coat
+                .open_menu(kind, index, at + Vector2::new(p.x as f32, p.y as f32));
         }
     }
 
     /// A tile menu entry (`id = cmd * 1000 + index`).
     #[func]
-    fn on_xg_paint_menu(&mut self, id: i64) {
+    fn on_xg_paint_menu(&mut self, token_id: i64) {
         use paint::menu as m;
-        let (cmd, i) = (id / 1000, id % 1000);
+        let (cmd, i) = (token_id / 1000, token_id % 1000);
         match cmd {
             m::SLOT_SELECT => self.select_faces_with_slot(i),
-            m::SLOT_BROWSE => self.xg_file(xogot_ui::FILE_SLOT, i),
+            m::SLOT_BROWSE => self.xg_file(modeler_ui::FILE_SLOT, i),
             m::SLOT_INSPECT => {
-                if let Some(mat) = self.data().and_then(|d| d.bind().material_slots().get(i as usize).flatten()) {
+                if let Some(mat) = self
+                    .contents()
+                    .and_then(|d| d.bind().stuff_pockets().get(i as usize).flatten())
+                {
                     // Deferred: edit_resource re-enters every plugin's handles / edit.
-                    EditorInterface::singleton().call_deferred("edit_resource", &[mat.to_variant()]);
+                    EditorInterface::singleton()
+                        .call_deferred("edit_resource", &[mat.to_variant()]);
                 }
             }
-            m::SLOT_CLEAR => self.set_slot_material(None, i),
+            m::SLOT_CLEAR => self.assign_pocket_stuff(None, i),
             m::COLOUR_REPLACE => self.swatch_store(i as usize),
             m::COLOUR_USE => self.swatch_use(i as usize, false),
             m::COLOUR_SELECT => {
@@ -819,7 +1005,7 @@ impl PixelBuilderPlugin {
 
     #[func]
     fn on_xg_color(&mut self, c: Color) {
-        self.color = c;
+        self.tint = c;
         self.sync_ui();
     }
 
@@ -855,7 +1041,7 @@ impl PixelBuilderPlugin {
     /// HUD buttons: Done / Cancel run the tool's Enter / Esc paths; Dismiss clears the message.
     #[func]
     fn on_xg_hud(&mut self, cmd: i64) {
-        let message = matches!(&self.ui, Some(LayoutUi::Xogot(x)) if x.hud.is_message());
+        let message = matches!(&self.ui, Some(LayoutUi::Modeler(x)) if x.hud.is_message());
         match cmd {
             hud::DONE if message => self.message.clear(),
             hud::DONE => self.hud_done(),
@@ -874,14 +1060,14 @@ impl PixelBuilderPlugin {
     /// Deferred from the overlay draw when the HUD's content changed (messages and tool status
     /// set outside `sync_ui`).
     #[func]
-    fn refresh_xogot_hud(&mut self) {
-        if !self.is_xogot() {
+    fn refresh_modeler_hud(&mut self) {
+        if !self.is_modeler() {
             return;
         }
         let st = self.full_state();
         let content = self.hud_content(&st);
         self.hud_key = hud_key(&content);
-        if let Some(LayoutUi::Xogot(x)) = &mut self.ui {
+        if let Some(LayoutUi::Modeler(x)) = &mut self.ui {
             x.hud.show(content, &st);
         }
     }
@@ -902,16 +1088,16 @@ impl PixelBuilderPlugin {
         }
     }
 
-    /// Overlay hook: schedules `refresh_xogot_hud` when the HUD content key changed.
-    pub(super) fn check_xogot_hud(&mut self) {
-        if !self.is_xogot() {
+    /// Overlay hook: schedules the HUD refresh when the HUD content key changed.
+    pub(super) fn check_modeler_hud(&mut self) {
+        if !self.is_modeler() {
             return;
         }
         let st = self.full_state();
         let key = hud_key(&self.hud_content(&st));
         if key != self.hud_key {
             self.hud_key = key;
-            self.to_gd().call_deferred("refresh_xogot_hud", &[]);
+            self.to_gd().call_deferred("refresh_modeler_hud", &[]);
         }
     }
 }

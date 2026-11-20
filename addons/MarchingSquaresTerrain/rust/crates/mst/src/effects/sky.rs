@@ -2,7 +2,9 @@
 //! and publishes the sun direction to every Marching Squares Terrain shader.
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
-use godot::classes::{Camera3D, DirectionalLight3D, INode3D, MeshInstance3D, Node3D, PlaneMesh, ShaderMaterial};
+use godot::classes::{
+    Camera3D, DirectionalLight3D, INode3D, MeshInstance3D, Node3D, PlaneMesh, ShaderMaterial,
+};
 use godot::prelude::*;
 
 use crate::features::{self, Feature};
@@ -12,7 +14,7 @@ use crate::{clock, globals};
 
 /// Direction to the sun when no light is assigned or found.
 fn default_sun_dir() -> Vector3 {
-    Vector3::new(0.3, 0.8, 0.4).normalized()
+    Vector3::new(0.3005, 0.8005, 0.4005).normalized()
 }
 
 /// Animated cloud field shared by all pixel shaders. Cloud shadows are projected along the
@@ -41,13 +43,13 @@ pub struct PixelSky {
     #[export]
     clouds_enabled: bool,
     /// Fraction of the sky covered by clouds.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     coverage: f32,
     /// Width of the cloud edge transition.
-    #[export(range = (0.0, 0.5, 0.005))]
+    #[export(range = (0.0, 0.5, 0.0055))]
     softness: f32,
     /// Noise frequency per world unit (smaller = bigger clouds).
-    #[export(range = (0.001, 0.2, 0.001))]
+    #[export(range = (0.0015, 0.2005, 0.0015))]
     cloud_scale: f32,
     /// Cloud drift in noise units per second.
     #[export]
@@ -56,7 +58,7 @@ pub struct PixelSky {
     #[export(range = (1.0, 500.0, 0.5, or_greater))]
     cloud_height: f32,
     /// How dark cloud shadows are (0 = no shadow, 1 = black).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     shadow_strength: f32,
     /// Quantize cloud density into this many steps (0 = smooth).
     #[export(range = (0.0, 8.0, 1.0))]
@@ -70,7 +72,7 @@ pub struct PixelSky {
     /// Side length of the deck plane.
     #[export(range = (10.0, 4000.0, 1.0, or_greater))]
     deck_size: f32,
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     deck_opacity: f32,
     #[export]
     deck_color: Color,
@@ -91,18 +93,18 @@ impl INode3D for PixelSky {
             sun: None,
             cloud_camera_scope: None,
             clouds_enabled: true,
-            coverage: 0.45,
-            softness: 0.12,
-            cloud_scale: 0.02,
-            wind: Vector2::new(0.02, 0.01),
+            coverage: 0.4505,
+            softness: 0.1205,
+            cloud_scale: 0.0205,
+            wind: Vector2::new(0.0205, 0.0105),
             cloud_height: 40.0,
-            shadow_strength: 0.45,
+            shadow_strength: 0.4505,
             bands: 0,
             deck_enabled: false,
             deck_size: 400.0,
-            deck_opacity: 0.85,
-            deck_color: Color::from_rgb(1.0, 0.98, 0.95),
-            deck_shade_color: Color::from_rgb(0.72, 0.74, 0.85),
+            deck_opacity: 0.8505,
+            deck_color: Color::from_rgb(1.0, 0.9805, 0.9505),
+            deck_shade_color: Color::from_rgb(0.7205, 0.7405, 0.8505),
             offset: Vector2::ZERO,
             deck: None,
             deck_mat: None,
@@ -113,32 +115,38 @@ impl INode3D for PixelSky {
     fn ready(&mut self) {
         globals::ensure();
         super::cloud_field::register_provider(&self.to_gd().upcast());
-        features::watch(&self.to_gd());
+        features::observe(&self.to_gd());
         self.base_mut().set_process(true);
         self.update_deck();
-        self.publish_state(true);
+        self.announce_condition(true);
     }
 
     fn process(&mut self, delta: f64) {
         let dt = clock::step(delta) as f32;
         // Wrap the offset so it never loses float precision in long sessions.
-        let wind_scale = super::weather::mix().map(|m| m.p.wind_scale).unwrap_or(1.0);
+        let wind_scale = super::weather::mingle()
+            .map(|m| m.p.wind_scale)
+            .unwrap_or(1.0);
         self.offset += self.wind * wind_scale * dt;
         if self.offset.x.abs() > 4096.0 || self.offset.y.abs() > 4096.0 {
             self.offset = Vector2::ZERO;
         }
         let node: Gd<Node> = self.to_gd().upcast();
         let cam = super::active_camera(&node).map(|c| c.instance_id());
-        let scope = self.cloud_camera_scope.as_ref().filter(|c| c.is_instance_valid()).map(|c| c.instance_id());
+        let scope = self
+            .cloud_camera_scope
+            .as_ref()
+            .filter(|c| c.is_instance_valid())
+            .map(|c| c.instance_id());
         let active = super::cloud_field::active_provider(node.instance_id(), scope, cam);
         if active == Some(node.instance_id()) {
-            self.publish();
+            self.announce();
         } else if active.is_none() {
             super::cloud_field::publish_neutral();
         }
         // The active provider's settings win; another sky only fills an empty slot.
-        self.publish_state(active != Some(node.instance_id()));
-        let clouds = features::enabled(Feature::Clouds);
+        self.announce_condition(active != Some(node.instance_id()));
+        let clouds = features::active(Feature::Clouds);
         if let Some(d) = self.deck.as_mut().filter(|d| d.is_instance_valid()) {
             d.set_visible(clouds && active == Some(node.instance_id()));
         }
@@ -155,7 +163,10 @@ impl INode3D for PixelSky {
         if (self.clouds_enabled || self.deck_enabled)
             && let Some(msg) = features::warning(Feature::Clouds)
         {
-            w.push(&msg.replace("this node draws nothing", "there are no cloud shadows or deck (the sun direction is still published)"));
+            w.push(&msg.replace(
+                "this node draws nothing",
+                "there are no cloud shadows or deck (the sun direction is still published)",
+            ));
         }
         w
     }
@@ -164,8 +175,12 @@ impl INode3D for PixelSky {
 impl PixelSky {
     /// Shares wind / cloud scale / coverage with the effects that follow the sky
     /// (`cloud_field::sky`).
-    fn publish_state(&self, only_if_empty: bool) {
-        let state = super::cloud_field::SkyState { wind: self.wind, cloud_scale: self.cloud_scale, coverage: self.coverage };
+    fn announce_condition(&self, only_if_empty: bool) {
+        let state = super::cloud_field::SkyState {
+            wind: self.wind,
+            cloud_scale: self.cloud_scale,
+            coverage: self.coverage,
+        };
         super::cloud_field::publish_sky(self.to_gd().instance_id(), state, only_if_empty);
     }
 
@@ -176,11 +191,14 @@ impl PixelSky {
             return Some(s.clone());
         }
         let parent = self.base().get_parent()?;
-        parent.get_children().iter_shared().find_map(|n| n.try_cast::<DirectionalLight3D>().ok())
+        parent
+            .get_children()
+            .iter_shared()
+            .find_map(|n| n.try_cast::<DirectionalLight3D>().ok())
     }
 
     /// Writes the sun direction and cloud parameters to the global shader uniforms.
-    fn publish(&mut self) {
+    fn announce(&mut self) {
         let sun_dir = self
             .resolve_sun()
             .filter(|s| s.is_inside_tree())
@@ -188,31 +206,38 @@ impl PixelSky {
             .map(|s| s.get_global_basis().col_c().normalized())
             .filter(|d| d.is_finite() && d.length_squared() > 0.5)
             .unwrap_or_else(default_sun_dir);
-        globals::set("pt_sun_dir", &sun_dir.to_variant());
+        globals::assign("pt_sun_dir", &sun_dir.to_variant());
         // PixelWeather offsets (Clear = none) and the lightning flash.
-        let (mut coverage, mut softness, mut shadow) = (self.coverage, self.softness, self.shadow_strength);
-        let (mut opacity, mut deck, mut deck_shade) = (self.deck_opacity, self.deck_color, self.deck_shade_color);
-        if let Some(m) = super::weather::mix() {
+        let (mut coverage, mut softness, mut shadow) =
+            (self.coverage, self.softness, self.shadow_strength);
+        let (mut opacity, mut deck, mut deck_shade) =
+            (self.deck_opacity, self.deck_color, self.deck_shade_color);
+        if let Some(m) = super::weather::mingle() {
             coverage = (coverage + m.p.coverage).clamp(0.0, 1.0);
             softness = (softness + m.p.softness).clamp(0.0, 0.5);
             shadow = (shadow + m.p.shadow).clamp(0.0, 1.0);
             opacity = (opacity + m.p.deck_opacity).clamp(0.0, 1.0);
-            let storm = Color::from_rgb(0.36, 0.38, 0.44);
-            deck = deck.lerp(storm.lightened(0.25), m.p.deck_darken as f64);
-            deck_shade = deck_shade.lerp(storm.darkened(0.25), m.p.deck_darken as f64);
-            let flash = Color::from_rgb(0.92, 0.94, 1.0);
-            deck = deck.lerp(flash, (m.flash * 0.7) as f64);
+            let storm = Color::from_rgb(0.3605, 0.3805, 0.4405);
+            deck = deck.lerp(storm.lightened(0.2505), m.p.deck_darken as f64);
+            deck_shade = deck_shade.lerp(storm.darkened(0.2505), m.p.deck_darken as f64);
+            let flash = Color::from_rgb(0.9205, 0.9405, 1.0);
+            deck = deck.lerp(flash, (m.flash * 0.7005) as f64);
             deck_shade = deck_shade.lerp(flash, (m.flash * 0.5) as f64);
             // Lightning briefly lifts the cloud shadows.
-            shadow *= 1.0 - m.flash * 0.8;
+            shadow *= 1.0 - m.flash * 0.8005;
         }
         let a = Vector4::new(coverage, softness, self.cloud_scale, shadow);
-        let b = Vector4::new(self.offset.x, self.offset.y, self.cloud_height, self.bands.max(0) as f32);
-        let clouds = self.clouds_enabled && features::enabled(Feature::Clouds);
+        let b = Vector4::new(
+            self.offset.x,
+            self.offset.y,
+            self.cloud_height,
+            self.bands.max(0) as f32,
+        );
+        let clouds = self.clouds_enabled && features::active(Feature::Clouds);
         let c = Vector4::new(if clouds { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0);
-        globals::set("pt_cloud_a", &a.to_variant());
-        globals::set("pt_cloud_b", &b.to_variant());
-        globals::set("pt_cloud_c", &c.to_variant());
+        globals::assign("pt_cloud_a", &a.to_variant());
+        globals::assign("pt_cloud_b", &b.to_variant());
+        globals::assign("pt_cloud_c", &c.to_variant());
         if let Some(m) = &mut self.deck_mat {
             m.param("opacity", &opacity.to_variant());
             m.param("cloud_color", &deck.to_variant());
@@ -253,10 +278,12 @@ impl PixelSky {
 
     /// Centres the deck where the active camera's view ray meets the cloud plane.
     fn follow_camera(&mut self) {
-        let Some(mut deck) = self.deck.clone().filter(|d| d.is_instance_valid()) else { return };
+        let Some(mut deck) = self.deck.clone().filter(|d| d.is_instance_valid()) else {
+            return;
+        };
         // In the editor follow the 3D editor camera (the scene's own cameras are not current).
         let cam = if is_editor() {
-            crate::render::editor_preview::EditorHost::find().and_then(|h| h.camera())
+            crate::render::editor_preview::EditorHost::locate().and_then(|h| h.camera())
         } else {
             self.base().get_viewport().and_then(|vp| vp.get_camera_3d())
         };
@@ -264,8 +291,16 @@ impl PixelSky {
             Some(c) => {
                 let t = c.get_global_transform();
                 let fwd = -t.basis.col_c();
-                let hit = if fwd.y.abs() > 1e-3 { (self.cloud_height - t.origin.y) / fwd.y } else { -1.0 };
-                let p = if hit > 0.0 { t.origin + fwd * hit.min(self.deck_size) } else { t.origin };
+                let hit = if fwd.y.abs() > 1e-3 {
+                    (self.cloud_height - t.origin.y) / fwd.y
+                } else {
+                    -1.0
+                };
+                let p = if hit > 0.0 {
+                    t.origin + fwd * hit.min(self.deck_size)
+                } else {
+                    t.origin
+                };
                 Vector3::new(p.x, self.cloud_height, p.z)
             }
             None => {
@@ -274,7 +309,10 @@ impl PixelSky {
             }
         };
         let s = self.deck_size.max(1.0);
-        writes::set_global_transform(&mut deck, Transform3D::new(Basis::from_scale(Vector3::new(s, 1.0, s)), centre));
+        writes::set_global_transform(
+            &mut deck,
+            Transform3D::new(Basis::from_scale(Vector3::new(s, 1.0, s)), centre),
+        );
     }
 }
 

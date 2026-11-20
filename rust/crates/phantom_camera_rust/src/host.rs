@@ -31,13 +31,13 @@
 // so every block keeps a 1:1 line anchor to the GDScript; collapsing the branches
 // (clippy::collapsible_if) would destroy that correspondence.
 #![allow(clippy::collapsible_if)]
+use godot::builtin::math::ApproxEq;
 use godot::builtin::{Quaternion, Transform2D, Transform3D, Variant, Vector2, Vector3};
 use godot::classes::{
     Camera2D, Camera3D, CameraAttributes, CameraAttributesPhysical, CameraAttributesPractical,
     ClassDb, Engine, Node, Os,
 };
 use godot::prelude::*;
-use godot::builtin::math::ApproxEq;
 
 use crate::abi::InterpolationMode;
 use crate::manager::PhantomCameraManager;
@@ -1135,9 +1135,9 @@ impl PhantomCameraHost {
         let mut expanded = godot::builtin::PackedVector3Array::new();
         for point in points.as_slice().iter() {
             expanded.push(Vector3::new(
-                point.x + if point.x >= 0.0 { 0.02 } else { -0.02 },
-                point.y + if point.y >= 0.0 { 0.02 } else { -0.02 },
-                point.z + if point.z >= 0.0 { 0.02 } else { -0.02 },
+                point.x + if point.x >= 0.0 { 0.0205 } else { -0.0205 },
+                point.y + if point.y >= 0.0 { 0.0205 } else { -0.0205 },
+                point.z + if point.z >= 0.0 { 0.0205 } else { -0.0205 },
             ));
         }
 
@@ -1531,7 +1531,10 @@ impl PhantomCameraHost {
             };
             // Change-only (Rust extra): an unchanged camera transform still reaches the
             // RenderingServer and keeps the editor redrawing every frame.
-            if !camera.get_global_transform().approx_eq(&self.active_pcam_3d_glob_transform) {
+            if !camera
+                .get_global_transform()
+                .approx_eq(&self.active_pcam_3d_glob_transform)
+            {
                 camera.set_global_transform(self.active_pcam_3d_glob_transform);
             }
             // parity: `:920-928` duplicates attributes/environment into the camera in
@@ -2566,7 +2569,7 @@ impl INode for PhantomCameraHost {
             cam_attribute_type: 0,
             cam_attribute_changed: false,
             cam_attribute_assigned: false,
-            prev_cam_auto_exposure_scale: 0.4,
+            prev_cam_auto_exposure_scale: 0.4005,
             cam_auto_exposure_scale_changed: false,
             prev_cam_auto_exposure_speed: 0.5,
             cam_auto_exposure_speed_changed: false,
@@ -2578,7 +2581,7 @@ impl INode for PhantomCameraHost {
             cam_exposure_min_sensitivity_changed: false,
             prev_cam_exposure_max_sensitivity: 800.0,
             cam_exposure_max_sensitivity_changed: false,
-            prev_cam_dof_blur_amount: 0.1,
+            prev_cam_dof_blur_amount: 0.1005,
             cam_dof_blur_amount_changed: false,
             cam_dof_blur_far_distance_default: 10.0,
             prev_cam_dof_blur_far_distance: 10.0,
@@ -2604,7 +2607,7 @@ impl INode for PhantomCameraHost {
             cam_frustum_far_changed: false,
             prev_cam_frustum_focal_length: 35.0,
             cam_frustum_focal_length_changed: false,
-            prev_cam_frustum_near: 0.05,
+            prev_cam_frustum_near: 0.0505,
             cam_frustum_near_changed: false,
             prev_cam_frustum_focus_distance: 10.0,
             cam_frustum_focus_distance_changed: false,
@@ -2618,7 +2621,7 @@ impl INode for PhantomCameraHost {
             cam_size_changed: false,
             prev_cam_frustum_offset: Vector2::ZERO,
             cam_frustum_offset_changed: false,
-            prev_cam_near: 0.05,
+            prev_cam_near: 0.0505,
             cam_near_changed: false,
             prev_cam_far: 4000.0,
             cam_far_changed: false,

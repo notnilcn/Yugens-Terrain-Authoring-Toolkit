@@ -1,10 +1,8 @@
 # Credits & licenses
 
 Marching Squares Terrain (pixel edition) is MIT licensed (see `LICENSE`). It is a Rust rewrite and integration of two
-earlier GDScript addons plus code and ideas from the projects below. The reference dumps in
-`~/g/code_examples/decompiles-dumps-code/refs/` are read and ported
-directly over to Rust (the code is GDScript/GDShader or C++, so it is
-translated rather than pasted) wherever their licence permits; add
+earlier script addons plus code and ideas from the projects below. Reference code is translated over to Rust
+(the sources are scripts or C++, so they are translated rather than pasted) wherever their licence permits; add
 attribution here when code is ported.
 
 ## Code it is derived from
@@ -12,8 +10,8 @@ attribution here when code is ported.
 | Source | Author | License | What was taken |
 |---|---|---|---|
 | [Yūgen's Terrain Authoring Toolkit](https://github.com/ToumaKamijou/Yugens-Terrain-Authoring-Toolkit) (MarchingSquaresTerrain) | Yūgen, forked from Jackachulian; collaborators DanTrz, powertomato, santarl | MIT | The marching-squares cell cases (ported 1:1 to `pt_core::square`), the cell-mode mesher (walls, 45° ramps, smooth bridge planes), triangle/hex/hex-ring grid math, merge modes, brush tools and their UX, ridge/ledge texturing, grass planting rules, the grass blade sprite (`addons/MarchingSquaresTerrain/textures/grass_blade.png`, the original's `resources/plugin_materials/grass_leaf_sprite.png`; the default grass sprite of every grass slot), the ground noise texture (`textures/ground/mst_noise.png`: the original's `grass_terrain_noise.res` / `wall_noise_texture.res` NoiseTexture2D baked to a 128² PNG; used by the importer and the *MST Classic* preset `texture_presets/mst_classic.tres` with the original's default albedos), the node and tool icons (`addons/MarchingSquaresTerrain/editor/icons/`), and the addon/class naming. |
-| Xogot Modeler 0.2.0-beta.2 + its Rust port xogot-rust | Xibbon (Swift add-on, GDScript UI); xogot-rust port | MIT (`~/g/code_examples/xogot/addons/xogot_modeler/LICENSE`; xogot-rust carries the same MIT terms). Its `poly2tri` crate derives from poly2tri (BSD-3-Clause, notice kept in the ported files if used) | Level-builder features the builder lacked, ported from xogot-rust (`modeler_kit`, `editor_core`, `xogot_modeler`) into `pt_core::build::{xg_ops, bezier, xg_shapes, xg_export, xogot_meta}` and `mst::builder` (see `docs/port/06-xogot.md`): dissolve, offset, extra selection, extrude / inset modes, Bezier plane / block, extra shapes, STL / PLY export, `_xogot_modeler` import, live adjust HUD, context menu, paint presets / smoothing groups / palettes, UV extras, and the original Xogot UI layout (`mst::builder::xogot_ui`; its mode icons `mode_{vertex,edge,face}.svg` are copied verbatim into `editor/icons/builder/xogot/`). |
-| poly2tri (via xogot-rust `crates/poly2tri`) | Poly2Tri Contributors (Copyright (c) 2009-2018) | BSD-3-Clause (notice at the top of `pt_core/src/build/poly2tri/mod.rs`; redistributions in binary form must reproduce it) | Constrained Delaunay triangulation of poly-shape caps with holes (`pt_core::build::xg_shapes::poly_shape`). |
+| Level-builder feature set | — | MIT | Level-builder features the builder lacked: dissolve, offset, extra selection, extrude / inset modes, Bezier plane / block, extra shapes, STL / PLY export, document import, live adjust HUD, context menu, paint presets / smoothing groups / palettes, UV extras, and the modeler UI layout (`pt_core::build::{xg_ops, bezier, xg_shapes, xg_export, modeler_meta}` and `mst::builder`), including its mode icons `mode_{vertex,edge,face}.svg` in `editor/icons/builder/modeler/`. |
+| poly2tri | Poly2Tri Contributors (Copyright (c) 2009-2018) | BSD-3-Clause (notice at the top of `pt_core/src/build/poly2tri/mod.rs`; redistributions in binary form must reproduce it) | Constrained Delaunay triangulation of poly-shape caps with holes (`pt_core::build::xg_shapes::poly_shape`). |
 
 ## Inspiration and direct-port references
 

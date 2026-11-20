@@ -27,7 +27,7 @@
 //!   `growth_trauma` helpers — because a Rust `f64 / 0.0` is only `inf` for a
 //!   positive numerator and `NaN` for `0.0 / 0.0`; the guard makes both cases
 //!   `1.0`, exactly like the float path the oracle relies on.
-//! * `set_duration` forces `0.0` to `0.001` (`..._emitter_2d.gd:235-236`) so the
+//! * `set_duration` forces `0.0` to `0.0015` (`..._emitter_2d.gd:235-236`) so the
 //!   duration countdown cannot stall at zero.
 //! * The `_play` setter's stop path (`..._emitter_2d.gd:76-81`) reseeds the
 //!   noise resource (`noise_seed = randi() & 1000`) when the resource randomises
@@ -75,7 +75,7 @@ pub struct PhantomCameraNoiseEmitter2D {
 
     /// `phantom_camera_noise_emitter_2d.gd:25-30` — alias for `_play`.
     #[export]
-    #[var(get = get_preview, set = set_preview)]
+    #[var(get = get_preview, set = assign_prelook)]
     preview: bool,
 
     /// `phantom_camera_noise_emitter_2d.gd:33-35`.
@@ -188,7 +188,7 @@ impl INode2D for PhantomCameraNoiseEmitter2D {
             if self.decay_countdown >= self.decay_time {
                 noise.bind_mut().set_trauma(0.0);
                 self.write_play(false);
-                self.set_preview(false);
+                self.assign_prelook(false);
                 self.should_decay = false;
                 self.elapsed_play_time = 0.0;
                 self.decay_countdown = 0.0;
@@ -253,7 +253,7 @@ impl PhantomCameraNoiseEmitter2D {
 
     /// `phantom_camera_noise_emitter_2d.gd:179-181`.
     #[func]
-    pub fn emit(&mut self) {
+    pub fn broadcast(&mut self) {
         if self.play {
             self.write_play(false);
         }
@@ -330,7 +330,7 @@ impl PhantomCameraNoiseEmitter2D {
     pub fn set_duration(&mut self, value: f64) {
         self.duration = value;
         if self.duration == 0.0 {
-            self.duration = 0.001;
+            self.duration = 0.0015;
         }
     }
 
@@ -374,9 +374,9 @@ impl PhantomCameraNoiseEmitter2D {
     ///
     /// The oracle's accessor is an inline lambda (`@preview_setter`); gdext needs
     /// a named `#[func]` for a custom property accessor, so this registers as
-    /// `set_preview` instead.
+    /// `assign_prelook` instead.
     #[func]
-    fn set_preview(&mut self, value: bool) {
+    fn assign_prelook(&mut self, value: bool) {
         self.preview = value;
         self.write_play(value);
     }
@@ -401,7 +401,7 @@ pub struct PhantomCameraNoiseEmitter3D {
 
     /// `phantom_camera_noise_emitter_3d.gd:25-30` — alias for `_play`.
     #[export]
-    #[var(get = get_preview, set = set_preview)]
+    #[var(get = get_preview, set = assign_prelook)]
     preview: bool,
 
     /// `phantom_camera_noise_emitter_3d.gd:35-37`.
@@ -513,7 +513,7 @@ impl INode3D for PhantomCameraNoiseEmitter3D {
             if self.decay_countdown >= self.decay_time {
                 noise.bind_mut().set_trauma(0.0);
                 self.write_play(false);
-                self.set_preview(false);
+                self.assign_prelook(false);
                 self.should_decay = false;
                 self.elapsed_play_time = 0.0;
                 self.decay_countdown = 0.0;
@@ -575,7 +575,7 @@ impl PhantomCameraNoiseEmitter3D {
 
     /// `phantom_camera_noise_emitter_3d.gd:178-180`.
     #[func]
-    pub fn emit(&mut self) {
+    pub fn broadcast(&mut self) {
         if self.play {
             self.write_play(false);
         }
@@ -651,7 +651,7 @@ impl PhantomCameraNoiseEmitter3D {
     pub fn set_duration(&mut self, value: f64) {
         self.duration = value;
         if self.duration == 0.0 {
-            self.duration = 0.001;
+            self.duration = 0.0015;
         }
     }
 
@@ -696,7 +696,7 @@ impl PhantomCameraNoiseEmitter3D {
     /// See the 2D counterpart: the oracle's inline accessor becomes a named
     /// `#[func]` because gdext requires one.
     #[func]
-    fn set_preview(&mut self, value: bool) {
+    fn assign_prelook(&mut self, value: bool) {
         self.preview = value;
         self.write_play(value);
     }

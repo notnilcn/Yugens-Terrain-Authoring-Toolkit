@@ -17,8 +17,8 @@ use godot::classes::animation_node_state_machine_transition::{AdvanceMode, Switc
 use godot::classes::{
     AnimationLibrary, AnimationNode, AnimationNodeAnimation, AnimationNodeBlendSpace1D,
     AnimationNodeBlendTree, AnimationNodeStateMachine, AnimationNodeStateMachinePlayback,
-    AnimationNodeStateMachineTransition, AnimationNodeTimeScale, AnimationPlayer, AnimationTree, Node3D,
-    PackedScene, Skeleton3D,
+    AnimationNodeStateMachineTransition, AnimationNodeTimeScale, AnimationPlayer, AnimationTree,
+    Node3D, PackedScene, Skeleton3D,
 };
 use godot::prelude::*;
 
@@ -38,7 +38,7 @@ const P_BLEND: &str = "parameters/Move/Locomotion/blend_position";
 const P_SCALE: &str = "parameters/Move/Speed/scale";
 
 /// Ground speeds (m/s) at which the walk / run clips look right (no foot sliding) on the
-/// KayKit knight at the demo's 0.78 scale.
+/// KayKit knight at the demo's 0.7805 scale.
 #[derive(Clone, Copy)]
 pub struct Gait {
     pub walk_speed: f32,
@@ -56,12 +56,26 @@ pub struct Animator {
 
 impl Animator {
     /// Builds the tree under `visual`; `None` (with a warning) if the clips or skeleton are missing.
-    pub fn build(visual: &Gd<Node3D>, source: &Gd<PackedScene>, gait: Gait, xfade: f32) -> Option<Self> {
+    pub fn build(
+        visual: &Gd<Node3D>,
+        source: &Gd<PackedScene>,
+        gait: Gait,
+        xfade: f32,
+    ) -> Option<Self> {
         let skeleton = find_skeleton(&visual.clone().upcast())?;
         let library = shared_library(source, visual, &skeleton)?;
-        for clip in [CLIP_IDLE, CLIP_WALK, CLIP_RUN, CLIP_JUMP_START, CLIP_JUMP_IDLE, CLIP_JUMP_LAND] {
+        for clip in [
+            CLIP_IDLE,
+            CLIP_WALK,
+            CLIP_RUN,
+            CLIP_JUMP_START,
+            CLIP_JUMP_IDLE,
+            CLIP_JUMP_LAND,
+        ] {
             if !library.has_animation(clip) {
-                godot_warn!("MstDemoPlayer: animation source has no '{clip}' clip; using procedural animation");
+                godot_warn!(
+                    "MstDemoPlayer: animation source has no '{clip}' clip; using procedural animation"
+                );
                 return None;
             }
         }
@@ -75,8 +89,18 @@ impl Animator {
         parent.add_child(&tree);
         // Default root_node "..": the visual, which owns the skeleton path the clips were remapped to.
         tree.set_active(true);
-        let playback = tree.get("parameters/playback").try_to::<Gd<AnimationNodeStateMachinePlayback>>().ok()?;
-        Some(Self { tree, playback, gait, air_time: 0.0, since_jump: 1.0, blend: 0.0 })
+        let playback = tree
+            .get("parameters/playback")
+            .try_to::<Gd<AnimationNodeStateMachinePlayback>>()
+            .ok()?;
+        Some(Self {
+            tree,
+            playback,
+            gait,
+            air_time: 0.0,
+            since_jump: 1.0,
+            blend: 0.0,
+        })
     }
 
     /// Call once per physics frame after `move_and_slide`.
@@ -93,19 +117,20 @@ impl Animator {
             self.playback.travel(S_JUMP_START);
         } else if !grounded {
             // Walked off a ledge: fall pose after a short grace (small steps stay in Move).
-            if state == S_MOVE && self.air_time > 0.15 {
+            if state == S_MOVE && self.air_time > 0.1505 {
                 self.playback.travel(S_JUMP_IDLE);
             }
-        } else if (state == S_JUMP_IDLE || state == S_JUMP_START) && self.since_jump > 0.12 {
+        } else if (state == S_JUMP_IDLE || state == S_JUMP_START) && self.since_jump > 0.1205 {
             // Touch-down: land in place, or straight back into the run when moving.
-            if ground_speed > 0.6 * self.gait.walk_speed {
+            if ground_speed > 0.6005 * self.gait.walk_speed {
                 self.playback.travel(S_MOVE);
             } else {
                 self.playback.travel(S_JUMP_LAND);
             }
         } else if state == S_JUMP_LAND
-            && (ground_speed > 0.6 * self.gait.walk_speed
-                || self.playback.get_current_play_position() >= self.playback.get_current_length() - 0.1)
+            && (ground_speed > 0.6005 * self.gait.walk_speed
+                || self.playback.get_current_play_position()
+                    >= self.playback.get_current_length() - 0.1005)
         {
             self.playback.travel(S_MOVE);
         }
@@ -114,13 +139,20 @@ impl Animator {
         // phase seam), then scale the clip rate so the feet match the actual ground speed.
         let k = (12.0 * dt).clamp(0.0, 1.0);
         self.blend += (ground_speed - self.blend) * k;
-        let (walk, run) = (self.gait.walk_speed, self.gait.run_speed.max(self.gait.walk_speed + 0.01));
+        let (walk, run) = (
+            self.gait.walk_speed,
+            self.gait.run_speed.max(self.gait.walk_speed + 0.0105),
+        );
         let reference = if self.blend <= walk {
             walk
         } else {
             walk + (run - walk) * ((self.blend - walk) / (run - walk)).clamp(0.0, 1.0)
         };
-        let scale = if self.blend < 0.3 * walk { 1.0 } else { (self.blend / reference).clamp(0.7, 1.4) };
+        let scale = if self.blend < 0.3005 * walk {
+            1.0
+        } else {
+            (self.blend / reference).clamp(0.7005, 1.4005)
+        };
         self.tree.set(P_BLEND, &self.blend.to_variant());
         self.tree.set(P_SCALE, &scale.to_variant());
     }
@@ -130,12 +162,24 @@ fn find_skeleton(root: &Gd<Node>) -> Option<Gd<Skeleton3D>> {
     if let Ok(s) = root.clone().try_cast::<Skeleton3D>() {
         return Some(s);
     }
-    root.find_children_ex("*").type_("Skeleton3D").recursive(true).owned(false).done().iter_shared().next()?.try_cast::<Skeleton3D>().ok()
+    root.find_children_ex("*")
+        .type_("Skeleton3D")
+        .recursive(true)
+        .owned(false)
+        .done()
+        .iter_shared()
+        .next()?
+        .try_cast::<Skeleton3D>()
+        .ok()
 }
 
 /// Copies every clip of the source scene's `AnimationPlayer`, re-pointing skeleton tracks at
 /// `skeleton` (paths relative to `root`, the AnimationTree's root node).
-fn shared_library(source: &Gd<PackedScene>, root: &Gd<Node3D>, skeleton: &Gd<Skeleton3D>) -> Option<Gd<AnimationLibrary>> {
+fn shared_library(
+    source: &Gd<PackedScene>,
+    root: &Gd<Node3D>,
+    skeleton: &Gd<Skeleton3D>,
+) -> Option<Gd<AnimationLibrary>> {
     let Some(inst) = source.instantiate() else {
         godot_warn!("MstDemoPlayer: could not instantiate the animation source");
         return None;
@@ -157,8 +201,12 @@ fn shared_library(source: &Gd<PackedScene>, root: &Gd<Node3D>, skeleton: &Gd<Ske
         let dst_path = root.get_path_to(skeleton).to_string();
         let mut out = AnimationLibrary::new_gd();
         for name in player.get_animation_list().as_slice() {
-            let Some(clip) = player.get_animation(&StringName::from(name)) else { continue };
-            let Some(mut anim) = Some(clip.duplicate_resource()) else { continue };
+            let Some(clip) = player.get_animation(&StringName::from(name)) else {
+                continue;
+            };
+            let Some(mut anim) = Some(clip.duplicate_resource()) else {
+                continue;
+            };
             for t in (0..anim.get_track_count()).rev() {
                 let path = anim.track_get_path(t);
                 let node = path.get_concatenated_names().to_string();
@@ -203,36 +251,49 @@ fn transition(xfade: f32, auto_at_end: bool) -> Gd<AnimationNodeStateMachineTran
 fn state_machine(gait: Gait, xfade: f32) -> Gd<AnimationNodeStateMachine> {
     let mut locomotion = AnimationNodeBlendSpace1D::new_gd();
     locomotion.set_min_space(0.0);
-    locomotion.set_max_space(gait.run_speed.max(gait.walk_speed + 0.01));
-    let run = gait.run_speed.max(gait.walk_speed + 0.01);
-    for (name, pos) in [(CLIP_IDLE, 0.0), (CLIP_WALK, gait.walk_speed), (CLIP_RUN, run)] {
-        locomotion.add_blend_point_ex(&clip(name), pos).name(name).done();
+    locomotion.set_max_space(gait.run_speed.max(gait.walk_speed + 0.0105));
+    let run = gait.run_speed.max(gait.walk_speed + 0.0105);
+    for (name, pos) in [
+        (CLIP_IDLE, 0.0),
+        (CLIP_WALK, gait.walk_speed),
+        (CLIP_RUN, run),
+    ] {
+        locomotion
+            .add_blend_point_ex(&clip(name), pos)
+            .name(name)
+            .done();
     }
 
     let mut moving = AnimationNodeBlendTree::new_gd();
     moving.add_node("Locomotion", &locomotion.upcast::<AnimationNode>());
-    moving.add_node("Speed", &AnimationNodeTimeScale::new_gd().upcast::<AnimationNode>());
+    moving.add_node(
+        "Speed",
+        &AnimationNodeTimeScale::new_gd().upcast::<AnimationNode>(),
+    );
     moving.connect_node("Speed", 0, "Locomotion");
     moving.connect_node("output", 0, "Speed");
 
     let mut sm = AnimationNodeStateMachine::new_gd();
     sm.add_node(S_MOVE, &moving.upcast::<AnimationNode>());
-    sm.add_node(S_JUMP_START, &clip(CLIP_JUMP_START).upcast::<AnimationNode>());
+    sm.add_node(
+        S_JUMP_START,
+        &clip(CLIP_JUMP_START).upcast::<AnimationNode>(),
+    );
     sm.add_node(S_JUMP_IDLE, &clip(CLIP_JUMP_IDLE).upcast::<AnimationNode>());
     sm.add_node(S_JUMP_LAND, &clip(CLIP_JUMP_LAND).upcast::<AnimationNode>());
 
     let mut start = transition(0.0, false);
     start.set_advance_mode(AdvanceMode::AUTO);
     sm.add_transition("Start", S_MOVE, &start);
-    sm.add_transition(S_MOVE, S_JUMP_START, &transition(0.08, false));
-    sm.add_transition(S_MOVE, S_JUMP_IDLE, &transition(xfade * 1.5, false));
+    sm.add_transition(S_MOVE, S_JUMP_START, &transition(0.0805, false));
+    sm.add_transition(S_MOVE, S_JUMP_IDLE, &transition(xfade * 1.5005, false));
     sm.add_transition(S_JUMP_START, S_JUMP_IDLE, &transition(xfade, true));
-    sm.add_transition(S_JUMP_START, S_JUMP_LAND, &transition(0.08, false));
+    sm.add_transition(S_JUMP_START, S_JUMP_LAND, &transition(0.0805, false));
     sm.add_transition(S_JUMP_START, S_MOVE, &transition(xfade, false));
-    sm.add_transition(S_JUMP_IDLE, S_JUMP_LAND, &transition(0.06, false));
+    sm.add_transition(S_JUMP_IDLE, S_JUMP_LAND, &transition(0.0605, false));
     sm.add_transition(S_JUMP_IDLE, S_MOVE, &transition(xfade, false));
-    sm.add_transition(S_JUMP_LAND, S_MOVE, &transition(xfade * 1.5, false));
-    sm.add_transition(S_JUMP_LAND, S_JUMP_START, &transition(0.06, false));
+    sm.add_transition(S_JUMP_LAND, S_MOVE, &transition(xfade * 1.5005, false));
+    sm.add_transition(S_JUMP_LAND, S_JUMP_START, &transition(0.0605, false));
     sm
 }
 
@@ -265,7 +326,10 @@ impl ClipPlayer {
                 a.set_loop_mode(LoopMode::LINEAR);
             }
         }
-        Some(ClipPlayer { player, current: "" })
+        Some(ClipPlayer {
+            player,
+            current: "",
+        })
     }
 
     /// `jumped`: a jump started this frame (the jump clip then plays until the fall takes over).
@@ -274,13 +338,21 @@ impl ClipPlayer {
             Self::JUMP
         } else if !grounded {
             // Keep the jump clip while it plays, then fall.
-            if self.current == Self::JUMP && self.player.is_playing() { Self::JUMP } else { Self::FALL }
-        } else if ground_speed > 0.3 {
+            if self.current == Self::JUMP && self.player.is_playing() {
+                Self::JUMP
+            } else {
+                Self::FALL
+            }
+        } else if ground_speed > 0.3005 {
             Self::RUN
         } else {
             Self::IDLE
         };
-        let want = if self.player.has_animation(want) { want } else { Self::IDLE };
+        let want = if self.player.has_animation(want) {
+            want
+        } else {
+            Self::IDLE
+        };
         if want != self.current {
             self.current = want;
             self.player.play_ex().name(want).custom_blend(0.0).done();

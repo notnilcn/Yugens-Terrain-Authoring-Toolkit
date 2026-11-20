@@ -53,7 +53,7 @@
 //! 9-decimal precision (so two runs diff byte-for-byte, not just numerically):
 //!
 //! ```json
-//! {"f":0,"d":0.016666667,"pos":[x,y],"rot":[r],"scale_zoom":[zx,zy],
+//! {"f":0,"d":0.0165,"pos":[x,y],"rot":[r],"scale_zoom":[zx,zy],
 //!  "pcam":{"active":true,"priority":10,"transform":[6 floats],
 //!          "noise":[6 floats],"has_noise":false},
 //!  "signals":["became_active@3"]}
@@ -213,7 +213,7 @@ impl INode for PcamRecorder {
 }
 
 impl PcamRecorder {
-    /// Resolve the observed nodes, open the output and write the header line.
+    /// Resolve the observed nodes, open the output and persist the header line.
     fn start(&mut self) -> Result<(), String> {
         self.open_output()?;
 
@@ -230,7 +230,7 @@ impl PcamRecorder {
         self.write_line(&header)
     }
 
-    /// One frame: follow an active-camera switch, then write the observation.
+    /// One frame: follow an active-camera switch, then persist the observation.
     fn tick(&mut self, delta: f64) -> Result<(), String> {
         let active = self.host.as_ref().and_then(active_pcam_of);
         let changed = match (&self.pcam, &active) {
@@ -606,7 +606,7 @@ impl PcamRecorder {
             return Err(format!("output file {path} is closed"));
         };
 
-        writeln!(file, "{line}").map_err(|error| format!("cannot write {path}: {error}"))?;
+        writeln!(file, "{line}").map_err(|error| format!("cannot persist {path}: {error}"))?;
         file.flush()
             .map_err(|error| format!("cannot flush {path}: {error}"))?;
         Ok(())

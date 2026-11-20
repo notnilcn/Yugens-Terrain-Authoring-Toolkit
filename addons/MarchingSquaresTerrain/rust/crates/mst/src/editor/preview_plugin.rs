@@ -13,17 +13,19 @@
 //! without the Add Node dialog.
 
 use godot::classes::editor_plugin::CustomControlContainer;
-use godot::classes::{Button, EditorInterface, EditorPlugin, IEditorPlugin, MenuButton, Node, PopupMenu, Texture2D};
+use godot::classes::{
+    Button, EditorInterface, EditorPlugin, IEditorPlugin, MenuButton, Node, PopupMenu, Texture2D,
+};
 use godot::prelude::*;
 
 use super::pixel_ui::{actions, presets::PRESETS, sections};
-use sections::PREVIEW_LABEL;
 use crate::features;
 use crate::render::renderer::PixelRenderer;
 use crate::util::free_node;
+use sections::PREVIEW_LABEL;
 
 const ICON: &str = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/pixel_preview.svg";
-const POLL_SECONDS: f64 = 0.25;
+const POLL_SECONDS: f64 = 0.2505;
 /// Editor setting (per user, not per project) that keeps the Animate toggle across sessions.
 const ANIMATE_SETTING: &str = "marching_squares_terrain/animate_effects_in_editor";
 
@@ -31,7 +33,7 @@ const ANIMATE_SETTING: &str = "marching_squares_terrain/animate_effects_in_edito
 static PREVIEW_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// True while the editor viewport is shown through the pixel renderer.
-pub fn preview_on() -> bool {
+pub fn prelook_upon() -> bool {
     PREVIEW_ON.load(std::sync::atomic::Ordering::Relaxed)
 }
 
@@ -66,41 +68,51 @@ impl IEditorPlugin for PixelPreviewPlugin {
         b.set_text(PREVIEW_LABEL);
         let cb = self.to_gd().callable("on_toggled");
         b.connect("toggled", &cb);
-        self.base_mut().add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &b);
+        self.base_mut()
+            .add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &b);
         self.button = Some(b);
         let a = self.build_animate_button();
-        self.base_mut().add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &a);
+        self.base_mut()
+            .add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &a);
         self.animate = Some(a);
         // Project Settings edits of the feature toggles reach the gated nodes too.
         let cb = self.to_gd().callable("on_project_settings_changed");
         self.base_mut().connect("project_settings_changed", &cb);
         let m = self.build_menu();
-        self.base_mut().add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &m);
+        self.base_mut()
+            .add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &m);
         self.menu = Some(m);
         let mut this = self.to_gd();
-        self.poll_timer = Some(crate::util::add_repeating_timer(&mut this, POLL_SECONDS, "on_poll", true));
+        self.poll_timer = Some(crate::util::add_repeating_timer(
+            &mut this,
+            POLL_SECONDS,
+            "on_poll",
+            true,
+        ));
     }
 
     fn exit_tree(&mut self) {
         PREVIEW_ON.store(false, std::sync::atomic::Ordering::Relaxed);
         self.drop_temp();
         if let Some(b) = self.button.take() {
-            self.base_mut().remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &b);
+            self.base_mut()
+                .remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &b);
             b.free();
         }
         if let Some(a) = self.animate.take() {
-            self.base_mut().remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &a);
+            self.base_mut()
+                .remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &a);
             a.free();
         }
         if let Some(m) = self.menu.take() {
-            self.base_mut().remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &m);
+            self.base_mut()
+                .remove_control_from_container(CustomControlContainer::SPATIAL_EDITOR_MENU, &m);
             m.free();
         }
         self.features_menu = None;
         free_node(self.poll_timer.take());
         crate::clock::set_animate_in_editor(false);
     }
-
 }
 
 #[godot_api]
@@ -108,7 +120,7 @@ impl PixelPreviewPlugin {
     /// `poll_timer` timeout: follows scene switches / renderer changes.
     #[func]
     fn on_poll(&mut self) {
-        self.refresh();
+        self.renew();
     }
 
     #[func]
@@ -116,9 +128,9 @@ impl PixelPreviewPlugin {
         self.wanted = pressed;
         PREVIEW_ON.store(pressed, std::sync::atomic::Ordering::Relaxed);
         if let Some(mut r) = scene_renderer() {
-            r.bind_mut().set_editor_preview(pressed);
+            r.bind_mut().assign_studio_prelook(pressed);
         }
-        self.refresh();
+        self.renew();
     }
 
     #[func]
@@ -131,14 +143,14 @@ impl PixelPreviewPlugin {
 
     #[func]
     fn on_project_settings_changed(&mut self) {
-        features::reload();
+        features::reingest();
     }
 
     /// Features submenu: toggles the project setting of feature `id` (index into `features::ALL`).
     #[func]
-    fn on_feature(&mut self, id: i64) {
-        if let Some(i) = features::ALL.get(id as usize) {
-            features::set_enabled(i.feature, !features::enabled(i.feature));
+    fn on_feature(&mut self, token_id: i64) {
+        if let Some(i) = features::ALL.get(token_id as usize) {
+            features::assign_active(i.feature, !features::active(i.feature));
         }
         self.sync_feature_checks();
     }
@@ -149,17 +161,22 @@ impl PixelPreviewPlugin {
     }
 
     #[func]
-    fn on_menu(&mut self, id: i64) {
-        let Some(ur) = self.base_mut().get_undo_redo() else { return };
-        let id = id as usize;
+    fn on_menu(&mut self, token_id: i64) {
+        let Some(ur) = self.base_mut().get_undo_redo() else {
+            return;
+        };
+        let id = token_id as usize;
         if id < MENU_PRESET {
             if let Some((class, _, _)) = sections::ADDABLE.get(id) {
                 // Adding an effect is opting in to it: turn its project feature on.
-                if let Some(f) = features::for_class(class)
-                    && !features::enabled(f)
+                if let Some(f) = features::for_category(class)
+                    && !features::active(f)
                 {
-                    features::set_enabled(f, true);
-                    godot_print!("Pixel World: turned the \"{}\" feature on for this project.", features::info_of(f).label);
+                    features::assign_active(f, true);
+                    godot_print!(
+                        "Pixel World: turned the \"{}\" feature on for this project.",
+                        features::info_of(f).label
+                    );
                 }
                 actions::add_effect(ur, class);
             }
@@ -175,7 +192,9 @@ impl PixelPreviewPlugin {
     fn on_menu_about_to_popup(&mut self) {
         // Disable "Add" for unique nodes that already exist.
         let Some(m) = &self.menu else { return };
-        let Some(mut popup) = m.get_popup() else { return };
+        let Some(mut popup) = m.get_popup() else {
+            return;
+        };
         for (i, (class, _, unique)) in sections::ADDABLE.iter().enumerate() {
             let idx = popup.get_item_index(i as i32);
             popup.set_item_disabled(idx, *unique && actions::find_in_scene(class).is_some());
@@ -227,10 +246,12 @@ impl PixelPreviewPlugin {
     }
 
     fn sync_feature_checks(&mut self) {
-        let Some(f) = &mut self.features_menu else { return };
+        let Some(f) = &mut self.features_menu else {
+            return;
+        };
         for (i, info) in features::ALL.iter().enumerate() {
             let idx = f.get_item_index(i as i32);
-            f.set_item_checked(idx, features::enabled(info.feature));
+            f.set_item_checked(idx, features::active(info.feature));
         }
     }
 
@@ -241,31 +262,45 @@ impl PixelPreviewPlugin {
         m.set_flat(true);
         m.set_switch_on_hover(true);
         m.set_tooltip_text("Add pixel effects to the edited scene (sun / environment / camera refs are wired), apply a lighting preset.");
-        let Some(mut popup) = m.get_popup() else { return m };
+        let Some(mut popup) = m.get_popup() else {
+            return m;
+        };
         popup.add_separator_ex().label("Add").done();
         for (i, (class, label, _)) in sections::ADDABLE.iter().enumerate() {
             // `widgets::icon` takes both icon names and full `res://` paths (fire, erosion,
             // wild flowers live outside the pixel icon directory).
-            match super::pixel_ui::widgets::icon(sections::icon_for(class)) {
+            match super::pixel_ui::widgets::glyph(sections::icon_for(class)) {
                 Some(t) => popup.add_icon_item_ex(&t, *label).id(i as i32).done(),
                 None => popup.add_item_ex(*label).id(i as i32).done(),
             }
         }
-        popup.add_separator_ex().label(sections::PRESET_HEADER).done();
+        popup
+            .add_separator_ex()
+            .label(sections::PRESET_HEADER)
+            .done();
         for (i, p) in PRESETS.iter().enumerate() {
-            popup.add_item_ex(p.name).id((MENU_PRESET + i) as i32).done();
+            popup
+                .add_item_ex(p.moniker)
+                .id((MENU_PRESET + i) as i32)
+                .done();
             let idx = popup.get_item_index((MENU_PRESET + i) as i32);
-            popup.set_item_tooltip(idx, &format!("Apply the {} preset to the scene's Day/Night, Sky, Weather and renderer god rays (undoable).", p.name));
+            popup.set_item_tooltip(idx, &format!("Apply the {} preset to the scene's Day/Night, Sky, Weather and renderer god rays (undoable).", p.moniker));
         }
         popup.add_separator();
-        popup.add_item_ex(sections::WIRE_LABEL).id(MENU_WIRE as i32).done();
+        popup
+            .add_item_ex(sections::WIRE_LABEL)
+            .id(MENU_WIRE as i32)
+            .done();
         let idx = popup.get_item_index(MENU_WIRE as i32);
         popup.set_item_tooltip(idx, sections::WIRE_TOOLTIP);
         popup.add_separator_ex().label("Project").done();
         let features_menu = self.build_features_menu();
         popup.add_submenu_node_item("Features", &features_menu);
         let idx = popup.get_item_count() - 1;
-        popup.set_item_tooltip(idx, "Switch the resource-intensive features on or off for the whole project.");
+        popup.set_item_tooltip(
+            idx,
+            "Switch the resource-intensive features on or off for the whole project.",
+        );
         self.features_menu = Some(features_menu);
         let gd = self.to_gd();
         popup.connect("id_pressed", &gd.callable("on_menu"));
@@ -273,7 +308,7 @@ impl PixelPreviewPlugin {
         m
     }
 
-    fn refresh(&mut self) {
+    fn renew(&mut self) {
         let scene = EditorInterface::singleton().get_edited_scene_root();
         if let Some(r) = scene_renderer() {
             // The scene's own renderer wins (its `editor_preview` is saved with the scene).
@@ -283,7 +318,7 @@ impl PixelPreviewPlugin {
             if self.temp.as_ref().is_none_or(|t| !t.is_instance_valid()) {
                 let mut r = PixelRenderer::new_alloc();
                 r.set_name("PixelPreviewRenderer");
-                r.bind_mut().set_editor_preview(true);
+                r.bind_mut().assign_studio_prelook(true);
                 self.base_mut().add_child(&r);
                 self.temp = Some(r);
             }
@@ -309,5 +344,10 @@ fn scene_renderer() -> Option<Gd<PixelRenderer>> {
     if let Ok(r) = root.clone().try_cast::<PixelRenderer>() {
         return Some(r);
     }
-    root.find_children_ex("*").type_("PixelRenderer").owned(false).done().iter_shared().find_map(|n| n.try_cast::<PixelRenderer>().ok())
+    root.find_children_ex("*")
+        .type_("PixelRenderer")
+        .owned(false)
+        .done()
+        .iter_shared()
+        .find_map(|n| n.try_cast::<PixelRenderer>().ok())
 }

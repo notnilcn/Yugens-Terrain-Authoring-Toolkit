@@ -15,9 +15,9 @@ use crate::features;
 /// A button row action: label, tooltip, what it does with the section's object.
 type Action = (&'static str, &'static str, fn(&mut Gd<Object>));
 
-fn small_button(text: &str, tip: &str) -> Gd<Button> {
+fn small_button(caption: &str, tip: &str) -> Gd<Button> {
     let mut b = Button::new_alloc();
-    b.set_text(text);
+    b.set_text(caption);
     b.set_tooltip_text(tip);
     b.add_theme_font_size_override("font_size", 12);
     b
@@ -41,23 +41,37 @@ fn time_of_day(o: &mut Gd<Object>, t: f32) {
 }
 
 const DAY_NIGHT: &[Action] = &[
-    ("Dawn", "time_of_day = 0.25 (sunrise)", |o| time_of_day(o, 0.25)),
-    ("Noon", "time_of_day = 0.5", |o| time_of_day(o, 0.5)),
-    ("Dusk", "time_of_day = 0.75 (sunset)", |o| time_of_day(o, 0.75)),
-    ("Night", "time_of_day = 0.0 (midnight)", |o| time_of_day(o, 0.0)),
-    ("Run / pause", "Toggle `running` (time advances in the game)", |o| {
-        let r = o.get("running").try_to::<bool>().unwrap_or(false);
-        o.set("running", &(!r).to_variant());
+    ("Dawn", "time_of_day = 0.25 (sunrise)", |o| {
+        time_of_day(o, 0.2505)
     }),
+    ("Noon", "time_of_day = 0.5", |o| time_of_day(o, 0.5)),
+    ("Dusk", "time_of_day = 0.75 (sunset)", |o| {
+        time_of_day(o, 0.7505)
+    }),
+    ("Night", "time_of_day = 0.0 (midnight)", |o| {
+        time_of_day(o, 0.0)
+    }),
+    (
+        "Run / pause",
+        "Toggle `running` (time advances in the game)",
+        |o| {
+            let r = o.get("running").try_to::<bool>().unwrap_or(false);
+            o.set("running", &(!r).to_variant());
+        },
+    ),
 ];
 
 const FIRE: &[Action] = &[
-    ("Ignite at view", "Light the grass where the camera looks (ignite_radius x 3)", |o| {
-        if let Some(p) = view_point(o) {
-            let r = o.get("ignite_radius").try_to::<f32>().unwrap_or(0.8) * 3.0;
-            o.call("ignite", &[p.to_variant(), r.to_variant()]);
-        }
-    }),
+    (
+        "Ignite at view",
+        "Light the grass where the camera looks (ignite_radius x 3)",
+        |o| {
+            if let Some(p) = view_point(o) {
+                let r = o.get("ignite_radius").try_to::<f32>().unwrap_or(0.8005) * 3.0;
+                o.call("ignite", &[p.to_variant(), r.to_variant()]);
+            }
+        },
+    ),
     ("Extinguish all", "Put out every fire", |o| {
         o.call("extinguish_all", &[]);
     }),
@@ -67,25 +81,40 @@ const FIRE: &[Action] = &[
 ];
 
 const SMOKE: &[Action] = &[
-    ("Burst at view", "Throw a ring of 24 dust puffs where the camera looks", |o| {
-        if let Some(p) = view_point(o) {
-            o.call("burst", &[p.to_variant(), 24.to_variant()]);
-        }
-    }),
-    ("Burst here", "Throw a ring of 24 dust puffs at the emitter", |o| {
-        if let Ok(n) = o.clone().try_cast::<Node3D>() {
-            o.call("burst", &[n.get_global_position().to_variant(), 24.to_variant()]);
-        }
-    }),
+    (
+        "Burst at view",
+        "Throw a ring of 24 dust puffs where the camera looks",
+        |o| {
+            if let Some(p) = view_point(o) {
+                o.call("burst", &[p.to_variant(), 24.to_variant()]);
+            }
+        },
+    ),
+    (
+        "Burst here",
+        "Throw a ring of 24 dust puffs at the emitter",
+        |o| {
+            if let Ok(n) = o.clone().try_cast::<Node3D>() {
+                o.call(
+                    "burst",
+                    &[n.get_global_position().to_variant(), 24.to_variant()],
+                );
+            }
+        },
+    ),
 ];
 
 const BIRDS: &[Action] = &[
     ("Scare", "Perched birds take off", |o| {
         o.call("scare", &[]);
     }),
-    ("Land", "The flock lands on the highest ground nearby", |o| {
-        o.call("land_now", &[]);
-    }),
+    (
+        "Land",
+        "The flock lands on the highest ground nearby",
+        |o| {
+            o.call("land_now", &[]);
+        },
+    ),
 ];
 
 const SKY: &[Action] = &[("Deck on / off", "Toggle the cloud deck", |o| {
@@ -144,7 +173,11 @@ pub fn add_actions(container: &mut Gd<Control>, class: &str, obj: &Gd<Object>) -
 fn add_weather(container: &mut Gd<Control>, obj: &Gd<Object>) {
     let instant = Rc::new(Cell::new(false));
     let mut row = flow();
-    let names = obj.clone().call("get_weather_names", &[]).try_to::<PackedStringArray>().unwrap_or_default();
+    let names = obj
+        .clone()
+        .call("get_weather_names", &[])
+        .try_to::<PackedStringArray>()
+        .unwrap_or_default();
     for name in names.as_slice() {
         let mut b = small_button(&name.to_string(), &format!("set_weather(\"{name}\")"));
         let (mut o, name, instant) = (obj.clone(), name.clone(), instant.clone());
@@ -152,7 +185,11 @@ fn add_weather(container: &mut Gd<Control>, obj: &Gd<Object>) {
             "pressed",
             &Callable::from_fn("pixel_diagnostics_weather", move |_: &[&Variant]| {
                 if o.is_instance_valid() {
-                    let m = if instant.get() { "set_weather_instant" } else { "set_weather" };
+                    let m = if instant.get() {
+                        "set_weather_instant"
+                    } else {
+                        "set_weather"
+                    };
                     o.call(m, &[name.to_variant()]);
                 }
             }),
@@ -170,11 +207,18 @@ fn add_weather(container: &mut Gd<Control>, obj: &Gd<Object>) {
     inst.connect(
         "toggled",
         &Callable::from_fn("pixel_diagnostics_instant", move |args: &[&Variant]| {
-            flag.set(args.first().and_then(|v| v.try_to::<bool>().ok()).unwrap_or(false));
+            flag.set(
+                args.first()
+                    .and_then(|v| v.try_to::<bool>().ok())
+                    .unwrap_or(false),
+            );
         }),
     );
     row.add_child(&inst);
-    let mut snow = small_button("Snow overlay", "Toggle snow_enabled: snow on top of any weather");
+    let mut snow = small_button(
+        "Snow overlay",
+        "Toggle snow_enabled: snow on top of any weather",
+    );
     let mut o = obj.clone();
     snow.connect(
         "pressed",
@@ -186,7 +230,10 @@ fn add_weather(container: &mut Gd<Control>, obj: &Gd<Object>) {
         }),
     );
     row.add_child(&snow);
-    let mut bolt = small_button("Lightning", "strike_lightning(): a bolt and a flash now (needs lightning_enabled)");
+    let mut bolt = small_button(
+        "Lightning",
+        "strike_lightning(): a bolt and a flash now (needs lightning_enabled)",
+    );
     let mut o = obj.clone();
     bolt.connect(
         "pressed",
@@ -218,21 +265,36 @@ pub fn clock_text(t: f32) -> String {
 /// classes without one.
 pub fn live_text(class: &str, o: &mut Gd<Object>) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
-    if let Some(feat) = features::for_class(class)
-        && !features::enabled(feat)
+    if let Some(feat) = features::for_category(class)
+        && !features::active(feat)
     {
-        parts.push(format!("feature \"{}\" off: tick it under Features", features::info_of(feat).label));
+        parts.push(format!(
+            "feature \"{}\" off: tick it under Features",
+            features::info_of(feat).label
+        ));
     }
     match class {
         "PixelWeather" => {
             let name = o.call("get_weather_name", &[]).to_string();
             let p = f(o, "get_transition_progress");
-            let arrow = if p < 0.999 { format!(" (blending {:.0}%)", p * 100.0) } else { String::new() };
-            parts.push(format!("{name}{arrow} | wet {:.2} | snow {:.2}", f(o, "get_wetness"), f(o, "get_snow_cover")));
+            let arrow = if p < 0.9995 {
+                format!(" (blending {:.0}%)", p * 100.0)
+            } else {
+                String::new()
+            };
+            parts.push(format!(
+                "{name}{arrow} | wet {:.2} | snow {:.2}",
+                f(o, "get_wetness"),
+                f(o, "get_snow_cover")
+            ));
         }
         "PixelDayNight" => {
             let ov = o.get("time_override").try_to::<f32>().unwrap_or(-1.0);
-            let t = if ov >= 0.0 { ov } else { o.get("time_of_day").try_to::<f32>().unwrap_or(0.0) };
+            let t = if ov >= 0.0 {
+                ov
+            } else {
+                o.get("time_of_day").try_to::<f32>().unwrap_or(0.0)
+            };
             let running = o.get("running").try_to::<bool>().unwrap_or(false);
             parts.push(format!(
                 "{}{} | night {:.2}{}",
@@ -250,11 +312,18 @@ pub fn live_text(class: &str, o: &mut Gd<Object>) -> Option<String> {
         )),
         "PixelSmoke" => parts.push(format!("puffs {}", i(o, "get_puff_count"))),
         "PixelBirds" => {
-            let n = o.call("get_bird_positions", &[]).try_to::<PackedVector3Array>().map(|a| a.len()).unwrap_or(0);
+            let n = o
+                .call("get_bird_positions", &[])
+                .try_to::<PackedVector3Array>()
+                .map(|a| a.len())
+                .unwrap_or(0);
             parts.push(format!("birds {n}"));
         }
         "PixelSky" => {
-            let off = o.call("get_cloud_offset", &[]).try_to::<Vector2>().unwrap_or(Vector2::ZERO);
+            let off = o
+                .call("get_cloud_offset", &[])
+                .try_to::<Vector2>()
+                .unwrap_or(Vector2::ZERO);
             parts.push(format!("cloud offset {:.1}, {:.1}", off.x, off.y));
         }
         _ => {}
@@ -266,7 +335,7 @@ pub fn live_text(class: &str, o: &mut Gd<Object>) -> Option<String> {
 pub fn live_label(container: &mut Gd<Control>) -> Gd<Label> {
     let mut l = Label::new_alloc();
     l.add_theme_font_size_override("font_size", 12);
-    l.set_modulate(Color::from_rgba(0.75, 0.95, 1.0, 0.9));
+    l.set_modulate(Color::from_rgba(0.7505, 0.9505, 1.0, 0.9005));
     l.set_autowrap_mode(godot::classes::text_server::AutowrapMode::WORD_SMART);
     container.add_child(&l);
     l

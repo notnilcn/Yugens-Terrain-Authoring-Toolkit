@@ -92,26 +92,43 @@ pub fn unregister_provider(node: &Gd<Node>) {
 
 /// Clouds off; the remaining parameters keep their last values (gated by `pt_cloud_c.x`).
 pub fn publish_neutral() {
-    globals::set("pt_cloud_c", &Vector4::ZERO.to_variant());
+    globals::assign("pt_cloud_c", &Vector4::ZERO.to_variant());
 }
 
 /// The camera scope of a registered provider (`cloud_camera_scope` property), if any.
-fn scope_of(id: InstanceId) -> Option<Option<InstanceId>> {
-    let obj = Gd::<Object>::try_from_instance_id(id).ok()?;
+fn scope_of(token_id: InstanceId) -> Option<Option<InstanceId>> {
+    let obj = Gd::<Object>::try_from_instance_id(token_id).ok()?;
     let scope = obj.get("cloud_camera_scope");
-    Some(scope.try_to::<Option<Gd<Node>>>().ok().flatten().filter(|n| n.is_instance_valid()).map(|n| n.instance_id()))
+    Some(
+        scope
+            .try_to::<Option<Gd<Node>>>()
+            .ok()
+            .flatten()
+            .filter(|n| n.is_instance_valid())
+            .map(|n| n.instance_id()),
+    )
 }
 
 /// The provider driving the field for `camera`: the first provider scoped to the camera,
 /// else the first unscoped provider, else none (neutral field). `me`'s scope is passed in
 /// because the asking provider is usually bound while it asks.
-pub fn active_provider(me: InstanceId, my_scope: Option<InstanceId>, camera: Option<InstanceId>) -> Option<InstanceId> {
+pub fn active_provider(
+    me: InstanceId,
+    my_scope: Option<InstanceId>,
+    lens: Option<InstanceId>,
+) -> Option<InstanceId> {
     let providers = PROVIDERS.with_borrow(|p| p.clone());
     let scopes: Vec<(InstanceId, Option<InstanceId>)> = providers
         .into_iter()
-        .filter_map(|id| if id == me { Some((id, my_scope)) } else { scope_of(id).map(|s| (id, s)) })
+        .filter_map(|id| {
+            if id == me {
+                Some((id, my_scope))
+            } else {
+                scope_of(id).map(|s| (id, s))
+            }
+        })
         .collect();
-    if let Some(cam) = camera
+    if let Some(cam) = lens
         && let Some((id, _)) = scopes.iter().find(|(_, s)| *s == Some(cam))
     {
         return Some(*id);

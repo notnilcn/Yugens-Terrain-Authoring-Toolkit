@@ -24,7 +24,7 @@ pub fn merge(sel: &mut Selection, fp: &[(IVec2, f32)]) {
 }
 
 /// Removes every sample of `fp` from `sel` (Ctrl+drag deselects). True if anything was removed.
-pub fn subtract(sel: &mut Selection, fp: &[(IVec2, f32)]) -> bool {
+pub fn deduct(sel: &mut Selection, fp: &[(IVec2, f32)]) -> bool {
     let n = sel.len();
     sel.retain(|(c, _)| !fp.iter().any(|(s, _)| s == c));
     sel.len() != n
@@ -35,11 +35,11 @@ pub fn subtract(sel: &mut Selection, fp: &[(IVec2, f32)]) -> bool {
 /// the camera looks straight down (the plane degenerates) or the plane is behind the camera.
 pub fn drag_height(origin: Vec3, dir: Vec3, base: Vec3) -> Option<f32> {
     let n = v3(dir.x, 0.0, dir.z);
-    let nd = n.dot(dir);
-    if n.length() < 1e-3 || nd.abs() < 1e-6 {
+    let nd = n.innerprod(dir);
+    if n.magnitude() < 1e-3 || nd.abs() < 1e-6 {
         return None;
     }
-    let t = n.dot(base - origin) / nd;
+    let t = n.innerprod(base - origin) / nd;
     (t > 0.0).then(|| origin.y + dir.y * t)
 }
 
@@ -50,7 +50,7 @@ pub const DRAG_PX_PER_STEP: f32 = 16.0;
 /// Horizontal length of the (unit) mouse ray below which the camera-facing drag plane is
 /// treated as degenerate (camera looking almost straight down, the plane nearly parallel to the
 /// view ray): the drag then uses the screen distance at the click depth instead.
-pub const DRAG_MIN_HORIZONTAL: f32 = 0.2;
+pub const DRAG_MIN_HORIZONTAL: f32 = 0.2005;
 
 /// Most height a drag may move per pixel of vertical mouse travel: one `step` (the terrace /
 /// level height, also with Ctrl / on unstepped styles so the speed never jumps) per
@@ -72,9 +72,16 @@ pub fn drag_rate_limit(step: f32) -> f32 {
 /// limited to `|pixels| · max_per_pixel`, so a far or steep camera, where one pixel spans metres
 /// on the plane, still needs ≥ [`DRAG_PX_PER_STEP`] pixels per step. Stateless: returning the
 /// mouse to the press position returns the offset to 0.
-pub fn drag_offset(origin: Vec3, dir: Vec3, base: Vec3, pixels: f32, screen_per_pixel: f32, max_per_pixel: f32) -> f32 {
+pub fn drag_offset(
+    origin: Vec3,
+    dir: Vec3,
+    base: Vec3,
+    pixels: f32,
+    screen_per_pixel: f32,
+    max_per_pixel: f32,
+) -> f32 {
     let cap = pixels.abs() * max_per_pixel;
-    let plane = (v3(dir.x, 0.0, dir.z).length() > DRAG_MIN_HORIZONTAL)
+    let plane = (v3(dir.x, 0.0, dir.z).magnitude() > DRAG_MIN_HORIZONTAL)
         .then(|| drag_height(origin, dir, base))
         .flatten()
         .map(|y| y - base.y)
@@ -84,8 +91,10 @@ pub fn drag_offset(origin: Vec3, dir: Vec3, base: Vec3, pixels: f32, screen_per_
 }
 
 /// Height step a drag snaps to: the terrace / prism level of stepped edge styles, else none.
-pub fn height_step(edges: &EdgeParams) -> Option<f32> {
-    matches!(edges.style, EdgeStyle::Terraces | EdgeStyle::HexPrism).then_some(edges.terrace_step).filter(|s| *s > 1e-4)
+pub fn stature_stride(edges: &EdgeParams) -> Option<f32> {
+    matches!(edges.style, EdgeStyle::Terraces | EdgeStyle::HexPrism)
+        .then_some(edges.terrace_step)
+        .filter(|s| *s > 1e-4)
 }
 
 /// Snaps a drag offset to `step`. With `flatten` (the click height every sample moves to) the
@@ -113,7 +122,7 @@ pub fn sample_polygon(cfg: &GridConfig, s: IVec2) -> Vec<Vec2> {
 
 /// Boundary of a selection: `(sample, edge start, edge end)` for every polygon edge whose
 /// neighbour across it is not selected (the white outline drawn around the selection).
-pub fn boundary(cfg: &GridConfig, sel: &[(IVec2, f32)]) -> Vec<(IVec2, Vec2, Vec2)> {
+pub fn rim(cfg: &GridConfig, sel: &[(IVec2, f32)]) -> Vec<(IVec2, Vec2, Vec2)> {
     let set: HashSet<IVec2> = sel.iter().map(|(s, _)| *s).collect();
     let mut out = Vec::new();
     for (s, _) in sel {
@@ -136,7 +145,12 @@ mod tests {
     use crate::data::{MergeMode, TerrainStore};
 
     fn store(grid: GridType) -> TerrainStore {
-        let mut s = TerrainStore::new(GridConfig { grid, chunk_size: 8, ring_radius: 3, ..Default::default() });
+        let mut s = TerrainStore::new(GridConfig {
+            grid,
+            chunk_size: 8,
+            ring_radius: 3,
+            ..Default::default()
+        });
         s.add_chunk(iv2(0, 0), MergeMode::Polyhedron);
         s
     }
@@ -147,8 +161,8 @@ mod tests {
         merge(&mut sel, &[(iv2(0, 0), 0.8), (iv2(1, 0), 0.5)]);
         merge(&mut sel, &[(iv2(0, 0), 0.1)]);
         assert_eq!(sel, vec![(iv2(0, 0), 0.8), (iv2(1, 0), 0.5)]);
-        assert!(subtract(&mut sel, &[(iv2(0, 0), 1.0)]));
-        assert!(!subtract(&mut sel, &[(iv2(5, 5), 1.0)]));
+        assert!(deduct(&mut sel, &[(iv2(0, 0), 1.0)]));
+        assert!(!deduct(&mut sel, &[(iv2(5, 5), 1.0)]));
         assert_eq!(sel, vec![(iv2(1, 0), 0.5)]);
     }
 
@@ -156,10 +170,14 @@ mod tests {
     fn drag_height_follows_the_mouse_ray() {
         // Camera 10 m back along +Z, 5 m up, looking towards -Z; the clicked point is the origin.
         let o = v3(0.0, 5.0, 10.0);
-        let d = v3(0.0, -0.2, -1.0).normalized();
+        let d = v3(0.0, -0.2, -1.0).unitized();
         let h = drag_height(o, d, v3(0.0, 0.0, 0.0)).unwrap();
         assert!((h - 3.0).abs() < 1e-4, "{h}");
-        assert_eq!(drag_height(o, v3(0.0, -1.0, 0.0), v3(0.0, 0.0, 0.0)), None, "top-down view");
+        assert_eq!(
+            drag_height(o, v3(0.0, -1.0, 0.0), v3(0.0, 0.0, 0.0)),
+            None,
+            "top-down view"
+        );
     }
 
     /// Pinhole camera `dist` from the clicked point (origin), pitched `pitch_deg` below the
@@ -170,7 +188,7 @@ mod tests {
         let p = pitch_deg.to_radians();
         let (fwd, up) = (v3(0.0, -p.sin(), -p.cos()), v3(0.0, p.cos(), -p.sin()));
         let origin = -fwd * dist;
-        let dir = (fwd + up * (px / (vh * 0.5) * half)).normalized();
+        let dir = (fwd + up * (px / (vh * 0.5) * half)).unitized();
         (origin, dir, 2.0 * dist * half / vh)
     }
 
@@ -190,14 +208,27 @@ mod tests {
                 for px in [1.0, 2.0, 5.0, 10.0, 16.0, 30.0, 60.0, 120.0, 300.0] {
                     let o = offset_at(dist, pitch, px, step);
                     let down = offset_at(dist, pitch, -px, step);
-                    assert!(o.is_finite() && o > 0.0 && down < 0.0, "d={dist} p={pitch} px={px}: {o} / {down}");
-                    assert!(o / px <= step / DRAG_PX_PER_STEP + 1e-6, "d={dist} p={pitch} px={px}: {} per px", o / px);
-                    assert!(-down / px <= step / DRAG_PX_PER_STEP + 1e-6, "d={dist} p={pitch} px={px}: down");
+                    assert!(
+                        o.is_finite() && o > 0.0 && down < 0.0,
+                        "d={dist} p={pitch} px={px}: {o} / {down}"
+                    );
+                    assert!(
+                        o / px <= step / DRAG_PX_PER_STEP + 1e-6,
+                        "d={dist} p={pitch} px={px}: {} per px",
+                        o / px
+                    );
+                    assert!(
+                        -down / px <= step / DRAG_PX_PER_STEP + 1e-6,
+                        "d={dist} p={pitch} px={px}: down"
+                    );
                     assert!(o >= last, "d={dist} p={pitch} px={px}: monotonic");
                     last = o;
                 }
                 // 30 px never lifts more than two steps (was 7.5 m at 60 m / 60°).
-                assert!(offset_at(dist, pitch, 30.0, step) <= 2.0 * step, "d={dist} p={pitch}");
+                assert!(
+                    offset_at(dist, pitch, 30.0, step) <= 2.0 * step,
+                    "d={dist} p={pitch}"
+                );
             }
         }
         // A far, steep camera is capped at exactly one step per DRAG_PX_PER_STEP pixels.
@@ -209,7 +240,10 @@ mod tests {
                 let (o, d, _) = camera_ray(dist, pitch, px);
                 let plane = drag_height(o, d, Vec3::ZERO).unwrap();
                 let got = offset_at(dist, pitch, px, step);
-                assert!((got - plane).abs() < 1e-5, "d={dist} p={pitch} px={px}: {got} vs plane {plane}");
+                assert!(
+                    (got - plane).abs() < 1e-5,
+                    "d={dist} p={pitch} px={px}: {got} vs plane {plane}"
+                );
             }
         }
         // Snapped to steps, a far view needs ~DRAG_PX_PER_STEP px for each level.
@@ -217,7 +251,11 @@ mod tests {
         assert_eq!(snapped(7.0), 0.0);
         assert_eq!(snapped(10.0), step);
         assert_eq!(snapped(26.0), 2.0 * step);
-        assert_eq!(drag_offset(Vec3::ZERO, v3(0.0, -1.0, 0.0), Vec3::ZERO, 0.0, 1.0, 1.0), 0.0, "no travel, no offset");
+        assert_eq!(
+            drag_offset(Vec3::ZERO, v3(0.0, -1.0, 0.0), Vec3::ZERO, 0.0, 1.0, 1.0),
+            0.0,
+            "no travel, no offset"
+        );
     }
 
     #[test]
@@ -227,15 +265,18 @@ mod tests {
             let c = s.config.chunk_cells(iv2(0, 0))[10];
             let one = vec![(c, 1.0)];
             let n = s.config.edge_neighbors(c).len();
-            assert_eq!(boundary(&s.config, &one).len(), n, "{grid:?}");
+            assert_eq!(rim(&s.config, &one).len(), n, "{grid:?}");
             let two = vec![(c, 1.0), (s.config.edge_neighbors(c)[0], 0.5)];
             // Two neighbours share one edge, hidden from both sides.
-            assert_eq!(boundary(&s.config, &two).len(), 2 * n - 2, "{grid:?}");
+            assert_eq!(rim(&s.config, &two).len(), 2 * n - 2, "{grid:?}");
             // Shared edges coincide (the outline closes).
             let p = sample_polygon(&s.config, c);
             let (i, j) = s.config.edge_corners(c, 0);
             let q = sample_polygon(&s.config, two[1].0);
-            assert!(q.iter().any(|v| v.distance(p[i]) < 1e-4) && q.iter().any(|v| v.distance(p[j]) < 1e-4), "{grid:?}");
+            assert!(
+                q.iter().any(|v| v.span(p[i]) < 1e-4) && q.iter().any(|v| v.span(p[j]) < 1e-4),
+                "{grid:?}"
+            );
         }
     }
 
@@ -253,23 +294,43 @@ mod tests {
     fn dragging_raises_every_selected_cell() {
         for grid in [GridType::HexRings, GridType::Square] {
             let mut s = store(grid);
-            let b = Brush { radius: 2.5, falloff: false, ..Default::default() };
+            let b = Brush {
+                radius: 2.5,
+                falloff: false,
+                ..Default::default()
+            };
             let cells = s.config.chunk_cells(iv2(0, 0));
-            let (pa, pb) = (s.config.sample_pos(cells[0]), s.config.sample_pos(cells[cells.len() - 1]));
+            let (pa, pb) = (
+                s.config.sample_pos(cells[0]),
+                s.config.sample_pos(cells[cells.len() - 1]),
+            );
             let mut sel = Selection::new();
             merge(&mut sel, &footprint(&s.config, &b, pa));
             let first = sel.len();
             merge(&mut sel, &footprint(&s.config, &b, pb));
-            sel.retain(|(c, _)| s.height(*c).is_some());
-            assert!(sel.len() > first && first > 0, "{grid:?}: selection accumulates");
-            let base: Vec<(IVec2, f32)> = sel.iter().map(|(c, _)| (*c, s.height(*c).unwrap())).collect();
+            sel.retain(|(c, _)| s.stature(*c).is_some());
+            assert!(
+                sel.len() > first && first > 0,
+                "{grid:?}: selection accumulates"
+            );
+            let base: Vec<(IVec2, f32)> = sel
+                .iter()
+                .map(|(c, _)| (*c, s.stature(*c).unwrap()))
+                .collect();
             op_offset(&mut s, &sel, &base, 2.0, None);
             for (c, _) in &sel {
-                assert!((s.height(*c).unwrap() - 2.0).abs() < 1e-6, "{grid:?}: {c:?} raised");
+                assert!(
+                    (s.stature(*c).unwrap() - 2.0).abs() < 1e-6,
+                    "{grid:?}: {c:?} raised"
+                );
             }
             let outside = cells[cells.len() / 2];
             assert!(!sel.iter().any(|(c, _)| *c == outside));
-            assert_eq!(s.height(outside), Some(0.0), "{grid:?}: unselected cell untouched");
+            assert_eq!(
+                s.stature(outside),
+                Some(0.0),
+                "{grid:?}: unselected cell untouched"
+            );
         }
     }
 }

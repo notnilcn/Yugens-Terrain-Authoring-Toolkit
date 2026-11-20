@@ -11,8 +11,8 @@
 //! The terrain-only attributes of `mesh.rs` (UV2, CUSTOM0/1) are not used by builder meshes.
 
 use super::model::BMesh;
-use super::tri::triangulate;
-use super::uv::auto_uv;
+use super::tri::mesh_fill;
+use super::uv::self_auto_tex_coord;
 use crate::math::*;
 use std::collections::HashMap;
 
@@ -26,18 +26,21 @@ pub struct CompileOptions {
 
 impl Default for CompileOptions {
     fn default() -> Self {
-        CompileOptions { units_per_repeat: 1.0, world_offset: Vec3::ZERO }
+        CompileOptions {
+            units_per_repeat: 1.0,
+            world_offset: Vec3::ZERO,
+        }
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct Surface {
-    pub material: u16,
+    pub stuff: u16,
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub uvs: Vec<[f32; 2]>,
-    pub colors: Vec<[f32; 4]>,
-    pub indices: Vec<i32>,
+    pub tints: Vec<[f32; 4]>,
+    pub ordinals: Vec<i32>,
     /// Source face of every triangle (`indices.len() / 3` entries).
     pub tri_faces: Vec<u32>,
 }
@@ -51,20 +54,22 @@ pub struct Compiled {
 
 /// Cached triangulation of every face: corner-index triples (CCW, like the loop).
 pub fn face_triangles(m: &BMesh) -> Vec<Vec<[usize; 3]>> {
-    (0..m.faces.len()).map(|f| triangulate(&m.face_points(f), m.face_normal(f))).collect()
+    (0..m.facets.len())
+        .map(|f| mesh_fill(&m.face_points(f), m.face_normal(f)))
+        .collect()
 }
 
-pub fn compile(m: &BMesh, opt: &CompileOptions) -> Compiled {
-    let normals: Vec<Vec3> = (0..m.faces.len()).map(|f| m.face_normal(f)).collect();
+pub fn bake(m: &BMesh, opt: &CompileOptions) -> Compiled {
+    let normals: Vec<Vec3> = (0..m.facets.len()).map(|f| m.face_normal(f)).collect();
     // Smoothed corner normals: per (vertex, group) area-weighted sum of face normals.
     let mut smooth: HashMap<(u32, u16), Vec3> = HashMap::new();
-    for (fi, f) in m.faces.iter().enumerate() {
-        if f.smooth == 0 {
+    for (fi, f) in m.facets.iter().enumerate() {
+        if f.glide == 0 {
             continue;
         }
         let w = normals[fi] * m.face_area(fi).max(1e-6);
         for v in &f.verts {
-            let e = smooth.entry((*v, f.smooth)).or_insert(Vec3::ZERO);
+            let e = smooth.entry((*v, f.glide)).or_insert(Vec3::ZERO);
             *e = *e + w;
         }
     }
@@ -72,35 +77,54 @@ pub fn compile(m: &BMesh, opt: &CompileOptions) -> Compiled {
     let mut by_slot: Vec<Surface> = Vec::new();
     let mut slot_index: HashMap<u16, usize> = HashMap::new();
     let mut collision = Vec::new();
-    for (fi, f) in m.faces.iter().enumerate() {
+    for (fi, f) in m.facets.iter().enumerate() {
         if f.verts.len() < 3 {
             continue;
         }
-        let si = *slot_index.entry(f.material).or_insert_with(|| {
-            by_slot.push(Surface { material: f.material, ..Default::default() });
+        let si = *slot_index.entry(f.stuff).or_insert_with(|| {
+            by_slot.push(Surface {
+                stuff: f.stuff,
+                ..Default::default()
+            });
             by_slot.len() - 1
         });
         let s = &mut by_slot[si];
         let base = s.positions.len() as i32;
         let n = normals[fi];
         let corner_cols = f.corner_colors();
-        let manual = f.manual_uvs();
+        let manual = f.by_hand_tex_coords();
         for (ci, v) in f.verts.iter().enumerate() {
             let p = m.positions[*v as usize];
-            let cn = if f.smooth == 0 { n } else { smooth.get(&(*v, f.smooth)).copied().unwrap_or(n).normalized() };
-            let up = if f.uv.world { p + opt.world_offset } else { p };
+            let cn = if f.glide == 0 {
+                n
+            } else {
+                smooth.get(&(*v, f.glide)).copied().unwrap_or(n).unitized()
+            };
+            let up = if f.tex_coord.world {
+                p + opt.world_offset
+            } else {
+                p
+            };
             let uv = match manual {
                 Some(c) => c[ci],
-                None => auto_uv(up, f.uv_normal(n), &f.uv, opt.units_per_repeat),
+                None => self_auto_tex_coord(up, f.uv_normal(n), &f.tex_coord, opt.units_per_repeat),
             };
             s.positions.push([p.x, p.y, p.z]);
             s.normals.push([cn.x, cn.y, cn.z]);
             s.uvs.push([uv.x, uv.y]);
-            s.colors.push(corner_cols.map_or(f.color, |c| c[ci]).map(|c| c as f32 / 255.0));
+            s.tints.push(
+                corner_cols
+                    .map_or(f.tint, |c| c[ci])
+                    .map(|c| c as f32 / 255.0),
+            );
         }
         for t in &tris[fi] {
             // CCW loop -> clockwise triangle for Godot.
-            s.indices.extend_from_slice(&[base + t[0] as i32, base + t[2] as i32, base + t[1] as i32]);
+            s.ordinals.extend_from_slice(&[
+                base + t[0] as i32,
+                base + t[2] as i32,
+                base + t[1] as i32,
+            ]);
             s.tri_faces.push(fi as u32);
             for k in [0, 2, 1] {
                 let p = m.positions[f.verts[t[k]] as usize];
@@ -108,8 +132,11 @@ pub fn compile(m: &BMesh, opt: &CompileOptions) -> Compiled {
             }
         }
     }
-    by_slot.sort_by_key(|s| s.material);
-    Compiled { surfaces: by_slot, collision }
+    by_slot.sort_by_key(|s| s.stuff);
+    Compiled {
+        surfaces: by_slot,
+        collision,
+    }
 }
 
 #[cfg(test)]
@@ -120,18 +147,18 @@ mod tests {
     #[test]
     fn box_compiles_to_twelve_triangles() {
         let m = shapes::cuboid(v3(2.0, 1.0, 3.0));
-        let c = compile(&m, &CompileOptions::default());
+        let c = bake(&m, &CompileOptions::default());
         assert_eq!(c.surfaces.len(), 1);
-        assert_eq!(c.surfaces[0].indices.len(), 36);
+        assert_eq!(c.surfaces[0].ordinals.len(), 36);
         assert_eq!(c.collision.len(), 36);
     }
 
     #[test]
     fn godot_winding_faces_outward() {
         let m = shapes::cuboid(v3(1.0, 1.0, 1.0));
-        let c = compile(&m, &CompileOptions::default());
+        let c = bake(&m, &CompileOptions::default());
         let s = &c.surfaces[0];
-        for t in s.indices.chunks(3) {
+        for t in s.ordinals.chunks(3) {
             let p = |i: i32| {
                 let q = s.positions[i as usize];
                 v3(q[0], q[1], q[2])
@@ -140,17 +167,17 @@ mod tests {
             // Godot: clockwise front => (c - a) x (b - a) points out.
             let n = (cc - a).cross(b - a);
             let centre = (a + b + cc) / 3.0 - v3(0.0, 0.5, 0.0);
-            assert!(n.dot(centre) > 0.0);
+            assert!(n.innerprod(centre) > 0.0);
         }
     }
 
     #[test]
     fn manual_uvs_are_emitted() {
         let mut m = shapes::cuboid(v3(1.0, 1.0, 1.0));
-        let n = m.faces[0].verts.len();
-        m.faces[0].uv_manual = true;
-        m.faces[0].uv_coords = (0..n).map(|i| v2(7.0 + i as f32, 3.0)).collect();
-        let c = compile(&m, &CompileOptions::default());
+        let n = m.facets[0].verts.len();
+        m.facets[0].uv_manual = true;
+        m.facets[0].uv_coords = (0..n).map(|i| v2(7.0 + i as f32, 3.0)).collect();
+        let c = bake(&m, &CompileOptions::default());
         let s = &c.surfaces[0];
         assert!(s.uvs.iter().any(|u| u[0] == 7.0 && u[1] == 3.0));
     }
@@ -158,28 +185,32 @@ mod tests {
     #[test]
     fn corner_colors_and_uv_axis_are_emitted() {
         let mut m = shapes::cuboid(v3(1.0, 1.0, 1.0));
-        let n = m.faces[0].verts.len();
-        m.faces[0].color_corners = (0..n).map(|i| [10 * i as u8, 0, 0, 255 - i as u8]).collect();
-        let c = compile(&m, &CompileOptions::default());
+        let n = m.facets[0].verts.len();
+        m.facets[0].color_corners = (0..n)
+            .map(|i| [10 * i as u8, 0, 0, 255 - i as u8])
+            .collect();
+        let c = bake(&m, &CompileOptions::default());
         let s = &c.surfaces[0];
         // The first face's corners come first, in loop order.
         for i in 0..n {
-            assert!((s.colors[i][0] - (10 * i) as f32 / 255.0).abs() < 1e-6);
-            assert!((s.colors[i][3] - (255 - i) as f32 / 255.0).abs() < 1e-6);
+            assert!((s.tints[i][0] - (10 * i) as f32 / 255.0).abs() < 1e-6);
+            assert!((s.tints[i][3] - (255 - i) as f32 / 255.0).abs() < 1e-6);
         }
-        assert_eq!(s.colors[n], [1.0; 4], "other faces keep the face colour");
+        assert_eq!(s.tints[n], [1.0; 4], "other faces keep the face colour");
         // A frozen projection axis changes the automatic UVs of a tilted face.
-        let f = (0..m.faces.len()).find(|f| m.face_normal(*f).x > 0.5).unwrap();
-        let before = compile(&m, &CompileOptions::default());
-        m.faces[f].uv_axis = v3(0.0, 1.0, 0.0);
-        let after = compile(&m, &CompileOptions::default());
+        let f = (0..m.facets.len())
+            .find(|f| m.face_normal(*f).x > 0.5)
+            .unwrap();
+        let before = bake(&m, &CompileOptions::default());
+        m.facets[f].uv_axis = v3(0.0, 1.0, 0.0);
+        let after = bake(&m, &CompileOptions::default());
         assert_ne!(before.surfaces[0].uvs, after.surfaces[0].uvs);
     }
 
     #[test]
-    fn smoothing_group_shares_normals() {
-        let mut m = shapes::cylinder(v3(2.0, 2.0, 2.0), 12, true);
-        let c = compile(&m, &CompileOptions::default());
+    fn gliding_cluster_owns_uprights() {
+        let mut m = shapes::tube(v3(2.0, 2.0, 2.0), 12, true);
+        let c = bake(&m, &CompileOptions::default());
         // Any two side corners at the same position must have the same normal.
         let s = &c.surfaces[0];
         let mut seen: HashMap<(i32, i32, i32), [f32; 3]> = HashMap::new();
@@ -189,16 +220,20 @@ mod tests {
             if n[1].abs() > 0.5 {
                 continue; // caps are flat
             }
-            let k = ((p[0] * 1000.0) as i32, (p[1] * 1000.0) as i32, (p[2] * 1000.0) as i32);
+            let k = (
+                (p[0] * 1000.0) as i32,
+                (p[1] * 1000.0) as i32,
+                (p[2] * 1000.0) as i32,
+            );
             if let Some(o) = seen.insert(k, n) {
                 assert!((o[0] - n[0]).abs() < 1e-4 && (o[2] - n[2]).abs() < 1e-4);
                 checked += 1;
             }
         }
         assert!(checked > 10);
-        for f in &mut m.faces {
-            f.material = (f.smooth > 0) as u16;
+        for f in &mut m.facets {
+            f.stuff = (f.glide > 0) as u16;
         }
-        assert_eq!(compile(&m, &CompileOptions::default()).surfaces.len(), 2);
+        assert_eq!(bake(&m, &CompileOptions::default()).surfaces.len(), 2);
     }
 }

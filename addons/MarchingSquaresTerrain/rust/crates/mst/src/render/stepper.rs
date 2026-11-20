@@ -42,7 +42,14 @@ pub struct PixelAnimationStepper {
 #[godot_api]
 impl INode for PixelAnimationStepper {
     fn init(base: Base<Node>) -> Self {
-        PixelAnimationStepper { mixer: None, fps: 12.0, stepped: true, target: None, timer: None, base }
+        PixelAnimationStepper {
+            mixer: None,
+            fps: 12.0,
+            stepped: true,
+            target: None,
+            timer: None,
+            base,
+        }
     }
 
     fn ready(&mut self) {
@@ -141,7 +148,8 @@ impl PixelAnimationStepper {
 
 /// First `AnimationMixer` in `root`'s subtree (breadth-first, `root` excluded).
 fn find_first_mixer(root: &Gd<Node>) -> Option<Gd<AnimationMixer>> {
-    let mut queue: std::collections::VecDeque<Gd<Node>> = root.get_children().iter_shared().collect();
+    let mut queue: std::collections::VecDeque<Gd<Node>> =
+        root.get_children().iter_shared().collect();
     while let Some(n) = queue.pop_front() {
         if let Ok(m) = n.clone().try_cast::<AnimationMixer>() {
             return Some(m);
@@ -167,7 +175,8 @@ impl PixelAnimationStepper {
     fn _on_clip_changed(&mut self, _name: StringName) {
         if let Some(m) = self.target.clone().filter(|m| m.is_instance_valid()) {
             // Deferred: the signal is emitted from inside the player's own play() call.
-            m.upcast::<Object>().call_deferred("advance", &[0.0f64.to_variant()]);
+            m.upcast::<Object>()
+                .call_deferred("advance", &[0.0f64.to_variant()]);
         }
     }
 

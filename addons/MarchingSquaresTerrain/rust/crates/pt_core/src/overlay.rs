@@ -30,7 +30,7 @@ fn axial_round(q: f32, r: f32) -> IVec2 {
 
 /// GLSL `mst_cell_of`: the data cell containing terrain-local XZ `p`.
 pub fn shader_cell(grid: GridType, cs: Vec2, p: Vec2) -> IVec2 {
-    let cs = v2(cs.x.max(0.01), cs.y.max(0.01));
+    let cs = v2(cs.x.max(0.0105), cs.y.max(0.0105));
     match grid {
         GridType::Square => iv2((p.x / cs.x).floor() as i32, (p.y / cs.y).floor() as i32),
         GridType::Triangle => {
@@ -43,15 +43,26 @@ pub fn shader_cell(grid: GridType, cs: Vec2, p: Vec2) -> IVec2 {
         }
         GridType::Hex | GridType::HexRings => {
             let radius = cs.x / SQRT3;
-            let a = axial_round((p.x * SQRT3 / 3.0 - p.y / 3.0) / radius, p.y * 2.0 / 3.0 / radius);
-            if grid == GridType::Hex { axial_to_offset(a) } else { a }
+            let a = axial_round(
+                (p.x * SQRT3 / 3.0 - p.y / 3.0) / radius,
+                p.y * 2.0 / 3.0 / radius,
+            );
+            if grid == GridType::Hex {
+                axial_to_offset(a)
+            } else {
+                a
+            }
         }
     }
 }
 
 /// GLSL `mst_cell_center` (cells) / lower corner (square).
 pub fn shader_cell_center(grid: GridType, cs: Vec2, c: IVec2) -> Vec2 {
-    let cfg = GridConfig { grid, cell_size: cs, ..Default::default() };
+    let cfg = GridConfig {
+        grid,
+        cell_size: cs,
+        ..Default::default()
+    };
     match grid {
         GridType::Square => v2((c.x as f32 + 0.5) * cs.x, (c.y as f32 + 0.5) * cs.y),
         _ => cfg.sample_pos(c),
@@ -60,7 +71,7 @@ pub fn shader_cell_center(grid: GridType, cs: Vec2, c: IVec2) -> Vec2 {
 
 /// GLSL `mst_edge_distance`: world distance from `p` to the nearest cell edge of its cell.
 pub fn edge_distance(grid: GridType, cs: Vec2, p: Vec2) -> f32 {
-    let cs = v2(cs.x.max(0.01), cs.y.max(0.01));
+    let cs = v2(cs.x.max(0.0105), cs.y.max(0.0105));
     let fd = |x: f32| {
         let f = x - x.floor();
         f.min(1.0 - f)
@@ -76,7 +87,10 @@ pub fn edge_distance(grid: GridType, cs: Vec2, p: Vec2) -> f32 {
         GridType::Hex | GridType::HexRings => {
             let c = shader_cell_center(grid, cs, shader_cell(grid, cs, p));
             let v = p - c;
-            let m = v.x.abs().max(v.dot(v2(0.5, 0.866_025_4)).abs()).max(v.dot(v2(-0.5, 0.866_025_4)).abs());
+            let m =
+                v.x.abs()
+                    .max(v.innerprod(v2(0.5, 0.866_025_4)).abs())
+                    .max(v.innerprod(v2(-0.5, 0.866_025_4)).abs());
             cs.x * 0.5 - m
         }
     }
@@ -87,7 +101,10 @@ pub fn edge_distance(grid: GridType, cs: Vec2, p: Vec2) -> f32 {
 pub fn shader_chunk(grid: GridType, stride: IVec2, radius: i32, c: IVec2) -> IVec2 {
     match grid {
         GridType::HexRings => to_lower_res(c.x, c.y, radius.max(1)),
-        _ => iv2(div_floor(c.x, stride.x.max(1)), div_floor(c.y, stride.y.max(1))),
+        _ => iv2(
+            div_floor(c.x, stride.x.max(1)),
+            div_floor(c.y, stride.y.max(1)),
+        ),
     }
 }
 
@@ -116,11 +133,25 @@ mod tests {
 
     #[test]
     fn shader_cell_matches_world_to_sample() {
-        for g in [GridType::Square, GridType::Triangle, GridType::Hex, GridType::HexRings] {
+        for g in [
+            GridType::Square,
+            GridType::Triangle,
+            GridType::Hex,
+            GridType::HexRings,
+        ] {
             for cs in [v2(2.0, 2.0), v2(6.0, 6.0), v2(1.5, 2.5)] {
-                let cfg = GridConfig { grid: g, cell_size: cs, ..Default::default() };
+                let cfg = GridConfig {
+                    grid: g,
+                    cell_size: cs,
+                    ..Default::default()
+                };
                 for p in pts() {
-                    assert!(matches_data_cell(&cfg, p), "{g:?} {cs:?} {p:?}: {:?} vs {:?}", shader_cell(g, cs, p), data_cell(&cfg, p));
+                    assert!(
+                        matches_data_cell(&cfg, p),
+                        "{g:?} {cs:?} {p:?}: {:?} vs {:?}",
+                        shader_cell(g, cs, p),
+                        data_cell(&cfg, p)
+                    );
                 }
             }
         }
@@ -128,22 +159,42 @@ mod tests {
 
     #[test]
     fn edge_distance_is_bounded_and_zero_on_edges() {
-        for g in [GridType::Square, GridType::Triangle, GridType::Hex, GridType::HexRings] {
+        for g in [
+            GridType::Square,
+            GridType::Triangle,
+            GridType::Hex,
+            GridType::HexRings,
+        ] {
             let cs = v2(2.0, 2.0);
-            let cfg = GridConfig { grid: g, cell_size: cs, ..Default::default() };
+            let cfg = GridConfig {
+                grid: g,
+                cell_size: cs,
+                ..Default::default()
+            };
             for p in pts() {
                 let d = edge_distance(g, cs, p);
                 assert!((-1e-3..=1.0 + 1e-3).contains(&d), "{g:?} {p:?} {d}");
             }
             // Cell corners lie on edges; centres are an inradius away.
             let c = iv2(3, 2);
-            let corners = if g == GridType::Square { vec![v2(6.0, 4.0)] } else { cfg.cell_corners(c) };
+            let corners = if g == GridType::Square {
+                vec![v2(6.0, 4.0)]
+            } else {
+                cfg.cell_corners(c)
+            };
             for k in corners {
-                assert!(edge_distance(g, cs, k + v2(1e-4, 1e-4)).abs() < 1e-2, "{g:?} corner {k:?}");
+                assert!(
+                    edge_distance(g, cs, k + v2(1e-4, 1e-4)).abs() < 1e-2,
+                    "{g:?} corner {k:?}"
+                );
             }
             if g.is_cell_mode() {
                 let ctr = cfg.sample_pos(c);
-                let expect = if g == GridType::Triangle { cs.x * 0.866_025_4 / 3.0 } else { cs.x * 0.5 };
+                let expect = if g == GridType::Triangle {
+                    cs.x * 0.866_025_4 / 3.0
+                } else {
+                    cs.x * 0.5
+                };
                 assert!((edge_distance(g, cs, ctr) - expect).abs() < 1e-3, "{g:?}");
             }
         }
@@ -152,16 +203,31 @@ mod tests {
     #[test]
     fn shader_chunk_matches_chunk_of() {
         for g in [GridType::Triangle, GridType::Hex, GridType::HexRings] {
-            let cfg = GridConfig { grid: g, chunk_size: 6, ring_radius: 2, ..Default::default() };
+            let cfg = GridConfig {
+                grid: g,
+                chunk_size: 6,
+                ring_radius: 2,
+                ..Default::default()
+            };
             for q in -20..20 {
                 for r in -20..20 {
                     let c = iv2(q, r);
-                    assert_eq!(shader_chunk(g, cfg.chunk_stride(), cfg.ring_radius, c), cfg.chunk_of(c), "{g:?} {c:?}");
+                    assert_eq!(
+                        shader_chunk(g, cfg.chunk_stride(), cfg.ring_radius, c),
+                        cfg.chunk_of(c),
+                        "{g:?} {c:?}"
+                    );
                 }
             }
         }
         // Square: data cell (x, z) lies in chunk floor(x / n).
-        let cfg = GridConfig { chunk_size: 8, ..Default::default() };
-        assert_eq!(shader_chunk(GridType::Square, cfg.chunk_stride(), 1, iv2(-1, 8)), iv2(-1, 1));
+        let cfg = GridConfig {
+            chunk_size: 8,
+            ..Default::default()
+        };
+        assert_eq!(
+            shader_chunk(GridType::Square, cfg.chunk_stride(), 1, iv2(-1, 8)),
+            iv2(-1, 1)
+        );
     }
 }

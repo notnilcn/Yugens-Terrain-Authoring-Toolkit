@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c805akatg4ctk"
-path="res://.godot/imported/mode_vertex.svg-e81b314b76ca8c935d8fdee62824edf0.ctex"
+uid="uid://dcpn8ejluiqw0"
+path="res://.godot/imported/mode_face.svg-4f31273b55a8dd74e826a66ba3332c25.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/MarchingSquaresTerrain/editor/icons/builder/xogot/mode_vertex.svg"
-dest_files=["res://.godot/imported/mode_vertex.svg-e81b314b76ca8c935d8fdee62824edf0.ctex"]
+source_file="res://addons/MarchingSquaresTerrain/editor/icons/builder/modeler/mode_face.svg"
+dest_files=["res://.godot/imported/mode_face.svg-4f31273b55a8dd74e826a66ba3332c25.ctex"]
 
 [params]
 

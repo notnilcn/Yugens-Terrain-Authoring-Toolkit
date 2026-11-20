@@ -32,11 +32,16 @@ pub struct MarchingSquaresTerrainData {
 
 impl MarchingSquaresTerrainData {
     fn mode_dict(&self, grid: GridType) -> VarDictionary {
-        self.chunks.get(grid.name()).and_then(|v| v.try_to::<VarDictionary>().ok()).unwrap_or_default()
+        self.chunks
+            .get(grid.moniker())
+            .and_then(|v| v.try_to::<VarDictionary>().ok())
+            .unwrap_or_default()
     }
 
     pub fn layout_of(&self, grid: GridType) -> Option<Vector4i> {
-        self.layout.get(grid.name()).and_then(|v| v.try_to::<Vector4i>().ok())
+        self.layout
+            .get(grid.moniker())
+            .and_then(|v| v.try_to::<Vector4i>().ok())
     }
 
     /// True when written since the last `take_unsaved_edits` (see `dirty`).
@@ -50,24 +55,35 @@ impl MarchingSquaresTerrainData {
 
     pub fn write_layout(&mut self, grid: GridType, l: Vector4i) {
         if self.layout_of(grid) != Some(l) {
-            self.layout.set(grid.name(), l);
+            self.layout.set(grid.moniker(), l);
             self.dirty = true;
         }
     }
 
     /// Grid types that have chunks, in GridType order.
     pub fn grids_with_chunks(&self) -> Vec<GridType> {
-        (0..4).map(GridType::from_i64).filter(|g| self.chunk_count(*g) > 0).collect()
+        (0..4)
+            .map(GridType::from_i64)
+            .filter(|g| self.chunk_count(*g) > 0)
+            .collect()
     }
 
     /// Replaces the chunks of `grid` with `chunks` (used by directory loading and imports).
-    pub fn replace_mode(&mut self, grid: GridType, layout: [i32; 4], chunks: &[(pt_core::math::IVec2, &ChunkData)]) {
+    pub fn replace_mode(
+        &mut self,
+        grid: GridType,
+        layout: [i32; 4],
+        chunks: &[(pt_core::math::IVec2, &ChunkData)],
+    ) {
         let mut d = VarDictionary::new();
         for (c, ch) in chunks {
-            d.set(from_iv(*c), &PackedByteArray::from(ch.to_bytes().as_slice()));
+            d.set(
+                from_iv(*c),
+                &PackedByteArray::from(ch.to_bytes().as_slice()),
+            );
         }
-        self.chunks.set(grid.name(), &d);
-        self.layout.set(grid.name(), layout_vec(grid, layout));
+        self.chunks.set(grid.moniker(), &d);
+        self.layout.set(grid.moniker(), layout_vec(grid, layout));
         self.dirty = true;
     }
 
@@ -81,7 +97,8 @@ impl MarchingSquaresTerrainData {
         let expected = store.config.samples_per_chunk();
         let mut bad = 0;
         for (k, v) in self.mode_dict(store.config.grid).iter_shared() {
-            let (Ok(coord), Ok(bytes)) = (k.try_to::<Vector2i>(), v.try_to::<PackedByteArray>()) else {
+            let (Ok(coord), Ok(bytes)) = (k.try_to::<Vector2i>(), v.try_to::<PackedByteArray>())
+            else {
                 bad += 1;
                 continue;
             };
@@ -93,38 +110,52 @@ impl MarchingSquaresTerrainData {
             }
         }
         if bad > 0 {
-            godot_warn!("MarchingSquaresTerrainData: skipped {bad} unreadable/mismatched chunk(s) for '{}'", store.config.grid.name());
+            godot_warn!(
+                "MarchingSquaresTerrainData: skipped {bad} unreadable/mismatched chunk(s) for '{}'",
+                store.config.grid.moniker()
+            );
         }
         store.chunks.len()
     }
 
     /// Writes (or removes, when `chunk` is `None`) one chunk blob.
-    pub fn write_chunk(&mut self, grid: GridType, coord: pt_core::math::IVec2, chunk: Option<&ChunkData>) {
+    pub fn write_chunk(
+        &mut self,
+        grid: GridType,
+        coord: pt_core::math::IVec2,
+        chunk: Option<&ChunkData>,
+    ) {
         self.dirty = true;
         let mut d = self.mode_dict(grid);
         match chunk {
             Some(c) => {
-                d.set(from_iv(coord), &PackedByteArray::from(c.to_bytes().as_slice()));
+                d.set(
+                    from_iv(coord),
+                    &PackedByteArray::from(c.to_bytes().as_slice()),
+                );
             }
             None => {
                 d.remove(from_iv(coord));
             }
         }
-        self.chunks.set(grid.name(), &d);
+        self.chunks.set(grid.moniker(), &d);
         self.dirty = true;
     }
 
     fn clear_mode(&mut self, grid: GridType) {
         self.dirty = true;
-        self.chunks.remove(grid.name());
-        self.layout.remove(grid.name());
-        self.scatter.remove(grid.name());
-        self.cell_tints.remove(grid.name());
+        self.chunks.remove(grid.moniker());
+        self.layout.remove(grid.moniker());
+        self.scatter.remove(grid.moniker());
+        self.cell_tints.remove(grid.moniker());
     }
 
     /// Painted cell tint blob of a grid mode.
     pub fn tint_bytes(&self, grid: GridType) -> Option<Vec<u8>> {
-        self.cell_tints.get(grid.name()).and_then(|v| v.try_to::<PackedByteArray>().ok()).map(|b| b.to_vec())
+        self.cell_tints
+            .get(grid.moniker())
+            .and_then(|v| v.try_to::<PackedByteArray>().ok())
+            .map(|b| b.to_vec())
     }
 
     /// Writes (or removes, for `None`) the painted cell tints of a grid mode.
@@ -136,17 +167,21 @@ impl MarchingSquaresTerrainData {
         self.dirty = true;
         match bytes {
             Some(b) => {
-                self.cell_tints.set(grid.name(), &PackedByteArray::from(b));
+                self.cell_tints
+                    .set(grid.moniker(), &PackedByteArray::from(b));
             }
             None => {
-                self.cell_tints.remove(grid.name());
+                self.cell_tints.remove(grid.moniker());
             }
         }
     }
 
     /// Scatter blob of a grid mode.
     pub fn scatter_bytes(&self, grid: GridType) -> Option<Vec<u8>> {
-        self.scatter.get(grid.name()).and_then(|v| v.try_to::<PackedByteArray>().ok()).map(|b| b.to_vec())
+        self.scatter
+            .get(grid.moniker())
+            .and_then(|v| v.try_to::<PackedByteArray>().ok())
+            .map(|b| b.to_vec())
     }
 
     /// Writes (or removes, for `None`) the scatter blob of a grid mode.
@@ -154,11 +189,11 @@ impl MarchingSquaresTerrainData {
         match bytes {
             Some(b) => {
                 self.dirty = true;
-                self.scatter.set(grid.name(), &PackedByteArray::from(b));
+                self.scatter.set(grid.moniker(), &PackedByteArray::from(b));
             }
             None => {
                 self.dirty = true;
-                self.scatter.remove(grid.name());
+                self.scatter.remove(grid.moniker());
             }
         }
     }
@@ -202,10 +237,11 @@ impl MarchingSquaresTerrainData {
     /// (zero when the grid has no chunks).
     #[func]
     fn get_grid_layout(&self, grid_type: i64) -> Vector4i {
-        self.layout_of(GridType::from_i64(grid_type)).unwrap_or(Vector4i::ZERO)
+        self.layout_of(GridType::from_i64(grid_type))
+            .unwrap_or(Vector4i::ZERO)
     }
 
-    /// Imports the original (GDScript) MarchingSquaresTerrain's data: a terrain data
+    /// Imports MarchingSquaresTerrain data from another project: a terrain data
     /// directory (`..._TerrainData/<Node>_<uid>/` with `square/`, `hex/`, ... folders), one mode
     /// folder, or a single `metadata.res`. Absolute paths work, so the original project can
     /// be read in place. Returns null when nothing could be read.
@@ -222,9 +258,14 @@ impl MarchingSquaresTerrainData {
         {
             let mut d = data.bind_mut();
             for (grid, layout, chunks) in &grids {
-                let list: Vec<_> = chunks.iter().map(|c| (c.coords, &c.data)).collect();
+                let list: Vec<_> = chunks.iter().map(|c| (c.coords, &c.contents)).collect();
                 d.replace_mode(*grid, *layout, &list);
-                godot_print!("MarchingSquaresTerrainData: imported {} {} chunk(s) (layout {:?}) from {path}", list.len(), grid.name(), layout);
+                godot_print!(
+                    "MarchingSquaresTerrainData: imported {} {} chunk(s) (layout {:?}) from {path}",
+                    list.len(),
+                    grid.moniker(),
+                    layout
+                );
             }
         }
         Some(data)
@@ -233,7 +274,11 @@ impl MarchingSquaresTerrainData {
 
 /// Layout vector with sane values for fields the grid does not use.
 pub fn layout_vec(grid: GridType, l: [i32; 4]) -> Vector4i {
-    let cs = if grid == GridType::HexRings && l[0] < 2 { 32 } else { l[0].clamp(2, 64) };
+    let cs = if grid == GridType::HexRings && l[0] < 2 {
+        32
+    } else {
+        l[0].clamp(2, 64)
+    };
     let rr = if l[1] < 1 { 4 } else { l[1].clamp(1, 16) };
     Vector4i::new(cs, rr, l[2].max(0), l[3].max(0))
 }

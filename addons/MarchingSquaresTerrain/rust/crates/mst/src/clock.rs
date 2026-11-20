@@ -56,7 +56,7 @@ pub fn tick(delta: f64) {
     }
     let t = (now() + delta as f32).rem_euclid(ROLLOVER_SECONDS);
     TIME_BITS.store(t.to_bits(), Ordering::Relaxed);
-    globals::set("pt_time", &t.to_variant());
+    globals::assign("pt_time", &t.to_variant());
 }
 
 /// Ticks the clock and returns the seconds an effect should advance this frame: `delta` while

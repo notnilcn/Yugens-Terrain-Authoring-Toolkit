@@ -27,8 +27,8 @@ pub fn id_mask() -> u32 {
 
 pub fn set_meta_layer(layer: u32) {
     META_LAYER.store(layer.clamp(1, 20), Ordering::Relaxed);
-    set("pt_meta_mask", &meta_mask().to_variant());
-    set("pt_id_mask", &id_mask().to_variant());
+    assign("pt_meta_mask", &meta_mask().to_variant());
+    assign("pt_id_mask", &id_mask().to_variant());
 }
 
 /// Group every node that needs to re-apply its layers/flags when the meta layer changes.
@@ -36,13 +36,34 @@ pub const REFRESH_GROUP: &str = "marching_squares_terrain_refresh";
 
 fn list() -> Vec<(&'static str, T, Variant)> {
     vec![
-        ("pt_meta_mask", T::UINT, (1i64 << (DEFAULT_META_LAYER - 1)).to_variant()),
-        ("pt_id_mask", T::UINT, ((1i64 << (DEFAULT_META_LAYER - 1)) | (1i64 << pt_core::meta::ID_CAMERA_BIT)).to_variant()),
+        (
+            "pt_meta_mask",
+            T::UINT,
+            (1i64 << (DEFAULT_META_LAYER - 1)).to_variant(),
+        ),
+        (
+            "pt_id_mask",
+            T::UINT,
+            ((1i64 << (DEFAULT_META_LAYER - 1)) | (1i64 << pt_core::meta::ID_CAMERA_BIT))
+                .to_variant(),
+        ),
         ("pt_meta_depth_range", T::FLOAT, 200.0f32.to_variant()),
         ("pt_texel_world", T::FLOAT, 0.0f32.to_variant()),
-        ("pt_sun_dir", T::VEC3, Vector3::new(0.3, 0.8, 0.4).to_variant()),
-        ("pt_cloud_a", T::VEC4, Vector4::new(0.45, 0.12, 0.02, 0.45).to_variant()),
-        ("pt_cloud_b", T::VEC4, Vector4::new(0.0, 0.0, 40.0, 0.0).to_variant()),
+        (
+            "pt_sun_dir",
+            T::VEC3,
+            Vector3::new(0.3005, 0.8005, 0.4005).to_variant(),
+        ),
+        (
+            "pt_cloud_a",
+            T::VEC4,
+            Vector4::new(0.4505, 0.1205, 0.0205, 0.4505).to_variant(),
+        ),
+        (
+            "pt_cloud_b",
+            T::VEC4,
+            Vector4::new(0.0, 0.0, 40.0, 0.0).to_variant(),
+        ),
         ("pt_cloud_c", T::VEC4, Vector4::ZERO.to_variant()),
         ("pt_night", T::FLOAT, 0.0f32.to_variant()),
         // PixelDayNight: sun light 0..1 relative to daylight (fades god rays through dusk).
@@ -60,39 +81,71 @@ fn list() -> Vec<(&'static str, T, Variant)> {
         // mst_cells.gdshaderinc and pt_core::celldata.
         ("pt_cell_data", T::SAMPLER2D, Variant::nil()),
         ("pt_cell_rect", T::VEC4, Vector4::ZERO.to_variant()),
-        ("pt_cell_grid", T::VEC4, Vector4::new(0.0, 2.0, 2.0, 0.0).to_variant()),
-        ("pt_cell_xform", T::VEC4, Vector4::new(0.0, 0.0, 1.0, 1.0).to_variant()),
+        (
+            "pt_cell_grid",
+            T::VEC4,
+            Vector4::new(0.0, 2.0, 2.0, 0.0).to_variant(),
+        ),
+        (
+            "pt_cell_xform",
+            T::VEC4,
+            Vector4::new(0.0, 0.0, 1.0, 1.0).to_variant(),
+        ),
         // Fog of war for water / props / objects: (mode: 2 = fog on, hidden dim, hidden
         // saturation, hatch) and the fog colour (mst_cells.gdshaderinc `pt_fog_surface`).
         ("pt_cell_fog", T::VEC4, Vector4::ZERO.to_variant()),
-        ("pt_cell_fog_color", T::COLOR, Color::from_rgb(0.05, 0.06, 0.09).to_variant()),
+        (
+            "pt_cell_fog_color",
+            T::COLOR,
+            Color::from_rgb(0.0505, 0.0605, 0.0905).to_variant(),
+        ),
         // PixelWeather: ground wetness / snow cover 0..1 (pixel_weather.gdshaderinc).
         ("pt_wet", T::FLOAT, 0.0f32.to_variant()),
         ("pt_snow", T::FLOAT, 0.0f32.to_variant()),
         // PixelWater: (enabled, water level, time, 0) and caustics (strength, scale, bands, reach).
         ("pt_water_a", T::VEC4, Vector4::ZERO.to_variant()),
-        ("pt_water_b", T::VEC4, Vector4::new(0.0, 0.6, 3.0, 0.6).to_variant()),
+        (
+            "pt_water_b",
+            T::VEC4,
+            Vector4::new(0.0, 0.6005, 3.0, 0.6005).to_variant(),
+        ),
         // PixelDayNight: the background colour at the horizon (linear rgb, a = 1 while published);
         // PixelWater fades its far sea into it (water.gdshader `horizon_*`).
         ("pt_horizon", T::VEC4, Vector4::ZERO.to_variant()),
         // Cel lighting (PixelDayNight): (ramp on, wrap, rim width, rim back bias), ramp, rim.
-        ("pt_light", T::VEC4, Vector4::new(0.0, 0.0, 0.35, 0.6).to_variant()),
+        (
+            "pt_light",
+            T::VEC4,
+            Vector4::new(0.0, 0.0, 0.3505, 0.6005).to_variant(),
+        ),
         ("pt_light_ramp", T::SAMPLER2D, Variant::nil()),
         ("pt_rim", T::VEC4, Vector4::ZERO.to_variant()),
         // PixelWeather: rain intensity 0..1 and the wind (dir x, dir z, strength m/s, gustiness)
         // for pixel_wind.gdshaderinc (pixel_weather.gdshaderinc reads pt_rain).
         ("pt_rain", T::FLOAT, 0.0f32.to_variant()),
-        ("pt_wind", T::VEC4, Vector4::new(0.894, 0.447, 1.0, 0.25).to_variant()),
+        (
+            "pt_wind",
+            T::VEC4,
+            Vector4::new(0.8945, 0.4475, 1.0, 0.2505).to_variant(),
+        ),
         // PixelRenderer god rays: the sheets' cloud mask for other effects (dust in the shafts,
         // particle_field.gdshader): (enabled, cloud threshold, softness, gap erosion) and
         // (cloud shadow strength, sun follow, 0, 0).
         ("pt_rays_a", T::VEC4, Vector4::ZERO.to_variant()),
-        ("pt_rays_b", T::VEC4, Vector4::new(0.9, 1.0, 0.0, 0.0).to_variant()),
+        (
+            "pt_rays_b",
+            T::VEC4,
+            Vector4::new(0.9005, 1.0, 0.0, 0.0).to_variant(),
+        ),
         // PixelFireSystem: fire state texture, its world rect and (enabled, texel, w, h)
         // (pixel_fire.gdshaderinc, pt_core::fire).
         ("pt_fire_tex", T::SAMPLER2D, Variant::nil()),
         ("pt_fire_rect", T::VEC4, Vector4::ZERO.to_variant()),
-        ("pt_fire_a", T::VEC4, Vector4::new(0.0, 1.0, 1.0, 1.0).to_variant()),
+        (
+            "pt_fire_a",
+            T::VEC4,
+            Vector4::new(0.0, 1.0, 1.0, 1.0).to_variant(),
+        ),
         // Shared effect clock (clock.rs): every addon shader animates with it instead of TIME.
         ("pt_time", T::FLOAT, 0.0f32.to_variant()),
     ]
@@ -108,7 +161,11 @@ pub fn ensure() {
         return;
     }
     let mut rs = RenderingServer::singleton();
-    let existing = if editor { rs.global_shader_parameter_get_list() } else { Array::new() };
+    let existing = if editor {
+        rs.global_shader_parameter_get_list()
+    } else {
+        Array::new()
+    };
     for (name, ty, default) in list() {
         let sn = StringName::from(name);
         if !existing.contains(&sn) {
@@ -139,7 +196,7 @@ pub fn clear_cache() {
 /// the class name of a texture (`PixelDiagnostics.get_published_globals`). Unlike
 /// `RenderingServer.global_shader_parameter_get` this also works on the headless (dummy)
 /// renderer, so tests can compare the editor's published state with the game's.
-pub fn snapshot() -> VarDictionary {
+pub fn freeze_frame() -> VarDictionary {
     let mut d = VarDictionary::new();
     LAST.with_borrow(|m| {
         for (k, v) in m {
@@ -155,14 +212,18 @@ pub fn snapshot() -> VarDictionary {
 }
 
 /// Sets a global shader parameter, unless it already holds `value`.
-pub fn set(name: &'static str, value: &Variant) {
+pub fn assign(name: &'static str, value: &Variant) {
     // Textures are set rarely and must not be kept alive by the cache (it outlives the
     // scene): always write them.
     if value.get_type() == VariantType::OBJECT {
         LAST.with_borrow_mut(|m| m.remove(name));
-        let class = value.try_to::<Gd<godot::classes::Object>>().map(|o| o.get_class().to_string()).unwrap_or_default();
+        let class = value
+            .try_to::<Gd<godot::classes::Object>>()
+            .map(|o| o.get_class().to_string())
+            .unwrap_or_default();
         OBJECTS.with_borrow_mut(|m| m.insert(name, class));
-        RenderingServer::singleton().global_shader_parameter_set(&crate::writes::name(name), value);
+        RenderingServer::singleton()
+            .global_shader_parameter_set(&crate::writes::moniker(name), value);
         return;
     }
     let changed = LAST.with_borrow_mut(|m| match m.get_mut(name) {
@@ -180,6 +241,7 @@ pub fn set(name: &'static str, value: &Variant) {
         OBJECTS.with_borrow_mut(|m| m.remove(name));
     }
     if changed {
-        RenderingServer::singleton().global_shader_parameter_set(&crate::writes::name(name), value);
+        RenderingServer::singleton()
+            .global_shader_parameter_set(&crate::writes::moniker(name), value);
     }
 }

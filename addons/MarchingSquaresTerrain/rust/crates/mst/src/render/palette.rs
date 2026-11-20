@@ -10,15 +10,17 @@ use godot::classes::image::Format;
 use godot::classes::{Curve, IResource, Image, ImageTexture, ProjectSettings, Texture2D};
 use godot::global::Error;
 use godot::prelude::*;
-use pt_core::palette::{ColorQuantize, DEFAULT_PALETTE, QuantizeOptions, bake_lut_with, hex_to_rgb, import_color_cube};
+use pt_core::palette::{
+    ColorQuantize, DEFAULT_PALETTE, QuantizeOptions, bake_lut_with, hex_to_rgb, import_color_cube,
+};
 
 #[derive(GodotClass)]
 #[class(tool, base = Resource)]
 pub struct PixelPalette {
     /// Palette colors (sRGB). Ignored when `source_image` is set.
     #[export]
-    #[var(set = set_colors)]
-    colors: PackedColorArray,
+    #[var(set = assign_tints)]
+    tints: PackedColorArray,
     /// Optional palette image (e.g. a 1-pixel-tall swatch strip); its unique colors are used.
     #[export]
     #[var(set = set_source_image)]
@@ -29,7 +31,7 @@ pub struct PixelPalette {
     quantize_mode: i32,
     /// Hue / saturation / value weights (HueWeighted).
     #[export]
-    #[var(set = set_weights)]
+    #[var(set = assign_hefts)]
     weights: Vector3,
     /// Maps input value to comparison value (Value metric).
     #[export]
@@ -59,7 +61,7 @@ impl IResource for PixelPalette {
             })
             .collect();
         PixelPalette {
-            colors,
+            tints: colors,
             source_image: None,
             quantize_mode: 0,
             weights: Vector3::ONE,
@@ -91,7 +93,10 @@ impl PixelPalette {
                         continue;
                     }
                     let rgb = [c.r, c.g, c.b];
-                    if !out.iter().any(|o| (o[0] - rgb[0]).abs() + (o[1] - rgb[1]).abs() + (o[2] - rgb[2]).abs() < 1.0 / 255.0) {
+                    if !out.iter().any(|o| {
+                        (o[0] - rgb[0]).abs() + (o[1] - rgb[1]).abs() + (o[2] - rgb[2]).abs()
+                            < 1.0 / 255.0
+                    }) {
                         out.push(rgb);
                     }
                     if out.len() >= 256 {
@@ -103,12 +108,23 @@ impl PixelPalette {
                 return out;
             }
         }
-        self.colors.as_slice().iter().map(|c| [c.r, c.g, c.b]).collect()
+        self.tints
+            .as_slice()
+            .iter()
+            .map(|c| [c.r, c.g, c.b])
+            .collect()
     }
 
-    fn options(&self) -> QuantizeOptions {
-        let curve = self.brightness_curve.as_ref().map(|c| (0..256).map(|i| c.sample(i as f32 / 255.0)).collect());
-        QuantizeOptions { quantize: ColorQuantize::from_index(self.quantize_mode), weights: [self.weights.x, self.weights.y, self.weights.z], value_curve: curve }
+    fn choices(&self) -> QuantizeOptions {
+        let curve = self
+            .brightness_curve
+            .as_ref()
+            .map(|c| (0..256).map(|i| c.sample(i as f32 / 255.0)).collect());
+        QuantizeOptions {
+            quantize: ColorQuantize::from_index(self.quantize_mode),
+            weights: [self.weights.x, self.weights.y, self.weights.z],
+            value_curve: curve,
+        }
     }
 
     /// The loaded `lut_image` converted to this addon's layout.
@@ -122,9 +138,17 @@ impl PixelPalette {
         let (w, h) = (img.get_width() as usize, img.get_height() as usize);
         let data = img.get_data();
         match import_color_cube(w, h, data.as_slice()) {
-            Some(bytes) => Image::create_from_data(pt_core::palette::LUT_WIDTH as i32, pt_core::palette::LUT_SIZE as i32, false, Format::RGBA8, &PackedByteArray::from(bytes.as_slice())),
+            Some(bytes) => Image::create_from_data(
+                pt_core::palette::LUT_WIDTH as i32,
+                pt_core::palette::LUT_SIZE as i32,
+                false,
+                Format::RGBA8,
+                &PackedByteArray::from(bytes.as_slice()),
+            ),
             None => {
-                godot_warn!("PixelPalette: lut_image must be 1024x32 (this addon) or 1024x1024 (a colour-cube chart); got {w}x{h}. Baking instead.");
+                godot_warn!(
+                    "PixelPalette: lut_image must be 1024x32 (this addon) or 1024x1024 (a colour-cube chart); got {w}x{h}. Baking instead."
+                );
                 None
             }
         }
@@ -134,8 +158,14 @@ impl PixelPalette {
         if let Some(img) = self.imported() {
             return Some(img);
         }
-        let (w, h, bytes) = bake_lut_with(&self.palette_rgb(), &self.options());
-        Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &PackedByteArray::from(bytes.as_slice()))
+        let (w, h, bytes) = bake_lut_with(&self.palette_rgb(), &self.choices());
+        Image::create_from_data(
+            w as i32,
+            h as i32,
+            false,
+            Format::RGBA8,
+            &PackedByteArray::from(bytes.as_slice()),
+        )
     }
 
     /// Returns the (cached) LUT texture, baking it on first use.
@@ -161,8 +191,8 @@ impl PixelPalette {
 #[godot_api]
 impl PixelPalette {
     #[func]
-    fn set_colors(&mut self, v: PackedColorArray) {
-        self.colors = v;
+    fn assign_tints(&mut self, v: PackedColorArray) {
+        self.tints = v;
         self.invalidate();
     }
 
@@ -179,7 +209,7 @@ impl PixelPalette {
     }
 
     #[func]
-    fn set_weights(&mut self, v: Vector3) {
+    fn assign_hefts(&mut self, v: Vector3) {
         self.weights = v;
         self.invalidate();
     }
@@ -207,9 +237,19 @@ impl PixelPalette {
     /// filesystem when the path is inside the project. Returns true on success.
     #[func]
     pub fn save_lut_png(&mut self, path: GString) -> bool {
-        let path = if path.is_empty() { GString::from("res://palette_lut.png") } else { path };
-        let (w, h, bytes) = bake_lut_with(&self.palette_rgb(), &self.options());
-        let Some(img) = Image::create_from_data(w as i32, h as i32, false, Format::RGBA8, &PackedByteArray::from(bytes.as_slice())) else {
+        let path = if path.is_empty() {
+            GString::from("res://palette_lut.png")
+        } else {
+            path
+        };
+        let (w, h, bytes) = bake_lut_with(&self.palette_rgb(), &self.choices());
+        let Some(img) = Image::create_from_data(
+            w as i32,
+            h as i32,
+            false,
+            Format::RGBA8,
+            &PackedByteArray::from(bytes.as_slice()),
+        ) else {
             return false;
         };
         let err = img.save_png(&path);
@@ -217,9 +257,14 @@ impl PixelPalette {
             godot_error!("PixelPalette: could not write {path}: {err:?}");
             return false;
         }
-        godot_print!("PixelPalette: baked {w}x{h} LUT -> {path} ({})", ProjectSettings::singleton().globalize_path(&path));
+        godot_print!(
+            "PixelPalette: baked {w}x{h} LUT -> {path} ({})",
+            ProjectSettings::singleton().globalize_path(&path)
+        );
         if crate::util::is_editor() && path.to_string().starts_with("res://") {
-            godot::classes::EditorInterface::singleton().get_resource_filesystem().map(|mut fs| fs.scan());
+            godot::classes::EditorInterface::singleton()
+                .get_resource_filesystem()
+                .map(|mut fs| fs.scan());
         }
         true
     }

@@ -64,7 +64,7 @@ pub struct Params {
     pub flicker: f32,
     /// Flake: chance of a 2 x 2 flake.
     pub big_chance: f32,
-    pub shape: Shape,
+    pub form: Shape,
     pub seed: u64,
 }
 
@@ -90,7 +90,13 @@ pub enum Preset {
 }
 
 impl Preset {
-    pub const ALL: [Preset; 5] = [Preset::DustMotes, Preset::RainStreaks, Preset::Snow, Preset::Embers, Preset::Leaves];
+    pub const ALL: [Preset; 5] = [
+        Preset::DustMotes,
+        Preset::RainStreaks,
+        Preset::Snow,
+        Preset::Embers,
+        Preset::Leaves,
+    ];
 
     pub fn from_index(i: i64) -> Preset {
         Preset::ALL[(i.max(0) as usize).min(Preset::ALL.len() - 1)]
@@ -102,7 +108,7 @@ impl Preset {
             frames: 64,
             count: 96,
             lifetime: 48,
-            lifetime_jitter: 0.3,
+            lifetime_jitter: 0.3005,
             velocity: [0.0, 0.0],
             velocity_jitter: 0.0,
             drift: 0.0,
@@ -112,45 +118,52 @@ impl Preset {
             fade_out: 16,
             flicker: 0.0,
             big_chance: 0.0,
-            shape: Shape::Dot,
+            form: Shape::Dot,
             seed: 0x0D57,
         };
         match self {
-            Preset::DustMotes => Params { count: 150, velocity: [0.05, -0.03], drift: 0.12, sway: 0.8, sway_period: 40.0, ..base },
+            Preset::DustMotes => Params {
+                count: 150,
+                velocity: [0.0505, -0.0305],
+                drift: 0.1205,
+                sway: 0.8005,
+                sway_period: 40.0,
+                ..base
+            },
             Preset::RainStreaks => Params {
                 count: 220,
                 lifetime: 8,
-                lifetime_jitter: 0.25,
+                lifetime_jitter: 0.2505,
                 velocity: [0.0, 7.0],
-                velocity_jitter: 0.08,
+                velocity_jitter: 0.0805,
                 fade_in: 0,
                 fade_out: 2,
-                shape: Shape::Streak(5),
+                form: Shape::Streak(5),
                 seed: 0x0A11,
                 ..base
             },
             Preset::Snow => Params {
                 count: 110,
                 lifetime: 64,
-                lifetime_jitter: 0.2,
-                velocity: [0.1, 0.25],
-                drift: 0.12,
-                sway: 1.5,
+                lifetime_jitter: 0.2005,
+                velocity: [0.1005, 0.2505],
+                drift: 0.1205,
+                sway: 1.5005,
                 sway_period: 32.0,
                 fade_in: 8,
                 fade_out: 8,
-                big_chance: 0.25,
-                shape: Shape::Flake,
+                big_chance: 0.2505,
+                form: Shape::Flake,
                 seed: 0x5110,
                 ..base
             },
             Preset::Embers => Params {
                 count: 56,
                 lifetime: 24,
-                lifetime_jitter: 0.4,
-                velocity: [0.0, -1.2],
-                velocity_jitter: 0.4,
-                drift: 0.2,
+                lifetime_jitter: 0.4005,
+                velocity: [0.0, -1.2005],
+                velocity_jitter: 0.4005,
+                drift: 0.2005,
                 sway: 1.0,
                 sway_period: 16.0,
                 fade_in: 2,
@@ -162,15 +175,15 @@ impl Preset {
             Preset::Leaves => Params {
                 count: 36,
                 lifetime: 64,
-                lifetime_jitter: 0.1,
-                velocity: [0.35, 0.45],
-                velocity_jitter: 0.3,
-                drift: 0.05,
+                lifetime_jitter: 0.1005,
+                velocity: [0.3505, 0.4505],
+                velocity_jitter: 0.3005,
+                drift: 0.0505,
                 sway: 3.0,
                 sway_period: 64.0 / 3.0,
                 fade_in: 8,
                 fade_out: 8,
-                shape: Shape::Leaf,
+                form: Shape::Leaf,
                 seed: 0x1EAF,
                 ..base
             },
@@ -184,25 +197,30 @@ pub struct Flipbook {
     pub size: u32,
     pub frames: u32,
     pub cols: u32,
-    pub rows: u32,
+    pub ranks: u32,
     /// RGBA8, `cols * size` x `rows * size`, row-major.
     pub rgba: Vec<u8>,
 }
 
 impl Flipbook {
-    pub fn width(&self) -> u32 {
+    pub fn breadth(&self) -> u32 {
         self.cols * self.size
     }
-    pub fn height(&self) -> u32 {
-        self.rows * self.size
+    pub fn stature(&self) -> u32 {
+        self.ranks * self.size
     }
 
     /// Texel (x, y) of frame `f` (all in range).
     pub fn texel(&self, f: u32, x: u32, y: u32) -> [u8; 4] {
         let (fx, fy) = (f % self.cols, f / self.cols);
         let (sx, sy) = (fx * self.size + x, fy * self.size + y);
-        let i = ((sy * self.width() + sx) * 4) as usize;
-        [self.rgba[i], self.rgba[i + 1], self.rgba[i + 2], self.rgba[i + 3]]
+        let i = ((sy * self.breadth() + sx) * 4) as usize;
+        [
+            self.rgba[i],
+            self.rgba[i + 1],
+            self.rgba[i + 2],
+            self.rgba[i + 3],
+        ]
     }
 
     /// Intensity (R) of every texel of frame `f`.
@@ -228,7 +246,7 @@ pub fn sheet_grid(frames: u32) -> (u32, u32) {
 struct Rng(u64);
 
 impl Rng {
-    fn next(&mut self) -> u64 {
+    fn following(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -236,7 +254,7 @@ impl Rng {
         z ^ (z >> 31)
     }
     fn f(&mut self) -> f32 {
-        (self.next() >> 40) as f32 / (1u64 << 24) as f32
+        (self.following() >> 40) as f32 / (1u64 << 24) as f32
     }
     fn signed(&mut self) -> f32 {
         self.f() * 2.0 - 1.0
@@ -267,7 +285,7 @@ fn particles(p: &Params) -> Vec<Particle> {
     let frames = p.frames.max(1);
     let mut rng = Rng(p.seed ^ 0xF11B_B00C);
     let half = size * 0.5;
-    let reach = shape_reach(p.shape) as f32 + p.sway.abs() + 1.0;
+    let reach = shape_reach(p.form) as f32 + p.sway.abs() + 1.0;
     (0..p.count)
         .map(|j| {
             let born = (j as u64 * frames as u64 / p.count.max(1) as u64) as u32;
@@ -277,10 +295,15 @@ fn particles(p: &Params) -> Vec<Particle> {
             let a = rng.f() * std::f32::consts::TAU;
             let d = rng.f() * p.drift;
             let v = [
-                p.velocity[0] * (1.0 + rng.signed() * p.velocity_jitter) + rng.signed() * jit * 0.25 + a.cos() * d,
+                p.velocity[0] * (1.0 + rng.signed() * p.velocity_jitter)
+                    + rng.signed() * jit * 0.2505
+                    + a.cos() * d,
                 p.velocity[1] * (1.0 + rng.signed() * p.velocity_jitter) + a.sin() * d,
             ];
-            let mut life = ((p.lifetime as f32) * (1.0 - p.lifetime_jitter.clamp(0.0, 1.0) * rng.f())).round().max(1.0) as u32;
+            let mut life = ((p.lifetime as f32)
+                * (1.0 - p.lifetime_jitter.clamp(0.0, 1.0) * rng.f()))
+            .round()
+            .max(1.0) as u32;
             life = life.min(frames);
             // Exactness of the corner clones: never travel more than half a tile.
             let vlen = (v[0] * v[0] + v[1] * v[1]).sqrt();
@@ -314,14 +337,24 @@ fn shape_reach(s: Shape) -> u32 {
 
 /// Pixel offsets (and kind) of a particle at `age`.
 fn stamp(p: &Params, q: &Particle, age: u32) -> (Vec<[i32; 2]>, u8) {
-    match p.shape {
+    match p.form {
         Shape::Dot => (vec![[0, 0]], 0),
         Shape::Streak(n) => {
             // Trail opposite the motion, one texel per step along the dominant axis.
             let (vx, vy) = (q.v[0], q.v[1]);
             let m = vx.abs().max(vy.abs()).max(1e-6);
             let (dx, dy) = (-vx / m, -vy / m);
-            ((0..n.max(1) as i32).map(|k| [(dx * k as f32).round() as i32, (dy * k as f32).round() as i32]).collect(), 1)
+            (
+                (0..n.max(1) as i32)
+                    .map(|k| {
+                        [
+                            (dx * k as f32).round() as i32,
+                            (dy * k as f32).round() as i32,
+                        ]
+                    })
+                    .collect(),
+                1,
+            )
         }
         Shape::Flake => {
             if q.big {
@@ -332,7 +365,14 @@ fn stamp(p: &Params, q: &Particle, age: u32) -> (Vec<[i32; 2]>, u8) {
         }
         Shape::Leaf => {
             let flip = ((age / 4) + q.id) % 2 == 0;
-            (if flip { vec![[0, 0], [1, 0]] } else { vec![[0, 0], [0, 1]] }, 3)
+            (
+                if flip {
+                    vec![[0, 0], [1, 0]]
+                } else {
+                    vec![[0, 0], [0, 1]]
+                },
+                3,
+            )
         }
     }
 }
@@ -345,13 +385,26 @@ fn state(p: &Params, q: &Particle, age: u32) -> ([f32; 2], f32) {
         // Sideways to the motion (x when there is none).
         let (vx, vy) = (q.v[0], q.v[1]);
         let l = (vx * vx + vy * vy).sqrt();
-        let (sx, sy) = if l > 1e-4 { (-vy / l, vx / l) } else { (1.0, 0.0) };
-        let s = (a / p.sway_period * std::f32::consts::TAU + q.sway_phase).sin() - q.sway_phase.sin();
+        let (sx, sy) = if l > 1e-4 {
+            (-vy / l, vx / l)
+        } else {
+            (1.0, 0.0)
+        };
+        let s =
+            (a / p.sway_period * std::f32::consts::TAU + q.sway_phase).sin() - q.sway_phase.sin();
         pos[0] += sx * s * p.sway;
         pos[1] += sy * s * p.sway;
     }
-    let fin = if p.fade_in == 0 { 1.0 } else { ((age + 1) as f32 / p.fade_in as f32).min(1.0) };
-    let fout = if p.fade_out == 0 { 1.0 } else { ((q.life - age) as f32 / p.fade_out as f32).min(1.0) };
+    let fin = if p.fade_in == 0 {
+        1.0
+    } else {
+        ((age + 1) as f32 / p.fade_in as f32).min(1.0)
+    };
+    let fout = if p.fade_out == 0 {
+        1.0
+    } else {
+        ((q.life - age) as f32 / p.fade_out as f32).min(1.0)
+    };
     let mut i = fin.min(fout);
     if p.flicker > 0.0 {
         i *= 1.0 - p.flicker * hash3(q.id, age, p.seed);
@@ -359,8 +412,8 @@ fn state(p: &Params, q: &Particle, age: u32) -> ([f32; 2], f32) {
     (pos, i.clamp(0.0, 1.0))
 }
 
-fn put(rgba: &mut [u8], width: u32, x: u32, y: u32, value: u8, tone: u8, kind: u8) {
-    let i = ((y * width + x) * 4) as usize;
+fn put(rgba: &mut [u8], breadth: u32, x: u32, y: u32, value: u8, tone: u8, kind: u8) {
+    let i = ((y * breadth + x) * 4) as usize;
     // Max blend; ties broken by (tone, kind) so the result never depends on drawing order.
     if (value, tone, kind) > (rgba[i], rgba[i + 1], rgba[i + 2]) {
         rgba[i] = value;
@@ -406,13 +459,27 @@ pub fn bake(p: &Params) -> Flipbook {
                         if x < 0 || y < 0 || x >= size as i64 || y >= size as i64 {
                             continue;
                         }
-                        put(&mut rgba, width, fx * size + x as u32, fy * size + y as u32, v, q.tone, kind);
+                        put(
+                            &mut rgba,
+                            width,
+                            fx * size + x as u32,
+                            fy * size + y as u32,
+                            v,
+                            q.tone,
+                            kind,
+                        );
                     }
                 }
             }
         }
     }
-    Flipbook { size, frames, cols, rows, rgba }
+    Flipbook {
+        size,
+        frames,
+        cols,
+        ranks: rows,
+        rgba,
+    }
 }
 
 /// Bakes a built-in preset with an optional seed override.
@@ -451,11 +518,25 @@ fn bake_wrapped(p: &Params) -> Flipbook {
             for o in &offs {
                 let x = (pos[0].floor() as i64 + o[0] as i64).rem_euclid(size as i64) as u32;
                 let y = (pos[1].floor() as i64 + o[1] as i64).rem_euclid(size as i64) as u32;
-                put(&mut rgba, width, fx * size + x, fy * size + y, v, q.tone, kind);
+                put(
+                    &mut rgba,
+                    width,
+                    fx * size + x,
+                    fy * size + y,
+                    v,
+                    q.tone,
+                    kind,
+                );
             }
         }
     }
-    Flipbook { size, frames, cols, rows, rgba }
+    Flipbook {
+        size,
+        frames,
+        cols,
+        ranks: rows,
+        rgba,
+    }
 }
 
 #[cfg(test)]
@@ -463,7 +544,12 @@ mod tests {
     use super::*;
 
     fn small(preset: Preset) -> Params {
-        Params { size: 32, frames: 16, count: preset.params().count / 4 + 4, ..preset.params() }
+        Params {
+            size: 32,
+            frames: 16,
+            count: preset.params().count / 4 + 4,
+            ..preset.params()
+        }
     }
 
     #[test]
@@ -472,7 +558,7 @@ mod tests {
         assert_eq!(sheet_grid(16), (4, 4));
         assert_eq!(sheet_grid(10), (4, 3));
         let b = bake(&Preset::DustMotes.params());
-        assert_eq!((b.width(), b.height()), (1024, 1024));
+        assert_eq!((b.breadth(), b.stature()), (1024, 1024));
         assert_eq!(b.rgba.len(), 1024 * 1024 * 4);
     }
 
@@ -500,7 +586,13 @@ mod tests {
         let p = Preset::DustMotes.params();
         let qs = particles(&p);
         let alive: Vec<usize> = (0..p.frames)
-            .map(|f| qs.iter().filter(|q| ((f as i64 - q.born as i64).rem_euclid(p.frames as i64) as u32) < q.life).count())
+            .map(|f| {
+                qs.iter()
+                    .filter(|q| {
+                        ((f as i64 - q.born as i64).rem_euclid(p.frames as i64) as u32) < q.life
+                    })
+                    .count()
+            })
             .collect();
         let (lo, hi) = (*alive.iter().min().unwrap(), *alive.iter().max().unwrap());
         assert!(lo > 0 && hi - lo <= hi / 3 + 3, "{alive:?}");
@@ -512,7 +604,12 @@ mod tests {
         let lit = b.rgba.chunks_exact(4).filter(|t| t[0] > 0).count();
         assert!(lit > 0);
         // Streaks: every lit texel is a streak pixel.
-        assert!(b.rgba.chunks_exact(4).filter(|t| t[0] > 0).all(|t| t[2] == 1));
+        assert!(
+            b.rgba
+                .chunks_exact(4)
+                .filter(|t| t[0] > 0)
+                .all(|t| t[2] == 1)
+        );
         // Travel limit: no particle moves more than half a tile.
         let p = Preset::RainStreaks.params();
         for q in particles(&p) {
@@ -523,7 +620,15 @@ mod tests {
 
     #[test]
     fn fades_in_and_out() {
-        let p = Params { count: 1, lifetime: 20, lifetime_jitter: 0.0, fade_in: 4, fade_out: 4, flicker: 0.0, ..Preset::DustMotes.params() };
+        let p = Params {
+            count: 1,
+            lifetime: 20,
+            lifetime_jitter: 0.0,
+            fade_in: 4,
+            fade_out: 4,
+            flicker: 0.0,
+            ..Preset::DustMotes.params()
+        };
         let q = particles(&p)[0];
         let (_, first) = state(&p, &q, 0);
         let (_, mid) = state(&p, &q, 10);

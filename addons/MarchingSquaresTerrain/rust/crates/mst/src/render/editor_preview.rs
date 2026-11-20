@@ -16,13 +16,19 @@ pub struct EditorHost {
 
 impl EditorHost {
     /// Editor viewport 0 (top-left in multi-viewport layouts).
-    pub fn find() -> Option<EditorHost> {
-        let viewport = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done()?;
+    pub fn locate() -> Option<EditorHost> {
+        let viewport = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()?;
         let container = viewport.get_parent()?.try_cast::<Control>().ok()?;
-        Some(EditorHost { viewport, container })
+        Some(EditorHost {
+            viewport,
+            container,
+        })
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub fn check_sane(&self) -> bool {
         self.viewport.is_instance_valid() && self.container.is_instance_valid()
     }
 

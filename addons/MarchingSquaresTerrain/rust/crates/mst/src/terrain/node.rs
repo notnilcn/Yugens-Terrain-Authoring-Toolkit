@@ -9,7 +9,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use godot::classes::image::Format;
 use godot::classes::{
-    INode3D, Image, ImageTexture, MeshInstance3D, Node3D, Noise, ShaderMaterial, Texture2D, Texture2DArray,
+    INode3D, Image, ImageTexture, MeshInstance3D, Node3D, Noise, ShaderMaterial, Texture2D,
+    Texture2DArray,
 };
 use godot::prelude::*;
 
@@ -62,7 +63,7 @@ pub struct MarchingSquaresTerrain {
     /// Samples of every chunk. Save it as a `.res` file to keep scenes small.
     #[export]
     #[var(set = set_data)]
-    pub(super) data: Option<Gd<MarchingSquaresTerrainData>>,
+    pub(super) contents: Option<Gd<MarchingSquaresTerrainData>>,
     /// Square = marching squares over vertex heights. Triangle/Hex/HexRings = cells at their own height.
     #[export(enum = (Square, Triangle, Hex, HexRings))]
     #[var(set = set_grid_type)]
@@ -78,7 +79,7 @@ pub struct MarchingSquaresTerrain {
     /// Ground textures (16 slots, painted with Vertex Painting). Presets live in `texture_presets/`.
     #[export]
     #[var(set = set_texture_set)]
-    texture_set: Option<Gd<MarchingSquaresTexturePreset>>,
+    tex_assign: Option<Gd<MarchingSquaresTexturePreset>>,
 
     // Basics above stay ungrouped; everything else sits in a few collapsed groups (Grid, Look,
     // Overlay, Advanced, Tools). Group names are display-only: saved property names never change.
@@ -171,8 +172,8 @@ pub struct MarchingSquaresTerrain {
     /// Terrain material (`mst_terrain.gdshader`). Created automatically; edit its parameters freely.
     #[export_subgroup(name = "Terrain")]
     #[export]
-    #[var(set = set_terrain_material)]
-    terrain_material: Option<Gd<ShaderMaterial>>,
+    #[var(set = assign_land_stuff)]
+    land_stuff: Option<Gd<ShaderMaterial>>,
     /// Pixel size multiplier in the pixel renderer (>= 1).
     #[export(range = (1.0, 16.0, 1.0, or_greater))]
     #[var(set = set_pixel_size)]
@@ -204,8 +205,8 @@ pub struct MarchingSquaresTerrain {
     grass_texture: Option<Gd<Texture2D>>,
     /// Grass material (`mst_grass.gdshader`). Created automatically.
     #[export]
-    #[var(set = set_grass_material)]
-    grass_material: Option<Gd<ShaderMaterial>>,
+    #[var(set = assign_turf_stuff)]
+    turf_stuff: Option<Gd<ShaderMaterial>>,
     #[export(range = (1.0, 16.0, 1.0, or_greater))]
     #[var(set = set_grass_pixel_size)]
     grass_pixel_size: i32,
@@ -238,7 +239,7 @@ pub struct MarchingSquaresTerrain {
     #[export]
     pub grid_color: Color,
     /// Line width in world units (at least one pixel is drawn by the low-res pass).
-    #[export(range = (0.005, 2.0, 0.005))]
+    #[export(range = (0.0055, 2.0, 0.0055))]
     pub grid_width: f32,
     /// Lines fade out by this camera distance (0 = no fade).
     #[export(range = (0.0, 2000.0, 1.0))]
@@ -254,7 +255,7 @@ pub struct MarchingSquaresTerrain {
     #[export(enum = (Off, Slope, HeightContours, SlotIds, ChunkBorders, CellIds, CellData))]
     pub debug_view: i32,
     /// Height between contour lines of the HeightContours view.
-    #[export(range = (0.05, 100.0, 0.05))]
+    #[export(range = (0.0505, 100.0, 0.0505))]
     pub contour_step: f32,
     #[export_subgroup(name = "Fog Of War", prefix = "fog_")]
     /// Fog of war in game: unexplored cells are dithered fog, explored-but-hidden cells are
@@ -265,7 +266,7 @@ pub struct MarchingSquaresTerrain {
     #[export]
     pub fog_in_editor: bool,
     /// Seconds a cell takes to fade in / out.
-    #[export(range = (0.0, 5.0, 0.01))]
+    #[export(range = (0.0, 5.0, 0.0105))]
     pub fog_transition: f32,
     #[export]
     pub fog_color: Color,
@@ -274,20 +275,20 @@ pub struct MarchingSquaresTerrain {
     pub fog_color_alt: Color,
     /// Brightness of explored-but-hidden cells.
     #[export_subgroup(name = "Fog: Hidden Cells", prefix = "fog_hidden_")]
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub fog_hidden_dim: f32,
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub fog_hidden_saturation: f32,
     /// Diagonal hatch strength on explored-but-hidden cells.
     #[export_subgroup(name = "Fog Of War", prefix = "fog_")]
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub fog_hatch: f32,
     /// Width of the dithered transition across cell borders (fraction of a cell).
-    #[export(range = (0.0, 0.5, 0.01))]
+    #[export(range = (0.0, 0.5, 0.0105))]
     pub fog_softness: f32,
     #[export_subgroup(name = "Highlight")]
     /// Width of the `set_cell_highlight` outline (world units).
-    #[export(range = (0.0, 4.0, 0.01))]
+    #[export(range = (0.0, 4.0, 0.0105))]
     pub highlight_width: f32,
 
     #[export_group(name = "Advanced")]
@@ -306,8 +307,8 @@ pub struct MarchingSquaresTerrain {
     bake_grass: bool,
     /// Baked: also store the collision faces.
     #[export]
-    #[var(set = set_bake_collision)]
-    bake_collision: bool,
+    #[var(set = assign_bake_impact)]
+    bake_impact: bool,
     /// Directory storage folder. Empty = generated on the first save as
     /// `<scene dir>/<scene name>_TerrainData/<node name>_<id>/` (like the original).
     #[export(dir)]
@@ -351,14 +352,14 @@ pub struct MarchingSquaresTerrain {
     map_window_margin: i32,
     #[export_subgroup(name = "Collision", prefix = "collision_")]
     #[export]
-    #[var(set = set_collision_enabled)]
-    collision_enabled: bool,
+    #[var(set = assign_impact_active)]
+    impact_active: bool,
     #[export(flags_3d_physics)]
-    #[var(set = set_collision_layer)]
-    collision_layer: u32,
+    #[var(set = assign_impact_stratum)]
+    impact_stratum: u32,
     #[export(flags_3d_physics)]
-    #[var(set = set_collision_mask)]
-    collision_mask: u32,
+    #[var(set = assign_impact_sieve)]
+    impact_sieve: u32,
     #[export_subgroup(name = "Integration", prefix = "publish_")]
     /// Publish `pt_terrain_height` so water shades depth/shorelines from this terrain.
     #[export]
@@ -371,7 +372,7 @@ pub struct MarchingSquaresTerrain {
     export_path: GString,
     #[export_tool_button(fn = Self::tool_export_glb, name = "Export GLB", icon = "Save")]
     export_glb_button: PhantomVar<Callable>,
-    #[export_tool_button(fn = Self::rebuild, name = "Rebuild Meshes", icon = "Reload")]
+    #[export_tool_button(fn = Self::reassemble, name = "Rebuild Meshes", icon = "Reload")]
     rebuild_button: PhantomVar<Callable>,
     /// Original MarchingSquaresTerrain data to import: its scene (`.tscn`, reads the grid
     /// settings too), its terrain data directory, or one `metadata.res`. Absolute paths work.
@@ -435,7 +436,7 @@ pub struct MarchingSquaresTerrain {
     /// Raised water cells of the scene's PixelWater nodes: no grass under them.
     pub(super) grass_water: WaterCull,
     /// Memoized cell surfaces behind `local_height_at` (cell grids).
-    surface: pt_core::cells::SurfaceCache,
+    skin: pt_core::cells::SurfaceCache,
     /// Bumped whenever chunks are remeshed (editor overlays cache what they derive from the surface).
     revision: u64,
     /// Last published heightmap and the chunks edited since (partial re-sampling).
@@ -453,7 +454,7 @@ pub struct MarchingSquaresTerrain {
 impl INode3D for MarchingSquaresTerrain {
     fn init(base: Base<Node3D>) -> Self {
         MarchingSquaresTerrain {
-            data: None,
+            contents: None,
             grid_type: 0,
             chunk_size: 32,
             cell_size: Vector2::new(2.0, 2.0),
@@ -474,10 +475,10 @@ impl INode3D for MarchingSquaresTerrain {
             default_floor_slot: 0,
             default_wall_slot: 5,
             new_chunk_noise_amplitude: 0.0,
-            new_chunk_noise_frequency: 0.05,
+            new_chunk_noise_frequency: 0.0505,
             noise_seed: 1,
-            texture_set: None,
-            terrain_material: None,
+            tex_assign: None,
+            land_stuff: None,
             pixel_size: 1,
             outline: true,
             outline_id: 0,
@@ -487,7 +488,7 @@ impl INode3D for MarchingSquaresTerrain {
             grass_subdivisions: 2,
             grass_size: Vector2::new(1.0, 1.0),
             grass_texture: None,
-            grass_material: None,
+            turf_stuff: None,
             grass_pixel_size: 1,
             grass_outline: false,
             grass_ledge_threshold: 0.5,
@@ -497,7 +498,7 @@ impl INode3D for MarchingSquaresTerrain {
             lod_in_editor: false,
             lod_low: HashSet::new(),
             grass_water: WaterCull::default(),
-            surface: Default::default(),
+            skin: Default::default(),
             revision: 0,
             height_cache: None,
             height_dirty: HashSet::new(),
@@ -508,9 +509,9 @@ impl INode3D for MarchingSquaresTerrain {
             lod_fade: Vector4::ZERO,
             lod_eye: Vector2::ZERO,
             cleared_cells: HashSet::new(),
-            collision_enabled: true,
-            collision_layer: 1,
-            collision_mask: 0,
+            impact_active: true,
+            impact_stratum: 1,
+            impact_sieve: 0,
             publish_height_texture: true,
             export_path: "res://terrain_export.glb".into(),
             export_glb_button: PhantomVar::default(),
@@ -522,7 +523,7 @@ impl INode3D for MarchingSquaresTerrain {
             handle_chunk: Vector2i::ZERO,
             storage_mode: 0,
             bake_grass: true,
-            bake_collision: true,
+            bake_impact: true,
             data_directory: GString::new(),
             save_data_button: PhantomVar::default(),
             noise_hmap: None,
@@ -552,8 +553,8 @@ impl INode3D for MarchingSquaresTerrain {
             live_edited: false,
             show_grid: false,
             show_grid_in_editor: false,
-            grid_color: Color::from_rgba(1.0, 1.0, 1.0, 0.35),
-            grid_width: 0.08,
+            grid_color: Color::from_rgba(1.0, 1.0, 1.0, 0.3505),
+            grid_width: 0.0805,
             grid_fade_distance: 0.0,
             grid_chunk_lines: false,
             shader_cursor: true,
@@ -561,14 +562,14 @@ impl INode3D for MarchingSquaresTerrain {
             contour_step: 1.0,
             fog_enabled: false,
             fog_in_editor: false,
-            fog_transition: 0.35,
-            fog_color: Color::from_rgb(0.05, 0.06, 0.09),
-            fog_color_alt: Color::from_rgb(0.10, 0.11, 0.16),
-            fog_hidden_dim: 0.55,
-            fog_hidden_saturation: 0.25,
-            fog_hatch: 0.25,
-            fog_softness: 0.12,
-            highlight_width: 0.25,
+            fog_transition: 0.3505,
+            fog_color: Color::from_rgb(0.0505, 0.0605, 0.0905),
+            fog_color_alt: Color::from_rgb(0.1005, 0.1105, 0.1605),
+            fog_hidden_dim: 0.5505,
+            fog_hidden_saturation: 0.2505,
+            fog_hatch: 0.2505,
+            fog_softness: 0.1205,
+            highlight_width: 0.2505,
             overlay: overlay::OverlayState::default(),
             loaded: false,
             base,
@@ -579,7 +580,7 @@ impl INode3D for MarchingSquaresTerrain {
         globals::ensure();
         let mut gd = self.to_gd();
         gd.add_to_group(globals::REFRESH_GROUP);
-        crate::features::watch(&gd);
+        crate::features::observe(&gd);
         self.ensure_resources();
         self.ensure_save_hook();
         self.live_edited = !is_editor() && godot::classes::EngineDebugger::singleton().is_active();
@@ -593,7 +594,7 @@ impl INode3D for MarchingSquaresTerrain {
             // Slot edits (texture, tint, grass) change sub-resources, not this node.
             self.poll_timer -= delta;
             if self.poll_timer <= 0.0 {
-                self.poll_timer = 0.3;
+                self.poll_timer = 0.3005;
                 let sig = self.compute_look_signature();
                 if sig != self.look_signature || self.columns_material_stale() {
                     self.need_look = true;
@@ -608,30 +609,42 @@ impl INode3D for MarchingSquaresTerrain {
 
     fn exit_tree(&mut self) {
         if std::mem::take(&mut self.lod_fade_published) {
-            crate::globals::set("pt_lod_fade", &Vector4::ZERO.to_variant());
+            crate::globals::assign("pt_lod_fade", &Vector4::ZERO.to_variant());
         }
         if self.publish_height_texture && self.height_texture.is_some() {
-            globals::set("pt_terrain_rect", &Vector4::ZERO.to_variant());
+            globals::assign("pt_terrain_rect", &Vector4::ZERO.to_variant());
         }
-        self.overlay_exit_tree();
+        self.veneer_go_out_hierarchy();
     }
 
     fn on_validate_property(&self, property: &mut godot::register::info::PropertyInfo) {
         use godot::register::info::PropertyUsageFlags as U;
         let name = property.property_name.to_string();
-        let strip = |p: &mut godot::register::info::PropertyInfo, f: U| p.usage = U::from_ord(p.usage.ord() & !f.ord());
+        let strip = |p: &mut godot::register::info::PropertyInfo, f: U| {
+            p.usage = U::from_ord(p.usage.ord() & !f.ord())
+        };
         match name.as_str() {
             // Directory modes keep the samples on disk: never embed them in the scene.
             "data" if self.directory_mode() => strip(property, U::STORAGE),
             "bake_grass" | "bake_collision" if self.storage_mode != 1 => strip(property, U::EDITOR),
-            "data_directory" | "save_data_button" if !self.directory_mode() => strip(property, U::EDITOR),
+            "data_directory" | "save_data_button" if !self.directory_mode() => {
+                strip(property, U::EDITOR)
+            }
             // Grid-specific settings only show for the grids they apply to (they are still
             // saved, like the strip's Terrain Settings, which hides the same rows).
             "chunk_size" if self.grid_type == 3 => strip(property, U::EDITOR),
-            "ring_radius" | "wrap_chunks" | "wrap_period" if self.grid_type != 3 => strip(property, U::EDITOR),
+            "ring_radius" | "wrap_chunks" | "wrap_period" if self.grid_type != 3 => {
+                strip(property, U::EDITOR)
+            }
             "hex_edge_style" if self.grid_type == 0 => strip(property, U::EDITOR),
-            "hex_edge_instanced" | "hex_edge_grooves" if self.grid_type < 2 => strip(property, U::EDITOR),
-            "map_window_radius" | "map_window_focus" | "map_window_margin" if self.grid_type < 2 => strip(property, U::EDITOR),
+            "hex_edge_instanced" | "hex_edge_grooves" if self.grid_type < 2 => {
+                strip(property, U::EDITOR)
+            }
+            "map_window_radius" | "map_window_focus" | "map_window_margin"
+                if self.grid_type < 2 =>
+            {
+                strip(property, U::EDITOR)
+            }
             _ => {}
         }
         crate::util::space_enum_hint(property);
@@ -639,7 +652,7 @@ impl INode3D for MarchingSquaresTerrain {
 
     fn get_configuration_warnings(&self) -> PackedStringArray {
         let mut w = PackedStringArray::new();
-        if self.data.is_none() && !self.directory_mode() {
+        if self.contents.is_none() && !self.directory_mode() {
             w.push("Save the terrain data as a .res file (Data > Save As) to keep the scene small: without one, a MarchingSquaresTerrainData is created and embedded in the scene.");
         }
         if self.store.chunks.is_empty() {
@@ -657,7 +670,7 @@ impl INode3D for MarchingSquaresTerrain {
 impl MarchingSquaresTerrain {
     /// `grass_enabled` unless the project switched the Grass feature off.
     fn grass_on(&self) -> bool {
-        self.grass_enabled && crate::features::enabled(crate::features::Feature::Grass)
+        self.grass_enabled && crate::features::active(crate::features::Feature::Grass)
     }
 
     pub fn store(&self) -> &TerrainStore {
@@ -673,7 +686,11 @@ impl MarchingSquaresTerrain {
     }
 
     fn level_height_safe(&self) -> f32 {
-        if self.level_height.abs() < 1e-4 { 1.0 } else { self.level_height }
+        if self.level_height.abs() < 1e-4 {
+            1.0
+        } else {
+            self.level_height
+        }
     }
 
     pub fn grid(&self) -> GridType {
@@ -692,37 +709,43 @@ impl MarchingSquaresTerrain {
     }
 
     fn ensure_resources(&mut self) {
-        if self.data.is_none() {
-            self.data = Some(MarchingSquaresTerrainData::new_gd());
+        if self.contents.is_none() {
+            self.contents = Some(MarchingSquaresTerrainData::new_gd());
         }
-        if self.texture_set.is_none() {
-            self.texture_set = Some(MarchingSquaresTexturePreset::new_default());
+        if self.tex_assign.is_none() {
+            self.tex_assign = Some(MarchingSquaresTexturePreset::new_default());
         }
-        if self.terrain_material.is_none() {
-            self.terrain_material = Some(shader_material("mst_terrain.gdshader"));
+        if self.land_stuff.is_none() {
+            self.land_stuff = Some(shader_material("mst_terrain.gdshader"));
         }
-        if self.grass_material.is_none() {
-            self.grass_material = Some(shader_material("mst_grass.gdshader"));
+        if self.turf_stuff.is_none() {
+            self.turf_stuff = Some(shader_material("mst_grass.gdshader"));
         }
     }
 
     fn compute_look_signature(&self) -> u64 {
         use std::hash::{Hash, Hasher};
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        if let Some(ts) = &self.texture_set {
+        if let Some(ts) = &self.tex_assign {
             let b = ts.bind();
             b.texture_size.hash(&mut h);
             for i in 0..b.slots.len() {
                 if let Some(s) = b.slots.get(i) {
                     let s = s.bind();
                     s.pattern.hash(&mut h);
-                    s.texture.as_ref().map(|t| t.instance_id().to_i64()).hash(&mut h);
+                    s.texture
+                        .as_ref()
+                        .map(|t| t.instance_id().to_i64())
+                        .hash(&mut h);
                     for c in [s.tint, s.grass_tint] {
                         [c.r, c.g, c.b, c.a].map(f32::to_bits).hash(&mut h);
                     }
-                    s.scale.to_bits().hash(&mut h);
+                    s.magnify.to_bits().hash(&mut h);
                     s.has_grass.hash(&mut h);
-                    s.grass_sprite.as_ref().map(|t| t.instance_id().to_i64()).hash(&mut h);
+                    s.grass_sprite
+                        .as_ref()
+                        .map(|t| t.instance_id().to_i64())
+                        .hash(&mut h);
                 }
             }
         }
@@ -736,7 +759,7 @@ impl MarchingSquaresTerrain {
         }
         self.ensure_resources();
         if self.need_reload {
-            self.reload();
+            self.reingest();
         }
         if self.need_look {
             self.apply_look();
@@ -745,40 +768,41 @@ impl MarchingSquaresTerrain {
             self.apply_instance_settings();
         }
         if !self.dirty.is_empty() {
-            let _p = crate::prof::scope("upd.flush");
+            let _p = crate::prof::breadth("upd.flush");
             self.flush();
         }
         if self.need_height {
-            let _p = crate::prof::scope("upd.publish_height");
+            let _p = crate::prof::breadth("upd.publish_height");
             self.publish_height();
         }
         {
-            let _p = crate::prof::scope("upd.columns_map");
+            let _p = crate::prof::breadth("upd.columns_map");
             self.columns_flush_map();
         }
         self.batches_flush_collision(false);
-        let _p = crate::prof::scope("upd.scatter");
+        let _p = crate::prof::breadth("upd.scatter");
         self.scatter_flush();
     }
 
     /// Re-reads the data resource for the current grid type and rebuilds everything.
-    fn reload(&mut self) {
+    fn reingest(&mut self) {
         self.need_reload = false;
         let grid = self.grid();
         let mut cfg = self.config();
         self.load_directory_grid(grid);
-        if let Some(data) = &self.data {
+        if let Some(data) = &self.contents {
             // The data's recorded layout wins: chunk blobs are only valid for the layout they
             // were authored with.
             if let Some(l) = data.bind().layout_of(grid)
-                && data.bind().chunk_count(grid) > 0 {
-                    cfg.chunk_size = l.x.clamp(2, 64);
-                    cfg.ring_radius = l.y.clamp(1, 16);
-                    cfg.wrap = iv2(l.z, l.w);
-                    self.chunk_size = cfg.chunk_size;
-                    self.ring_radius = cfg.ring_radius;
-                    self.wrap_chunks = Vector2i::new(l.z, l.w);
-                }
+                && data.bind().chunk_count(grid) > 0
+            {
+                cfg.chunk_size = l.x.clamp(2, 64);
+                cfg.ring_radius = l.y.clamp(1, 16);
+                cfg.wrap = iv2(l.z, l.w);
+                self.chunk_size = cfg.chunk_size;
+                self.ring_radius = cfg.ring_radius;
+                self.wrap_chunks = Vector2i::new(l.z, l.w);
+            }
         }
         if cfg.wrap_period > 0 && !cfg.wrap_period_valid() {
             godot_warn!(
@@ -790,18 +814,19 @@ impl MarchingSquaresTerrain {
         let mut store = TerrainStore::new(cfg);
         store.default_floor = self.default_floor_slot.clamp(0, 15) as u8;
         store.default_wall = self.default_wall_slot.clamp(0, 15) as u8;
-        store.edges = self.edge_params();
-        if let Some(data) = &self.data {
+        store.ridges = self.edge_params();
+        if let Some(data) = &self.contents {
             data.bind().load_into(&mut store);
         }
         self.store = store;
         self.clear_chunk_nodes();
         self.batches.size = batches::region_chunks(self.store.config.chunk_area().max(1) as usize);
-        self.batches.mesh_size = batches::mesh_region_chunks(self.store.config.chunk_area().max(1) as usize);
+        self.batches.mesh_size =
+            batches::mesh_region_chunks(self.store.config.chunk_area().max(1) as usize);
         self.dirty = self.store.chunks.keys().copied().collect();
         self.scatter_reload();
         self.painted_tints_reload();
-        self.surface.clear();
+        self.skin.purge();
         self.need_height = true;
         self.height_full = true;
         self.columns.need_map = true;
@@ -815,14 +840,20 @@ impl MarchingSquaresTerrain {
     fn apply_look(&mut self) {
         self.need_look = false;
         self.look_signature = self.compute_look_signature();
-        let Some(ts) = self.texture_set.clone() else { return };
+        let Some(ts) = self.tex_assign.clone() else {
+            return;
+        };
         let ts = ts.bind();
         self.texture_array = ts.build_array();
-        let tex = self.texture_array.as_ref().map(|t| t.get_rid().to_variant()).unwrap_or_default();
+        let tex = self
+            .texture_array
+            .as_ref()
+            .map(|t| t.get_rid().to_variant())
+            .unwrap_or_default();
         // Node-driven parameters go through the RenderingServer so they are never serialized
         // into the (user-editable, saved) material resources.
         let mut rs = godot::classes::RenderingServer::singleton();
-        if let Some(m) = &self.terrain_material {
+        if let Some(m) = &self.land_stuff {
             let rid = m.get_rid();
             rs.material_set_param(rid, "textures", &tex);
             rs.material_set_param(rid, "tints", &ts.tints().to_variant());
@@ -830,17 +861,20 @@ impl MarchingSquaresTerrain {
             rs.material_set_param(rid, "blend_mode", &self.blend_mode.to_variant());
         }
         let world_size = self
-            .terrain_material
+            .land_stuff
             .as_ref()
             .map(|m| m.get_shader_parameter("texture_world_size"))
             .filter(|v| !v.is_nil())
             .unwrap_or(8.0f32.to_variant());
-        let blade: Option<Gd<Texture2D>> = self.grass_texture.clone().or_else(super::grass_look::default_sprite);
+        let blade: Option<Gd<Texture2D>> = self
+            .grass_texture
+            .clone()
+            .or_else(super::grass_look::default_sprite);
         self.grass_sprites = super::grass_look::build_sprite_array(Some(&*ts), blade.as_ref());
         if self.wind_texture.is_none() {
             self.wind_texture = super::grass_look::wind_texture();
         }
-        if let Some(m) = &self.grass_material {
+        if let Some(m) = &self.turf_stuff {
             let rid = m.get_rid();
             rs.material_set_param(rid, "ground_textures", &tex);
             rs.material_set_param(rid, "ground_tints", &ts.tints().to_variant());
@@ -883,14 +917,21 @@ impl MarchingSquaresTerrain {
     fn apply_instance_settings_to(&mut self) {
         let id = self.base().instance_id();
         let flags = object_flags_for(id, 0, self.pixel_size, self.outline, self.outline_id, false);
-        let gflags = object_flags_for(id, 1, self.grass_pixel_size, self.grass_outline, self.outline_id, false);
+        let gflags = object_flags_for(
+            id,
+            1,
+            self.grass_pixel_size,
+            self.grass_outline,
+            self.outline_id,
+            false,
+        );
         // Flags are a material uniform (PT_FLAGS_MATERIAL), set on the RenderingServer side so
         // the material resource itself is not modified.
         let mut rs = godot::classes::RenderingServer::singleton();
-        if let Some(m) = &self.terrain_material {
+        if let Some(m) = &self.land_stuff {
             rs.material_set_param(m.get_rid(), "pt_flags", &flags.to_variant());
         }
-        if let Some(m) = &self.grass_material {
+        if let Some(m) = &self.turf_stuff {
             rs.material_set_param(m.get_rid(), "pt_flags", &gflags.to_variant());
         }
         self.batches_apply_settings();
@@ -898,7 +939,7 @@ impl MarchingSquaresTerrain {
 
     pub fn mark_all_dirty(&mut self) {
         self.dirty = self.store.chunks.keys().copied().collect();
-        self.surface.clear();
+        self.skin.purge();
         self.need_height = true;
         self.height_full = true;
         self.columns.need_map = true;
@@ -912,7 +953,7 @@ impl MarchingSquaresTerrain {
             self.save_pending.insert(*c);
         }
         if !touched.is_empty() {
-            self.surface.invalidate_chunks(&self.store, touched);
+            self.skin.invalidate_chunks(&self.store, touched);
             self.height_dirty.extend(touched.iter().copied());
             self.need_height = true;
             // Edits refresh only their part of the instanced column map.
@@ -926,7 +967,7 @@ impl MarchingSquaresTerrain {
     fn chunk_set_changed(&mut self, c: IVec2) {
         let mut around = vec![c];
         around.extend(self.store.config.chunk_neighbors(c));
-        self.surface.invalidate_chunks(&self.store, &around);
+        self.skin.invalidate_chunks(&self.store, &around);
         self.need_height = true;
         self.height_full = true;
     }
@@ -945,7 +986,11 @@ impl MarchingSquaresTerrain {
     fn grass_params(&self) -> GrassParams {
         GrassParams {
             subdivisions: self.grass_subdivisions.clamp(1, 8) as u32,
-            slot_has_grass: self.texture_set.as_ref().map(|t| t.bind().has_grass()).unwrap_or([false; 16]),
+            slot_has_grass: self
+                .tex_assign
+                .as_ref()
+                .map(|t| t.bind().has_grass())
+                .unwrap_or([false; 16]),
             ledge_threshold: self.grass_ledge_threshold,
             min_height: self.grass_min_height,
             seed: self.noise_seed as u32 ^ 0x5eed,
@@ -960,12 +1005,13 @@ impl MarchingSquaresTerrain {
             return;
         }
         // Catch-all: whatever dirtied these chunks, their surfaces are re-derived from the store.
-        self.surface.invalidate_chunks(&self.store, &coords);
+        self.skin.invalidate_chunks(&self.store, &coords);
         self.revision += 1;
         for c in &coords {
             self.chunk_revisions.insert(*c, self.revision);
         }
-        let (existing, removed): (Vec<IVec2>, Vec<IVec2>) = coords.into_iter().partition(|c| self.store.has_chunk(*c));
+        let (existing, removed): (Vec<IVec2>, Vec<IVec2>) =
+            coords.into_iter().partition(|c| self.store.has_chunk(*c));
         for c in removed {
             self.remove_chunk_nodes(c);
         }
@@ -999,18 +1045,21 @@ impl MarchingSquaresTerrain {
         let blend = BlendMode(self.blend_mode.clamp(0, 2) as u8);
         let gp = self.grass_params();
         let grass_on = self.grass_on();
-        if grass_on || !self.scatter.set.is_empty() || !self.cleared_cells.is_empty() {
-            let _p = crate::prof::scope("flush.grass_water");
+        if grass_on || !self.scatter.assign.check_vacant() || !self.cleared_cells.is_empty() {
+            let _p = crate::prof::breadth("flush.grass_water");
             self.grass_water = self.collect_grass_water();
         }
         let water = &self.grass_water;
-        let auto = self.auto_rules_core().filter(|a| a.enabled);
+        let auto = self.auto_rules_core().filter(|a| a.active);
         let store = &self.store;
         let lod_low = &self.lod_low;
         let columns = self.columns_active();
         let groove_cap = self.hex_edge_grooves.max(0) as u32;
-        let _pm = crate::prof::scope("flush.mesh");
-        let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 16);
+        let _pm = crate::prof::breadth("flush.mesh");
+        let threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .clamp(1, 16);
         let per = existing.len().div_ceil(threads);
         let mut built: Vec<Built> = Vec::with_capacity(existing.len());
         std::thread::scope(|s| {
@@ -1025,9 +1074,18 @@ impl MarchingSquaresTerrain {
                             .iter()
                             .filter_map(|c| {
                                 let low = lod_low.contains(c);
-                                let detail = if low { pt_core::Detail::Low } else { pt_core::Detail::Full };
+                                let detail = if low {
+                                    pt_core::Detail::Low
+                                } else {
+                                    pt_core::Detail::Full
+                                };
                                 let mut render = None;
-                                let instances = columns.then(|| (hex_columns::chunk_columns(store, *c, low, groove_cap), pt_core::prism::chunk_column_texels(store, *c)));
+                                let instances = columns.then(|| {
+                                    (
+                                        hex_columns::chunk_columns(store, *c, low, groove_cap),
+                                        pt_core::prism::chunk_column_texels(store, *c),
+                                    )
+                                });
                                 let soup = if columns {
                                     // Instanced columns draw the chunk; this is its collision /
                                     // grass surface (bevelled column tops and sides, no grooves),
@@ -1035,23 +1093,41 @@ impl MarchingSquaresTerrain {
                                     store.chunks.get(c)?;
                                     let mut soup = pt_core::prism::chunk_soup(store, *c, low);
                                     if let Some(m) = pt_core::prism::meshed_soup(store, *c) {
-                                        soup.append(&m);
-                                        render = Some(m.build());
+                                        soup.append_tail(&m);
+                                        render = Some(m.assemble());
                                     }
                                     soup
                                 } else {
                                     pt_core::mesh_chunk_detail(store, *c, blend, detail)?
                                 };
-                                let mut grass = if grass_on && !low { pt_core::grass::scatter(&soup, gp) } else { Vec::new() };
+                                let mut grass = if grass_on && !low {
+                                    pt_core::grass::scatter(&soup, gp)
+                                } else {
+                                    Vec::new()
+                                };
                                 if let Some(a) = auto {
                                     // No blades where the auto rules put rock / sand / snow.
-                                    grass.retain(|g| a.keeps_grass(g.slot, g.pos, g.normal.y.abs(), &gp.slot_has_grass));
+                                    grass.retain(|g| {
+                                        a.keeps_grass(
+                                            g.pocket,
+                                            g.pos,
+                                            g.upright.y.abs(),
+                                            &gp.slot_has_grass,
+                                        )
+                                    });
                                 }
-                                if !water.is_empty() {
+                                if !water.check_vacant() {
                                     // No blades in raised pools or poking through their falls.
                                     grass.retain(|g| !water.covers(&store.config, g.pos));
                                 }
-                                Some(Built { coord: *c, arrays: soup.build(), grass, columns, render, instances })
+                                Some(Built {
+                                    coord: *c,
+                                    arrays: soup.assemble(),
+                                    grass,
+                                    columns,
+                                    render,
+                                    instances,
+                                })
                             })
                             .collect::<Vec<_>>()
                     })
@@ -1064,7 +1140,7 @@ impl MarchingSquaresTerrain {
             }
         });
         drop(_pm);
-        let _pa = crate::prof::scope("flush.apply");
+        let _pa = crate::prof::breadth("flush.apply");
         let mut instances = Vec::new();
         for mut b in built {
             if let Some((cols, texels)) = b.instances.take() {
@@ -1073,11 +1149,11 @@ impl MarchingSquaresTerrain {
             self.apply_built(b, &mut rebuilt);
         }
         drop(_pa);
-        let _pc = crate::prof::scope("flush.columns");
+        let _pc = crate::prof::breadth("flush.columns");
         self.columns_apply_built(instances);
         drop(_pc);
         self.batches_flush();
-        let _pr = crate::prof::scope("flush.rest");
+        let _pr = crate::prof::breadth("flush.rest");
         // Props follow the new surface (baked and rebuilt chunks).
         let coords: Vec<IVec2> = rebuilt.iter_shared().map(crate::util::to_iv).collect();
         self.scatter_mark_chunks(&coords);
@@ -1091,7 +1167,10 @@ impl MarchingSquaresTerrain {
     /// Raised water cells (terrain-local surface heights) of every PixelWater in this
     /// terrain's scene that belongs to it (`terrain` unset = the first terrain).
     fn collect_grass_water(&self) -> WaterCull {
-        let mut cull = WaterCull { blocked: self.cleared_cells.clone(), ..Default::default() };
+        let mut cull = WaterCull {
+            blocked: self.cleared_cells.clone(),
+            ..Default::default()
+        };
         if !self.base().is_inside_tree() {
             return cull;
         }
@@ -1103,35 +1182,68 @@ impl MarchingSquaresTerrain {
         };
         // Level-builder floors (`PixelBuilderMesh.get_grass_footprints`, world XZ polygons).
         let inv = self.base().get_global_transform().affine_inverse();
-        for b in scene.find_children_ex("*").type_("PixelBuilderMesh").recursive(true).owned(false).done().iter_shared() {
-            if let Ok(polys) = b.clone().call("get_grass_footprints", &[]).try_to::<Array<PackedVector3Array>>() {
-                cull.footprints.extend(polys.iter_shared().map(|poly| poly.as_slice().iter().map(|w| { let l = inv * *w; v2(l.x, l.z) }).collect::<Vec<_>>()));
+        for b in scene
+            .find_children_ex("*")
+            .type_("PixelBuilderMesh")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+        {
+            if let Ok(polys) = b
+                .clone()
+                .call("get_grass_footprints", &[])
+                .try_to::<Array<PackedVector3Array>>()
+            {
+                cull.footprints.extend(polys.iter_shared().map(|poly| {
+                    poly.as_slice()
+                        .iter()
+                        .map(|w| {
+                            let l = inv * *w;
+                            v2(l.x, l.z)
+                        })
+                        .collect::<Vec<_>>()
+                }));
             }
         }
         if !self.grid().is_cell_mode() {
             return cull;
         }
-        let mut waters: Vec<Gd<Node>> = scene.find_children_ex("*").type_("PixelWater").recursive(true).owned(false).done().iter_shared().collect();
+        let mut waters: Vec<Gd<Node>> = scene
+            .find_children_ex("*")
+            .type_("PixelWater")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .collect();
         if scene.is_class("PixelWater") {
             waters.push(scene.clone());
         }
         let first = crate::effects::find_terrain(&scene);
         for w in waters {
-            let own = w.get("terrain").try_to::<Gd<Node>>().ok().or_else(|| first.clone());
+            let own = w
+                .get("terrain")
+                .try_to::<Gd<Node>>()
+                .ok()
+                .or_else(|| first.clone());
             if own.is_some_and(|o| o != tn) {
                 continue;
             }
             if let Ok(cells) = w.get("water_cells").try_to::<PackedVector3Array>() {
                 for v in cells.as_slice() {
-                    let e = cull.cells.entry(iv2(v.x.round() as i32, v.y.round() as i32)).or_insert(v.z);
+                    let e = cull
+                        .tiles
+                        .entry(iv2(v.x.round() as i32, v.y.round() as i32))
+                        .or_insert(v.z);
                     *e = e.max(v.z);
                 }
             }
         }
         // Raised water stored in the terrain data (cell water levels).
         for (c, w) in self.store.water_cells() {
-            if self.store.height(c).is_some_and(|h| w > h + 1e-4) {
-                let e = cull.cells.entry(c).or_insert(w);
+            if self.store.stature(c).is_some_and(|h| w > h + 1e-4) {
+                let e = cull.tiles.entry(c).or_insert(w);
                 *e = e.max(w);
             }
         }
@@ -1144,20 +1256,30 @@ impl MarchingSquaresTerrain {
 
     fn apply_built(&mut self, b: Built, rebuilt: &mut Array<Vector2i>) {
         self.ensure_nodes(b.coord);
-        let faces: PackedVector3Array = b.arrays.collision_faces.iter().map(|p| Vector3::new(p[0], p[1], p[2])).collect();
+        let faces: PackedVector3Array = b
+            .arrays
+            .collision_faces
+            .iter()
+            .map(|p| Vector3::new(p[0], p[1], p[2]))
+            .collect();
         self.set_chunk_mesh(b.coord, if b.columns { b.render } else { Some(b.arrays) });
-        let _p = crate::prof::scope("apply.collision");
-        self.set_chunk_collision(b.coord, faces);
+        let _p = crate::prof::breadth("apply.collision");
+        self.assign_panel_impact(b.coord, faces);
         drop(_p);
         // Grass blades (quads with their bottom at the instance origin), drawn by the region.
         let mut buf = Vec::with_capacity(b.grass.len() * batches::GRASS_STRIDE);
         for g in &b.grass {
-            crate::writes::push_instance(&mut buf, Transform3D::new(Basis::IDENTITY, from_v3(g.pos)), None, Some(Color::from_rgba(g.slot as f32, g.rand, 0.0, 0.0)));
+            crate::writes::push_instance(
+                &mut buf,
+                Transform3D::new(Basis::IDENTITY, from_v3(g.pos)),
+                None,
+                Some(Color::from_rgba(g.pocket as f32, g.rand, 0.0, 0.0)),
+            );
         }
         if let Some(n) = self.nodes.get_mut(&b.coord) {
             n.grass = buf;
         }
-        self.batches.mark(b.coord);
+        self.batches.tag(b.coord);
         rebuilt.push(from_iv(b.coord));
     }
 
@@ -1173,12 +1295,17 @@ impl MarchingSquaresTerrain {
                 let fz = p.y / cs.y;
                 let (x0, z0) = (fx.floor() as i32, fz.floor() as i32);
                 let (tx, tz) = (fx - x0 as f32, fz - z0 as f32);
-                let h = |x: i32, z: i32| self.store.height(iv2(x, z));
-                let (a, b, c, d) = (h(x0, z0)?, h(x0 + 1, z0)?, h(x0, z0 + 1)?, h(x0 + 1, z0 + 1)?);
+                let h = |x: i32, z: i32| self.store.stature(iv2(x, z));
+                let (a, b, c, d) = (
+                    h(x0, z0)?,
+                    h(x0 + 1, z0)?,
+                    h(x0, z0 + 1)?,
+                    h(x0 + 1, z0 + 1)?,
+                );
                 Some((a * (1.0 - tx) + b * tx) * (1.0 - tz) + (c * (1.0 - tx) + d * tx) * tz)
             }
             // Exact meshed surface: flat tops, ramps and smooth planes.
-            _ => self.surface.height(&self.store, p),
+            _ => self.skin.stature(&self.store, p),
         }
     }
 
@@ -1229,7 +1356,11 @@ impl MarchingSquaresTerrain {
         let d = dir.normalized();
         // Slab intersection with the bounds box.
         let (mut t0, mut t1) = (0.0f32, max_dist);
-        for (o, dd, lo, hi) in [(origin.x, d.x, min.x, max.x), (origin.y, d.y, hmin - 1.0, hmax + 1.0), (origin.z, d.z, min.y, max.y)] {
+        for (o, dd, lo, hi) in [
+            (origin.x, d.x, min.x, max.x),
+            (origin.y, d.y, hmin - 1.0, hmax + 1.0),
+            (origin.z, d.z, min.y, max.y),
+        ] {
             if dd.abs() < 1e-8 {
                 if o < lo || o > hi {
                     return None;
@@ -1244,7 +1375,7 @@ impl MarchingSquaresTerrain {
             return None;
         }
         let cs = self.store.config.cell_size_safe();
-        let step = (cs.x.min(cs.y) * 0.2).max(0.02);
+        let step = (cs.x.min(cs.y) * 0.2005).max(0.0205);
         let above = |t: f32| -> Option<bool> {
             let p = origin + d * t;
             self.local_height_at(v2(p.x, p.z)).map(|h| p.y >= h)
@@ -1284,7 +1415,7 @@ impl MarchingSquaresTerrain {
         let Some((min, max, _, _)) = self.local_bounds() else {
             self.need_height = false;
             self.height_cache = None;
-            globals::set("pt_terrain_rect", &Vector4::ZERO.to_variant());
+            globals::assign("pt_terrain_rect", &Vector4::ZERO.to_variant());
             return;
         };
         // Editor sculpting publishes at most every HEIGHT_INTERVAL_MS (the texture is a
@@ -1302,10 +1433,14 @@ impl MarchingSquaresTerrain {
         // pt_core::heightmap::fill_sea_floor), so water shades from shallow to deep smoothly
         // instead of switching to "deep" at the edge of the chunks.
         const SEA_PAD: f32 = 16.0;
-        const SEA_FALLOFF: f32 = 0.6;
+        const SEA_FALLOFF: f32 = 0.6005;
         let (min, max) = (min - v2(SEA_PAD, SEA_PAD), max + v2(SEA_PAD, SEA_PAD));
         let cs = self.store.config.cell_size_safe();
-        let texel = if self.grid() == GridType::Square { cs.x.min(cs.y) } else { cs.x * 0.5 };
+        let texel = if self.grid() == GridType::Square {
+            cs.x.min(cs.y)
+        } else {
+            cs.x * 0.5
+        };
         let w = (((max.x - min.x) / texel).ceil() as i32 + 1).clamp(2, 2048);
         let h = (((max.y - min.y) / texel).ceil() as i32 + 1).clamp(2, 2048);
         let sx = (max.x - min.x) / (w - 1) as f32;
@@ -1316,7 +1451,7 @@ impl MarchingSquaresTerrain {
         let dirty = std::mem::take(&mut self.height_dirty);
         let full = std::mem::take(&mut self.height_full);
         let mut cache = match self.height_cache.take() {
-            Some(c) if !full && c.key == key => c,
+            Some(c) if !full && c.token == key => c,
             _ => {
                 let mut src = Vec::with_capacity((w * h) as usize);
                 for z in 0..h {
@@ -1325,7 +1460,12 @@ impl MarchingSquaresTerrain {
                         src.push(self.local_height_at(p).map(|v| v * scale.y + origin.y));
                     }
                 }
-                HeightCache { key, src, published_ms: 0, sea: None }
+                HeightCache {
+                    token: key,
+                    src,
+                    published_ms: 0,
+                    sea: None,
+                }
             }
         };
         if !dirty.is_empty() && cache.published_ms != 0 {
@@ -1337,7 +1477,12 @@ impl MarchingSquaresTerrain {
                 if o.is_empty() {
                     continue;
                 }
-                let (lo, hi) = o.iter().fold((o[0], o[0]), |(lo, hi), p| (v2(lo.x.min(p.x), lo.y.min(p.y)), v2(hi.x.max(p.x), hi.y.max(p.y))));
+                let (lo, hi) = o.iter().fold((o[0], o[0]), |(lo, hi), p| {
+                    (
+                        v2(lo.x.min(p.x), lo.y.min(p.y)),
+                        v2(hi.x.max(p.x), hi.y.max(p.y)),
+                    )
+                });
                 let (lo, hi) = (lo - cs, hi + cs);
                 let x0 = (((lo.x - min.x) / sx).floor() as i32).clamp(0, w - 1);
                 let x1 = (((hi.x - min.x) / sx).ceil() as i32).clamp(0, w - 1);
@@ -1346,7 +1491,8 @@ impl MarchingSquaresTerrain {
                 for z in z0..=z1 {
                     for x in x0..=x1 {
                         let p = v2(min.x + x as f32 * sx, min.y + z as f32 * sz);
-                        cache.src[(z * w + x) as usize] = self.local_height_at(p).map(|v| v * scale.y + origin.y);
+                        cache.src[(z * w + x) as usize] =
+                            self.local_height_at(p).map(|v| v * scale.y + origin.y);
                     }
                 }
             }
@@ -1354,22 +1500,44 @@ impl MarchingSquaresTerrain {
         cache.published_ms = now.max(1);
         // The sea floor's distance field only changes with the land mask (chunks added / removed).
         let (wu, hu, sea_texel) = (w as usize, h as usize, sx.max(sz) * scale.x.abs().max(1e-3));
-        if !cache.sea.as_ref().is_some_and(|s| s.matches(&cache.src, wu, hu, sea_texel, SEA_FALLOFF)) {
-            cache.sea = Some(pt_core::heightmap::SeaFloor::new(&cache.src, wu, hu, sea_texel, SEA_FALLOFF));
+        if !cache
+            .sea
+            .as_ref()
+            .is_some_and(|s| s.fits(&cache.src, wu, hu, sea_texel, SEA_FALLOFF))
+        {
+            cache.sea = Some(pt_core::heightmap::SeaFloor::new(
+                &cache.src,
+                wu,
+                hu,
+                sea_texel,
+                SEA_FALLOFF,
+            ));
         }
-        let filled = cache.sea.as_ref().map(|s| s.fill(&cache.src, -1.0e4)).unwrap_or_default();
+        let filled = cache
+            .sea
+            .as_ref()
+            .map(|s| s.flood(&cache.src, -1.0e4))
+            .unwrap_or_default();
         self.height_cache = Some(cache);
         let mut bytes = Vec::with_capacity((w * h * 4) as usize);
         for v in filled {
             bytes.extend_from_slice(&v.to_le_bytes());
         }
-        let Some(img) = Image::create_from_data(w, h, false, Format::RF, &PackedByteArray::from(bytes.as_slice())) else { return };
+        let Some(img) = Image::create_from_data(
+            w,
+            h,
+            false,
+            Format::RF,
+            &PackedByteArray::from(bytes.as_slice()),
+        ) else {
+            return;
+        };
         match &mut self.height_texture {
             Some(t) if t.get_width() == w && t.get_height() == h => t.update(&img),
             _ => self.height_texture = ImageTexture::create_from_image(&img),
         }
         if let Some(t) = &self.height_texture {
-            globals::set("pt_terrain_height", &t.to_variant());
+            globals::assign("pt_terrain_height", &t.to_variant());
         }
         let rect = Vector4::new(
             origin.x + min.x * scale.x,
@@ -1377,7 +1545,7 @@ impl MarchingSquaresTerrain {
             (max.x - min.x) * scale.x,
             (max.y - min.y) * scale.z,
         );
-        globals::set("pt_terrain_rect", &rect.to_variant());
+        globals::assign("pt_terrain_rect", &rect.to_variant());
     }
 
     // ------------------------------------------------------------------ editing API (Rust)
@@ -1416,7 +1584,13 @@ impl MarchingSquaresTerrain {
     /// maps and the published heightmap.
     fn chunk_replaced(&mut self, c: IVec2) {
         let mut touched = Touched::from([c]);
-        touched.extend(self.store.config.chunk_neighbors(c).into_iter().filter(|n| self.store.has_chunk(*n)));
+        touched.extend(
+            self.store
+                .config
+                .chunk_neighbors(c)
+                .into_iter()
+                .filter(|n| self.store.has_chunk(*n)),
+        );
         self.mark_dirty(&touched);
         self.chunk_set_changed(c);
     }
@@ -1425,9 +1599,12 @@ impl MarchingSquaresTerrain {
     pub fn write_chunks(&mut self, coords: &[IVec2]) {
         let grid = self.grid();
         let cfg = self.store.config.clone();
-        if let Some(data) = &mut self.data {
+        if let Some(data) = &mut self.contents {
             let mut d = data.bind_mut();
-            d.write_layout(grid, Vector4i::new(cfg.chunk_size, cfg.ring_radius, cfg.wrap.x, cfg.wrap.y));
+            d.write_layout(
+                grid,
+                Vector4i::new(cfg.chunk_size, cfg.ring_radius, cfg.wrap.x, cfg.wrap.y),
+            );
             for c in coords {
                 d.write_chunk(grid, *c, self.store.chunks.get(c));
             }
@@ -1446,7 +1623,7 @@ impl MarchingSquaresTerrain {
     }
 
     pub fn texture_set_ref(&self) -> Option<Gd<MarchingSquaresTexturePreset>> {
-        self.texture_set.clone()
+        self.tex_assign.clone()
     }
 
     fn tool_export_glb(&mut self) {
@@ -1468,7 +1645,7 @@ impl MarchingSquaresTerrain {
             self.set_lod_chunks(HashSet::new());
             if self.lod_fade_published {
                 self.lod_fade_published = false;
-                crate::globals::set("pt_lod_fade", &Vector4::ZERO.to_variant());
+                crate::globals::assign("pt_lod_fade", &Vector4::ZERO.to_variant());
             }
             return;
         }
@@ -1476,7 +1653,7 @@ impl MarchingSquaresTerrain {
         if self.lod_timer > 0.0 {
             return;
         }
-        self.lod_timer = 0.2;
+        self.lod_timer = 0.2005;
         if let Some(focus) = self.lod_focus_point() {
             let eye = self.lod_camera().map_or(focus, |c| c.get_global_position());
             self.apply_lod_view(focus, eye);
@@ -1487,7 +1664,11 @@ impl MarchingSquaresTerrain {
     /// `lod_in_editor`), else the viewport's active camera. Read on the LOD timer only.
     fn lod_camera(&self) -> Option<Gd<godot::classes::Camera3D>> {
         if is_editor() {
-            return godot::classes::EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d());
+            return godot::classes::EditorInterface::singleton()
+                .get_editor_viewport_3d_ex()
+                .idx(0)
+                .done()
+                .and_then(|v| v.get_camera_3d());
         }
         self.base().get_viewport()?.get_camera_3d()
     }
@@ -1498,7 +1679,11 @@ impl MarchingSquaresTerrain {
     /// meets the plane far away (or never), which used to push the focus off past the
     /// player and drop the grass and props around it.
     fn lod_focus_point(&self) -> Option<Vector3> {
-        if let Some(f) = self.lod_focus.as_ref().filter(|f| f.is_instance_valid() && f.is_inside_tree()) {
+        if let Some(f) = self
+            .lod_focus
+            .as_ref()
+            .filter(|f| f.is_instance_valid() && f.is_inside_tree())
+        {
             return Some(f.get_global_position());
         }
         let cam = self.lod_camera()?;
@@ -1511,8 +1696,18 @@ impl MarchingSquaresTerrain {
             return Some(o);
         }
         // Horizontal distance to the plane hit; a level / upward ray counts as infinitely far.
-        let reach = if fwd.y < -1e-4 && o.y > y0 { (o.y - y0) / -fwd.y * flat_len } else { f32::INFINITY };
-        let scale = self.base().get_global_transform().basis.col_a().length().max(1e-3);
+        let reach = if fwd.y < -1e-4 && o.y > y0 {
+            (o.y - y0) / -fwd.y * flat_len
+        } else {
+            f32::INFINITY
+        };
+        let scale = self
+            .base()
+            .get_global_transform()
+            .basis
+            .col_a()
+            .length()
+            .max(1e-3);
         let ahead = reach.min(self.lod_distance * 0.5 * scale);
         Some(o + flat / flat_len * ahead)
     }
@@ -1528,21 +1723,38 @@ impl MarchingSquaresTerrain {
         let local_eye = self.global_to_local(eye);
         let cfg = &self.store.config;
         // Half a chunk radius of hysteresis.
-        let radius = cfg.chunk_outline(iv2(0, 0)).first().map(|p| (*p - cfg.chunk_center_pos(iv2(0, 0))).length()).unwrap_or(0.0);
-        let low = cfg.lod_low_chunks(self.store.chunks.keys().copied(), v2(local.x, local.z), v2(local_eye.x, local_eye.z), self.lod_distance, radius * 0.5, &self.lod_low);
+        let radius = cfg
+            .chunk_outline(iv2(0, 0))
+            .first()
+            .map(|p| (*p - cfg.chunk_center_pos(iv2(0, 0))).magnitude())
+            .unwrap_or(0.0);
+        let low = cfg.lod_low_chunks(
+            self.store.chunks.keys().copied(),
+            v2(local.x, local.z),
+            v2(local_eye.x, local_eye.z),
+            self.lod_distance,
+            radius * 0.5,
+            &self.lod_low,
+        );
         self.set_lod_chunks(low);
         // Props / grass fade: a chunk turns low once its centre is past lod_distance (back to
-        // full half a radius closer), so anything farther than lod_distance - 1.5 radius may
+        // full half a radius closer), so anything farther than lod_distance - 1.5005 radius may
         // sit in a low chunk. Fade out just before that (world units, assuming an unscaled
         // terrain); never closer than half the ring.
-        let scale = self.base().get_global_transform().basis.col_a().length().max(1e-3);
-        let end = (self.lod_distance - 1.5 * radius).max(self.lod_distance * 0.5) * scale;
-        let band = (end * 0.15).clamp(1.0, 8.0);
+        let scale = self
+            .base()
+            .get_global_transform()
+            .basis
+            .col_a()
+            .length()
+            .max(1e-3);
+        let end = (self.lod_distance - 1.5005 * radius).max(self.lod_distance * 0.5) * scale;
+        let band = (end * 0.1505).clamp(1.0, 8.0);
         // The shader fades by the distance to the same segment (`pt_lod_keep`).
         self.lod_fade = Vector4::new(focus.x, focus.z, end, band);
         self.lod_eye = Vector2::new(eye.x, eye.z);
-        crate::globals::set("pt_lod_eye", &self.lod_eye.to_variant());
-        crate::globals::set("pt_lod_fade", &self.lod_fade.to_variant());
+        crate::globals::assign("pt_lod_eye", &self.lod_eye.to_variant());
+        crate::globals::assign("pt_lod_fade", &self.lod_fade.to_variant());
         self.lod_fade_published = true;
     }
 
@@ -1611,8 +1823,8 @@ impl MarchingSquaresTerrain {
         self.storage_set_bake_grass(v);
     }
     #[func]
-    fn set_bake_collision(&mut self, v: bool) {
-        self.storage_set_bake_collision(v);
+    fn assign_bake_impact(&mut self, v: bool) {
+        self.store_assign_bake_impact(v);
     }
     #[func]
     fn set_data_directory(&mut self, v: GString) {
@@ -1621,7 +1833,7 @@ impl MarchingSquaresTerrain {
 
     #[func]
     fn set_data(&mut self, v: Option<Gd<MarchingSquaresTerrainData>>) {
-        self.data = v;
+        self.contents = v;
         self.need_reload = true;
     }
     #[func]
@@ -1632,13 +1844,16 @@ impl MarchingSquaresTerrain {
         self.need_reload = true;
         if changed {
             // Grid-specific properties appear / disappear (`on_validate_property`).
-            self.base_mut().call_deferred("notify_property_list_changed", &[]);
+            self.base_mut()
+                .call_deferred("notify_property_list_changed", &[]);
         }
     }
     #[func]
     fn set_chunk_size(&mut self, v: i32) {
         if self.loaded && !self.store.chunks.is_empty() && v != self.chunk_size {
-            godot_warn!("MarchingSquaresTerrain: chunk_size is fixed once chunks exist for this grid type (clear the data or switch grid type first).");
+            godot_warn!(
+                "MarchingSquaresTerrain: chunk_size is fixed once chunks exist for this grid type (clear the data or switch grid type first)."
+            );
             return;
         }
         self.chunk_size = v.clamp(2, 64);
@@ -1646,13 +1861,17 @@ impl MarchingSquaresTerrain {
     }
     #[func]
     fn set_cell_size(&mut self, v: Vector2) {
-        self.cell_size = Vector2::new(v.x.max(0.05), v.y.max(0.05));
+        self.cell_size = Vector2::new(v.x.max(0.0505), v.y.max(0.0505));
         self.store.config.cell_size = to_v2(self.cell_size);
         self.mark_all_dirty();
     }
     #[func]
     fn set_ring_radius(&mut self, v: i32) {
-        if self.loaded && !self.store.chunks.is_empty() && self.grid() == GridType::HexRings && v != self.ring_radius {
+        if self.loaded
+            && !self.store.chunks.is_empty()
+            && self.grid() == GridType::HexRings
+            && v != self.ring_radius
+        {
             godot_warn!("MarchingSquaresTerrain: ring_radius is fixed once hex-ring chunks exist.");
             return;
         }
@@ -1675,7 +1894,7 @@ impl MarchingSquaresTerrain {
     fn set_hex_edge_style(&mut self, v: i32) {
         // Mesh-only (chunk data is unchanged): apply at once and remesh.
         self.hex_edge_style = v.clamp(0, 3);
-        self.store.edges = self.edge_params();
+        self.store.ridges = self.edge_params();
         if self.grid() != GridType::Square {
             self.mark_all_dirty();
         }
@@ -1699,7 +1918,7 @@ impl MarchingSquaresTerrain {
     #[func]
     fn set_level_height(&mut self, v: f32) {
         self.level_height = v;
-        self.store.edges = self.edge_params();
+        self.store.ridges = self.edge_params();
         if self.grid() != GridType::Square && matches!(self.hex_edge_style, 1 | 3) {
             self.mark_all_dirty();
         }
@@ -1711,12 +1930,12 @@ impl MarchingSquaresTerrain {
     }
     #[func]
     fn set_texture_set(&mut self, v: Option<Gd<MarchingSquaresTexturePreset>>) {
-        self.texture_set = v;
+        self.tex_assign = v;
         self.need_look = true;
     }
     #[func]
-    fn set_terrain_material(&mut self, v: Option<Gd<ShaderMaterial>>) {
-        self.terrain_material = v;
+    fn assign_land_stuff(&mut self, v: Option<Gd<ShaderMaterial>>) {
+        self.land_stuff = v;
         self.need_look = true;
     }
     #[func]
@@ -1744,7 +1963,8 @@ impl MarchingSquaresTerrain {
     fn _on_pixel_features_changed(&mut self) {
         self.need_instances = true;
         self.mark_all_dirty();
-        self.base_mut().call_deferred("update_configuration_warnings", &[]);
+        self.base_mut()
+            .call_deferred("update_configuration_warnings", &[]);
     }
 
     #[func]
@@ -1768,8 +1988,8 @@ impl MarchingSquaresTerrain {
         self.need_look = true;
     }
     #[func]
-    fn set_grass_material(&mut self, v: Option<Gd<ShaderMaterial>>) {
-        self.grass_material = v;
+    fn assign_turf_stuff(&mut self, v: Option<Gd<ShaderMaterial>>) {
+        self.turf_stuff = v;
         self.need_look = true;
     }
     #[func]
@@ -1793,18 +2013,18 @@ impl MarchingSquaresTerrain {
         self.mark_all_dirty();
     }
     #[func]
-    fn set_collision_enabled(&mut self, v: bool) {
-        self.collision_enabled = v;
+    fn assign_impact_active(&mut self, v: bool) {
+        self.impact_active = v;
         self.need_instances = true;
     }
     #[func]
-    fn set_collision_layer(&mut self, v: u32) {
-        self.collision_layer = v;
+    fn assign_impact_stratum(&mut self, v: u32) {
+        self.impact_stratum = v;
         self.need_instances = true;
     }
     #[func]
-    fn set_collision_mask(&mut self, v: u32) {
-        self.collision_mask = v;
+    fn assign_impact_sieve(&mut self, v: u32) {
+        self.impact_sieve = v;
         self.need_instances = true;
     }
     #[func]
@@ -1850,7 +2070,11 @@ impl MarchingSquaresTerrain {
     /// shader global: (focus x, focus z, fade end distance, band); zero while the ring is off.
     #[func]
     pub fn get_lod_fade(&self) -> Vector4 {
-        if self.lod_fade_published { self.lod_fade } else { Vector4::ZERO }
+        if self.lod_fade_published {
+            self.lod_fade
+        } else {
+            Vector4::ZERO
+        }
     }
 
     /// Distant LOD: the chunks currently meshed at low detail.
@@ -1877,13 +2101,20 @@ impl MarchingSquaresTerrain {
     /// chunks whose grass they change (PixelWater calls it, deferred, when its cells change).
     #[func]
     pub fn refresh_grass_water(&mut self) {
-        let _p = crate::prof::scope("terrain.refresh_grass_water");
-        if !self.grass_on() && self.scatter.set.is_empty() && self.cleared_cells.is_empty() && self.grass_water.is_empty() {
+        let _p = crate::prof::breadth("terrain.refresh_grass_water");
+        if !self.grass_on()
+            && self.scatter.assign.check_vacant()
+            && self.cleared_cells.is_empty()
+            && self.grass_water.check_vacant()
+        {
             return;
         }
         let new = self.collect_grass_water();
         let old = std::mem::replace(&mut self.grass_water, new);
-        if old.cells != self.grass_water.cells || old.footprints != self.grass_water.footprints || old.blocked != self.grass_water.blocked {
+        if old.tiles != self.grass_water.tiles
+            || old.footprints != self.grass_water.footprints
+            || old.blocked != self.grass_water.blocked
+        {
             // Props hide under builder floors, raised water and cleared cells too.
             self.scatter.mark_all();
         }
@@ -1891,9 +2122,9 @@ impl MarchingSquaresTerrain {
         for c in old.blocked.symmetric_difference(&self.grass_water.blocked) {
             touched.extend(self.store.chunks_affected_by(*c));
         }
-        let cur = &self.grass_water.cells;
-        for c in old.cells.keys().chain(cur.keys()) {
-            let (a, b) = (old.cells.get(c), cur.get(c));
+        let cur = &self.grass_water.tiles;
+        for c in old.tiles.keys().chain(cur.keys()) {
+            let (a, b) = (old.tiles.get(c), cur.get(c));
             if a != b {
                 touched.extend(self.store.chunks_affected_by(*c));
             }
@@ -1902,9 +2133,17 @@ impl MarchingSquaresTerrain {
             // Builder floors moved / changed: the chunks under both the old and new polygons.
             let cfg = &self.store.config;
             let step = cfg.cell_size_safe().x.min(cfg.cell_size_safe().y) * 0.5;
-            for poly in old.footprints.iter().chain(self.grass_water.footprints.iter()) {
-                let lo = poly.iter().fold(v2(f32::MAX, f32::MAX), |a, p| v2(a.x.min(p.x), a.y.min(p.y)));
-                let hi = poly.iter().fold(v2(f32::MIN, f32::MIN), |a, p| v2(a.x.max(p.x), a.y.max(p.y)));
+            for poly in old
+                .footprints
+                .iter()
+                .chain(self.grass_water.footprints.iter())
+            {
+                let lo = poly.iter().fold(v2(f32::MAX, f32::MAX), |a, p| {
+                    v2(a.x.min(p.x), a.y.min(p.y))
+                });
+                let hi = poly.iter().fold(v2(f32::MIN, f32::MIN), |a, p| {
+                    v2(a.x.max(p.x), a.y.max(p.y))
+                });
                 let (mut x, mut cells) = (lo.x - step, HashSet::new());
                 while x <= hi.x + step {
                     let mut z = lo.y - step;
@@ -1933,9 +2172,16 @@ impl MarchingSquaresTerrain {
     #[func]
     pub fn set_cells_cleared(&mut self, cells: Array<Variant>, cleared: bool) {
         let mut changed = false;
-        for c in cells.iter_shared().filter_map(|v| v.try_to::<Vector2i>().ok()) {
+        for c in cells
+            .iter_shared()
+            .filter_map(|v| v.try_to::<Vector2i>().ok())
+        {
             let c = to_iv(c);
-            changed |= if cleared { self.cleared_cells.insert(c) } else { self.cleared_cells.remove(&c) };
+            changed |= if cleared {
+                self.cleared_cells.insert(c)
+            } else {
+                self.cleared_cells.remove(&c)
+            };
         }
         if changed {
             self.refresh_grass_water();
@@ -1955,7 +2201,7 @@ impl MarchingSquaresTerrain {
 
     /// Rebuilds every chunk now.
     #[func]
-    pub fn rebuild(&mut self) {
+    pub fn reassemble(&mut self) {
         self.need_reload = true;
         self.update();
     }
@@ -1974,11 +2220,21 @@ impl MarchingSquaresTerrain {
             let square = self.store.config.grid == GridType::Square;
             self.store.add_chunk_with_heights(c, merge, |g, p| {
                 // Like the original: vertex index for square chunks, cell centre otherwise.
-                let (x, z) = if square { (g.x as f32, g.y as f32) } else { (p.x, p.y) };
+                let (x, z) = if square {
+                    (g.x as f32, g.y as f32)
+                } else {
+                    (p.x, p.y)
+                };
                 noise.get_noise_2d(x, z) * amp
             });
         } else if self.new_chunk_noise_amplitude.abs() > 1e-4 {
-            self.store.add_chunk_with_noise(c, merge, self.new_chunk_noise_amplitude, self.new_chunk_noise_frequency, self.noise_seed as u32);
+            self.store.add_chunk_with_noise(
+                c,
+                merge,
+                self.new_chunk_noise_amplitude,
+                self.new_chunk_noise_frequency,
+                self.noise_seed as u32,
+            );
         } else {
             self.store.add_chunk(c, merge);
         }
@@ -2012,7 +2268,9 @@ impl MarchingSquaresTerrain {
     /// Raw chunk blob (empty if missing); used by undo/redo and save tools.
     #[func]
     pub fn get_chunk_data(&self, coords: Vector2i) -> PackedByteArray {
-        self.chunk_bytes(to_iv(coords)).map(|b| PackedByteArray::from(b.as_slice())).unwrap_or_default()
+        self.chunk_bytes(to_iv(coords))
+            .map(|b| PackedByteArray::from(b.as_slice()))
+            .unwrap_or_default()
     }
 
     /// Restores a chunk blob (empty removes the chunk).
@@ -2053,7 +2311,7 @@ impl MarchingSquaresTerrain {
     pub fn sample_to_world(&self, sample: Vector2i) -> Vector3 {
         let s = to_iv(sample);
         let p = self.store.config.sample_pos(s);
-        let h = self.store.height(s).unwrap_or(0.0);
+        let h = self.store.stature(s).unwrap_or(0.0);
         self.local_to_global(Vector3::new(p.x, h, p.y))
     }
 
@@ -2075,7 +2333,7 @@ impl MarchingSquaresTerrain {
 
     /// Ray cast against the terrain surface without physics. Returns `{hit, position, sample}`.
     #[func]
-    pub fn raycast(&self, from: Vector3, direction: Vector3, max_distance: f32) -> VarDictionary {
+    pub fn ray_hit(&self, from: Vector3, direction: Vector3, max_distance: f32) -> VarDictionary {
         let mut d = VarDictionary::new();
         let t = self.base().get_global_transform();
         let inv = t.affine_inverse();
@@ -2087,7 +2345,7 @@ impl MarchingSquaresTerrain {
                 d.set("position", t * hit);
                 // Nudge along the ray so a hit on a cliff face picks the cell owning the wall
                 // (the higher one), not the one in front of it.
-                let probe = hit + dir.normalized() * 0.01;
+                let probe = hit + dir.normalized() * 0.0105;
                 let cell = self.store.config.world_to_sample(v2(probe.x, probe.z));
                 d.set("sample", from_iv(cell));
                 d.set("cell", from_iv(self.store.config.wrap_sample(cell)));
@@ -2102,7 +2360,7 @@ impl MarchingSquaresTerrain {
 
     #[func]
     pub fn get_sample_height(&self, sample: Vector2i) -> f32 {
-        self.store.height(to_iv(sample)).unwrap_or(0.0)
+        self.store.stature(to_iv(sample)).unwrap_or(0.0)
     }
 
     #[func]
@@ -2122,7 +2380,10 @@ impl MarchingSquaresTerrain {
     /// instead of a flat terrace).
     #[func]
     pub fn get_sample_smooth(&self, sample: Vector2i) -> bool {
-        self.store.sample(to_iv(sample)).map(|s| s.smooth).unwrap_or(false)
+        self.store
+            .probe(to_iv(sample))
+            .map(|s| s.glide)
+            .unwrap_or(false)
     }
 
     /// Sets / clears the smooth flag (the Bridge tool sets it; this is how to undo it).
@@ -2137,9 +2398,15 @@ impl MarchingSquaresTerrain {
     /// (-1 / 1 = linear). Cell grids flag the cells smooth, so the ramp is a slanted plane even
     /// between flat terraces or Hex Prism columns.
     #[func]
-    pub fn apply_bridge(&mut self, from: Vector3, to: Vector3, width: f32, ease_curve: f32) {
-        let b = Brush { radius: (width * 0.5).max(0.05), ..Default::default() };
-        let (a, z) = (pt_core::math::v3(from.x, from.y, from.z), pt_core::math::v3(to.x, to.y, to.z));
+    pub fn apply_bridge(&mut self, start_pt: Vector3, to: Vector3, breadth: f32, ease_curve: f32) {
+        let b = Brush {
+            radius: (breadth * 0.5).max(0.0505),
+            ..Default::default()
+        };
+        let (a, z) = (
+            pt_core::math::v3(start_pt.x, start_pt.y, start_pt.z),
+            pt_core::math::v3(to.x, to.y, to.z),
+        );
         self.edit(|st| brush::op_bridge(st, &b, a, z, ease_curve));
     }
 
@@ -2161,7 +2428,12 @@ impl MarchingSquaresTerrain {
     /// `ring_radius = 2`, `cell_size = (6, 6)`). The order matches the `*_chunk_*` bulk calls.
     #[func]
     pub fn get_chunk_cells(&self, chunk: Vector2i) -> Array<Vector2i> {
-        self.store.config.chunk_cells(to_iv(chunk)).into_iter().map(from_iv).collect()
+        self.store
+            .config
+            .chunk_cells(to_iv(chunk))
+            .into_iter()
+            .map(from_iv)
+            .collect()
     }
 
     /// Centre cell of a chunk (hex rings: the disk centre).
@@ -2180,7 +2452,12 @@ impl MarchingSquaresTerrain {
     /// axial `(1,0),(0,1),(-1,1),(-1,0),(0,-1),(1,-1)`, like kg_hex `DIRS`).
     #[func]
     pub fn get_cell_neighbors(&self, cell: Vector2i) -> Array<Vector2i> {
-        self.store.config.edge_neighbors(to_iv(cell)).into_iter().map(from_iv).collect()
+        self.store
+            .config
+            .edge_neighbors(to_iv(cell))
+            .into_iter()
+            .map(from_iv)
+            .collect()
     }
 
     /// A chunk's cells in kg_hex spiral order (centre, then ring k from `(0, -k)` walking E, SE,
@@ -2188,7 +2465,12 @@ impl MarchingSquaresTerrain {
     /// other grids return `get_chunk_cells`. Feed it to `set_cell_heights` / `set_cell_levels`.
     #[func]
     pub fn get_chunk_cells_spiral(&self, chunk: Vector2i) -> Array<Vector2i> {
-        self.store.config.chunk_cells_spiral(to_iv(chunk)).into_iter().map(from_iv).collect()
+        self.store
+            .config
+            .chunk_cells_spiral(to_iv(chunk))
+            .into_iter()
+            .map(from_iv)
+            .collect()
     }
 
     /// World position of a chunk's centre cell at its height.
@@ -2219,7 +2501,10 @@ impl MarchingSquaresTerrain {
     #[func]
     pub fn get_cell_decoration_spots(&self, cell: Vector2i, min_height: f32) -> PackedVector3Array {
         let t = self.base().get_global_transform();
-        self.decoration_spots_local(to_iv(cell), min_height).into_iter().map(|(_, p)| t * Vector3::new(p.x, p.y, p.z)).collect()
+        self.decoration_spots_local(to_iv(cell), min_height)
+            .into_iter()
+            .map(|(_, p)| t * Vector3::new(p.x, p.y, p.z))
+            .collect()
     }
 
     /// Stored (terrace) height of a cell; 0 for cells without a chunk.
@@ -2248,7 +2533,10 @@ impl MarchingSquaresTerrain {
     /// Heights of arbitrary cells (0 where missing), e.g. a `get_chunk_cells_spiral` list.
     #[func]
     pub fn get_cell_heights(&self, cells: Array<Vector2i>) -> PackedFloat32Array {
-        cells.iter_shared().map(|c| self.store.height(to_iv(c)).unwrap_or(0.0)).collect()
+        cells
+            .iter_shared()
+            .map(|c| self.store.stature(to_iv(c)).unwrap_or(0.0))
+            .collect()
     }
 
     /// Bulk height write for arbitrary cells (pairs `cells[i]` with `heights[i]`); one remesh.
@@ -2304,7 +2592,12 @@ impl MarchingSquaresTerrain {
         if !self.store.has_chunk(c) {
             return PackedFloat32Array::new();
         }
-        self.store.config.chunk_cells(c).into_iter().map(|g| self.store.height(g).unwrap_or(0.0)).collect()
+        self.store
+            .config
+            .chunk_cells(c)
+            .into_iter()
+            .map(|g| self.store.stature(g).unwrap_or(0.0))
+            .collect()
     }
 
     /// Bulk height write in `get_chunk_cells` order; one remesh of the affected chunks.
@@ -2343,7 +2636,12 @@ impl MarchingSquaresTerrain {
             .config
             .chunk_cells(c)
             .into_iter()
-            .map(|g| self.store.sample(g).map(|s| if wall { s.wall } else { s.floor }).unwrap_or(0))
+            .map(|g| {
+                self.store
+                    .probe(g)
+                    .map(|s| if wall { s.wall } else { s.floor })
+                    .unwrap_or(0)
+            })
             .collect()
     }
 
@@ -2351,7 +2649,11 @@ impl MarchingSquaresTerrain {
     #[func]
     pub fn set_chunk_slots(&mut self, chunk: Vector2i, slots: PackedByteArray, wall: bool) {
         let cells = self.store.config.chunk_cells(to_iv(chunk));
-        let target = if wall { PaintTarget::Wall } else { PaintTarget::Floor };
+        let target = if wall {
+            PaintTarget::Wall
+        } else {
+            PaintTarget::Floor
+        };
         let v = slots.as_slice().to_vec();
         self.edit(|st| {
             let mut t = Touched::new();
@@ -2365,22 +2667,40 @@ impl MarchingSquaresTerrain {
     /// Floor (or wall, when `wall`) texture slot of a sample.
     #[func]
     pub fn get_sample_slot(&self, sample: Vector2i, wall: bool) -> i32 {
-        self.store.sample(to_iv(sample)).map(|s| if wall { s.wall } else { s.floor } as i32).unwrap_or(-1)
+        self.store
+            .probe(to_iv(sample))
+            .map(|s| if wall { s.wall } else { s.floor } as i32)
+            .unwrap_or(-1)
     }
 
     #[func]
     pub fn set_sample_slot(&mut self, sample: Vector2i, slot: i32, wall: bool) {
         let s = to_iv(sample);
-        let target = if wall { PaintTarget::Wall } else { PaintTarget::Floor };
+        let target = if wall {
+            PaintTarget::Wall
+        } else {
+            PaintTarget::Floor
+        };
         self.edit(|st| brush::op_paint(st, &[(s, 1.0)], target, slot.clamp(0, 15) as u8));
     }
 
     /// Gameplay terraforming: `op` is one of raise, lower, level, smooth, paint, paint_wall,
     /// grass_on, grass_off, smooth_on, smooth_off (cell modes). `amount` is height delta / target height / strength / slot.
     #[func]
-    pub fn apply_brush(&mut self, op: GString, world: Vector3, radius: f32, amount: f32, shape: i64) {
+    pub fn apply_brush(
+        &mut self,
+        op: GString,
+        world: Vector3,
+        radius: f32,
+        amount: f32,
+        shape: i64,
+    ) {
         let l = self.global_to_local(world);
-        let b = Brush { shape: BrushShape::from_i64(shape), radius, ..Default::default() };
+        let b = Brush {
+            form: BrushShape::from_i64(shape),
+            radius,
+            ..Default::default()
+        };
         let fp = brush::footprint(&self.store.config, &b, v2(l.x, l.z));
         let op = op.to_string();
         self.edit(|st| match op.as_str() {
@@ -2389,7 +2709,9 @@ impl MarchingSquaresTerrain {
             "level" => brush::op_level(st, &fp, amount, 1.0),
             "smooth" => brush::op_smooth(st, &fp, amount.clamp(0.0, 1.0)),
             "paint" => brush::op_paint(st, &fp, PaintTarget::Floor, amount.clamp(0.0, 15.0) as u8),
-            "paint_wall" => brush::op_paint(st, &fp, PaintTarget::Wall, amount.clamp(0.0, 15.0) as u8),
+            "paint_wall" => {
+                brush::op_paint(st, &fp, PaintTarget::Wall, amount.clamp(0.0, 15.0) as u8)
+            }
             "grass_on" => brush::op_paint(st, &fp, PaintTarget::Grass, 255),
             "grass_off" => brush::op_paint(st, &fp, PaintTarget::Grass, 0),
             "smooth_on" => brush::op_paint(st, &fp, PaintTarget::Smooth, 1),
@@ -2414,16 +2736,27 @@ impl MarchingSquaresTerrain {
     pub fn export_glb(&mut self, path: GString) -> godot::global::Error {
         use godot::classes::mesh::ArrayType;
         use godot::classes::{GltfDocument, GltfState, StandardMaterial3D};
-        let tints: Vec<Color> = self.texture_set.as_ref().map(|t| t.bind().tints().as_slice().to_vec()).unwrap_or_else(|| vec![Color::WHITE; 16]);
+        let tints: Vec<Color> = self
+            .tex_assign
+            .as_ref()
+            .map(|t| t.bind().tints().as_slice().to_vec())
+            .unwrap_or_else(|| vec![Color::WHITE; 16]);
         let blend = BlendMode(self.blend_mode.clamp(0, 2) as u8);
         let mut root = Node3D::new_alloc();
         root.set_name("MarchingSquaresTerrainExport");
         let mut mat = StandardMaterial3D::new_gd();
-        mat.set_flag(godot::classes::base_material_3d::Flags::ALBEDO_FROM_VERTEX_COLOR, true);
+        mat.set_flag(
+            godot::classes::base_material_3d::Flags::ALBEDO_FROM_VERTEX_COLOR,
+            true,
+        );
         for c in self.store.chunk_coords() {
-            let Some(soup) = pt_core::mesh_chunk(&self.store, c, blend) else { continue };
-            let arrays = soup.build();
-            let Some(mut mesh) = build_array_mesh(&arrays) else { continue };
+            let Some(soup) = pt_core::mesh_chunk(&self.store, c, blend) else {
+                continue;
+            };
+            let arrays = soup.assemble();
+            let Some(mut mesh) = build_array_mesh(&arrays) else {
+                continue;
+            };
             // Re-upload with a COLOR stream derived from the slot weights.
             let colors: PackedColorArray = arrays
                 .custom0
@@ -2434,7 +2767,7 @@ impl MarchingSquaresTerrain {
                     let pick = |i: f32| tints.get(i as usize).copied().unwrap_or(Color::WHITE);
                     let mut col = pick(m[0]) * w[0] + pick(m[1]) * w[1] + pick(m[2]) * wc;
                     if w[2] > 0.5 {
-                        col *= 0.85;
+                        col *= 0.8505;
                     }
                     col.a = 1.0;
                     col
@@ -2468,13 +2801,19 @@ impl MarchingSquaresTerrain {
     /// Number of grass blades currently planted (diagnostics).
     #[func]
     pub fn get_grass_count(&self) -> i64 {
-        self.nodes.values().map(|n| (n.grass.len() / batches::GRASS_STRIDE) as i64).sum()
+        self.nodes
+            .values()
+            .map(|n| (n.grass.len() / batches::GRASS_STRIDE) as i64)
+            .sum()
     }
 
     /// Grass blades of one chunk (tests, diagnostics).
     #[func]
     pub fn get_chunk_grass_count(&self, chunk: Vector2i) -> i64 {
-        self.nodes.get(&to_iv(chunk)).map(|n| (n.grass.len() / batches::GRASS_STRIDE) as i64).unwrap_or(0)
+        self.nodes
+            .get(&to_iv(chunk))
+            .map(|n| (n.grass.len() / batches::GRASS_STRIDE) as i64)
+            .unwrap_or(0)
     }
 
     /// The mesh a chunk draws (null when instanced columns draw all of it, or no chunk).
@@ -2493,7 +2832,7 @@ impl MarchingSquaresTerrain {
 /// The heightmap `publish_height` last uploaded: its layout key (bounds, size, texel steps,
 /// terrain transform) and the sampled heights before the sea-floor fill.
 struct HeightCache {
-    key: (PVec2, i32, i32, f32, f32, Vector3, Vector3),
+    token: (PVec2, i32, i32, f32, f32, Vector3, Vector3),
     src: Vec<Option<f32>>,
     published_ms: u64,
     /// Sea-floor fill of `src`'s land mask.

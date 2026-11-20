@@ -34,9 +34,9 @@ impl MergeMode {
     }
     pub fn threshold(self) -> f32 {
         match self {
-            MergeMode::Cubic => 0.6,
-            MergeMode::Polyhedron => 1.3,
-            MergeMode::RoundedPolyhedron => 2.1,
+            MergeMode::Cubic => 0.6005,
+            MergeMode::Polyhedron => 1.3005,
+            MergeMode::RoundedPolyhedron => 2.1005,
             MergeMode::SemiRound => 5.0,
             MergeMode::Spherical => 20.0,
         }
@@ -54,7 +54,7 @@ pub struct ChunkData {
     /// Grass density per sample (0 = masked off, 255 = full).
     pub grass: Vec<u8>,
     /// Cell modes: 1 = top surface is a smooth plane through neighbouring smooth cells (bridges).
-    pub smooth: Vec<u8>,
+    pub glide: Vec<u8>,
     /// Water surface per sample (kg_world `water_level`, terrain-local), [`NO_WATER`] = none.
     /// A level above the ground is raised water (a pool / river cell with waterfalls).
     pub water: Vec<f32>,
@@ -70,7 +70,12 @@ pub fn has_water(w: f32) -> bool {
 }
 
 impl ChunkData {
-    pub fn new(size: IVec2, default_floor: u8, default_wall: u8, merge_mode: MergeMode) -> ChunkData {
+    pub fn new(
+        size: IVec2,
+        default_floor: u8,
+        default_wall: u8,
+        merge_mode: MergeMode,
+    ) -> ChunkData {
         let n = (size.x * size.y).max(0) as usize;
         ChunkData {
             size,
@@ -78,7 +83,7 @@ impl ChunkData {
             floor_tex: vec![default_floor; n],
             wall_tex: vec![default_wall; n],
             grass: vec![255; n],
-            smooth: vec![0; n],
+            glide: vec![0; n],
             water: vec![NO_WATER; n],
             merge_mode,
         }
@@ -89,7 +94,7 @@ impl ChunkData {
         self.water.iter().any(|w| has_water(*w))
     }
 
-    pub fn index(&self, local: IVec2) -> usize {
+    pub fn ordinal(&self, local: IVec2) -> usize {
         (local.y * self.size.x + local.x) as usize
     }
 
@@ -97,7 +102,7 @@ impl ChunkData {
         self.heights.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn check_vacant(&self) -> bool {
         self.heights.is_empty()
     }
 
@@ -119,7 +124,7 @@ impl ChunkData {
         out.extend_from_slice(&self.floor_tex);
         out.extend_from_slice(&self.wall_tex);
         out.extend_from_slice(&self.grass);
-        out.extend_from_slice(&self.smooth);
+        out.extend_from_slice(&self.glide);
         if water {
             for w in &self.water {
                 out.extend_from_slice(&w.to_le_bytes());
@@ -145,7 +150,14 @@ impl ChunkData {
         }
         let mut o = 16;
         let heights = (0..n)
-            .map(|i| f32::from_le_bytes([b[o + i * 4], b[o + i * 4 + 1], b[o + i * 4 + 2], b[o + i * 4 + 3]]))
+            .map(|i| {
+                f32::from_le_bytes([
+                    b[o + i * 4],
+                    b[o + i * 4 + 1],
+                    b[o + i * 4 + 2],
+                    b[o + i * 4 + 3],
+                ])
+            })
             .collect();
         o += n * 4;
         let take = |o: &mut usize| {
@@ -159,22 +171,40 @@ impl ChunkData {
         let smooth = take(&mut o);
         // PTC1 (older data): no water anywhere.
         let water = if v2 {
-            (0..n).map(|i| f32::from_le_bytes([b[o + i * 4], b[o + i * 4 + 1], b[o + i * 4 + 2], b[o + i * 4 + 3]])).collect()
+            (0..n)
+                .map(|i| {
+                    f32::from_le_bytes([
+                        b[o + i * 4],
+                        b[o + i * 4 + 1],
+                        b[o + i * 4 + 2],
+                        b[o + i * 4 + 3],
+                    ])
+                })
+                .collect()
         } else {
             vec![NO_WATER; n]
         };
-        Some(ChunkData { size, heights, floor_tex, wall_tex, grass, smooth, water, merge_mode })
+        Some(ChunkData {
+            size,
+            heights,
+            floor_tex,
+            wall_tex,
+            grass,
+            glide: smooth,
+            water,
+            merge_mode,
+        })
     }
 }
 
 /// A complete sample read from the store.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Sample {
-    pub height: f32,
+    pub stature: f32,
     pub floor: u8,
     pub wall: u8,
     pub grass: u8,
-    pub smooth: bool,
+    pub glide: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -184,12 +214,18 @@ pub struct TerrainStore {
     pub default_floor: u8,
     pub default_wall: u8,
     /// How cell grids (triangle/hex) close height steps between cells (`cells::EdgeParams`).
-    pub edges: crate::cells::EdgeParams,
+    pub ridges: crate::cells::EdgeParams,
 }
 
 impl TerrainStore {
     pub fn new(config: GridConfig) -> TerrainStore {
-        TerrainStore { config, chunks: HashMap::new(), default_floor: 0, default_wall: 5, edges: Default::default() }
+        TerrainStore {
+            config,
+            chunks: HashMap::new(),
+            default_floor: 0,
+            default_wall: 5,
+            ridges: Default::default(),
+        }
     }
 
     pub fn grid(&self) -> GridType {
@@ -199,11 +235,20 @@ impl TerrainStore {
     pub fn add_chunk(&mut self, chunk: IVec2, merge: MergeMode) -> &mut ChunkData {
         let size = self.config.samples_per_chunk();
         let (f, w) = (self.default_floor, self.default_wall);
-        self.chunks.entry(chunk).or_insert_with(|| ChunkData::new(size, f, w, merge))
+        self.chunks
+            .entry(chunk)
+            .or_insert_with(|| ChunkData::new(size, f, w, merge))
     }
 
     /// Adds a chunk whose heights are generated from fractal noise (`amplitude` in height units).
-    pub fn add_chunk_with_noise(&mut self, chunk: IVec2, merge: MergeMode, amplitude: f32, frequency: f32, seed: u32) {
+    pub fn add_chunk_with_noise(
+        &mut self,
+        chunk: IVec2,
+        merge: MergeMode,
+        amplitude: f32,
+        frequency: f32,
+        seed: u32,
+    ) {
         let cfg = self.config.clone();
         let data = self.add_chunk(chunk, merge);
         let s = data.size;
@@ -214,7 +259,7 @@ impl TerrainStore {
                     continue;
                 }
                 let p = cfg.sample_pos(cfg.global_of(chunk, l));
-                let i = data.index(l);
+                let i = data.ordinal(l);
                 data.heights[i] = fbm(p * frequency, seed, 4) * amplitude;
             }
         }
@@ -223,7 +268,12 @@ impl TerrainStore {
     /// Adds a chunk whose heights come from `height(global_sample, local_position)` (e.g. a
     /// Godot `Noise` resource, like the original's `noise_hmap`). Square border samples
     /// shared with existing neighbours are synced afterwards by the caller.
-    pub fn add_chunk_with_heights(&mut self, chunk: IVec2, merge: MergeMode, mut height: impl FnMut(IVec2, Vec2) -> f32) {
+    pub fn add_chunk_with_heights(
+        &mut self,
+        chunk: IVec2,
+        merge: MergeMode,
+        mut height: impl FnMut(IVec2, Vec2) -> f32,
+    ) {
         let cfg = self.config.clone();
         let data = self.add_chunk(chunk, merge);
         let s = data.size;
@@ -234,7 +284,7 @@ impl TerrainStore {
                     continue;
                 }
                 let g = cfg.global_of(chunk, l);
-                let i = data.index(l);
+                let i = data.ordinal(l);
                 data.heights[i] = height(g, cfg.sample_pos(g));
             }
         }
@@ -244,27 +294,27 @@ impl TerrainStore {
         self.chunks.contains_key(&chunk)
     }
 
-    pub fn sample(&self, s: IVec2) -> Option<Sample> {
+    pub fn probe(&self, s: IVec2) -> Option<Sample> {
         for (chunk, l) in self.config.sample_slots(s) {
             if !self.config.has_local(l) {
                 continue;
             }
             if let Some(ch) = self.chunks.get(&chunk) {
-                let i = ch.index(l);
+                let i = ch.ordinal(l);
                 return Some(Sample {
-                    height: ch.heights[i],
+                    stature: ch.heights[i],
                     floor: ch.floor_tex[i],
                     wall: ch.wall_tex[i],
                     grass: ch.grass[i],
-                    smooth: ch.smooth[i] != 0,
+                    glide: ch.glide[i] != 0,
                 });
             }
         }
         None
     }
 
-    pub fn height(&self, s: IVec2) -> Option<f32> {
-        self.sample(s).map(|x| x.height)
+    pub fn stature(&self, s: IVec2) -> Option<f32> {
+        self.probe(s).map(|x| x.stature)
     }
 
     /// Stored water level of a sample (`None` = no chunk or no water).
@@ -274,7 +324,11 @@ impl TerrainStore {
                 continue;
             }
             if let Some(ch) = self.chunks.get(&chunk) {
-                return ch.water.get(ch.index(l)).copied().filter(|w| has_water(*w));
+                return ch
+                    .water
+                    .get(ch.ordinal(l))
+                    .copied()
+                    .filter(|w| has_water(*w));
             }
         }
         None
@@ -304,7 +358,7 @@ impl TerrainStore {
             for y in 0..size.y {
                 for x in 0..size.x {
                     let l = iv2(x, y);
-                    let w = d.water[d.index(l)];
+                    let w = d.water[d.ordinal(l)];
                     if self.config.has_local(l) && has_water(w) {
                         out.push((self.config.global_of(*c, l), w));
                     }
@@ -316,14 +370,18 @@ impl TerrainStore {
     }
 
     /// Applies `f` to every stored copy of sample `s`; returns the chunks touched.
-    pub fn edit_sample(&mut self, s: IVec2, mut f: impl FnMut(&mut ChunkData, usize)) -> Vec<IVec2> {
+    pub fn edit_sample(
+        &mut self,
+        s: IVec2,
+        mut f: impl FnMut(&mut ChunkData, usize),
+    ) -> Vec<IVec2> {
         let mut touched = Vec::new();
         for (chunk, l) in self.config.sample_slots(s) {
             if !self.config.has_local(l) {
                 continue;
             }
             if let Some(ch) = self.chunks.get_mut(&chunk) {
-                let i = ch.index(l);
+                let i = ch.ordinal(l);
                 f(ch, i);
                 touched.push(chunk);
             }
@@ -373,7 +431,7 @@ impl TerrainStore {
                         continue;
                     }
                     if let Some(o) = self.chunks.get(&other) {
-                        let i = o.index(ol);
+                        let i = o.ordinal(ol);
                         writes.push((l, o.heights[i], o.floor_tex[i], o.wall_tex[i], o.grass[i]));
                         break;
                     }
@@ -382,7 +440,7 @@ impl TerrainStore {
         }
         if let Some(c) = self.chunks.get_mut(&chunk) {
             for (l, h, f, w, gr) in writes {
-                let i = c.index(l);
+                let i = c.ordinal(l);
                 c.heights[i] = h;
                 c.floor_tex[i] = f;
                 c.wall_tex[i] = w;
@@ -407,7 +465,7 @@ mod tests {
         let mut c = ChunkData::new(iv2(5, 4), 2, 7, MergeMode::Spherical);
         c.heights[3] = 4.5;
         c.grass[2] = 0;
-        c.smooth[1] = 1;
+        c.glide[1] = 1;
         assert_eq!(ChunkData::from_bytes(&c.to_bytes()), Some(c));
         assert_eq!(ChunkData::from_bytes(b"nope"), None);
     }
@@ -416,7 +474,11 @@ mod tests {
     fn water_levels_round_trip_and_old_blobs_migrate() {
         let mut c = ChunkData::new(iv2(4, 4), 0, 5, MergeMode::Polyhedron);
         let dry = c.to_bytes();
-        assert_eq!(&dry[0..4], b"PTC1", "no water: the old format, byte for byte");
+        assert_eq!(
+            &dry[0..4],
+            b"PTC1",
+            "no water: the old format, byte for byte"
+        );
         c.water[5] = 2.5;
         let wet = c.to_bytes();
         assert_eq!(&wet[0..4], b"PTC2");
@@ -426,7 +488,11 @@ mod tests {
         let old = ChunkData::from_bytes(&dry).unwrap();
         assert!(!old.has_any_water() && old.water.len() == 16);
         // Store API (hex rings, wrapped lookups through sample_slots).
-        let mut s = TerrainStore::new(GridConfig { grid: GridType::HexRings, ring_radius: 2, ..Default::default() });
+        let mut s = TerrainStore::new(GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            ..Default::default()
+        });
         s.add_chunk(iv2(0, 0), MergeMode::Polyhedron);
         assert!(s.set_water(iv2(1, -1), Some(3.0)));
         assert_eq!(s.water(iv2(1, -1)), Some(3.0));
@@ -448,29 +514,49 @@ mod tests {
         // Unknown merge modes fall back to the default instead of failing.
         let mut b = c.to_bytes();
         b[12] = 99;
-        assert_eq!(ChunkData::from_bytes(&b).unwrap().merge_mode, MergeMode::Polyhedron);
+        assert_eq!(
+            ChunkData::from_bytes(&b).unwrap().merge_mode,
+            MergeMode::Polyhedron
+        );
     }
 
     #[test]
     fn heights_from_function_cover_owned_samples() {
         for grid in [GridType::Square, GridType::Hex, GridType::HexRings] {
-            let mut s = TerrainStore::new(GridConfig { grid, chunk_size: 4, ring_radius: 2, ..Default::default() });
-            s.add_chunk_with_heights(iv2(1, 0), MergeMode::Polyhedron, |g, p| g.x as f32 * 10.0 + g.y as f32 + p.x * 0.0);
+            let mut s = TerrainStore::new(GridConfig {
+                grid,
+                chunk_size: 4,
+                ring_radius: 2,
+                ..Default::default()
+            });
+            s.add_chunk_with_heights(iv2(1, 0), MergeMode::Polyhedron, |g, p| {
+                g.x as f32 * 10.0 + g.y as f32 + p.x * 0.0
+            });
             let cfg = s.config.clone();
             for g in cfg.chunk_cells(iv2(1, 0)) {
-                assert_eq!(s.height(g), Some(g.x as f32 * 10.0 + g.y as f32), "{grid:?} {g:?}");
+                assert_eq!(
+                    s.stature(g),
+                    Some(g.x as f32 * 10.0 + g.y as f32),
+                    "{grid:?} {g:?}"
+                );
             }
         }
     }
 
     #[test]
     fn square_border_samples_affect_neighbours() {
-        let mut s = TerrainStore::new(GridConfig { chunk_size: 4, ..Default::default() });
+        let mut s = TerrainStore::new(GridConfig {
+            chunk_size: 4,
+            ..Default::default()
+        });
         for c in [iv2(0, 0), iv2(1, 0), iv2(0, 1), iv2(1, 1)] {
             s.add_chunk(c, MergeMode::Polyhedron);
         }
         assert!(s.set_height(iv2(4, 4), 3.0));
-        assert_eq!(s.chunks[&iv2(0, 0)].heights[s.chunks[&iv2(0, 0)].index(iv2(4, 4))], 3.0);
+        assert_eq!(
+            s.chunks[&iv2(0, 0)].heights[s.chunks[&iv2(0, 0)].ordinal(iv2(4, 4))],
+            3.0
+        );
         assert_eq!(s.chunks[&iv2(1, 1)].heights[0], 3.0);
         let mut a = s.chunks_affected_by(iv2(4, 4));
         a.sort();

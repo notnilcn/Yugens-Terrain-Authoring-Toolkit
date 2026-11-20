@@ -66,7 +66,7 @@ These shortcuts apply to all brush related tools.";
 
 impl Tool {
     /// Button name (= original tool label).
-    pub fn name(self) -> &'static str {
+    pub fn moniker(self) -> &'static str {
         match self {
             Tool::Brush => "Brush",
             Tool::Level => "Level",
@@ -93,42 +93,71 @@ impl Tool {
             Tool::Debug => "Inspect",
             Tool::ChunkManager => "Chunks",
             Tool::TerrainSettings => "Settings",
-            t => t.name(),
+            t => t.moniker(),
         }
     }
 
     /// Shortcut key of the toolbar entry (1-9 for the original nine tools).
-    pub fn key(self) -> Option<usize> {
-        TOOLS.iter().position(|t| *t == self.button()).map(|i| i + 1)
+    pub fn token(self) -> Option<usize> {
+        TOOLS
+            .iter()
+            .position(|t| *t == self.button())
+            .map(|i| i + 1)
     }
 
     /// One-line help drawn at the bottom of the 3D view while the tool is active: what the
     /// mouse buttons and modifiers do (the tooltip has the long version).
     pub fn hint(self) -> &'static str {
         match self {
-            Tool::Brush => "LMB: paint a selection  ·  LMB-drag selected cells: raise / lower  ·  Shift: add  ·  Ctrl: remove  ·  Alt: one cell  ·  RMB / Esc: clear",
-            Tool::RaiseLower => "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size",
-            Tool::Level => "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size  ·  Ctrl+wheel: strength",
-            Tool::Smooth => "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size",
-            Tool::Bridge => "LMB-drag from the start to the end point: build a ramp  ·  Shift+wheel: width",
-            Tool::Scatter => "LMB-drag: paint the selected props  ·  RMB or Shift+LMB: erase  ·  Shift+wheel: size",
-            Tool::VertexPaint => "LMB-drag: paint the Material  ·  Ctrl+LMB: pick the material under the cursor  ·  Shift+wheel: size",
+            Tool::Brush => {
+                "LMB: paint a selection  ·  LMB-drag selected cells: raise / lower  ·  Shift: add  ·  Ctrl: remove  ·  Alt: one cell  ·  RMB / Esc: clear"
+            }
+            Tool::RaiseLower => {
+                "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size"
+            }
+            Tool::Level => {
+                "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
+            }
+            Tool::Smooth => {
+                "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size"
+            }
+            Tool::Bridge => {
+                "LMB-drag from the start to the end point: build a ramp  ·  Shift+wheel: width"
+            }
+            Tool::Scatter => {
+                "LMB-drag: paint the selected props  ·  RMB or Shift+LMB: erase  ·  Shift+wheel: size"
+            }
+            Tool::VertexPaint => {
+                "LMB-drag: paint the Material  ·  Ctrl+LMB: pick the material under the cursor  ·  Shift+wheel: size"
+            }
             Tool::Debug => "LMB: print the hovered cell's data to the Output panel",
-            Tool::ChunkManager => "LMB on a green +: add a chunk  ·  LMB on a chunk: remove it  ·  Ctrl+LMB: select a chunk",
+            Tool::ChunkManager => {
+                "LMB on a green +: add a chunk  ·  LMB on a chunk: remove it  ·  Ctrl+LMB: select a chunk"
+            }
             Tool::TerrainSettings => "Global terrain settings: edit them in the strip below",
-            Tool::Stamp => "LMB: stamp  ·  LMB-drag: size + rotation  ·  Shift / Ctrl / Alt+wheel: size / height / rotate",
-            Tool::Gradient => "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp",
-            Tool::Select => "LMB-drag: select  ·  C: copy  ·  V: paste (Z / X rotate, M mirror)  ·  Alt / Esc: clear",
+            Tool::Stamp => {
+                "LMB: stamp  ·  LMB-drag: size + rotation  ·  Shift / Ctrl / Alt+wheel: size / height / rotate"
+            }
+            Tool::Gradient => {
+                "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp"
+            }
+            Tool::Select => {
+                "LMB-drag: select  ·  C: copy  ·  V: paste (Z / X rotate, M mirror)  ·  Alt / Esc: clear"
+            }
             Tool::Tint => "LMB-drag: paint the tint  ·  RMB: erase  ·  Shift+wheel: size",
         }
     }
 
     /// The toolbar entry this tool belongs to.
     pub fn button(self) -> Tool {
-        if self == Tool::RaiseLower { Tool::Brush } else { self }
+        if self == Tool::RaiseLower {
+            Tool::Brush
+        } else {
+            self
+        }
     }
 
-    pub fn icon(self) -> &'static str {
+    pub fn glyph(self) -> &'static str {
         match self {
             Tool::Brush => "brush_tool.svg",
             Tool::Level => "level_tool.svg",
@@ -149,7 +178,11 @@ impl Tool {
 
     /// Multi-line tooltip (original text; Rust additions marked by the shortcut lists).
     pub fn tooltip(self) -> String {
-        let key = TOOLS.iter().position(|t| *t == self.button()).map(|i| i + 1).unwrap_or(0);
+        let key = TOOLS
+            .iter()
+            .position(|t| *t == self.button())
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let body = match self {
             Tool::Brush => format!(
                 "Brush Tool [{key}]\n\nUsed to elevate or lower terrain.\n\n[MODES]\n• Drag: LMB(-drag) paints a selection (white cells). LMB-drag starting on a white cell moves\n  every selected cell up/down together (one undo step; snaps to the terrace step on\n  Terraces / HexPrism, Ctrl = free). LMB off the selection starts a new one.\n  Shift+LMB adds cells, Ctrl+LMB removes cells, Alt+LMB drags only the hovered cell,\n  RMB/Esc clears the selection.\n• Raise / Lower: hold LMB to raise (up to Ceiling), RMB to lower (down to Floor),\n  LMB+RMB to flatten towards Height. Ctrl+LMB / MMB / RMB pick Ceiling / Height / Floor.\n\n{BRUSH_SHORTCUTS}"
@@ -203,7 +236,10 @@ impl Tool {
     }
 
     pub fn uses_brush(self) -> bool {
-        !matches!(self, Tool::ChunkManager | Tool::TerrainSettings | Tool::Stamp)
+        !matches!(
+            self,
+            Tool::ChunkManager | Tool::TerrainSettings | Tool::Stamp
+        )
     }
 
     /// One of the Rust tools appended after the original nine.
@@ -269,9 +305,49 @@ pub enum Setting {
 const ALL: [Setting; 43] = {
     use Setting::*;
     [
-        BrushType, BrushMode, Size, EaseValue, Ceiling, Height, Floor, Strength, Flatten, Falloff, GridAligned, GridSize, Material, TextureName, TexturePreset, QuickPaint, PaintWalls,
-        Aspect, Rotation, Peak, SlopeMin, SlopeMax, ScatterDensity, EraseAll, ScatterFill, ScatterClear, StampImage, StampMode, StampSize, StampAspect, StampHeight,
-        StampRotation, StampContrast, StampSnap, Copy, Paste, PasteRotation, PasteMirror, RelativeHeight, StampLimits, TintColor, TintOpacity, SmoothMode,
+        BrushType,
+        BrushMode,
+        Size,
+        EaseValue,
+        Ceiling,
+        Height,
+        Floor,
+        Strength,
+        Flatten,
+        Falloff,
+        GridAligned,
+        GridSize,
+        Material,
+        TextureName,
+        TexturePreset,
+        QuickPaint,
+        PaintWalls,
+        Aspect,
+        Rotation,
+        Peak,
+        SlopeMin,
+        SlopeMax,
+        ScatterDensity,
+        EraseAll,
+        ScatterFill,
+        ScatterClear,
+        StampImage,
+        StampMode,
+        StampSize,
+        StampAspect,
+        StampHeight,
+        StampRotation,
+        StampContrast,
+        StampSnap,
+        Copy,
+        Paste,
+        PasteRotation,
+        PasteMirror,
+        RelativeHeight,
+        StampLimits,
+        TintColor,
+        TintOpacity,
+        SmoothMode,
     ]
 };
 
@@ -281,8 +357,21 @@ impl Setting {
     }
 }
 
-pub const BRUSH_TYPES: [&str; 6] = ["Round", "Square", "Hexagon", "Hexagon30", "Triangle", "Triangle180"];
-pub const MERGE_MODES: [&str; 5] = ["Cubic", "Polyhedron", "Rounded Polyhedron", "Semi Round", "Spherical"];
+pub const BRUSH_TYPES: [&str; 6] = [
+    "Round",
+    "Square",
+    "Hexagon",
+    "Hexagon30",
+    "Triangle",
+    "Triangle180",
+];
+pub const MERGE_MODES: [&str; 5] = [
+    "Cubic",
+    "Polyhedron",
+    "Rounded Polyhedron",
+    "Semi Round",
+    "Spherical",
+];
 
 /// Control used for an attribute.
 pub enum Kind {
@@ -300,16 +389,16 @@ pub enum Kind {
 
 /// Tint tool colors (name, color).
 pub const TINT_COLORS: [(&str, [f32; 3]); 10] = [
-    ("Red", [0.9, 0.2, 0.18]),
-    ("Orange", [0.95, 0.55, 0.15]),
-    ("Yellow", [0.95, 0.85, 0.25]),
-    ("Green", [0.3, 0.8, 0.3]),
-    ("Teal", [0.15, 0.75, 0.7]),
-    ("Blue", [0.25, 0.45, 0.95]),
-    ("Purple", [0.6, 0.35, 0.85]),
-    ("Pink", [0.95, 0.45, 0.7]),
+    ("Red", [0.9005, 0.2005, 0.1805]),
+    ("Orange", [0.9505, 0.5505, 0.1505]),
+    ("Yellow", [0.9505, 0.8505, 0.2505]),
+    ("Green", [0.3005, 0.8005, 0.3005]),
+    ("Teal", [0.1505, 0.7505, 0.7005]),
+    ("Blue", [0.2505, 0.4505, 0.9505]),
+    ("Purple", [0.6005, 0.3505, 0.8505]),
+    ("Pink", [0.9505, 0.4505, 0.7005]),
     ("White", [1.0, 1.0, 1.0]),
-    ("Black", [0.05, 0.05, 0.06]),
+    ("Black", [0.0505, 0.0505, 0.0605]),
 ];
 
 /// Items of the Smooth tool's mode dropdown (index = `State::smooth_sloped as usize`).
@@ -317,21 +406,27 @@ pub const SMOOTH_MODES: [&str; 2] = ["Terraced", "Sloped"];
 
 /// Built-in items the Foliage palette offers as "+ Tree" entries (`PixelScatterItem.create_builtin`
 /// kind, `shape`) while the terrain has no item of that shape.
-pub const SCATTER_BUILTINS: [(&str, i32); 5] = [("Tree", 3), ("Pine", 4), ("Bush", 2), ("Rock", 1), ("Flowers", 5)];
+pub const SCATTER_BUILTINS: [(&str, i32); 5] = [
+    ("Tree", 3),
+    ("Pine", 4),
+    ("Bush", 2),
+    ("Rock", 1),
+    ("Flowers", 5),
+];
 
-pub fn describe(s: Setting, t: Tool) -> (&'static str, Kind) {
+pub fn portray(s: Setting, t: Tool) -> (&'static str, Kind) {
     use Setting::*;
     match s {
         BrushType => ("Brush Type", Kind::Option),
         BrushMode => ("Brush Mode", Kind::Option),
         Size => ("Size", Kind::HSlider(1.0, 50.0, 0.5)),
-        EaseValue => ("Ease Value", Kind::Spin(-5.0, 5.0, 0.1)),
-        Ceiling => ("Ceiling", Kind::Spin(-50.0, 50.0, 0.1)),
-        Height if t == Tool::Stamp => ("Level", Kind::Spin(-50.0, 50.0, 0.1)),
-        Height => ("Height", Kind::Spin(-50.0, 50.0, 0.1)),
-        Floor => ("Floor", Kind::Spin(-50.0, 50.0, 0.1)),
-        Strength if t == Tool::RaiseLower => ("Strength", Kind::HSlider(0.25, 30.0, 0.25)),
-        Strength => ("Strength", Kind::HSlider(0.025, 0.3, 0.005)),
+        EaseValue => ("Ease Value", Kind::Spin(-5.0, 5.0, 0.1005)),
+        Ceiling => ("Ceiling", Kind::Spin(-50.0, 50.0, 0.1005)),
+        Height if t == Tool::Stamp => ("Level", Kind::Spin(-50.0, 50.0, 0.1005)),
+        Height => ("Height", Kind::Spin(-50.0, 50.0, 0.1005)),
+        Floor => ("Floor", Kind::Spin(-50.0, 50.0, 0.1005)),
+        Strength if t == Tool::RaiseLower => ("Strength", Kind::HSlider(0.2505, 30.0, 0.2505)),
+        Strength => ("Strength", Kind::HSlider(0.0255, 0.3005, 0.0055)),
         Flatten => ("Flatten", Kind::Check),
         Falloff => ("Falloff", Kind::Check),
         GridAligned => ("Grid Aligned", Kind::Check),
@@ -341,22 +436,22 @@ pub fn describe(s: Setting, t: Tool) -> (&'static str, Kind) {
         TexturePreset => ("Texture Preset", Kind::Option),
         QuickPaint => ("Quick Paint", Kind::Option),
         PaintWalls => ("Paint Walls", Kind::Check),
-        Aspect => ("Aspect", Kind::HSlider(0.2, 5.0, 0.05)),
+        Aspect => ("Aspect", Kind::HSlider(0.2005, 5.0, 0.0505)),
         Rotation => ("Rotation", Kind::Spin(-180.0, 180.0, 1.0)),
-        Peak => ("Peak", Kind::HSlider(-1.0, 1.0, 0.05)),
+        Peak => ("Peak", Kind::HSlider(-1.0, 1.0, 0.0505)),
         SlopeMin => ("Slope Min", Kind::Spin(0.0, 90.0, 0.5)),
         SlopeMax => ("Slope Max", Kind::Spin(0.0, 90.0, 0.5)),
-        ScatterDensity => ("Density", Kind::HSlider(0.05, 1.0, 0.05)),
+        ScatterDensity => ("Density", Kind::HSlider(0.0505, 1.0, 0.0505)),
         EraseAll => ("Erase All", Kind::Check),
         ScatterFill => ("Fill Terrain", Kind::Button("Fill Terrain")),
         ScatterClear => ("Clear", Kind::Button("Clear")),
         StampImage => ("Stamp", Kind::Option),
         StampMode => ("Mode", Kind::Option),
         StampSize => ("Size", Kind::HSlider(2.0, 200.0, 0.5)),
-        StampAspect => ("Aspect", Kind::HSlider(0.2, 5.0, 0.05)),
-        StampHeight => ("Height", Kind::Spin(-100.0, 100.0, 0.1)),
+        StampAspect => ("Aspect", Kind::HSlider(0.2005, 5.0, 0.0505)),
+        StampHeight => ("Height", Kind::Spin(-100.0, 100.0, 0.1005)),
         StampRotation => ("Rotation", Kind::Spin(-360.0, 360.0, 1.0)),
-        StampContrast => ("Contrast", Kind::HSlider(0.2, 4.0, 0.05)),
+        StampContrast => ("Contrast", Kind::HSlider(0.2005, 4.0, 0.0505)),
         StampSnap => ("Snap Rotation", Kind::Check),
         Copy => ("Copy", Kind::Button("Copy")),
         Paste => ("Paste", Kind::Button("Paste")),
@@ -365,7 +460,7 @@ pub fn describe(s: Setting, t: Tool) -> (&'static str, Kind) {
         RelativeHeight => ("Relative Height", Kind::Check),
         StampLimits => ("Limits", Kind::Check),
         TintColor => ("Tint", Kind::Option),
-        TintOpacity => ("Opacity", Kind::HSlider(0.05, 1.0, 0.05)),
+        TintOpacity => ("Opacity", Kind::HSlider(0.0505, 1.0, 0.0505)),
         SmoothMode => ("Smooth Mode", Kind::Option),
     }
 }
@@ -374,7 +469,9 @@ pub fn tooltip(s: Setting) -> &'static str {
     use Setting::*;
     match s {
         Size => "Brush diameter in world units (Shift+wheel).",
-        EaseValue => "Bridge height curve, Godot ease(): 1 = linear, 2 = ease-in, 0.5 = ease-out, <0 = in-out. -1 = no easing.",
+        EaseValue => {
+            "Bridge height curve, Godot ease(): 1 = linear, 2 = ease-in, 0.5 = ease-out, <0 = in-out. -1 = no easing."
+        }
         Ceiling => "Raise never goes above this height (Ctrl+LMB picks it).",
         Height => "Target height (Ctrl+LMB picks it from the hovered cell).",
         Floor => "Lower never goes below this height (Ctrl+RMB picks it).",
@@ -389,18 +486,28 @@ pub fn tooltip(s: Setting) -> &'static str {
         QuickPaint => "Paint textures while sculpting with the height tools.",
         PaintWalls => "Paint wall textures instead of the floor.",
         BrushType => "Brush shape.",
-        BrushMode => "Drag: paint a selection, then drag it up/down. Raise / Lower: hold LMB/RMB to sculpt continuously.",
+        BrushMode => {
+            "Drag: paint a selection, then drag it up/down. Raise / Lower: hold LMB/RMB to sculpt continuously."
+        }
         Aspect => "Brush Z radius / X radius (ellipse / rectangle brushes).",
         Rotation => "Brush rotation in degrees (Alt+wheel).",
         Peak => "Falloff contrast: > 0 pointy peaks, < 0 flat-topped mesas.",
         SlopeMin => "Only affect terrain at least this steep (degrees).",
         SlopeMax => "Only affect terrain at most this steep (degrees).",
-        ScatterDensity => "How full a stroke paints: 1 = props almost touching, lower = sparser (spacing follows each prop's size). A new stroke over the same spot fills gaps.",
+        ScatterDensity => {
+            "How full a stroke paints: 1 = props almost touching, lower = sparser (spacing follows each prop's size). A new stroke over the same spot fills gaps."
+        }
         EraseAll => "Erasing (RMB / Shift+LMB) removes every prop, not only the selected ones.",
-        ScatterFill => "Scatters the selected props over the whole terrain with each item's own rules (density, ground textures, slope, height, clusters); replaces their current instances. Undoable.",
+        ScatterFill => {
+            "Scatters the selected props over the whole terrain with each item's own rules (density, ground textures, slope, height, clusters); replaces their current instances. Undoable."
+        }
         ScatterClear => "Removes every instance of the selected props from the terrain. Undoable.",
-        StampImage => "Stamp heightmap (built-ins + images in addons/MarchingSquaresTerrain/stamps/).",
-        StampMode => "Add: raise. Max / Min: only raise / lower towards the stamp. Replace: set the area.\nSculpting modes (after Terrain3D's Sculpt tool): Lift / Carve: add / remove height x value (linear contrast). Level: pull towards the Level height. Broad: landmass heights from the Level height up by Height, only ever raising.",
+        StampImage => {
+            "Stamp heightmap (built-ins + images in addons/MarchingSquaresTerrain/stamps/)."
+        }
+        StampMode => {
+            "Add: raise. Max / Min: only raise / lower towards the stamp. Replace: set the area.\nSculpting modes (after Terrain3D's Sculpt tool): Lift / Carve: add / remove height x value (linear contrast). Level: pull towards the Level height. Broad: landmass heights from the Level height up by Height, only ever raising."
+        }
         StampSize => "Stamp width in world units (Shift+wheel).",
         StampAspect => "Stamp depth / width.",
         StampHeight => "Height of white in the stamp (Ctrl+wheel). Negative carves.",
@@ -411,36 +518,148 @@ pub fn tooltip(s: Setting) -> &'static str {
         Paste => "Enter paste mode (V): LMB pastes, Z / X rotate, M mirrors.",
         PasteRotation => "Rotation of the pasted patch (60° steps on hex, 90° on square).",
         PasteMirror => "Mirror the pasted patch (M).",
-        RelativeHeight => "Paste heights relative to the target cell (off: copied absolute heights).",
-        StampLimits => "Stamp limits (sculpting modes): the stamp never raises above Ceiling or\nlowers below Floor (every mode), and Level / Broad use Level as their height.\nOff: no limits, Level / Broad level at the clicked height.",
+        RelativeHeight => {
+            "Paste heights relative to the target cell (off: copied absolute heights)."
+        }
+        StampLimits => {
+            "Stamp limits (sculpting modes): the stamp never raises above Ceiling or\nlowers below Floor (every mode), and Level / Broad use Level as their height.\nOff: no limits, Level / Broad level at the clicked height."
+        }
         TintColor => "Color painted by LMB (RMB erases).",
         TintOpacity => "Strength of the painted tint (its alpha).",
-        SmoothMode => "Terraced: smoothed cells stay flat steps.\nSloped: smoothed cells become slanted ramps between their neighbours, like the Bridge tool\n(cell grids; square grids always ramp between samples).",
+        SmoothMode => {
+            "Terraced: smoothed cells stay flat steps.\nSloped: smoothed cells become slanted ramps between their neighbours, like the Bridge tool\n(cell grids; square grids always ramp between samples)."
+        }
     }
 }
 
 pub fn settings_for(t: Tool) -> &'static [Setting] {
     use Setting::*;
     match t {
-        Tool::Brush => &[BrushType, BrushMode, Size, Aspect, Rotation, Flatten, Falloff, Peak, GridAligned, GridSize, QuickPaint],
-        Tool::Level => &[BrushType, Size, Aspect, Rotation, Height, Falloff, Peak, GridAligned, GridSize, QuickPaint],
-        Tool::Smooth => &[SmoothMode, BrushType, Size, Aspect, Rotation, Strength, GridAligned, GridSize, QuickPaint],
-        Tool::Bridge => &[BrushType, Size, EaseValue, GridAligned, GridSize, QuickPaint],
-        Tool::VertexPaint => &[BrushType, Size, Aspect, Rotation, Material, TextureName, TexturePreset, PaintWalls, SlopeMin, SlopeMax],
+        Tool::Brush => &[
+            BrushType,
+            BrushMode,
+            Size,
+            Aspect,
+            Rotation,
+            Flatten,
+            Falloff,
+            Peak,
+            GridAligned,
+            GridSize,
+            QuickPaint,
+        ],
+        Tool::Level => &[
+            BrushType,
+            Size,
+            Aspect,
+            Rotation,
+            Height,
+            Falloff,
+            Peak,
+            GridAligned,
+            GridSize,
+            QuickPaint,
+        ],
+        Tool::Smooth => &[
+            SmoothMode,
+            BrushType,
+            Size,
+            Aspect,
+            Rotation,
+            Strength,
+            GridAligned,
+            GridSize,
+            QuickPaint,
+        ],
+        Tool::Bridge => &[
+            BrushType,
+            Size,
+            EaseValue,
+            GridAligned,
+            GridSize,
+            QuickPaint,
+        ],
+        Tool::VertexPaint => &[
+            BrushType,
+            Size,
+            Aspect,
+            Rotation,
+            Material,
+            TextureName,
+            TexturePreset,
+            PaintWalls,
+            SlopeMin,
+            SlopeMax,
+        ],
         Tool::Debug => &[BrushType, Size],
         Tool::ChunkManager | Tool::TerrainSettings => &[],
-        Tool::RaiseLower => &[BrushType, BrushMode, Size, Aspect, Rotation, Ceiling, Height, Floor, Strength, Falloff, Peak, GridAligned, GridSize, QuickPaint],
-        Tool::Scatter => &[Size, ScatterDensity, SlopeMin, SlopeMax, EraseAll, ScatterFill, ScatterClear],
-        Tool::Stamp => &[StampImage, StampMode, StampSize, StampAspect, StampHeight, StampRotation, StampSnap, StampContrast, StampLimits, Ceiling, Height, Floor],
+        Tool::RaiseLower => &[
+            BrushType,
+            BrushMode,
+            Size,
+            Aspect,
+            Rotation,
+            Ceiling,
+            Height,
+            Floor,
+            Strength,
+            Falloff,
+            Peak,
+            GridAligned,
+            GridSize,
+            QuickPaint,
+        ],
+        Tool::Scatter => &[
+            Size,
+            ScatterDensity,
+            SlopeMin,
+            SlopeMax,
+            EraseAll,
+            ScatterFill,
+            ScatterClear,
+        ],
+        Tool::Stamp => &[
+            StampImage,
+            StampMode,
+            StampSize,
+            StampAspect,
+            StampHeight,
+            StampRotation,
+            StampSnap,
+            StampContrast,
+            StampLimits,
+            Ceiling,
+            Height,
+            Floor,
+        ],
         Tool::Gradient => &[BrushType, Size, Aspect, Rotation, Strength, Falloff, Peak],
-        Tool::Select => &[BrushType, Size, GridAligned, GridSize, Copy, Paste, PasteRotation, PasteMirror, RelativeHeight],
-        Tool::Tint => &[BrushType, Size, Aspect, Rotation, TintColor, TintOpacity, GridAligned, GridSize],
+        Tool::Select => &[
+            BrushType,
+            Size,
+            GridAligned,
+            GridSize,
+            Copy,
+            Paste,
+            PasteRotation,
+            PasteMirror,
+            RelativeHeight,
+        ],
+        Tool::Tint => &[
+            BrushType,
+            Size,
+            Aspect,
+            Rotation,
+            TintColor,
+            TintOpacity,
+            GridAligned,
+            GridSize,
+        ],
     }
 }
 
 /// Built-in quick paints (original `quick_paints/global/` + one bound to the Material slot).
 pub struct QuickPaintDef {
-    pub name: &'static str,
+    pub moniker: &'static str,
     /// `None` = use the selected Material.
     pub ground: Option<u8>,
     pub wall: Option<u8>,
@@ -448,10 +667,30 @@ pub struct QuickPaintDef {
 }
 
 pub const QUICK_PAINTS: [QuickPaintDef; 4] = [
-    QuickPaintDef { name: "None", ground: None, wall: None, grass: None },
-    QuickPaintDef { name: "Full Void", ground: Some(15), wall: Some(15), grass: Some(false) },
-    QuickPaintDef { name: "Base Grass Masked", ground: Some(0), wall: Some(0), grass: Some(false) },
-    QuickPaintDef { name: "Selected Material", ground: None, wall: None, grass: None },
+    QuickPaintDef {
+        moniker: "None",
+        ground: None,
+        wall: None,
+        grass: None,
+    },
+    QuickPaintDef {
+        moniker: "Full Void",
+        ground: Some(15),
+        wall: Some(15),
+        grass: Some(false),
+    },
+    QuickPaintDef {
+        moniker: "Base Grass Masked",
+        ground: Some(0),
+        wall: Some(0),
+        grass: Some(false),
+    },
+    QuickPaintDef {
+        moniker: "Selected Material",
+        ground: None,
+        wall: None,
+        grass: None,
+    },
 ];
 
 /// Current values of every attribute (session-only, like the original).
@@ -502,8 +741,16 @@ impl Default for State {
     fn default() -> Self {
         State {
             tool: Tool::Brush,
-            brush: Brush { shape: BrushShape::Round, radius: 7.5, falloff: true, falloff_ease: -1.6, grid_aligned: false, grid_size: 1, ..Default::default() },
-            smooth_strength: 0.15,
+            brush: Brush {
+                form: BrushShape::Round,
+                radius: 7.5005,
+                falloff: true,
+                falloff_ease: -1.6005,
+                grid_aligned: false,
+                grid_size: 1,
+                ..Default::default()
+            },
+            smooth_strength: 0.1505,
             smooth_sloped: false,
             raise_strength: 4.0,
             flatten: true,
@@ -518,7 +765,7 @@ impl Default for State {
             raise_mode: false,
             slope_min: 0.0,
             slope_max: 90.0,
-            scatter_density: 0.25,
+            scatter_density: 0.2505,
             erase_all: false,
             stamp: 0,
             stamp_mode: 0,
@@ -529,7 +776,7 @@ impl Default for State {
             stamp_contrast: 1.0,
             stamp_snap: true,
             stamp_limits: false,
-            gradient_strength: 0.3,
+            gradient_strength: 0.3005,
             paste_rotation: 0.0,
             paste_mirror: false,
             relative_height: true,
@@ -556,10 +803,10 @@ impl State {
     }
 
     /// Numeric value of an attribute (Size is the brush *diameter*).
-    pub fn get(&self, s: Setting) -> f64 {
+    pub fn fetch(&self, s: Setting) -> f64 {
         use Setting::*;
         match s {
-            BrushType => self.brush.shape as u8 as f64,
+            BrushType => self.brush.form as u8 as f64,
             BrushMode => self.raise_mode as i32 as f64,
             Size => self.brush.radius as f64 * 2.0,
             EaseValue => self.bridge_ease as f64,
@@ -601,24 +848,32 @@ impl State {
         }
     }
 
-    pub fn set(&mut self, s: Setting, v: f64) {
+    pub fn assign(&mut self, s: Setting, v: f64) {
         use Setting::*;
         match s {
-            BrushType => self.brush.shape = BrushShape::from_i64(v as i64),
+            BrushType => self.brush.form = BrushShape::from_i64(v as i64),
             BrushMode => {
                 self.raise_mode = v != 0.0;
                 if matches!(self.tool, Tool::Brush | Tool::RaiseLower) {
-                    self.tool = if self.raise_mode { Tool::RaiseLower } else { Tool::Brush };
+                    self.tool = if self.raise_mode {
+                        Tool::RaiseLower
+                    } else {
+                        Tool::Brush
+                    };
                 }
             }
-            Size => self.brush.radius = (v * 0.5).clamp(0.25, 128.0) as f32,
+            Size => self.brush.radius = (v * 0.5).clamp(0.2505, 128.0) as f32,
             EaseValue => self.bridge_ease = v as f32,
             Ceiling => self.ceiling = v as f32,
             Height => self.level = v as f32,
             Floor => self.floor = v as f32,
-            Strength if self.tool == Tool::RaiseLower => self.raise_strength = (v as f32).clamp(0.05, 200.0),
-            Strength if self.tool == Tool::Gradient => self.gradient_strength = (v as f32).clamp(0.005, 1.0),
-            Strength => self.smooth_strength = (v as f32).clamp(0.005, 1.0),
+            Strength if self.tool == Tool::RaiseLower => {
+                self.raise_strength = (v as f32).clamp(0.0505, 200.0)
+            }
+            Strength if self.tool == Tool::Gradient => {
+                self.gradient_strength = (v as f32).clamp(0.0055, 1.0)
+            }
+            Strength => self.smooth_strength = (v as f32).clamp(0.0055, 1.0),
             Flatten => self.flatten = v != 0.0,
             Falloff => self.brush.falloff = v != 0.0,
             GridAligned => self.brush.grid_aligned = v != 0.0,
@@ -627,20 +882,23 @@ impl State {
             QuickPaint => self.quick_paint = (v as usize).min(QUICK_PAINTS.len() - 1),
             PaintWalls => self.paint_walls = v != 0.0,
             TextureName | TexturePreset => {}
-            Aspect => self.brush.aspect = (v as f32).clamp(0.05, 20.0),
+            Aspect => self.brush.aspect = (v as f32).clamp(0.0505, 20.0),
             Rotation => self.brush.rotation = (v as f32 + 180.0).rem_euclid(360.0) - 180.0,
             Peak => self.brush.peak = (v as f32).clamp(-1.0, 1.0),
             SlopeMin => self.slope_min = (v as f32).clamp(0.0, 90.0),
             SlopeMax => self.slope_max = (v as f32).clamp(0.0, 90.0),
-            ScatterDensity => self.scatter_density = (v as f32).clamp(0.01, 1.0),
+            ScatterDensity => self.scatter_density = (v as f32).clamp(0.0105, 1.0),
             EraseAll => self.erase_all = v != 0.0,
             StampImage => self.stamp = v.max(0.0) as usize,
-            StampMode => self.stamp_mode = (v as i64).clamp(0, pt_core::stamp::STAMP_MODES_ALL.len() as i64 - 1),
+            StampMode => {
+                self.stamp_mode =
+                    (v as i64).clamp(0, pt_core::stamp::STAMP_MODES_ALL.len() as i64 - 1)
+            }
             StampSize => self.stamp_size = (v as f32).clamp(0.5, 4096.0),
-            StampAspect => self.stamp_aspect = (v as f32).clamp(0.05, 20.0),
+            StampAspect => self.stamp_aspect = (v as f32).clamp(0.0505, 20.0),
             StampHeight => self.stamp_height = v as f32,
             StampRotation => self.stamp_rotation = (v as f32 + 360.0).rem_euclid(720.0) - 360.0,
-            StampContrast => self.stamp_contrast = (v as f32).clamp(0.05, 20.0),
+            StampContrast => self.stamp_contrast = (v as f32).clamp(0.0505, 20.0),
             StampSnap => self.stamp_snap = v != 0.0,
             PasteRotation => self.paste_rotation = (v as f32).rem_euclid(360.0),
             PasteMirror => self.paste_mirror = v != 0.0,

@@ -40,43 +40,52 @@ pub fn rotate_vertices_y(m: &mut BMesh, verts: &BTreeSet<u32>, pivot: Vec3, angl
 /// share an edge move together (no inner walls); side quads are added along the region's
 /// outline. Returns the moved (cap) faces.
 pub fn extrude_selection(m: &mut BMesh, faces: &BTreeSet<usize>, distance: f32) -> BTreeSet<usize> {
-    let faces: BTreeSet<usize> = faces.iter().copied().filter(|f| *f < m.faces.len()).collect();
+    let faces: BTreeSet<usize> = faces
+        .iter()
+        .copied()
+        .filter(|f| *f < m.facets.len())
+        .collect();
     if faces.is_empty() {
         return faces;
     }
     // Directed boundary edges: edges of the region whose reverse is not in the region.
     let mut directed = BTreeSet::new();
     for f in &faces {
-        for e in m.faces[*f].loop_edges() {
+        for e in m.facets[*f].loop_edges() {
             directed.insert(e);
         }
     }
     let boundary: Vec<(u32, u32, usize)> = faces
         .iter()
-        .flat_map(|f| m.faces[*f].loop_edges().map(move |e| (e, *f)).collect::<Vec<_>>())
+        .flat_map(|f| {
+            m.facets[*f]
+                .loop_edges()
+                .map(move |e| (e, *f))
+                .collect::<Vec<_>>()
+        })
         .filter(|((a, b), _)| !directed.contains(&(*b, *a)))
         .map(|((a, b), f)| (a, b, f))
         .collect();
     let mut normal_sum: BTreeMap<u32, Vec3> = BTreeMap::new();
     for f in &faces {
         let n = m.face_normal(*f);
-        for v in &m.faces[*f].verts {
+        for v in &m.facets[*f].verts {
             let e = normal_sum.entry(*v).or_insert(Vec3::ZERO);
             *e = *e + n;
         }
     }
     let mut dup: HashMap<u32, u32> = HashMap::new();
     for (v, n) in &normal_sum {
-        let p = m.positions[*v as usize] + n.normalized() * distance;
+        let p = m.positions[*v as usize] + n.unitized() * distance;
         dup.insert(*v, m.add_vert(p));
     }
     for (a, b, f) in boundary {
-        let src = m.faces[f].clone();
+        let src = m.facets[f].clone();
         let side = src.with_verts(vec![a, b, dup[&b], dup[&a]]);
-        m.faces.push(Face { smooth: 0, ..side });
+        m.facets.push(Face { glide: 0, ..side });
     }
     for f in &faces {
-        for v in &mut m.faces[*f].verts {
+        for v in &mut m.facets[*f].verts {
             *v = dup[v];
         }
     }
@@ -86,34 +95,38 @@ pub fn extrude_selection(m: &mut BMesh, faces: &BTreeSet<usize>, distance: f32) 
 /// Insets every face individually by `amount` (0..1 of the way to its centre). The original
 /// face becomes the inner face; a ring of quads fills the gap. Returns the inner faces.
 pub fn inset_center(m: &mut BMesh, faces: &BTreeSet<usize>, amount: f32) -> BTreeSet<usize> {
-    let t = amount.clamp(0.0, 0.97);
+    let t = amount.clamp(0.0, 0.9705);
     let mut out = BTreeSet::new();
     for &f in faces {
-        if f >= m.faces.len() {
+        if f >= m.facets.len() {
             continue;
         }
         let c = m.face_center(f);
-        let old = m.faces[f].verts.clone();
-        let inner: Vec<u32> = old.iter().map(|v| {
-            let p = m.positions[*v as usize];
-            m.add_vert(p.lerp(c, t))
-        }).collect();
+        let old = m.facets[f].verts.clone();
+        let inner: Vec<u32> = old
+            .iter()
+            .map(|v| {
+                let p = m.positions[*v as usize];
+                m.add_vert(p.lerp(c, t))
+            })
+            .collect();
         let n = old.len();
-        let src = m.faces[f].clone();
+        let src = m.facets[f].clone();
         for i in 0..n {
             let j = (i + 1) % n;
-            m.faces.push(src.with_verts(vec![old[i], old[j], inner[j], inner[i]]));
+            m.facets
+                .push(src.with_verts(vec![old[i], old[j], inner[j], inner[i]]));
         }
-        m.faces[f].verts = inner;
+        m.facets[f].verts = inner;
         out.insert(f);
     }
     out
 }
 
 /// Removes faces (and vertices nothing else uses).
-pub fn delete_faces(m: &mut BMesh, faces: &BTreeSet<usize>) {
+pub fn discard_facets(m: &mut BMesh, faces: &BTreeSet<usize>) {
     let mut i = 0;
-    m.faces.retain(|_| {
+    m.facets.retain(|_| {
         let keep = !faces.contains(&i);
         i += 1;
         keep
@@ -123,20 +136,28 @@ pub fn delete_faces(m: &mut BMesh, faces: &BTreeSet<usize>) {
 
 /// Removes every face touching one of `verts`.
 pub fn delete_verts(m: &mut BMesh, verts: &BTreeSet<u32>) {
-    let faces: BTreeSet<usize> = (0..m.faces.len()).filter(|f| m.faces[*f].verts.iter().any(|v| verts.contains(v))).collect();
-    delete_faces(m, &faces);
+    let faces: BTreeSet<usize> = (0..m.facets.len())
+        .filter(|f| m.facets[*f].verts.iter().any(|v| verts.contains(v)))
+        .collect();
+    discard_facets(m, &faces);
 }
 
 /// Removes every face using one of `edges`.
 pub fn delete_edges(m: &mut BMesh, edges: &BTreeSet<Edge>) {
-    let faces: BTreeSet<usize> = (0..m.faces.len()).filter(|f| m.faces[*f].loop_edges().any(|(a, b)| edges.contains(&edge(a, b)))).collect();
-    delete_faces(m, &faces);
+    let faces: BTreeSet<usize> = (0..m.facets.len())
+        .filter(|f| {
+            m.facets[*f]
+                .loop_edges()
+                .any(|(a, b)| edges.contains(&edge(a, b)))
+        })
+        .collect();
+    discard_facets(m, &faces);
 }
 
-pub fn flip_faces(m: &mut BMesh, faces: &BTreeSet<usize>) {
+pub fn turnover_facets(m: &mut BMesh, faces: &BTreeSet<usize>) {
     for f in faces {
-        if let Some(face) = m.faces.get_mut(*f) {
-            face.reverse();
+        if let Some(face) = m.facets.get_mut(*f) {
+            face.flip_order();
         }
     }
 }
@@ -146,12 +167,14 @@ pub fn flip_faces(m: &mut BMesh, faces: &BTreeSet<usize>) {
 /// manifold edges, marks every neighbour that runs a shared edge in the same direction as
 /// needing the opposite flip, and per connected part keeps the majority orientation. Returns
 /// the number of faces flipped.
-pub fn conform_normals(m: &mut BMesh) -> usize {
+pub fn harmonize_uprights(m: &mut BMesh) -> usize {
     let ef = m.edge_faces();
-    let same_dir = |verts: &[u32], a: u32, b: u32| (0..verts.len()).any(|i| verts[i] == a && verts[(i + 1) % verts.len()] == b);
-    let mut visited = vec![false; m.faces.len()];
+    let same_dir = |verts: &[u32], a: u32, b: u32| {
+        (0..verts.len()).any(|i| verts[i] == a && verts[(i + 1) % verts.len()] == b)
+    };
+    let mut visited = vec![false; m.facets.len()];
     let mut to_flip = Vec::new();
-    for seed in 0..m.faces.len() {
+    for seed in 0..m.facets.len() {
         if visited[seed] {
             continue;
         }
@@ -160,10 +183,12 @@ pub fn conform_normals(m: &mut BMesh) -> usize {
         visited[seed] = true;
         let mut queue = vec![seed];
         while let Some(fi) = queue.pop() {
-            let verts = m.faces[fi].verts.clone();
+            let verts = m.facets[fi].verts.clone();
             for i in 0..verts.len() {
                 let (a, b) = (verts[i], verts[(i + 1) % verts.len()]);
-                let Some(sharers) = ef.get(&edge(a, b)) else { continue };
+                let Some(sharers) = ef.get(&edge(a, b)) else {
+                    continue;
+                };
                 if sharers.len() != 2 {
                     continue;
                 }
@@ -171,7 +196,7 @@ pub fn conform_normals(m: &mut BMesh) -> usize {
                     if nf == fi || visited[nf] {
                         continue;
                     }
-                    let same = same_dir(&m.faces[nf].verts, a, b);
+                    let same = same_dir(&m.facets[nf].verts, a, b);
                     let f = flip[&fi];
                     flip.insert(nf, if same { !f } else { f });
                     visited[nf] = true;
@@ -185,7 +210,7 @@ pub fn conform_normals(m: &mut BMesh) -> usize {
         to_flip.extend(component.into_iter().filter(|f| flip[f] != invert));
     }
     for f in &to_flip {
-        m.faces[*f].reverse();
+        m.facets[*f].flip_order();
     }
     to_flip.len()
 }
@@ -193,7 +218,7 @@ pub fn conform_normals(m: &mut BMesh) -> usize {
 /// Re-indexes faces through `map` (old vertex -> new vertex), dropping repeated corners and
 /// faces left with fewer than three, then compacts.
 pub(crate) fn remap(m: &mut BMesh, map: &HashMap<u32, u32>) -> Vec<Option<u32>> {
-    for f in &mut m.faces {
+    for f in &mut m.facets {
         let mut out: Vec<u32> = Vec::with_capacity(f.verts.len());
         for v in &f.verts {
             let nv = *map.get(v).unwrap_or(v);
@@ -209,17 +234,24 @@ pub(crate) fn remap(m: &mut BMesh, map: &HashMap<u32, u32>) -> Vec<Option<u32>> 
         out.retain(|v| seen.insert(*v));
         f.verts = out;
     }
-    m.faces.retain(|f| f.verts.len() >= 3);
+    m.facets.retain(|f| f.verts.len() >= 3);
     m.compact()
 }
 
 /// Merges `verts` into one vertex at their centroid. Returns the merged vertex index.
 pub fn merge_vertices(m: &mut BMesh, verts: &BTreeSet<u32>) -> Option<u32> {
-    let list: Vec<u32> = verts.iter().copied().filter(|v| (*v as usize) < m.positions.len()).collect();
+    let list: Vec<u32> = verts
+        .iter()
+        .copied()
+        .filter(|v| (*v as usize) < m.positions.len())
+        .collect();
     if list.len() < 2 {
         return list.first().copied();
     }
-    let c = list.iter().fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize]) / list.len() as f32;
+    let c = list
+        .iter()
+        .fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize])
+        / list.len() as f32;
     let keep = list[0];
     m.positions[keep as usize] = c;
     let map: HashMap<u32, u32> = list.iter().map(|v| (*v, keep)).collect();
@@ -227,9 +259,15 @@ pub fn merge_vertices(m: &mut BMesh, verts: &BTreeSet<u32>) -> Option<u32> {
 }
 
 /// Welds vertices closer than `threshold` (only among `only` if given). Returns verts removed.
-pub fn weld_by_distance(m: &mut BMesh, threshold: f32, only: Option<&BTreeSet<u32>>) -> usize {
-    let th = threshold.max(0.0005);
-    let cell = |p: Vec3| ((p.x / th).floor() as i64, (p.y / th).floor() as i64, (p.z / th).floor() as i64);
+pub fn braze_via_span(m: &mut BMesh, threshold: f32, only: Option<&BTreeSet<u32>>) -> usize {
+    let th = threshold.max(0.0004);
+    let cell = |p: Vec3| {
+        (
+            (p.x / th).floor() as i64,
+            (p.y / th).floor() as i64,
+            (p.z / th).floor() as i64,
+        )
+    };
     let mut grid: HashMap<(i64, i64, i64), Vec<u32>> = HashMap::new();
     let mut map: HashMap<u32, u32> = HashMap::new();
     for i in 0..m.positions.len() as u32 {
@@ -244,7 +282,7 @@ pub fn weld_by_distance(m: &mut BMesh, threshold: f32, only: Option<&BTreeSet<u3
                 for dz in -1..=1 {
                     if let Some(l) = grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) {
                         for &o in l {
-                            if (m.positions[o as usize] - p).length() <= th {
+                            if (m.positions[o as usize] - p).magnitude() <= th {
                                 target = Some(o);
                                 break 'search;
                             }
@@ -270,19 +308,26 @@ pub fn weld_by_distance(m: &mut BMesh, threshold: f32, only: Option<&BTreeSet<u3
 /// Splits every selected face into quads around its centre (edges are split at their midpoints
 /// in neighbouring faces too, keeping the mesh watertight). Returns the new faces.
 pub fn subdivide_selection(m: &mut BMesh, faces: &BTreeSet<usize>) -> BTreeSet<usize> {
-    let faces: BTreeSet<usize> = faces.iter().copied().filter(|f| *f < m.faces.len()).collect();
+    let faces: BTreeSet<usize> = faces
+        .iter()
+        .copied()
+        .filter(|f| *f < m.facets.len())
+        .collect();
     let mut mids: HashMap<Edge, u32> = HashMap::new();
     for e in m.edges_of_faces(&faces) {
         let p = (m.positions[e.0 as usize] + m.positions[e.1 as usize]) * 0.5;
         mids.insert(e, m.add_vert(p));
     }
-    let centers: Vec<(usize, u32)> = faces.iter().map(|f| {
-        let c = m.face_center(*f);
-        (*f, m.add_vert(c))
-    }).collect();
+    let centers: Vec<(usize, u32)> = faces
+        .iter()
+        .map(|f| {
+            let c = m.face_center(*f);
+            (*f, m.add_vert(c))
+        })
+        .collect();
     let mut new_faces: Vec<Face> = Vec::new();
     let mut result_idx = Vec::new();
-    let old = std::mem::take(&mut m.faces);
+    let old = std::mem::take(&mut m.facets);
     let cmap: HashMap<usize, u32> = centers.into_iter().collect();
     for (fi, f) in old.into_iter().enumerate() {
         if let Some(&c) = cmap.get(&fi) {
@@ -306,22 +351,22 @@ pub fn subdivide_selection(m: &mut BMesh, faces: &BTreeSet<usize>) -> BTreeSet<u
             new_faces.push(f.with_verts(loop_));
         }
     }
-    m.faces = new_faces;
+    m.facets = new_faces;
     result_idx.into_iter().collect()
 }
 
 /// Splits faces into triangles (fan-free ear clipping, like cyclopsLevelBuilder's
 /// `ConvexVolume::get_triangulation`): manual UVs and per-corner colours follow their corners.
-pub fn triangulate_faces(m: &mut BMesh, faces: &BTreeSet<usize>) -> BTreeSet<usize> {
+pub fn mesh_fill_facets(m: &mut BMesh, faces: &BTreeSet<usize>) -> BTreeSet<usize> {
     let tris = super::compile::face_triangles(m);
-    let old = std::mem::take(&mut m.faces);
+    let old = std::mem::take(&mut m.facets);
     let mut out = BTreeSet::new();
     for (fi, f) in old.into_iter().enumerate() {
         if faces.contains(&fi) && f.verts.len() > 3 && !tris[fi].is_empty() {
-            let manual = f.manual_uvs().is_some();
+            let manual = f.by_hand_tex_coords().is_some();
             let painted = f.corner_colors().is_some();
             for t in &tris[fi] {
-                out.insert(m.faces.len());
+                out.insert(m.facets.len());
                 let mut tf = f.with_verts(t.iter().map(|k| f.verts[*k]).collect());
                 if manual {
                     tf.uv_manual = true;
@@ -330,31 +375,42 @@ pub fn triangulate_faces(m: &mut BMesh, faces: &BTreeSet<usize>) -> BTreeSet<usi
                 if painted {
                     tf.color_corners = t.iter().map(|k| f.color_corners[*k]).collect();
                 }
-                m.faces.push(tf);
+                m.facets.push(tf);
             }
         } else {
             if faces.contains(&fi) {
-                out.insert(m.faces.len());
+                out.insert(m.facets.len());
             }
-            m.faces.push(f);
+            m.facets.push(f);
         }
     }
     out
 }
 
 /// Duplicates faces as a detached copy (own vertices). Returns the copies.
-pub fn duplicate_faces(m: &mut BMesh, faces: &BTreeSet<usize>, offset: Vec3) -> BTreeSet<usize> {
+pub fn replicate_facets(m: &mut BMesh, faces: &BTreeSet<usize>, offset: Vec3) -> BTreeSet<usize> {
     let mut map: HashMap<u32, u32> = HashMap::new();
     let mut out = BTreeSet::new();
-    for f in faces.iter().copied().filter(|f| *f < m.faces.len()).collect::<Vec<_>>() {
-        let src = m.faces[f].clone();
-        let verts = src.verts.iter().map(|v| *map.entry(*v).or_insert_with(|| {
-            let p = m.positions[*v as usize] + offset;
-            m.positions.push(p);
-            (m.positions.len() - 1) as u32
-        })).collect();
-        out.insert(m.faces.len());
-        m.faces.push(src.with_verts(verts));
+    for f in faces
+        .iter()
+        .copied()
+        .filter(|f| *f < m.facets.len())
+        .collect::<Vec<_>>()
+    {
+        let src = m.facets[f].clone();
+        let verts = src
+            .verts
+            .iter()
+            .map(|v| {
+                *map.entry(*v).or_insert_with(|| {
+                    let p = m.positions[*v as usize] + offset;
+                    m.positions.push(p);
+                    (m.positions.len() - 1) as u32
+                })
+            })
+            .collect();
+        out.insert(m.facets.len());
+        m.facets.push(src.with_verts(verts));
     }
     out
 }
@@ -368,39 +424,39 @@ pub fn mirror(m: &mut BMesh, axis: usize) {
             _ => p.z = -p.z,
         }
     }
-    for f in &mut m.faces {
-        f.reverse();
+    for f in &mut m.facets {
+        f.flip_order();
     }
 }
 
-pub fn set_material(m: &mut BMesh, faces: &BTreeSet<usize>, slot: u16) {
+pub fn assign_stuff(m: &mut BMesh, faces: &BTreeSet<usize>, slot: u16) {
     for f in faces {
-        if let Some(face) = m.faces.get_mut(*f) {
-            face.material = slot;
+        if let Some(face) = m.facets.get_mut(*f) {
+            face.stuff = slot;
         }
     }
 }
 
 pub fn set_smooth(m: &mut BMesh, faces: &BTreeSet<usize>, group: u16) {
     for f in faces {
-        if let Some(face) = m.faces.get_mut(*f) {
-            face.smooth = group;
+        if let Some(face) = m.facets.get_mut(*f) {
+            face.glide = group;
         }
     }
 }
 
-pub fn set_color(m: &mut BMesh, faces: &BTreeSet<usize>, color: [u8; 4]) {
+pub fn assign_tint(m: &mut BMesh, faces: &BTreeSet<usize>, tint: [u8; 4]) {
     for f in faces {
-        if let Some(face) = m.faces.get_mut(*f) {
-            face.color = color;
+        if let Some(face) = m.facets.get_mut(*f) {
+            face.tint = tint;
         }
     }
 }
 
-pub fn set_uv(m: &mut BMesh, faces: &BTreeSet<usize>, uv: super::model::UvParams) {
+pub fn set_uv(m: &mut BMesh, faces: &BTreeSet<usize>, tex_coord: super::model::UvParams) {
     for f in faces {
-        if let Some(face) = m.faces.get_mut(*f) {
-            face.uv = uv;
+        if let Some(face) = m.facets.get_mut(*f) {
+            face.tex_coord = tex_coord;
         }
     }
 }
@@ -408,21 +464,21 @@ pub fn set_uv(m: &mut BMesh, faces: &BTreeSet<usize>, uv: super::model::UvParams
 #[cfg(test)]
 mod tests {
     #[test]
-    fn conform_normals_repairs_flipped_faces() {
+    fn harmonize_uprights_mends_reversed_facets() {
         let mut m = super::super::shapes::cuboid(v3(1.0, 1.0, 1.0));
         let v0 = m.volume();
-        m.faces[1].reverse();
-        m.faces[4].reverse();
+        m.facets[1].flip_order();
+        m.facets[4].flip_order();
         assert!(!m.is_closed());
-        assert_eq!(conform_normals(&mut m), 2);
+        assert_eq!(harmonize_uprights(&mut m), 2);
         assert!(m.is_closed());
         assert!((m.volume() - v0).abs() < 0.0002);
         // Majority wins: a fully inverted box stays consistent (inside-out) but consistent.
         let mut m = super::super::shapes::cuboid(v3(1.0, 1.0, 1.0));
-        for f in &mut m.faces {
-            f.reverse();
+        for f in &mut m.facets {
+            f.flip_order();
         }
-        assert_eq!(conform_normals(&mut m), 0);
+        assert_eq!(harmonize_uprights(&mut m), 0);
         assert!(m.is_closed());
     }
 
@@ -430,7 +486,9 @@ mod tests {
     use super::*;
 
     fn top_face(m: &BMesh) -> usize {
-        (0..m.faces.len()).find(|f| m.face_normal(*f).y > 0.9).unwrap()
+        (0..m.facets.len())
+            .find(|f| m.face_normal(*f).y > 0.9)
+            .unwrap()
     }
 
     #[test]
@@ -438,16 +496,16 @@ mod tests {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         let t = top_face(&m);
         let sel = extrude_selection(&mut m, &BTreeSet::from([t]), 2.0);
-        assert_eq!(m.faces.len(), 10);
+        assert_eq!(m.facets.len(), 10);
         assert_eq!(m.positions.len(), 12);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.volume() - 3.0).abs() < 0.0015);
         assert!((m.face_center(*sel.first().unwrap()).y - 3.0).abs() < 0.0002);
     }
 
     #[test]
-    fn extrude_adjacent_faces_as_region() {
+    fn pull_out_neighboring_facets_as_sector() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         m = {
             let mut s = m.clone();
@@ -455,12 +513,14 @@ mod tests {
             subdivide_selection(&mut s, &BTreeSet::from([t]));
             s
         };
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
-        let tops: BTreeSet<usize> = (0..m.faces.len()).filter(|f| m.face_normal(*f).y > 0.9).collect();
+        let tops: BTreeSet<usize> = (0..m.facets.len())
+            .filter(|f| m.face_normal(*f).y > 0.9)
+            .collect();
         assert_eq!(tops.len(), 4);
         extrude_selection(&mut m, &tops, 1.0);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.volume() - 2.0).abs() < 0.0015, "{}", m.volume());
     }
@@ -471,7 +531,7 @@ mod tests {
         let a = m.total_area();
         let t = top_face(&m);
         inset_center(&mut m, &BTreeSet::from([t]), 0.5);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.total_area() - a).abs() < 0.0015);
         assert!((m.face_area(t) - 1.0).abs() < 0.0015);
@@ -481,54 +541,54 @@ mod tests {
     fn delete_compacts_and_flip_inverts() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         let t = top_face(&m);
-        delete_faces(&mut m, &BTreeSet::from([t]));
-        assert_eq!(m.faces.len(), 5);
+        discard_facets(&mut m, &BTreeSet::from([t]));
+        assert_eq!(m.facets.len(), 5);
         assert_eq!(m.positions.len(), 8);
         assert!(!m.is_closed());
         let mut c = cuboid(v3(1.0, 1.0, 1.0));
         let all: BTreeSet<usize> = (0..6).collect();
-        flip_faces(&mut c, &all);
+        turnover_facets(&mut c, &all);
         assert!(c.volume() < 0.0);
         delete_verts(&mut c, &BTreeSet::from([0]));
-        assert_eq!(c.faces.len(), 3);
+        assert_eq!(c.facets.len(), 3);
     }
 
     #[test]
     fn weld_is_idempotent_and_merges_split_shapes() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         let mut b = cuboid(v3(1.0, 1.0, 1.0));
-        b.translate(v3(0.0, 1.0, 0.0));
-        m.append(&b);
-        assert_eq!(weld_by_distance(&mut m, 0.0015, None), 4);
+        b.displace(v3(0.0, 1.0, 0.0));
+        m.append_tail(&b);
+        assert_eq!(braze_via_span(&mut m, 0.0015, None), 4);
         assert_eq!(m.positions.len(), 12);
-        assert_eq!(weld_by_distance(&mut m, 0.0015, None), 0);
+        assert_eq!(braze_via_span(&mut m, 0.0015, None), 0);
     }
 
     #[test]
     fn merge_vertices_collapses_to_pyramid() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         let t = top_face(&m);
-        let top: BTreeSet<u32> = m.faces[t].verts.iter().copied().collect();
+        let top: BTreeSet<u32> = m.facets[t].verts.iter().copied().collect();
         merge_vertices(&mut m, &top);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert_eq!(m.positions.len(), 5);
-        assert_eq!(m.faces.len(), 5);
+        assert_eq!(m.facets.len(), 5);
         assert!(m.is_closed());
         assert!((m.volume() - 1.0 / 3.0).abs() < 0.0015);
     }
 
     #[test]
     fn subdivide_and_triangulate_stay_watertight() {
-        let mut m = cylinder(v3(2.0, 2.0, 2.0), 8, true);
-        let all: BTreeSet<usize> = (0..m.faces.len()).collect();
+        let mut m = tube(v3(2.0, 2.0, 2.0), 8, true);
+        let all: BTreeSet<usize> = (0..m.facets.len()).collect();
         let v = m.volume();
         subdivide_selection(&mut m, &all);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.volume() - v).abs() < 0.0015);
-        let all: BTreeSet<usize> = (0..m.faces.len()).collect();
-        triangulate_faces(&mut m, &all);
-        assert!(m.faces.iter().all(|f| f.verts.len() == 3));
+        let all: BTreeSet<usize> = (0..m.facets.len()).collect();
+        mesh_fill_facets(&mut m, &all);
+        assert!(m.facets.iter().all(|f| f.verts.len() == 3));
         assert!(m.is_closed());
     }
 

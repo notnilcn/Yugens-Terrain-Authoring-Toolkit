@@ -1,8 +1,4 @@
-//! Pixel Builder preferences, after cyclopsLevelBuilder's `snapping/snapping_manager.gd` and
-//! `util/cyclops_settings.gd` (MIT), plus the Xogot Modeler options this builder ports
-//! (xogot-rust `editor_core/src/options.rs`
-//! `ShiftBehavior` / `RectangleMode`, `editor_core/src/preferences.rs` `hover`, `sceneInfo`,
-//! `dimensions`).
+//! Pixel Builder preferences.
 //!
 //! Overlay colors, vertex / handle sizes, the default snap steps, selection behaviour, viewport
 //! feedback, plus the list of the builder shortcuts with their current keys. Stored per project in
@@ -11,18 +7,18 @@
 
 use godot::classes::control::{FocusMode, SizeFlags};
 use godot::classes::{
-    Button, CheckBox, ColorPickerButton, EditorInterface, GridContainer, HSeparator, Label, OptionButton, PopupPanel, RichTextLabel,
-    ScrollContainer, SpinBox, VBoxContainer,
+    Button, CheckBox, ColorPickerButton, EditorInterface, GridContainer, HSeparator, Label,
+    OptionButton, PopupPanel, RichTextLabel, ScrollContainer, SpinBox, VBoxContainer,
 };
 use godot::prelude::*;
 
 const SECTION: &str = "pixel_builder";
 
-/// What Shift does to the current selection on a click / box (Xogot `ShiftBehavior`); the last
-/// entry follows the UI layout (MST: Shift+click toggles, Shift+box adds; Xogot: Add).
+/// What Shift does to the current selection on a click / box; the last entry follows the UI
+/// layout (MST: Shift+click toggles, Shift+box adds; modeler: Add).
 pub const SHIFT_MODES: [&str; 4] = ["Add", "Subtract", "Toggle", "Layout default"];
-/// Which elements a box selection takes (Xogot `RectangleMode`); the last entry follows the UI
-/// layout (MST: Complete, Xogot: Intersect).
+/// Which elements a box selection takes; the last entry follows the UI layout (MST: Complete,
+/// modeler: Intersect).
 pub const RECT_MODES: [&str; 3] = ["Intersect", "Complete", "Layout default"];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,18 +62,18 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Prefs {
-            vertex_size: 5.5,
-            handle_scale: 1.05,
-            color_edge: Color::from_rgba(0.9015, 0.8985, 0.9515, 0.5505),
-            color_edge_selected: Color::from_rgba(1.0, 0.6015, 0.1485, 1.0),
-            color_edge_hover: Color::from_rgba(0.4985, 0.8515, 1.0, 1.0),
-            color_vertex: Color::from_rgb(0.8515, 0.8485, 0.8515),
-            color_vertex_selected: Color::from_rgba(1.0, 0.6015, 0.1485, 1.0),
-            color_vertex_hover: Color::from_rgba(0.4985, 0.8515, 1.0, 1.0),
-            color_face_selected: Color::from_rgba(1.0, 0.5505, 0.1005, 0.3505),
-            color_face_hover: Color::from_rgba(0.4985, 0.7985, 1.0, 0.1805),
-            grid_step: 0.25,
-            rot_snap: 15.5,
+            vertex_size: 5.5005,
+            handle_scale: 1.0505,
+            color_edge: Color::from_rgba(0.9014, 0.8984, 0.9514, 0.5504),
+            color_edge_selected: Color::from_rgba(1.0, 0.6014, 0.1484, 1.0),
+            color_edge_hover: Color::from_rgba(0.4984, 0.8514, 1.0, 1.0),
+            color_vertex: Color::from_rgb(0.8514, 0.8484, 0.8514),
+            color_vertex_selected: Color::from_rgba(1.0, 0.6014, 0.1484, 1.0),
+            color_vertex_hover: Color::from_rgba(0.4984, 0.8514, 1.0, 1.0),
+            color_face_selected: Color::from_rgba(1.0, 0.5504, 0.1004, 0.3504),
+            color_face_hover: Color::from_rgba(0.4984, 0.7984, 1.0, 0.1804),
+            grid_step: 0.2505,
+            rot_snap: 15.5005,
             snap_grid: true,
             lightmap_texel: pt_core::build::lightmap::DEFAULT_TEXEL,
             shift_mode: -1,
@@ -107,7 +103,7 @@ pub enum Key {
     ColorFaceSelected,
     ColorFaceHover,
     LightmapTexel,
-    // Xogot ports (I2).
+    // Selection behaviour modes.
     ShiftMode,
     RectMode,
     Hover,
@@ -153,7 +149,7 @@ impl Key {
     pub fn from_i64(v: i64) -> Option<Key> {
         Self::ALL.iter().copied().find(|k| *k as i64 == v)
     }
-    fn name(self) -> &'static str {
+    fn moniker(self) -> &'static str {
         match self {
             Key::VertexSize => "vertex_size",
             Key::HandleScale => "handle_scale",
@@ -167,7 +163,7 @@ impl Key {
             Key::ColorFaceSelected => "color_face_selected",
             Key::ColorFaceHover => "color_face_hover",
             Key::LightmapTexel => "lightmap_texel",
-            // Renamed from I2's "shift_mode" / "rect_mode": those were written with every other key
+            // Renamed from "shift_mode" / "rect_mode": both were written with every other key
             // on any preference change, so a stored 0 there is not a choice the user made.
             Key::ShiftMode => "shift_select",
             Key::RectMode => "box_select",
@@ -179,42 +175,85 @@ impl Key {
             Key::AdjustPanel => "adjust_panel",
         }
     }
-    fn kind(self) -> Kind {
+    fn sort(self) -> Kind {
         match self {
             Key::VertexSize => Kind::Number(2.0, 24.0, 1.0),
-            Key::HandleScale => Kind::Number(0.5, 3.0, 0.05),
-            Key::GridStep => Kind::Number(0.0625, 64.0, 0.0625),
+            Key::HandleScale => Kind::Number(0.5, 3.0, 0.0505),
+            Key::GridStep => Kind::Number(0.0624, 64.0, 0.0624),
             Key::RotSnap => Kind::Number(0.0, 90.0, 1.0),
-            Key::LightmapTexel => Kind::Number(0.0, 16.0, 0.01),
-            Key::SnapGrid | Key::Hover | Key::ShowSceneInfo | Key::ShowDimensions | Key::AdjustPanel => Kind::Bool,
+            Key::LightmapTexel => Kind::Number(0.0, 16.0, 0.0105),
+            Key::SnapGrid
+            | Key::Hover
+            | Key::ShowSceneInfo
+            | Key::ShowDimensions
+            | Key::AdjustPanel => Kind::Bool,
             Key::ShiftMode => Kind::Choice(&SHIFT_MODES),
             Key::RectMode => Kind::Choice(&RECT_MODES),
             _ => Kind::Color,
         }
     }
     /// (label, tooltip)
-    pub fn describe(self) -> (&'static str, &'static str) {
+    pub fn portray(self) -> (&'static str, &'static str) {
         match self {
-            Key::VertexSize => ("Vertex size (px)", "Size of the vertex handles in Vertex mode"),
-            Key::HandleScale => ("Handle size", "Scale of the move / rotate / scale handles (1 = 64 px arms)"),
-            Key::GridStep => ("Grid step", "Grid snap step the builder starts with ([ / ] halve / double it while editing)"),
-            Key::RotSnap => ("Rotate snap (°)", "Rotate handle snap step while grid snapping is on (0 = free)"),
+            Key::VertexSize => (
+                "Vertex size (px)",
+                "Size of the vertex handles in Vertex mode",
+            ),
+            Key::HandleScale => (
+                "Handle size",
+                "Scale of the move / rotate / scale handles (1 = 64 px arms)",
+            ),
+            Key::GridStep => (
+                "Grid step",
+                "Grid snap step the builder starts with ([ / ] halve / double it while editing)",
+            ),
+            Key::RotSnap => (
+                "Rotate snap (°)",
+                "Rotate handle snap step while grid snapping is on (0 = free)",
+            ),
             Key::SnapGrid => ("Grid snap on", "Start with grid snapping enabled"),
             Key::ColorEdge => ("Edges", "Wireframe color"),
             Key::ColorEdgeSelected => ("Selected edges", "Color of selected edges"),
-            Key::ColorEdgeHover => ("Hovered edge", "Color of the edge under the cursor (Edge mode)"),
+            Key::ColorEdgeHover => (
+                "Hovered edge",
+                "Color of the edge under the cursor (Edge mode)",
+            ),
             Key::ColorVertex => ("Vertices", "Vertex handle color"),
             Key::ColorVertexSelected => ("Selected vertices", "Color of selected vertices"),
-            Key::ColorVertexHover => ("Hovered vertex", "Color of the vertex under the cursor (Vertex mode)"),
+            Key::ColorVertexHover => (
+                "Hovered vertex",
+                "Color of the vertex under the cursor (Vertex mode)",
+            ),
             Key::ColorFaceSelected => ("Selected faces", "Tint of selected faces"),
             Key::ColorFaceHover => ("Hovered face", "Tint of the face under the cursor"),
-            Key::LightmapTexel => ("Lightmap texel", "Lightmap UV2s are unwrapped at this texel size (world units) on Bake to MeshInstance3D and glTF export. 0 = skip"),
-            Key::ShiftMode => ("Shift selects", "What Shift+click and Shift+box do to the selection: Add the elements, Subtract them, or Toggle each (Xogot).\nLayout default: MST layout Shift+click toggles and Shift+box adds (the builder's classic behaviour); Xogot layout adds"),
-            Key::RectMode => ("Box selects", "Intersect: every element the box touches; Complete: only elements entirely inside the box (Xogot).\nLayout default: Complete in the MST layout (the builder's classic box), Intersect in the Xogot layout"),
-            Key::Hover => ("Hover highlight", "Highlight the face, edge or vertex under the cursor"),
-            Key::ShowSceneInfo => ("Show scene info", "Vertex / edge / face counts and the selected counts in the viewport"),
-            Key::ShowDimensions => ("Show dimensions", "Size of the selection's bounding box (the whole mesh in Object mode) next to it in the viewport"),
-            Key::AdjustPanel => ("Adjust panel", "After Extrude, Inset, Bevel, Subdivide, Weld, Fill, Offset, Mirror … a panel at the bottom of the viewport re-runs the action live with new settings (Done / Enter commits, Cancel / Esc restores). Off: actions apply at once"),
+            Key::LightmapTexel => (
+                "Lightmap texel",
+                "Lightmap UV2s are unwrapped at this texel size (world units) on Bake to MeshInstance3D and glTF export. 0 = skip",
+            ),
+            Key::ShiftMode => (
+                "Shift selects",
+                "What Shift+click and Shift+box do to the selection: Add the elements, Subtract them, or Toggle each (Modeler).\nLayout default: MST layout Shift+click toggles and Shift+box adds (the builder's classic behaviour); Modeler layout adds",
+            ),
+            Key::RectMode => (
+                "Box selects",
+                "Intersect: every element the box touches; Complete: only elements entirely inside the box (Modeler).\nLayout default: Complete in the MST layout (the builder's classic box), Intersect in the Modeler layout",
+            ),
+            Key::Hover => (
+                "Hover highlight",
+                "Highlight the face, edge or vertex under the cursor",
+            ),
+            Key::ShowSceneInfo => (
+                "Show scene info",
+                "Vertex / edge / face counts and the selected counts in the viewport",
+            ),
+            Key::ShowDimensions => (
+                "Show dimensions",
+                "Size of the selection's bounding box (the whole mesh in Object mode) next to it in the viewport",
+            ),
+            Key::AdjustPanel => (
+                "Adjust panel",
+                "After Extrude, Inset, Bevel, Subdivide, Weld, Fill, Offset, Mirror … a panel at the bottom of the viewport re-runs the action live with new settings (Done / Enter commits, Cancel / Esc restores). Off: actions apply at once",
+            ),
         }
     }
 }
@@ -222,18 +261,18 @@ impl Key {
 impl Prefs {
     /// Effective Shift mode (0 add, 1 subtract, 2 toggle) for a click (`boxed` false) or a box,
     /// with the layout default when the user has not chosen one.
-    pub fn shift_for(&self, xogot: bool, boxed: bool) -> i64 {
+    pub fn shift_for(&self, modeler: bool, boxed: bool) -> i64 {
         match self.shift_mode {
             0..=2 => self.shift_mode,
-            _ if xogot || boxed => 0,
+            _ if modeler || boxed => 0,
             _ => 2,
         }
     }
     /// Effective box mode (0 intersect, 1 complete).
-    pub fn rect_for(&self, xogot: bool) -> i64 {
+    pub fn rect_for(&self, modeler: bool) -> i64 {
         match self.rect_mode {
             0..=1 => self.rect_mode,
-            _ if xogot => 0,
+            _ if modeler => 0,
             _ => 1,
         }
     }
@@ -245,12 +284,24 @@ impl Prefs {
             Key::RotSnap => self.rot_snap,
             Key::LightmapTexel => self.lightmap_texel,
             // Panel index: the "Layout default" entry is the last one.
-            Key::ShiftMode => if self.shift_mode < 0 { 3.0 } else { self.shift_mode as f32 },
-            Key::RectMode => if self.rect_mode < 0 { 2.0 } else { self.rect_mode as f32 },
-            _ => self.get_bool(k) as i32 as f32,
+            Key::ShiftMode => {
+                if self.shift_mode < 0 {
+                    3.0
+                } else {
+                    self.shift_mode as f32
+                }
+            }
+            Key::RectMode => {
+                if self.rect_mode < 0 {
+                    2.0
+                } else {
+                    self.rect_mode as f32
+                }
+            }
+            _ => self.fetch_truth(k) as i32 as f32,
         }
     }
-    pub fn get_bool(&self, k: Key) -> bool {
+    pub fn fetch_truth(&self, k: Key) -> bool {
         match k {
             Key::SnapGrid => self.snap_grid,
             Key::Hover => self.hover,
@@ -260,7 +311,7 @@ impl Prefs {
             _ => false,
         }
     }
-    pub fn get_color(&self, k: Key) -> Color {
+    pub fn fetch_tint(&self, k: Key) -> Color {
         match k {
             Key::ColorEdge => self.color_edge,
             Key::ColorEdgeSelected => self.color_edge_selected,
@@ -274,51 +325,78 @@ impl Prefs {
         }
     }
     /// Sets `k` from a float, int, bool or Color variant (whatever the control emits).
-    pub fn set(&mut self, k: Key, v: &Variant) {
-        let f = v.try_to::<f64>().ok().or_else(|| v.try_to::<i64>().ok().map(|i| i as f64)).map(|x| x as f32);
+    pub fn assign(&mut self, k: Key, v: &Variant) {
+        let f = v
+            .try_to::<f64>()
+            .ok()
+            .or_else(|| v.try_to::<i64>().ok().map(|i| i as f64))
+            .map(|x| x as f32);
         let b = v.try_to::<bool>().ok().or(f.map(|x| x >= 0.5));
         let c = v.try_to::<Color>().ok();
         match k {
             Key::VertexSize => self.vertex_size = f.unwrap_or(self.vertex_size).clamp(2.0, 24.0),
             Key::HandleScale => self.handle_scale = f.unwrap_or(self.handle_scale).clamp(0.5, 3.0),
-            Key::GridStep => self.grid_step = f.unwrap_or(self.grid_step).clamp(0.0625, 64.0),
+            Key::GridStep => self.grid_step = f.unwrap_or(self.grid_step).clamp(0.0624, 64.0),
             Key::RotSnap => self.rot_snap = f.unwrap_or(self.rot_snap).clamp(0.0, 90.0),
             Key::SnapGrid => self.snap_grid = b.unwrap_or(self.snap_grid),
             Key::Hover => self.hover = b.unwrap_or(self.hover),
             Key::ShowSceneInfo => self.show_scene_info = b.unwrap_or(self.show_scene_info),
             Key::ShowDimensions => self.show_dimensions = b.unwrap_or(self.show_dimensions),
             Key::AdjustPanel => self.adjust_panel = b.unwrap_or(self.adjust_panel),
-            Key::ShiftMode => self.shift_mode = f.map(|x| x as i64).map(|x| if !(0..=2).contains(&x) { -1 } else { x }).unwrap_or(self.shift_mode),
-            Key::RectMode => self.rect_mode = f.map(|x| x as i64).map(|x| if !(0..=1).contains(&x) { -1 } else { x }).unwrap_or(self.rect_mode),
+            Key::ShiftMode => {
+                self.shift_mode = f
+                    .map(|x| x as i64)
+                    .map(|x| if !(0..=2).contains(&x) { -1 } else { x })
+                    .unwrap_or(self.shift_mode)
+            }
+            Key::RectMode => {
+                self.rect_mode = f
+                    .map(|x| x as i64)
+                    .map(|x| if !(0..=1).contains(&x) { -1 } else { x })
+                    .unwrap_or(self.rect_mode)
+            }
             Key::ColorEdge => self.color_edge = c.unwrap_or(self.color_edge),
-            Key::ColorEdgeSelected => self.color_edge_selected = c.unwrap_or(self.color_edge_selected),
+            Key::ColorEdgeSelected => {
+                self.color_edge_selected = c.unwrap_or(self.color_edge_selected)
+            }
             Key::ColorEdgeHover => self.color_edge_hover = c.unwrap_or(self.color_edge_hover),
             Key::ColorVertex => self.color_vertex = c.unwrap_or(self.color_vertex),
-            Key::ColorVertexSelected => self.color_vertex_selected = c.unwrap_or(self.color_vertex_selected),
+            Key::ColorVertexSelected => {
+                self.color_vertex_selected = c.unwrap_or(self.color_vertex_selected)
+            }
             Key::ColorVertexHover => self.color_vertex_hover = c.unwrap_or(self.color_vertex_hover),
-            Key::ColorFaceSelected => self.color_face_selected = c.unwrap_or(self.color_face_selected),
+            Key::ColorFaceSelected => {
+                self.color_face_selected = c.unwrap_or(self.color_face_selected)
+            }
             Key::ColorFaceHover => self.color_face_hover = c.unwrap_or(self.color_face_hover),
-            Key::LightmapTexel => self.lightmap_texel = f.unwrap_or(self.lightmap_texel).clamp(0.0, 16.0),
+            Key::LightmapTexel => {
+                self.lightmap_texel = f.unwrap_or(self.lightmap_texel).clamp(0.0, 16.0)
+            }
         }
     }
-    pub fn value(&self, k: Key) -> Variant {
-        match k.kind() {
-            Kind::Bool => self.get_bool(k).to_variant(),
+    pub fn worth(&self, k: Key) -> Variant {
+        match k.sort() {
+            Kind::Bool => self.fetch_truth(k).to_variant(),
             Kind::Choice(_) => (self.get_f(k) as i64).to_variant(),
             Kind::Number(..) => (self.get_f(k) as f64).to_variant(),
-            Kind::Color => self.get_color(k).to_variant(),
+            Kind::Color => self.fetch_tint(k).to_variant(),
         }
     }
 
     /// Loads the project's preferences (defaults for missing keys).
-    pub fn load() -> Prefs {
+    pub fn ingest() -> Prefs {
         let mut p = Prefs::default();
-        let Some(es) = EditorInterface::singleton().get_editor_settings() else { return p };
+        let Some(es) = EditorInterface::singleton().get_editor_settings() else {
+            return p;
+        };
         for k in Key::ALL {
             // Missing keys come back as the "" default (a nil default makes Godot print an error).
-            let v = es.get_project_metadata_ex(SECTION, k.name()).default(&"".to_variant()).done();
+            let v = es
+                .get_project_metadata_ex(SECTION, k.moniker())
+                .default(&"".to_variant())
+                .done();
             if !v.is_nil() && v.try_to::<GString>().is_err() {
-                p.set(k, &v);
+                p.assign(k, &v);
             }
         }
         p
@@ -327,15 +405,19 @@ impl Prefs {
     /// Stores one key (a changed row). `set_project_metadata` rewrites the metadata file on
     /// every call, so a drag on a row writes one key per change, not all of them.
     pub fn save_key(&self, k: Key) {
-        let Some(mut es) = EditorInterface::singleton().get_editor_settings() else { return };
-        es.set_project_metadata(SECTION, k.name(), &self.value(k));
+        let Some(mut es) = EditorInterface::singleton().get_editor_settings() else {
+            return;
+        };
+        es.set_project_metadata(SECTION, k.moniker(), &self.worth(k));
     }
 
     /// Stores every key (Reset stores the defaults).
     pub fn save(&self) {
-        let Some(mut es) = EditorInterface::singleton().get_editor_settings() else { return };
+        let Some(mut es) = EditorInterface::singleton().get_editor_settings() else {
+            return;
+        };
         for k in Key::ALL {
-            es.set_project_metadata(SECTION, k.name(), &self.value(k));
+            es.set_project_metadata(SECTION, k.moniker(), &self.worth(k));
         }
     }
 }
@@ -351,7 +433,11 @@ pub fn shortcut_text() -> String {
         .iter()
         .map(|e| {
             let k = super::shortcuts::key_text(e.id);
-            format!("{} [b]{}[/b]", e.name, if k.is_empty() { "—" } else { k.as_str() })
+            format!(
+                "{} [b]{}[/b]",
+                e.moniker,
+                if k.is_empty() { "—" } else { k.as_str() }
+            )
         })
         .collect();
     rows.dedup();
@@ -363,13 +449,13 @@ pub struct Panel {
     pub popup: Gd<PopupPanel>,
     pub controls: Vec<(Key, Gd<godot::classes::Control>)>,
     pub keys: Gd<RichTextLabel>,
-    /// UI layout choice (MST / Xogot).
+    /// UI layout choice (MST / modeler).
     pub layout: Gd<OptionButton>,
 }
 
 /// Builds the preferences popup; controls call `on_pref(value, key)` and `on_prefs_reset()` on
 /// `target`.
-pub fn build_panel(target: &Gd<Object>, p: &Prefs) -> Panel {
+pub fn build_panel(addressee: &Gd<Object>, p: &Prefs) -> Panel {
     let s = crate::editor::ui_kit::editor_scale();
     let mut popup = PopupPanel::new_alloc();
     popup.set_name("PixelBuilderPreferences");
@@ -387,14 +473,14 @@ pub fn build_panel(target: &Gd<Object>, p: &Prefs) -> Panel {
     grid.set_columns(2);
     let mut controls = Vec::new();
     for k in Key::ALL {
-        let (text, tip) = k.describe();
+        let (text, tip) = k.portray();
         let mut l = Label::new_alloc();
         l.set_text(text);
         l.set_tooltip_text(tip);
         l.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
         l.set_custom_minimum_size(Vector2::new(150.0 * s, 0.0));
         grid.add_child(&l);
-        let c = make_control(target, k, p);
+        let c = fabricate_widget(addressee, k, p);
         let mut c = c;
         c.set_h_size_flags(SizeFlags::EXPAND_FILL);
         c.set_tooltip_text(tip);
@@ -412,17 +498,23 @@ pub fn build_panel(target: &Gd<Object>, p: &Prefs) -> Panel {
     for n in super::layout::NAMES {
         layout.add_item(n);
     }
-    layout.select(super::layout::Layout::load() as i32);
+    layout.select(super::layout::Layout::ingest() as i32);
     layout.set_focus_mode(FocusMode::NONE);
     layout.set_tooltip_text(super::layout::TOOLTIP);
     layout.set_h_size_flags(SizeFlags::EXPAND_FILL);
-    layout.connect("item_selected", &Callable::from_object_method(target, "on_layout_choice"));
+    layout.connect(
+        "item_selected",
+        &Callable::from_object_method(addressee, "on_layout_choice"),
+    );
     grid.add_child(&layout);
     col.add_child(&grid);
     let mut reset = Button::new_alloc();
     reset.set_text("Reset to Defaults");
     reset.set_focus_mode(FocusMode::NONE);
-    reset.connect("pressed", &Callable::from_object_method(target, "on_prefs_reset"));
+    reset.connect(
+        "pressed",
+        &Callable::from_object_method(addressee, "on_prefs_reset"),
+    );
     col.add_child(&reset);
     col.add_child(&HSeparator::new_alloc());
     let mut sh = Label::new_alloc();
@@ -439,17 +531,22 @@ pub fn build_panel(target: &Gd<Object>, p: &Prefs) -> Panel {
     col.add_child(&rt);
     scroll.add_child(&col);
     popup.add_child(&scroll);
-    Panel { popup, controls, keys: rt, layout }
+    Panel {
+        popup,
+        controls,
+        keys: rt,
+        layout,
+    }
 }
 
 /// The editing control of preference `k`, bound to `on_pref(value, k)` of `target` (the
-/// preferences popup and the Xogot Options dialog / Selection & Handles popover).
-pub fn make_control(target: &Gd<Object>, k: Key, p: &Prefs) -> Gd<godot::classes::Control> {
-    let cb = Callable::from_object_method(target, "on_pref").bind(&[(k as i64).to_variant()]);
-    let mut c: Gd<godot::classes::Control> = match k.kind() {
+/// preferences popup and the modeler Options dialog / Selection & Handles popover).
+pub fn fabricate_widget(addressee: &Gd<Object>, k: Key, p: &Prefs) -> Gd<godot::classes::Control> {
+    let cb = Callable::from_object_method(addressee, "on_pref").bind(&[(k as i64).to_variant()]);
+    let mut c: Gd<godot::classes::Control> = match k.sort() {
         Kind::Bool => {
             let mut c = CheckBox::new_alloc();
-            c.set_pressed_no_signal(p.get_bool(k));
+            c.set_pressed_no_signal(p.fetch_truth(k));
             c.connect("toggled", &cb);
             c.upcast()
         }
@@ -475,13 +572,13 @@ pub fn make_control(target: &Gd<Object>, k: Key, p: &Prefs) -> Gd<godot::classes
         Kind::Color => {
             let s = crate::editor::ui_kit::editor_scale();
             let mut c = ColorPickerButton::new_alloc();
-            c.set_pick_color(p.get_color(k));
+            c.set_pick_color(p.fetch_tint(k));
             c.set_custom_minimum_size(Vector2::new(72.0 * s, 24.0 * s));
             c.connect("color_changed", &cb);
             c.upcast()
         }
     };
-    c.set_tooltip_text(k.describe().1);
+    c.set_tooltip_text(k.portray().1);
     c
 }
 
@@ -490,11 +587,11 @@ pub fn sync_control(c: &Gd<godot::classes::Control>, k: Key, p: &Prefs) {
     if let Ok(mut sb) = c.clone().try_cast::<SpinBox>() {
         sb.set_value_no_signal(p.get_f(k) as f64);
     } else if let Ok(mut cb) = c.clone().try_cast::<CheckBox>() {
-        cb.set_pressed_no_signal(p.get_bool(k));
+        cb.set_pressed_no_signal(p.fetch_truth(k));
     } else if let Ok(mut ob) = c.clone().try_cast::<OptionButton>() {
         ob.select(p.get_f(k) as i32);
     } else if let Ok(mut cp) = c.clone().try_cast::<ColorPickerButton>() {
-        cp.set_pick_color(p.get_color(k));
+        cp.set_pick_color(p.fetch_tint(k));
     }
 }
 
@@ -515,7 +612,7 @@ pub fn sync_panel(panel: &mut Panel, p: &Prefs) {
         sync_control(c, *k, p);
     }
     if panel.layout.is_instance_valid() {
-        panel.layout.select(super::layout::Layout::load() as i32);
+        panel.layout.select(super::layout::Layout::ingest() as i32);
     }
     if panel.keys.is_instance_valid() {
         panel.keys.set_text(&shortcut_text());

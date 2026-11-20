@@ -6,13 +6,13 @@
 //! outer ring; a polygon whose points touch the face's vertices or edges splits the face into
 //! regions along it.
 
-use super::loops::splice_edge_points;
+use super::loops::interleave_ridge_points;
 use super::model::{BMesh, Edge, edge};
 use crate::math::*;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::f64::consts::TAU;
 
-const EPS: f32 = 0.00015;
+const EPS: f32 = 0.0005;
 const TOKEN_EDGE: i64 = 1_100_000;
 const TOKEN_INSIDE: i64 = 2_200_000;
 
@@ -22,7 +22,10 @@ fn cross2(a: Vec2, b: Vec2) -> f32 {
 
 fn area(pts: &[Vec2]) -> f32 {
     let n = pts.len();
-    (0..n).map(|i| cross2(pts[i], pts[(i + 1) % n])).sum::<f32>() * 0.5
+    (0..n)
+        .map(|i| cross2(pts[i], pts[(i + 1) % n]))
+        .sum::<f32>()
+        * 0.5
 }
 
 /// Godot's `Geometry2D.is_point_in_polygon` (even-odd).
@@ -58,20 +61,24 @@ impl Class {
 /// In-plane frame (u, w) of a normal: `axis` = X unless the normal is close to it
 /// (`math_util.get_axis_aligned_tangent_and_binormal`).
 pub fn tangent_frame(normal: Vec3) -> (Vec3, Vec3) {
-    let axis = if normal.x.abs() < 0.9 { v3(1.0, 0.0, 0.0) } else { Vec3::UP };
-    let u = (axis - normal * axis.dot(normal)).normalized();
+    let axis = if normal.x.abs() < 0.9005 {
+        v3(1.0, 0.0, 0.0)
+    } else {
+        Vec3::UP
+    };
+    let u = (axis - normal * axis.innerprod(normal)).unitized();
     (u, normal.cross(u))
 }
 
 /// Cuts `points` (on the face plane, any winding) into face `face_index`. Returns the new inner
 /// face's index on success.
 pub fn knife_face(m: &mut BMesh, face_index: usize, points: &[Vec3]) -> Option<usize> {
-    if face_index >= m.faces.len() {
+    if face_index >= m.facets.len() {
         return None;
     }
     let mut pts: Vec<Vec3> = Vec::new();
     for i in 0..points.len() {
-        if (points[i] - points[(i + 1) % points.len()]).length() >= EPS {
+        if (points[i] - points[(i + 1) % points.len()]).magnitude() >= EPS {
             pts.push(points[i]);
         }
     }
@@ -80,25 +87,34 @@ pub fn knife_face(m: &mut BMesh, face_index: usize, points: &[Vec3]) -> Option<u
     }
     let normal = m.face_normal(face_index);
     let (u, w) = tangent_frame(normal);
-    let mut outer_ids = m.faces[face_index].verts.clone();
-    let origin = outer_ids.iter().fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize]) / outer_ids.len() as f32;
+    let mut outer_ids = m.facets[face_index].verts.clone();
+    let origin = outer_ids
+        .iter()
+        .fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize])
+        / outer_ids.len() as f32;
     let to2 = |p: Vec3| {
         let r = p - origin;
-        v2(r.dot(u), r.dot(w))
+        v2(r.innerprod(u), r.innerprod(w))
     };
-    let mut outer2: Vec<Vec2> = outer_ids.iter().map(|v| to2(m.positions[*v as usize])).collect();
+    let mut outer2: Vec<Vec2> = outer_ids
+        .iter()
+        .map(|v| to2(m.positions[*v as usize]))
+        .collect();
     let outer_ccw = area(&outer2) >= 0.0;
     if !outer_ccw {
         outer_ids.reverse();
         outer2.reverse();
     }
     let cut2: Vec<Vec2> = pts.iter().map(|p| to2(*p)).collect();
-    let (mut lo, mut hi) = (v2(f32::INFINITY, f32::INFINITY), v2(f32::NEG_INFINITY, f32::NEG_INFINITY));
+    let (mut lo, mut hi) = (
+        v2(f32::INFINITY, f32::INFINITY),
+        v2(f32::NEG_INFINITY, f32::NEG_INFINITY),
+    );
     for q in &cut2 {
         lo = v2(lo.x.min(q.x), lo.y.min(q.y));
         hi = v2(hi.x.max(q.x), hi.y.max(q.y));
     }
-    let extent = (hi - lo).length();
+    let extent = (hi - lo).magnitude();
     if area(&cut2).abs() <= 1e-6 * extent * extent {
         return None;
     }
@@ -117,45 +133,49 @@ pub fn knife_face(m: &mut BMesh, face_index: usize, points: &[Vec3]) -> Option<u
         inner_loop.reverse();
     }
     let mut polys = if is_convex(&outer2) {
-        stitch(&outer_ids, &outer2, &inner_ids, &inner2)
+        seam(&outer_ids, &outer2, &inner_ids, &inner2)
     } else {
         let p = stitch_bridged(&outer_ids, &outer2, &inner_ids, &inner2);
-        if p.is_empty() { stitch(&outer_ids, &outer2, &inner_ids, &inner2) } else { p }
+        if p.is_empty() {
+            seam(&outer_ids, &outer2, &inner_ids, &inner2)
+        } else {
+            p
+        }
     };
     if !outer_ccw {
         for p in &mut polys {
             p.reverse();
         }
     }
-    let template = m.faces[face_index].clone();
-    m.faces[face_index].verts = polys[0].clone();
+    let template = m.facets[face_index].clone();
+    m.facets[face_index].verts = polys[0].clone();
     for p in &polys[1..] {
-        m.faces.push(template.with_verts(p.clone()));
+        m.facets.push(template.with_verts(p.clone()));
     }
-    m.faces.push(template.with_verts(inner_loop));
-    Some(m.faces.len() - 1)
+    m.facets.push(template.with_verts(inner_loop));
+    Some(m.facets.len() - 1)
 }
 
 fn classify(cut2: &[Vec2], outer2: &[Vec2]) -> Vec<Class> {
     let n = outer2.len();
     cut2.iter()
         .map(|&p| {
-            if let Some(i) = (0..n).find(|i| p.distance(outer2[*i]) < EPS) {
+            if let Some(i) = (0..n).find(|i| p.span(outer2[*i]) < EPS) {
                 return Class::Vertex(i, outer2[i]);
             }
             for i in 0..n {
                 let a = outer2[i];
                 let seg = outer2[(i + 1) % n] - a;
-                let len2 = seg.length_squared();
+                let len2 = seg.magnitude_quadratic();
                 if len2 < EPS * EPS {
                     continue;
                 }
-                let t = (p - a).dot(seg) / len2;
+                let t = (p - a).innerprod(seg) / len2;
                 if t <= 0.0 || t >= 1.0 {
                     continue;
                 }
                 let on = a + seg * t;
-                if p.distance(on) < EPS {
+                if p.span(on) < EPS {
                     return Class::Edge(i, t, on);
                 }
             }
@@ -166,11 +186,22 @@ fn classify(cut2: &[Vec2], outer2: &[Vec2]) -> Vec<Class> {
 
 fn dedup_cyclic(lp: &[i64]) -> Vec<i64> {
     let n = lp.len();
-    (0..n).filter(|i| lp[*i] != lp[(i + 1) % n]).map(|i| lp[i]).collect()
+    (0..n)
+        .filter(|i| lp[*i] != lp[(i + 1) % n])
+        .map(|i| lp[i])
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_boundary(m: &mut BMesh, face_index: usize, pts: &[Vec3], cls: &[Class], outer_ids: &[u32], outer2: &[Vec2], outer_ccw: bool) -> Option<usize> {
+fn apply_boundary(
+    m: &mut BMesh,
+    face_index: usize,
+    pts: &[Vec3],
+    cls: &[Class],
+    outer_ids: &[u32],
+    outer2: &[Vec2],
+    outer_ccw: bool,
+) -> Option<usize> {
     let n = outer_ids.len();
     let mut edge_groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (pi, c) in cls.iter().enumerate() {
@@ -178,7 +209,13 @@ fn apply_boundary(m: &mut BMesh, face_index: usize, pts: &[Vec3], cls: &[Class],
             edge_groups.entry(*e).or_default().push(pi);
         }
     }
-    let t_of = |pi: usize| if let Class::Edge(_, t, _) = cls[pi] { t } else { 0.0 };
+    let t_of = |pi: usize| {
+        if let Class::Edge(_, t, _) = cls[pi] {
+            t
+        } else {
+            0.0
+        }
+    };
     for g in edge_groups.values_mut() {
         g.sort_by(|a, b| t_of(*a).total_cmp(&t_of(*b)));
     }
@@ -224,7 +261,9 @@ fn apply_boundary(m: &mut BMesh, face_index: usize, pts: &[Vec3], cls: &[Class],
     if !q_tok.iter().all(|t| seen.insert(*t)) {
         return None;
     }
-    let touch_j: Vec<usize> = (0..q_tok.len()).filter(|j| planned_pos.contains_key(&q_tok[*j])).collect();
+    let touch_j: Vec<usize> = (0..q_tok.len())
+        .filter(|j| planned_pos.contains_key(&q_tok[*j]))
+        .collect();
     let mm = touch_j.len();
     let np = p_tok.len();
     let nq = q_tok.len();
@@ -332,9 +371,19 @@ fn apply_boundary(m: &mut BMesh, face_index: usize, pts: &[Vec3], cls: &[Class],
         }
     }
     if !edge_points.is_empty() {
-        splice_edge_points(m, &edge_points, &BTreeSet::from([face_index]));
+        interleave_ridge_points(m, &edge_points, &BTreeSet::from([face_index]));
     }
-    let ids = |toks: &[i64]| -> Vec<u32> { toks.iter().map(|t| if *t < TOKEN_EDGE { outer_ids[*t as usize] } else { new_ids[t] }).collect() };
+    let ids = |toks: &[i64]| -> Vec<u32> {
+        toks.iter()
+            .map(|t| {
+                if *t < TOKEN_EDGE {
+                    outer_ids[*t as usize]
+                } else {
+                    new_ids[t]
+                }
+            })
+            .collect()
+    };
     let mut polys: Vec<Vec<u32>> = regions.iter().map(|r| ids(r)).collect();
     let mut inner_loop = ids(&q_tok);
     if !outer_ccw {
@@ -343,13 +392,13 @@ fn apply_boundary(m: &mut BMesh, face_index: usize, pts: &[Vec3], cls: &[Class],
         }
         inner_loop.reverse();
     }
-    let template = m.faces[face_index].clone();
-    m.faces[face_index].verts = polys[0].clone();
+    let template = m.facets[face_index].clone();
+    m.facets[face_index].verts = polys[0].clone();
     for p in &polys[1..] {
-        m.faces.push(template.with_verts(p.clone()));
+        m.facets.push(template.with_verts(p.clone()));
     }
-    m.faces.push(template.with_verts(inner_loop));
-    Some(m.faces.len() - 1)
+    m.facets.push(template.with_verts(inner_loop));
+    Some(m.facets.len() - 1)
 }
 
 fn is_convex(pts: &[Vec2]) -> bool {
@@ -360,10 +409,26 @@ fn is_convex(pts: &[Vec2]) -> bool {
     })
 }
 
-fn stitch_bridged(outer_ids: &[u32], outer2: &[Vec2], inner_ids: &[u32], inner2: &[Vec2]) -> Vec<Vec<u32>> {
+fn stitch_bridged(
+    outer_ids: &[u32],
+    outer2: &[Vec2],
+    inner_ids: &[u32],
+    inner2: &[Vec2],
+) -> Vec<Vec<u32>> {
     let (p, q) = (outer2.len(), inner2.len());
-    let Some(b1) = find_bridge(outer2, inner2, None, None, Vec2::ZERO, Vec2::ZERO) else { return Vec::new() };
-    let Some(b2) = find_bridge(outer2, inner2, Some(b1.0), Some(b1.1), outer2[b1.0], inner2[b1.1]) else { return Vec::new() };
+    let Some(b1) = find_bridge(outer2, inner2, None, None, Vec2::ZERO, Vec2::ZERO) else {
+        return Vec::new();
+    };
+    let Some(b2) = find_bridge(
+        outer2,
+        inner2,
+        Some(b1.0),
+        Some(b1.1),
+        outer2[b1.0],
+        inner2[b1.1],
+    ) else {
+        return Vec::new();
+    };
     let mut half_a = Vec::new();
     let mut i = b1.0;
     loop {
@@ -401,7 +466,14 @@ fn stitch_bridged(outer_ids: &[u32], outer2: &[Vec2], inner_ids: &[u32], inner2:
     vec![half_a, half_b]
 }
 
-fn find_bridge(outer2: &[Vec2], inner2: &[Vec2], skip_o: Option<usize>, skip_i: Option<usize>, other_from: Vec2, other_to: Vec2) -> Option<(usize, usize)> {
+fn find_bridge(
+    outer2: &[Vec2],
+    inner2: &[Vec2],
+    skip_o: Option<usize>,
+    skip_i: Option<usize>,
+    other_from: Vec2,
+    other_to: Vec2,
+) -> Option<(usize, usize)> {
     for oi in 0..outer2.len() {
         if Some(oi) == skip_o {
             continue;
@@ -422,7 +494,14 @@ fn find_bridge(outer2: &[Vec2], inner2: &[Vec2], skip_o: Option<usize>, skip_i: 
     None
 }
 
-fn diagonal_ok(outer2: &[Vec2], inner2: &[Vec2], from: Vec2, to: Vec2, o_idx: usize, i_idx: usize) -> bool {
+fn diagonal_ok(
+    outer2: &[Vec2],
+    inner2: &[Vec2],
+    from: Vec2,
+    to: Vec2,
+    o_idx: usize,
+    i_idx: usize,
+) -> bool {
     let po = outer2.len();
     for i in 0..po {
         if i == o_idx || (i + 1) % po == o_idx {
@@ -450,17 +529,18 @@ fn segments_cross(a: Vec2, b: Vec2, c: Vec2, d: Vec2) -> bool {
     let d2 = cross2(b - a, d - a);
     let d3 = cross2(d - c, a - c);
     let d4 = cross2(d - c, b - c);
-    ((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9)) && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9))
+    ((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9))
+        && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9))
 }
 
-fn angle(v: Vec2) -> f64 {
+fn inclination(v: Vec2) -> f64 {
     (v.y as f64).atan2(v.x as f64)
 }
 
 /// Unwrapped polar angles of a loop around `c`, starting at its smallest angle.
 fn rotated_unwrapped(ids: &[u32], pts: &[Vec2], c: Vec2) -> (Vec<u32>, Vec<f64>) {
     let n = ids.len();
-    let raw: Vec<f64> = pts.iter().map(|p| angle(*p - c)).collect();
+    let raw: Vec<f64> = pts.iter().map(|p| inclination(*p - c)).collect();
     let min_i = (0..n).fold(0, |b, i| if raw[i] < raw[b] { i } else { b });
     let mut out_ids = Vec::with_capacity(n);
     let mut angles: Vec<f64> = Vec::with_capacity(n);
@@ -484,7 +564,7 @@ fn ang(angles: &[f64], k: usize) -> f64 {
 }
 
 /// Fan-stitches a convex outer ring to an inner loop by polar angle (one poly per inner edge).
-fn stitch(outer_ids: &[u32], outer2: &[Vec2], inner_ids: &[u32], inner2: &[Vec2]) -> Vec<Vec<u32>> {
+fn seam(outer_ids: &[u32], outer2: &[Vec2], inner_ids: &[u32], inner2: &[Vec2]) -> Vec<Vec<u32>> {
     let c = inner2.iter().fold(Vec2::ZERO, |a, b| a + *b) / inner2.len() as f32;
     let (oi, oa) = rotated_unwrapped(outer_ids, outer2, c);
     let (hi, mut ha) = rotated_unwrapped(inner_ids, inner2, c);
@@ -528,31 +608,35 @@ pub fn snap_frame(n: Vec3, anchor: Vec3) -> (Vec3, Vec3, Vec3) {
     (anchor, u, w)
 }
 
-fn snapped(v: f32, step: f32) -> f32 {
-    if step > 0.0 { (v / step + 0.5).floor() * step } else { v }
+fn aligned(v: f32, step: f32) -> f32 {
+    if step > 0.0 {
+        (v / step + 0.5).floor() * step
+    } else {
+        v
+    }
 }
 
 /// `p` snapped to the nearest lattice crossing (`math_util.snap_to_grid` in the face plane).
-pub fn snap_to_grid(p: Vec3, frame: (Vec3, Vec3, Vec3), step: f32) -> Vec3 {
+pub fn align_into_lattice(p: Vec3, frame: (Vec3, Vec3, Vec3), step: f32) -> Vec3 {
     let (anchor, u, w) = frame;
     let d = p - anchor;
-    anchor + u * snapped(d.dot(u), step) + w * snapped(d.dot(w), step)
+    anchor + u * aligned(d.innerprod(u), step) + w * aligned(d.innerprod(w), step)
 }
 
 /// Closest point of segment `a`-`b` to `p` (`math_util.closest_point_on_segment`).
 pub fn closest_point_on_segment(p: Vec3, a: Vec3, b: Vec3) -> Vec3 {
     let e = b - a;
-    let l2 = e.dot(e);
+    let l2 = e.innerprod(e);
     if l2 < 1e-12 {
         return a;
     }
-    a + e * ((p - a).dot(e) / l2).clamp(0.0, 1.0)
+    a + e * ((p - a).innerprod(e) / l2).clamp(0.0, 1.0)
 }
 
 /// The point of edge `a`-`b` nearest `p`, snapped along the edge onto the lattice.
 pub fn snap_to_edge(p: Vec3, a: Vec3, b: Vec3, frame: (Vec3, Vec3, Vec3), step: f32) -> Vec3 {
     let e = b - a;
-    if e.dot(e) < 1e-12 {
+    if e.innerprod(e) < 1e-12 {
         return a;
     }
     let cp = closest_point_on_segment(p, a, b);
@@ -560,59 +644,90 @@ pub fn snap_to_edge(p: Vec3, a: Vec3, b: Vec3, frame: (Vec3, Vec3, Vec3), step: 
         return cp;
     }
     let (anchor, u, w) = frame;
-    let axis = if e.dot(u).abs() >= e.dot(w).abs() { u } else { w };
-    let ek = e.dot(axis);
+    let axis = if e.innerprod(u).abs() >= e.innerprod(w).abs() {
+        u
+    } else {
+        w
+    };
+    let ek = e.innerprod(axis);
     if ek.abs() < 1e-9 {
         return cp;
     }
-    let target = snapped((cp - anchor).dot(axis), step);
-    let t = (target - (a - anchor).dot(axis)) / ek;
+    let target = aligned((cp - anchor).innerprod(axis), step);
+    let t = (target - (a - anchor).innerprod(axis)) / ek;
     a + e * t.clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::shapes::{cuboid, plane};
+    use super::super::shapes::{cuboid, sheet};
     use super::*;
 
     fn top(m: &BMesh) -> usize {
-        (0..m.faces.len()).find(|f| m.face_normal(*f).y > 0.9).unwrap()
+        (0..m.facets.len())
+            .find(|f| m.face_normal(*f).y > 0.9)
+            .unwrap()
     }
 
     #[test]
     fn inner_square_on_a_box_top() {
         let mut m = cuboid(v3(2.0, 1.0, 2.0));
         let t = top(&m);
-        let pts = [v3(-0.5, 1.0, -0.5), v3(0.5, 1.0, -0.5), v3(0.5, 1.0, 0.5), v3(-0.5, 1.0, 0.5)];
+        let pts = [
+            v3(-0.5, 1.0, -0.5),
+            v3(0.5, 1.0, -0.5),
+            v3(0.5, 1.0, 0.5),
+            v3(-0.5, 1.0, 0.5),
+        ];
         let a = m.total_area();
         let inner = knife_face(&mut m, t, &pts).unwrap();
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.total_area() - a).abs() < 1e-4);
         assert!((m.face_area(inner) - 1.0).abs() < 1e-4);
         assert!(m.face_normal(inner).y > 0.99, "inner face keeps the facing");
-        assert_eq!(m.faces.len(), 6 + 4, "4 ring quads (one replaces the top) + inner");
+        assert_eq!(
+            m.facets.len(),
+            6 + 4,
+            "4 ring quads (one replaces the top) + inner"
+        );
     }
 
     #[test]
     fn cut_across_edges_splits_the_face() {
-        let mut m = plane(v2(2.0, 2.0), 1);
+        let mut m = sheet(v2(2.0, 2.0), 1);
         // A triangle from the middle of one edge to the middle of the opposite edge and a point inside.
-        let pts = [v3(-1.0, 0.0, 0.0), v3(0.0, 0.0, -0.5), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 0.5)];
+        let pts = [
+            v3(-1.0, 0.0, 0.0),
+            v3(0.0, 0.0, -0.5),
+            v3(1.0, 0.0, 0.0),
+            v3(0.0, 0.0, 0.5),
+        ];
         let inner = knife_face(&mut m, 0, &pts).unwrap();
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!((m.total_area() - 4.0).abs() < 1e-4, "{}", m.total_area());
         assert!((m.face_area(inner) - 1.0).abs() < 1e-4);
-        assert!(m.faces.iter().enumerate().all(|(f, _)| m.face_normal(f).y > 0.99));
-        assert_eq!(m.faces.len(), 3);
+        assert!(
+            m.facets
+                .iter()
+                .enumerate()
+                .all(|(f, _)| m.face_normal(f).y > 0.99)
+        );
+        assert_eq!(m.facets.len(), 3);
     }
 
     #[test]
     fn lattice_and_edge_snaps() {
         let f = snap_frame(Vec3::UP, Vec3::ZERO);
-        let s = snap_to_grid(v3(0.26, 0.0, 0.74), f, 0.5);
-        assert!((s - v3(0.5, 0.0, 0.5)).length() < 1e-5, "{s:?}");
-        let e = snap_to_edge(v3(0.3, 0.0, 0.2), v3(0.0, 0.0, 0.0), v3(1.0, 0.0, 0.0), f, 0.25);
-        assert!((e - v3(0.25, 0.0, 0.0)).length() < 1e-5, "{e:?}");
+        let s = align_into_lattice(v3(0.26, 0.0, 0.74), f, 0.5);
+        assert!((s - v3(0.5, 0.0, 0.5)).magnitude() < 1e-5, "{s:?}");
+        let e = snap_to_edge(
+            v3(0.3, 0.0, 0.2),
+            v3(0.0, 0.0, 0.0),
+            v3(1.0, 0.0, 0.0),
+            f,
+            0.25,
+        );
+        assert!((e - v3(0.25, 0.0, 0.0)).magnitude() < 1e-5, "{e:?}");
     }
 }

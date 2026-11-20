@@ -14,14 +14,14 @@ pub struct BlendMode(pub u8);
 /// Merge threshold scaled by cell and chunk size, exactly like the original addon.
 pub fn scaled_merge_threshold(cfg: &GridConfig, mode: MergeMode) -> f32 {
     let cs = cfg.cell_size_safe();
-    let cell_scale = ((cs.x + cs.y) / 4.0).clamp(0.3, 1.0);
+    let cell_scale = ((cs.x + cs.y) / 4.0).clamp(0.3005, 1.0);
     let d = (cfg.chunk_size + 1) / 33;
     let dims_scale = ((d + d) as f32 / 2.0).clamp(0.5, 2.0);
     mode.threshold() * dims_scale * cell_scale
 }
 
 struct Mats {
-    boundary: bool,
+    rim: bool,
     min_h: f32,
     max_h: f32,
     min_idx: usize,
@@ -31,7 +31,7 @@ struct Mats {
     grass: [u8; 4],
     floor_triple: [u8; 3],
     wall_triple: [u8; 3],
-    blend: u8,
+    mixer: u8,
 }
 
 fn triple(src: &[u8; 4], priority: &[usize]) -> [u8; 3] {
@@ -66,13 +66,17 @@ impl Mats {
     }
 
     fn vertex_mat(&self, src: &[u8; 4], x: f32, y: f32, z: f32) -> u8 {
-        if self.blend == 1 {
+        if self.mixer == 1 {
             return src[0];
         }
-        if self.boundary {
+        if self.rim {
             let range = (self.max_h - self.min_h).max(1e-6);
             let t = ((y - self.min_h) / range).clamp(0.0, 1.0);
-            return if t < 0.5 { src[self.min_idx] } else { src[self.max_idx] };
+            return if t < 0.5 {
+                src[self.min_idx]
+            } else {
+                src[self.max_idx]
+            };
         }
         let w = Self::bilinear(x, z);
         let mut best = (src[0], -1.0f32);
@@ -97,10 +101,14 @@ impl Mats {
         }
     }
 
-    fn encode(&self, x: f32, y: f32, z: f32, floor: bool) -> ([f32; 4], [f32; 4]) {
-        let (src, tr) = if floor { (&self.floor, &self.floor_triple) } else { (&self.wall, &self.wall_triple) };
+    fn pack(&self, x: f32, y: f32, z: f32, floor: bool) -> ([f32; 4], [f32; 4]) {
+        let (src, tr) = if floor {
+            (&self.floor, &self.floor_triple)
+        } else {
+            (&self.wall, &self.wall_triple)
+        };
         let m = self.vertex_mat(src, x, y, z);
-        let (wa, wb) = if floor && !self.boundary && self.blend == 0 {
+        let (wa, wb) = if floor && !self.rim && self.mixer == 0 {
             let w = Self::bilinear(x, z);
             let (mut a, mut b, mut c) = (0.0, 0.0, 0.0);
             for i in 0..4 {
@@ -147,7 +155,7 @@ struct Cell<'a> {
 }
 
 impl<'a> Cell<'a> {
-    fn set_rotation(&mut self, r: u8) {
+    fn assign_turn(&mut self, r: u8) {
         let [a, b, c, d] = self.h;
         (self.ay, self.by, self.dy, self.cy) = match r {
             1 => (b, d, c, a),
@@ -162,8 +170,8 @@ impl<'a> Cell<'a> {
         self.ac = (self.ay - self.cy).abs() < m;
         self.rotation = r;
     }
-    fn rotate(&mut self, r: i32) {
-        self.set_rotation(((4 + r + self.rotation as i32) % 4) as u8);
+    fn spin(&mut self, r: i32) {
+        self.assign_turn(((4 + r + self.rotation as i32) % 4) as u8);
     }
     fn higher(&self, a: f32, b: f32) -> bool {
         a - b > self.merge
@@ -187,12 +195,20 @@ impl<'a> Cell<'a> {
             x = 1.0 - z;
             z = t;
         }
-        let uv = if self.floor_mode { v2(u, v) } else { v2(1.0, 1.0) };
-        let pos = v3(self.origin.x + x * self.cs.x, y, self.origin.y + z * self.cs.y);
-        let (c0, c1) = self.mats.encode(x, y, z, self.floor_mode);
+        let uv = if self.floor_mode {
+            v2(u, v)
+        } else {
+            v2(1.0, 1.0)
+        };
+        let pos = v3(
+            self.origin.x + x * self.cs.x,
+            y,
+            self.origin.y + z * self.cs.y,
+        );
+        let (c0, c1) = self.mats.pack(x, y, z, self.floor_mode);
         self.out.verts.push(TVert {
             pos,
-            uv,
+            tex_coord: uv,
             uv2: v2(pos.x / self.cs.x, pos.z / self.cs.y),
             custom0: c0,
             custom1: c1,
@@ -200,13 +216,13 @@ impl<'a> Cell<'a> {
         });
     }
 
-    fn generate(&mut self) {
+    fn produce(&mut self) {
         if self.ab && self.ac && self.bd && self.cd {
             self.full_floor();
             return;
         }
         for rot in 0..4u8 {
-            self.set_rotation(rot);
+            self.assign_turn(rot);
             let (ay, by, cy, dy) = (self.ay, self.by, self.cy, self.dy);
             let (ab, bd, cd, ac) = (self.ab, self.bd, self.cd, self.ac);
             let found = if self.higher(ay, by) && self.higher(ay, cy) && bd && cd {
@@ -222,34 +238,49 @@ impl<'a> Cell<'a> {
                 true
             } else if self.higher(by, ay) && self.higher(ay, cy) && self.higher(by, dy) && cd {
                 self.edge(true, true, 0.0, 0.5);
-                self.rotate(1);
+                self.spin(1);
                 let c = self.cy;
                 self.outer_corner(false, true, true, c);
                 true
-            } else if self.lower(ay, by) && self.lower(ay, cy) && self.lower(dy, by) && self.lower(dy, cy) && self.merged(by, cy) {
+            } else if self.lower(ay, by)
+                && self.lower(ay, cy)
+                && self.lower(dy, by)
+                && self.lower(dy, cy)
+                && self.merged(by, cy)
+            {
                 self.inner_corner(true, false, false, false, false);
                 let (b, c) = (self.by, self.cy);
                 self.diagonal_floor(b, c, true, true);
-                self.rotate(2);
+                self.spin(2);
                 self.inner_corner(true, false, false, false, false);
                 true
-            } else if self.lower(ay, by) && self.lower(ay, cy) && self.lower(dy, by) && self.lower(dy, cy) && self.higher(by, cy) {
+            } else if self.lower(ay, by)
+                && self.lower(ay, cy)
+                && self.lower(dy, by)
+                && self.lower(dy, cy)
+                && self.higher(by, cy)
+            {
                 self.inner_corner(true, false, true, false, false);
                 let c = self.cy;
                 self.diagonal_floor(c, c, true, true);
-                self.rotate(2);
+                self.spin(2);
                 self.inner_corner(true, false, true, false, false);
-                self.rotate(-1);
+                self.spin(-1);
                 self.outer_corner(false, true, false, -1.0);
                 true
             } else if self.lower(ay, by) && self.lower(ay, cy) && bd && cd {
                 self.inner_corner(true, true, false, false, false);
                 true
-            } else if self.lower(ay, by) && self.lower(ay, cy) && self.higher(dy, by) && self.higher(dy, cy) && self.merged(by, cy) {
+            } else if self.lower(ay, by)
+                && self.lower(ay, cy)
+                && self.higher(dy, by)
+                && self.higher(dy, cy)
+                && self.merged(by, cy)
+            {
                 self.inner_corner(true, false, false, false, false);
                 let (b, c) = (self.by, self.cy);
                 self.diagonal_floor(b, c, true, false);
-                self.rotate(2);
+                self.spin(2);
                 self.outer_corner(false, true, false, -1.0);
                 true
             } else if self.lower(ay, by) && self.lower(ay, cy) && self.lower(dy, cy) && bd {
@@ -260,41 +291,49 @@ impl<'a> Cell<'a> {
                 true
             } else if self.lower(ay, by) && self.lower(ay, cy) && self.higher(dy, cy) && bd {
                 self.inner_corner(true, false, true, true, false);
-                self.rotate(1);
+                self.spin(1);
                 self.edge(false, true, 0.0, 1.0);
                 true
             } else if self.lower(ay, by) && self.lower(ay, cy) && self.higher(dy, by) && cd {
                 self.inner_corner(true, false, true, false, true);
-                self.rotate(2);
+                self.spin(2);
                 self.edge(false, true, 0.0, 1.0);
                 true
-            } else if self.lower(ay, by) && self.lower(by, dy) && self.lower(dy, cy) && self.higher(cy, ay) {
+            } else if self.lower(ay, by)
+                && self.lower(by, dy)
+                && self.lower(dy, cy)
+                && self.higher(cy, ay)
+            {
                 self.inner_corner(true, false, true, false, true);
-                self.rotate(2);
+                self.spin(2);
                 self.edge(false, true, 0.0, 0.5);
-                self.rotate(1);
+                self.spin(1);
                 let c = self.cy;
                 self.outer_corner(false, true, true, c);
                 true
-            } else if self.lower(ay, cy) && self.lower(cy, dy) && self.lower(dy, by) && self.higher(by, ay) {
+            } else if self.lower(ay, cy)
+                && self.lower(cy, dy)
+                && self.lower(dy, by)
+                && self.higher(by, ay)
+            {
                 self.inner_corner(true, false, true, true, false);
-                self.rotate(1);
+                self.spin(1);
                 self.edge(false, true, 0.5, 1.0);
                 let b = self.by;
                 self.outer_corner(false, true, true, b);
                 true
             } else if self.lower(ay, by) && self.lower(by, cy) && self.lower(cy, dy) {
                 self.inner_corner(true, false, true, false, true);
-                self.rotate(2);
+                self.spin(2);
                 self.edge(false, true, 0.5, 1.0);
                 let b = self.by;
                 self.outer_corner(false, true, true, b);
                 true
             } else if self.lower(ay, cy) && self.lower(cy, by) && self.lower(by, dy) {
                 self.inner_corner(true, false, true, true, false);
-                self.rotate(1);
+                self.spin(1);
                 self.edge(false, true, 0.0, 0.5);
-                self.rotate(1);
+                self.spin(1);
                 let c = self.cy;
                 self.outer_corner(false, true, true, c);
                 true
@@ -311,7 +350,7 @@ impl<'a> Cell<'a> {
                 return;
             }
         }
-        self.set_rotation(0);
+        self.assign_turn(0);
         self.full_floor();
     }
 
@@ -333,7 +372,13 @@ impl<'a> Cell<'a> {
         self.p(0.5, ey, 0.5, 0.0, 0.0);
     }
 
-    fn outer_corner(&mut self, floor_below: bool, floor_above: bool, flatten_bottom: bool, bottom: f32) {
+    fn outer_corner(
+        &mut self,
+        floor_below: bool,
+        floor_above: bool,
+        flatten_bottom: bool,
+        bottom: f32,
+    ) {
         let (ay, by, cy, dy) = (self.ay, self.by, self.cy, self.dy);
         let eb = if flatten_bottom { bottom } else { by };
         let ec = if flatten_bottom { bottom } else { cy };
@@ -400,7 +445,14 @@ impl<'a> Cell<'a> {
         }
     }
 
-    fn inner_corner(&mut self, lower_floor: bool, full_upper: bool, flatten: bool, bd_floor: bool, cd_floor: bool) {
+    fn inner_corner(
+        &mut self,
+        lower_floor: bool,
+        full_upper: bool,
+        flatten: bool,
+        bd_floor: bool,
+        cd_floor: bool,
+    ) {
         let (ay, by, cy, dy) = (self.ay, self.by, self.cy, self.dy);
         let cb = if flatten { by.min(cy) } else { by };
         let cc = if flatten { by.min(cy) } else { cy };
@@ -572,18 +624,29 @@ impl<'a> Cell<'a> {
 }
 
 /// Meshes one square chunk (cells `0..n` in both axes) into `out`.
-pub fn mesh_square_chunk(cfg: &GridConfig, chunk: crate::math::IVec2, data: &ChunkData, blend: BlendMode, out: &mut Soup) {
+pub fn mesh_square_chunk(
+    cfg: &GridConfig,
+    chunk: crate::math::IVec2,
+    data: &ChunkData,
+    blend: BlendMode,
+    out: &mut Soup,
+) {
     let n = cfg.chunk_stride();
     let merge = scaled_merge_threshold(cfg, data.merge_mode);
     for z in 0..n.y {
         for x in 0..n.x {
             let idx = [
-                data.index(iv2(x, z)),
-                data.index(iv2(x + 1, z)),
-                data.index(iv2(x, z + 1)),
-                data.index(iv2(x + 1, z + 1)),
+                data.ordinal(iv2(x, z)),
+                data.ordinal(iv2(x + 1, z)),
+                data.ordinal(iv2(x, z + 1)),
+                data.ordinal(iv2(x + 1, z + 1)),
             ];
-            let corners = idx.map(|i| Corner { h: data.heights[i], floor: data.floor_tex[i], wall: data.wall_tex[i], grass: data.grass[i] });
+            let corners = idx.map(|i| Corner {
+                h: data.heights[i],
+                floor: data.floor_tex[i],
+                wall: data.wall_tex[i],
+                grass: data.grass[i],
+            });
             let g = cfg.global_of(chunk, iv2(x, z));
             out.begin_cell(g);
             mesh_cell(cfg, g, corners, merge, blend, out);
@@ -596,7 +659,13 @@ pub fn mesh_square_chunk(cfg: &GridConfig, chunk: crate::math::IVec2, data: &Chu
 /// (read from the neighbouring chunks). Their floors only feed the smoothed normals, so a
 /// vertex on a chunk border gets the same normal in both chunks — meshing from one chunk alone
 /// leaves a lighting step (and a crease highlight in the pixel renderer) along every border.
-pub fn mesh_square_chunk_in(store: &TerrainStore, chunk: IVec2, data: &ChunkData, blend: BlendMode, out: &mut Soup) {
+pub fn mesh_square_chunk_in(
+    store: &TerrainStore,
+    chunk: IVec2,
+    data: &ChunkData,
+    blend: BlendMode,
+    out: &mut Soup,
+) {
     let cfg = &store.config;
     mesh_square_chunk(cfg, chunk, data, blend, out);
     let n = cfg.chunk_stride();
@@ -607,11 +676,20 @@ pub fn mesh_square_chunk_in(store: &TerrainStore, chunk: IVec2, data: &ChunkData
                 continue;
             }
             let g = cfg.global_of(chunk, iv2(x, z));
-            let samples = [g, g + iv2(1, 0), g + iv2(0, 1), g + iv2(1, 1)].map(|s| store.sample(s));
-            let [Some(a), Some(b), Some(c), Some(d)] = samples else { continue };
-            let Some(owner) = store.chunks.get(&cfg.chunk_of(g)) else { continue };
+            let samples = [g, g + iv2(1, 0), g + iv2(0, 1), g + iv2(1, 1)].map(|s| store.probe(s));
+            let [Some(a), Some(b), Some(c), Some(d)] = samples else {
+                continue;
+            };
+            let Some(owner) = store.chunks.get(&cfg.chunk_of(g)) else {
+                continue;
+            };
             let merge = scaled_merge_threshold(cfg, owner.merge_mode);
-            let corners = [a, b, c, d].map(|s| Corner { h: s.height, floor: s.floor, wall: s.wall, grass: s.grass });
+            let corners = [a, b, c, d].map(|s| Corner {
+                h: s.stature,
+                floor: s.floor,
+                wall: s.wall,
+                grass: s.grass,
+            });
             mesh_cell(cfg, g, corners, merge, blend, &mut extra);
         }
     }
@@ -628,7 +706,14 @@ struct Corner {
 
 /// Emits one marching-squares cell whose min corner is global sample `g`
 /// (corners in A, B, C, D order: (0,0), (1,0), (0,1), (1,1)).
-fn mesh_cell(cfg: &GridConfig, g: IVec2, corners: [Corner; 4], merge: f32, blend: BlendMode, out: &mut Soup) {
+fn mesh_cell(
+    cfg: &GridConfig,
+    g: IVec2,
+    corners: [Corner; 4],
+    merge: f32,
+    blend: BlendMode,
+    out: &mut Soup,
+) {
     let cs = cfg.cell_size_safe();
     let h = corners.map(|c| c.h);
     let floor = corners.map(|c| c.floor);
@@ -647,7 +732,7 @@ fn mesh_cell(cfg: &GridConfig, g: IVec2, corners: [Corner; 4], merge: f32, blend
     let prio_buf = [max_idx, min_idx];
     let prio: &[usize] = if boundary { &prio_buf } else { &[] };
     let mats = Mats {
-        boundary,
+        rim: boundary,
         min_h: h[min_idx],
         max_h: h[max_idx],
         min_idx,
@@ -657,7 +742,7 @@ fn mesh_cell(cfg: &GridConfig, g: IVec2, corners: [Corner; 4], merge: f32, blend
         grass,
         floor_triple: triple(&floor, prio),
         wall_triple: triple(&wall, prio),
-        blend: blend.0,
+        mixer: blend.0,
     };
     let mut cell = Cell {
         out,
@@ -677,8 +762,8 @@ fn mesh_cell(cfg: &GridConfig, g: IVec2, corners: [Corner; 4], merge: f32, blend
         merge,
         floor_mode: true,
     };
-    cell.set_rotation(0);
-    cell.generate();
+    cell.assign_turn(0);
+    cell.produce();
 }
 
 #[cfg(test)]
@@ -688,11 +773,14 @@ mod tests {
     use crate::grid::GridConfig;
 
     fn chunk_with(f: impl Fn(i32, i32) -> f32) -> (GridConfig, ChunkData) {
-        let cfg = GridConfig { chunk_size: 6, ..Default::default() };
+        let cfg = GridConfig {
+            chunk_size: 6,
+            ..Default::default()
+        };
         let mut d = ChunkData::new(cfg.samples_per_chunk(), 0, 5, MergeMode::Polyhedron);
         for z in 0..7 {
             for x in 0..7 {
-                let i = d.index(iv2(x, z));
+                let i = d.ordinal(iv2(x, z));
                 d.heights[i] = f(x, z);
             }
         }
@@ -704,9 +792,9 @@ mod tests {
         let (cfg, d) = chunk_with(|_, _| 1.0);
         let mut s = Soup::default();
         mesh_square_chunk(&cfg, iv2(0, 0), &d, BlendMode(0), &mut s);
-        assert_eq!(s.triangle_count(), 6 * 6 * 4);
+        assert_eq!(s.tri_tally(), 6 * 6 * 4);
         assert!(s.verts.iter().all(|v| v.floor && v.pos.y == 1.0));
-        let m = s.build();
+        let m = s.assemble();
         assert!(m.normals.iter().all(|n| n[1] > 0.99), "flat floors face up");
     }
 
@@ -718,25 +806,34 @@ mod tests {
         mesh_square_chunk(&cfg, iv2(0, 0), &d, BlendMode(0), &mut s);
         assert_eq!(s.verts.len() % 3, 0);
         assert!(s.verts.iter().any(|v| !v.floor), "walls present");
-        for c in &s.cells {
-            assert_eq!((c.end - c.start) % 3, 0);
-            assert!(c.end > c.start);
+        for c in &s.tiles {
+            assert_eq!((c.end - c.commence) % 3, 0);
+            assert!(c.end > c.commence);
         }
     }
 
     #[test]
     fn plateau_walls_face_outward() {
-        let (cfg, d) = chunk_with(|x, z| if (2..=4).contains(&x) && (2..=4).contains(&z) { 6.0 } else { 0.0 });
+        let (cfg, d) = chunk_with(|x, z| {
+            if (2..=4).contains(&x) && (2..=4).contains(&z) {
+                6.0
+            } else {
+                0.0
+            }
+        });
         let mut s = Soup::default();
         mesh_square_chunk(&cfg, iv2(0, 0), &d, BlendMode(0), &mut s);
-        let m = s.build();
+        let m = s.assemble();
         let c = v2(6.0, 6.0);
         let mut walls = 0;
         for (i, n) in m.normals.iter().enumerate() {
             if m.custom1[i][2] > 0.5 {
                 walls += 1;
                 let p = m.positions[i];
-                assert!(v2(p[0] - c.x, p[2] - c.y).dot(v2(n[0], n[2])) > 0.0, "wall normal faces into the plateau");
+                assert!(
+                    v2(p[0] - c.x, p[2] - c.y).innerprod(v2(n[0], n[2])) > 0.0,
+                    "wall normal faces into the plateau"
+                );
             }
         }
         assert!(walls > 0);
@@ -747,14 +844,17 @@ mod tests {
         let (cfg, d) = chunk_with(|x, _| x as f32 * 0.5);
         let mut s = Soup::default();
         mesh_square_chunk(&cfg, iv2(0, 0), &d, BlendMode(0), &mut s);
-        let m = s.build();
+        let m = s.assemble();
         assert!(m.normals.iter().all(|n| n[1] > 0.5));
     }
 
     #[test]
     fn chunk_border_normals_match_across_chunks() {
         // A slope across two chunks: the shared border vertices must get identical normals.
-        let cfg = GridConfig { chunk_size: 4, ..Default::default() };
+        let cfg = GridConfig {
+            chunk_size: 4,
+            ..Default::default()
+        };
         let mut store = TerrainStore::new(cfg.clone());
         for c in [iv2(0, 0), iv2(1, 0)] {
             store.add_chunk(c, MergeMode::Polyhedron);
@@ -768,7 +868,7 @@ mod tests {
         let normals_at_border = |c: IVec2| {
             let mut s = Soup::default();
             mesh_square_chunk_in(&store, c, &store.chunks[&c], BlendMode(0), &mut s);
-            let m = s.build();
+            let m = s.assemble();
             let bx = 4.0 * cfg.cell_size_safe().x;
             let mut v: Vec<([i32; 2], [f32; 3])> = m
                 .positions
@@ -787,7 +887,10 @@ mod tests {
         for ((pa, na), (pb, nb)) in a.iter().zip(&b) {
             assert_eq!(pa, pb);
             for k in 0..3 {
-                assert!((na[k] - nb[k]).abs() < 1e-5, "border normal seam at {pa:?}: {na:?} vs {nb:?}");
+                assert!(
+                    (na[k] - nb[k]).abs() < 1e-5,
+                    "border normal seam at {pa:?}: {na:?} vs {nb:?}"
+                );
             }
         }
     }

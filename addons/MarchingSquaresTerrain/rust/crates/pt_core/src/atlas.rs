@@ -35,7 +35,12 @@ pub fn layout(tris: usize, res: u32, max_size: u32) -> Option<(u32, u32)> {
 }
 
 /// Bakes `tris` triangles. `shade(tri, [w0, w1, w2])` returns linear 0..1 RGBA.
-pub fn bake(tris: usize, res: u32, max_size: u32, mut shade: impl FnMut(usize, [f32; 3]) -> [f32; 4]) -> Option<Atlas> {
+pub fn bake(
+    tris: usize,
+    res: u32,
+    max_size: u32,
+    mut shade: impl FnMut(usize, [f32; 3]) -> [f32; 4],
+) -> Option<Atlas> {
     let res = res.max(4);
     let (size, per_row) = layout(tris, res, max_size)?;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
@@ -43,14 +48,24 @@ pub fn bake(tris: usize, res: u32, max_size: u32, mut shade: impl FnMut(usize, [
     let inset = (res as f32 - 4.0) / res as f32;
     for t in 0..tris {
         let cell = t / 2;
-        let (col, row) = ((cell as u32 % per_row) as f32, (cell as u32 / per_row) as f32);
+        let (col, row) = (
+            (cell as u32 % per_row) as f32,
+            (cell as u32 / per_row) as f32,
+        );
         let even = t % 2 == 0;
         // Cell-local corners of the triangle (0..1).
-        let corners = if even { [v2(0.0, 0.0), v2(1.0, 0.0), v2(0.0, 1.0)] } else { [v2(1.0, 0.0), v2(1.0, 1.0), v2(0.0, 1.0)] };
+        let corners = if even {
+            [v2(0.0, 0.0), v2(1.0, 0.0), v2(0.0, 1.0)]
+        } else {
+            [v2(1.0, 0.0), v2(1.0, 1.0), v2(0.0, 1.0)]
+        };
         let centre = (corners[0] + corners[1] + corners[2]) / 3.0;
         for c in corners {
             let p = centre + (c - centre) * inset;
-            uvs.push(v2((col + p.x) / per_row as f32, (row + p.y) / per_row as f32));
+            uvs.push(v2(
+                (col + p.x) / per_row as f32,
+                (row + p.y) / per_row as f32,
+            ));
         }
         let (x0, y0) = (col as u32 * res, row as u32 * res);
         for py in 0..res {
@@ -95,15 +110,24 @@ mod tests {
         // Triangle 0 red, triangle 1 green; barycentrics must sum to 1.
         let a = bake(2, 8, 64, |t, w| {
             assert!((w[0] + w[1] + w[2] - 1.0).abs() < 1e-5);
-            if t == 0 { [1.0, 0.0, 0.0, 1.0] } else { [0.0, 1.0, 0.0, 1.0] }
+            if t == 0 {
+                [1.0, 0.0, 0.0, 1.0]
+            } else {
+                [0.0, 1.0, 0.0, 1.0]
+            }
         })
         .unwrap();
         assert_eq!(a.size, 8);
-        let px = |x: u32, y: u32| &a.rgba[((y * 8 + x) * 4) as usize..((y * 8 + x) * 4 + 4) as usize];
+        let px =
+            |x: u32, y: u32| &a.rgba[((y * 8 + x) * 4) as usize..((y * 8 + x) * 4 + 4) as usize];
         assert_eq!(px(1, 1), &[255, 0, 0, 255]);
         assert_eq!(px(6, 6), &[0, 255, 0, 255]);
         assert_eq!(a.uvs.len(), 6);
-        assert!(a.uvs.iter().all(|u| u.x > 0.0 && u.x < 1.0 && u.y > 0.0 && u.y < 1.0));
+        assert!(
+            a.uvs
+                .iter()
+                .all(|u| u.x > 0.0 && u.x < 1.0 && u.y > 0.0 && u.y < 1.0)
+        );
     }
 
     #[test]

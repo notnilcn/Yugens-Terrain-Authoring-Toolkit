@@ -31,7 +31,7 @@ impl GridType {
             _ => GridType::Square,
         }
     }
-    pub fn name(self) -> &'static str {
+    pub fn moniker(self) -> &'static str {
         match self {
             GridType::Square => "square",
             GridType::Triangle => "triangle",
@@ -64,16 +64,44 @@ pub struct GridConfig {
 
 impl Default for GridConfig {
     fn default() -> Self {
-        GridConfig { grid: GridType::Square, chunk_size: 32, cell_size: v2(2.0, 2.0), ring_radius: 4, wrap: iv2(0, 0), wrap_period: 0 }
+        GridConfig {
+            grid: GridType::Square,
+            chunk_size: 32,
+            cell_size: v2(2.0, 2.0),
+            ring_radius: 4,
+            wrap: iv2(0, 0),
+            wrap_period: 0,
+        }
     }
 }
 
 /// kg_hex: a large (terrain) hex is the small-hex lattice scaled by this in axial space.
 pub const SMALL_PER_LARGE_AXIS: i32 = 3;
 
-const HEX_EVEN: [IVec2; 6] = [iv2(1, 0), iv2(0, 1), iv2(-1, 1), iv2(-1, 0), iv2(-1, -1), iv2(0, -1)];
-const HEX_ODD: [IVec2; 6] = [iv2(1, 0), iv2(1, 1), iv2(0, 1), iv2(-1, 0), iv2(0, -1), iv2(1, -1)];
-const AXIAL: [IVec2; 6] = [iv2(1, 0), iv2(0, 1), iv2(-1, 1), iv2(-1, 0), iv2(0, -1), iv2(1, -1)];
+const HEX_EVEN: [IVec2; 6] = [
+    iv2(1, 0),
+    iv2(0, 1),
+    iv2(-1, 1),
+    iv2(-1, 0),
+    iv2(-1, -1),
+    iv2(0, -1),
+];
+const HEX_ODD: [IVec2; 6] = [
+    iv2(1, 0),
+    iv2(1, 1),
+    iv2(0, 1),
+    iv2(-1, 0),
+    iv2(0, -1),
+    iv2(1, -1),
+];
+const AXIAL: [IVec2; 6] = [
+    iv2(1, 0),
+    iv2(0, 1),
+    iv2(-1, 1),
+    iv2(-1, 0),
+    iv2(0, -1),
+    iv2(1, -1),
+];
 
 fn floor_div(a: i32, b: i32) -> i32 {
     debug_assert!(b > 0);
@@ -82,7 +110,7 @@ fn floor_div(a: i32, b: i32) -> i32 {
 
 impl GridConfig {
     pub fn cell_size_safe(&self) -> Vec2 {
-        v2(self.cell_size.x.max(0.01), self.cell_size.y.max(0.01))
+        v2(self.cell_size.x.max(0.0105), self.cell_size.y.max(0.0105))
     }
 
     /// Bounding box of samples stored per chunk.
@@ -102,7 +130,11 @@ impl GridConfig {
     /// Distance between chunk origins in samples (square chunks overlap by one border row).
     pub fn chunk_stride(&self) -> IVec2 {
         let s = self.samples_per_chunk();
-        if self.grid == GridType::Square { s - iv2(1, 1) } else { s }
+        if self.grid == GridType::Square {
+            s - iv2(1, 1)
+        } else {
+            s
+        }
     }
 
     /// Every (chunk, local) slot holding a copy of `sample`: square border vertices are
@@ -224,7 +256,10 @@ impl GridConfig {
             return sample;
         }
         let chunk = to_lower_res(sample.x, sample.y, r);
-        let wrapped = iv2(chunk.x.rem_euclid(self.wrap.x), chunk.y.rem_euclid(self.wrap.y));
+        let wrapped = iv2(
+            chunk.x.rem_euclid(self.wrap.x),
+            chunk.y.rem_euclid(self.wrap.y),
+        );
         if wrapped == chunk {
             return sample;
         }
@@ -249,7 +284,9 @@ impl GridConfig {
 
     /// Whether `wrap_period` is active: hex rings, `P > 0` and a multiple of the chunk area.
     pub fn wrap_period_valid(&self) -> bool {
-        self.grid == GridType::HexRings && self.wrap_period > 0 && self.wrap_period % self.chunk_area() == 0
+        self.grid == GridType::HexRings
+            && self.wrap_period > 0
+            && self.wrap_period % self.chunk_area() == 0
     }
 
     /// Canonical coordinate of a chunk under the active wrap (identity without wrap).
@@ -282,7 +319,10 @@ impl GridConfig {
     /// Small hex containing a terrain-local XZ point.
     pub fn world_to_small_hex(&self, p: Vec2) -> IVec2 {
         let radius = self.hex_radius() / SMALL_PER_LARGE_AXIS as f32;
-        axial_round((p.x * SQRT3 / 3.0 - p.y / 3.0) / radius, p.y * 2.0 / 3.0 / radius)
+        axial_round(
+            (p.x * SQRT3 / 3.0 - p.y / 3.0) / radius,
+            p.y * 2.0 / 3.0 / radius,
+        )
     }
 
     /// The cell owning a small hex (kg_hex `SmallHex::large`: `div_floor(q + 1, 3)` per axis).
@@ -308,7 +348,10 @@ impl GridConfig {
             GridType::Square => v2(s.x as f32 * cs.x, s.y as f32 * cs.y),
             GridType::Hex => {
                 let sp = self.hex_spacing();
-                v2(sp.x * (s.x as f32 + 0.5 * (s.y & 1) as f32), sp.y * s.y as f32)
+                v2(
+                    sp.x * (s.x as f32 + 0.5 * (s.y & 1) as f32),
+                    sp.y * s.y as f32,
+                )
             }
             GridType::HexRings => {
                 let sp = self.hex_spacing();
@@ -336,7 +379,7 @@ impl GridConfig {
                 for dy in -1..=1 {
                     for dx in -1..=1 {
                         let c = iv2(col + dx, row + dy);
-                        let d = (self.sample_pos(c) - p).length_squared();
+                        let d = (self.sample_pos(c) - p).magnitude_quadratic();
                         if d < bd {
                             bd = d;
                             best = c;
@@ -374,16 +417,27 @@ impl GridConfig {
 
     fn tri_lattice(&self, i: i32, j: i32) -> Vec2 {
         let s = self.cell_size_safe().x;
-        v2(i as f32 * s + j as f32 * s * 0.5, j as f32 * self.tri_row_height())
+        v2(
+            i as f32 * s + j as f32 * s * 0.5,
+            j as f32 * self.tri_row_height(),
+        )
     }
 
     fn tri_corners(&self, c: IVec2) -> [Vec2; 3] {
         let i = c.x.div_euclid(2);
         let j = c.y;
         if c.x & 1 == 0 {
-            [self.tri_lattice(i, j), self.tri_lattice(i + 1, j), self.tri_lattice(i, j + 1)]
+            [
+                self.tri_lattice(i, j),
+                self.tri_lattice(i + 1, j),
+                self.tri_lattice(i, j + 1),
+            ]
         } else {
-            [self.tri_lattice(i + 1, j + 1), self.tri_lattice(i + 1, j), self.tri_lattice(i, j + 1)]
+            [
+                self.tri_lattice(i + 1, j + 1),
+                self.tri_lattice(i + 1, j),
+                self.tri_lattice(i, j + 1),
+            ]
         }
     }
 
@@ -425,7 +479,12 @@ impl GridConfig {
                     vec![iv2(c.x - 1, c.y), iv2(c.x - 1, c.y + 1), iv2(c.x + 1, c.y)]
                 }
             }
-            GridType::Square => vec![iv2(c.x + 1, c.y), iv2(c.x, c.y + 1), iv2(c.x - 1, c.y), iv2(c.x, c.y - 1)],
+            GridType::Square => vec![
+                iv2(c.x + 1, c.y),
+                iv2(c.x, c.y + 1),
+                iv2(c.x - 1, c.y),
+                iv2(c.x, c.y - 1),
+            ],
         }
     }
 
@@ -441,7 +500,12 @@ impl GridConfig {
     /// Neighbouring samples used by the smooth tool (4/6/3 connectivity).
     pub fn sample_neighbors(&self, s: IVec2) -> Vec<IVec2> {
         match self.grid {
-            GridType::Square => vec![iv2(s.x + 1, s.y), iv2(s.x - 1, s.y), iv2(s.x, s.y + 1), iv2(s.x, s.y - 1)],
+            GridType::Square => vec![
+                iv2(s.x + 1, s.y),
+                iv2(s.x - 1, s.y),
+                iv2(s.x, s.y + 1),
+                iv2(s.x, s.y - 1),
+            ],
             _ => self.edge_neighbors(s),
         }
     }
@@ -511,7 +575,10 @@ impl GridConfig {
             GridType::Hex => {
                 let c = self.world_to_sample(center);
                 let ca = offset_to_axial(c);
-                disk(ca, size - 1).into_iter().map(axial_to_offset).collect()
+                disk(ca, size - 1)
+                    .into_iter()
+                    .map(axial_to_offset)
+                    .collect()
             }
             GridType::HexRings => disk(self.world_to_sample(center), size - 1),
             GridType::Triangle => {
@@ -526,7 +593,7 @@ impl GridConfig {
                 for di in 0..2 {
                     for dj in 0..2 {
                         let p = self.tri_lattice(i0 + di, j0 + dj);
-                        let d = (p - center).length_squared();
+                        let d = (p - center).magnitude_quadratic();
                         if d < bd {
                             bd = d;
                             best = iv2(i0 + di, j0 + dj);
@@ -580,7 +647,12 @@ impl GridConfig {
                     let cs = self.cell_size_safe();
                     let n = self.chunk_stride().x as f32;
                     let o = v2(chunk.x as f32 * n * cs.x, chunk.y as f32 * n * cs.y);
-                    vec![o, o + v2(n * cs.x, 0.0), o + v2(n * cs.x, n * cs.y), o + v2(0.0, n * cs.y)]
+                    vec![
+                        o,
+                        o + v2(n * cs.x, 0.0),
+                        o + v2(n * cs.x, n * cs.y),
+                        o + v2(0.0, n * cs.y),
+                    ]
                 } else {
                     vec![a, b, c, d]
                 }
@@ -614,18 +686,22 @@ impl GridConfig {
         chunks: impl IntoIterator<Item = IVec2>,
         focus: Vec2,
         eye: Vec2,
-        distance: f32,
+        span: f32,
         hysteresis: f32,
         prev: &std::collections::HashSet<IVec2>,
     ) -> std::collections::HashSet<IVec2> {
-        if distance <= 0.0 {
+        if span <= 0.0 {
             return Default::default();
         }
         chunks
             .into_iter()
             .filter(|c| {
                 let d = segment_distance(self.chunk_center_pos(*c), focus, eye);
-                d > if prev.contains(c) { distance - hysteresis.max(0.0) } else { distance }
+                d > if prev.contains(c) {
+                    span - hysteresis.max(0.0)
+                } else {
+                    span
+                }
             })
             .collect()
     }
@@ -636,7 +712,10 @@ impl GridConfig {
             GridType::Square => {
                 let cs = self.cell_size_safe();
                 let n = self.chunk_size.max(1) as f32;
-                iv2((p.x / (cs.x * n)).floor() as i32, (p.y / (cs.y * n)).floor() as i32)
+                iv2(
+                    (p.x / (cs.x * n)).floor() as i32,
+                    (p.y / (cs.y * n)).floor() as i32,
+                )
             }
             _ => self.chunk_of(self.world_to_sample(p)),
         }
@@ -726,16 +805,23 @@ pub fn to_lower_res(q: i32, r: i32, radius: i32) -> IVec2 {
 /// Center hex of a chunk (hexx `to_higher_res`).
 pub fn chunk_center_hex(cq: i32, cr: i32, radius: i32) -> IVec2 {
     let s = -cq - cr;
-    iv2(cq * (radius + 1) - radius * s, cr * (radius + 1) - radius * cq)
+    iv2(
+        cq * (radius + 1) - radius * s,
+        cr * (radius + 1) - radius * cq,
+    )
 }
 
 /// Distance from `p` to the segment `a`-`b` (a point when `a == b`). Mirrored by
 /// `pt_lod_keep` in `pixel_noise.gdshaderinc` (distant-LOD fade).
 pub fn segment_distance(p: Vec2, a: Vec2, b: Vec2) -> f32 {
     let ab = b - a;
-    let len2 = ab.length_squared();
-    let t = if len2 > 1e-12 { ((p - a).dot(ab) / len2).clamp(0.0, 1.0) } else { 0.0 };
-    (p - (a + ab * t)).length()
+    let len2 = ab.magnitude_quadratic();
+    let t = if len2 > 1e-12 {
+        ((p - a).innerprod(ab) / len2).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (p - (a + ab * t)).magnitude()
 }
 
 #[cfg(test)]
@@ -743,12 +829,22 @@ mod tests {
     use super::*;
 
     fn cfg(grid: GridType) -> GridConfig {
-        GridConfig { grid, chunk_size: 8, ring_radius: 2, ..Default::default() }
+        GridConfig {
+            grid,
+            chunk_size: 8,
+            ring_radius: 2,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn chunk_local_global_roundtrip() {
-        for g in [GridType::Square, GridType::Triangle, GridType::Hex, GridType::HexRings] {
+        for g in [
+            GridType::Square,
+            GridType::Triangle,
+            GridType::Hex,
+            GridType::HexRings,
+        ] {
             let c = cfg(g);
             for y in -20..20 {
                 for x in -20..20 {
@@ -779,7 +875,12 @@ mod tests {
 
     #[test]
     fn world_to_sample_inverts_sample_pos() {
-        for g in [GridType::Square, GridType::Triangle, GridType::Hex, GridType::HexRings] {
+        for g in [
+            GridType::Square,
+            GridType::Triangle,
+            GridType::Hex,
+            GridType::HexRings,
+        ] {
             let c = cfg(g);
             for y in -6..6 {
                 for x in -6..6 {
@@ -815,7 +916,10 @@ mod tests {
                 let (a, b) = c.edge_corners(s, e);
                 let nc = c.cell_corners(n);
                 for p in [corners[a], corners[b]] {
-                    assert!(nc.iter().any(|q| (*q - p).length() < 1e-3), "{g:?} edge {e}");
+                    assert!(
+                        nc.iter().any(|q| (*q - p).magnitude() < 1e-3),
+                        "{g:?} edge {e}"
+                    );
                 }
             }
         }
@@ -833,8 +937,25 @@ mod tests {
 
     /// kg_hex `patch::LARGE_LOCAL` (radius-2 spiral) literally.
     const LARGE_LOCAL: [(i32, i32); 19] = [
-        (0, 0), (0, -1), (1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0),
-        (0, -2), (1, -2), (2, -2), (2, -1), (2, 0), (1, 1), (0, 2), (-1, 2), (-2, 2), (-2, 1), (-2, 0), (-1, -1),
+        (0, 0),
+        (0, -1),
+        (1, -1),
+        (1, 0),
+        (0, 1),
+        (-1, 1),
+        (-1, 0),
+        (0, -2),
+        (1, -2),
+        (2, -2),
+        (2, -1),
+        (2, 0),
+        (1, 1),
+        (0, 2),
+        (-1, 2),
+        (-2, 2),
+        (-2, 1),
+        (-2, 0),
+        (-1, -1),
     ];
 
     #[test]
@@ -854,23 +975,47 @@ mod tests {
     #[test]
     fn kg_hex_pixel_and_patch_conventions() {
         // Game scale: large hex 6 units flat-to-flat, ring 2 chunk == PatchCoord.
-        let c = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(6.0, 6.0), ..Default::default() };
+        let c = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(6.0, 6.0),
+            ..Default::default()
+        };
         let r = 6.0 / SQRT3;
         for (q, rr) in [(0, 0), (1, 0), (0, 1), (-3, 5), (7, -2)] {
             // kg_hex pixel: x = R(√3 q + √3/2 r), y = 1.5 R r; 2D y -> 3D +Z.
             let p = c.sample_pos(iv2(q, rr));
-            let e = v2(r * (SQRT3 * q as f32 + SQRT3 / 2.0 * rr as f32), 1.5 * r * rr as f32);
-            assert!((p - e).length() < 1e-4, "{q},{rr}");
+            let e = v2(
+                r * (SQRT3 * q as f32 + SQRT3 / 2.0 * rr as f32),
+                1.5 * r * rr as f32,
+            );
+            assert!((p - e).magnitude() < 1e-4, "{q},{rr}");
         }
         // PatchCoord::center_large = (3q - 2s, 3r - 2q); unit steps move it by (5,-2), (2,3).
         assert_eq!(c.chunk_center_cell(iv2(1, 0)), iv2(5, -2));
         assert_eq!(c.chunk_center_cell(iv2(0, 1)), iv2(2, 3));
         // Neighbour order == kg_hex DIRS (E, SE, SW, W, NW, NE).
-        assert_eq!(c.edge_neighbors(iv2(0, 0)), vec![iv2(1, 0), iv2(0, 1), iv2(-1, 1), iv2(-1, 0), iv2(0, -1), iv2(1, -1)]);
+        assert_eq!(
+            c.edge_neighbors(iv2(0, 0)),
+            vec![
+                iv2(1, 0),
+                iv2(0, 1),
+                iv2(-1, 1),
+                iv2(-1, 0),
+                iv2(0, -1),
+                iv2(1, -1)
+            ]
+        );
         // Small hexes: 2 units flat-to-flat, owner rule div_floor(q + 1, 3).
-        assert!((c.small_hex_pos(iv2(3, 0)) - c.sample_pos(iv2(1, 0))).length() < 1e-4);
+        assert!((c.small_hex_pos(iv2(3, 0)) - c.sample_pos(iv2(1, 0))).magnitude() < 1e-4);
         assert!((c.small_hex_pos(iv2(1, 0)).x - 2.0).abs() < 1e-4);
-        for (s, o) in [((0, 0), (0, 0)), ((1, 1), (0, 0)), ((2, 0), (1, 0)), ((-1, -1), (0, 0)), ((-2, 4), (-1, 1))] {
+        for (s, o) in [
+            ((0, 0), (0, 0)),
+            ((1, 1), (0, 0)),
+            ((2, 0), (1, 0)),
+            ((-1, -1), (0, 0)),
+            ((-2, 4), (-1, 1)),
+        ] {
             assert_eq!(c.small_hex_owner(iv2(s.0, s.1)), iv2(o.0, o.1), "{s:?}");
         }
         for q in -7..7 {
@@ -884,7 +1029,12 @@ mod tests {
     #[test]
     fn axial_period_wrap_matches_kg_hex_torus() {
         // k = 1: P = 19 large hexes on both axial axes.
-        let mut c = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(6.0, 6.0), ..Default::default() };
+        let mut c = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(6.0, 6.0),
+            ..Default::default()
+        };
         c.wrap_period = 19;
         assert!(c.wrap_period_valid());
         for q in -25..25 {
@@ -897,7 +1047,10 @@ mod tests {
                 // Canonical: the canonical cell's chunk is its own canonical chunk, and its
                 // (q, r) mod P equals the input's.
                 assert_eq!(c.wrap_sample(w), w);
-                assert_eq!(iv2(w.x.rem_euclid(19), w.y.rem_euclid(19)), iv2(q.rem_euclid(19), r.rem_euclid(19)));
+                assert_eq!(
+                    iv2(w.x.rem_euclid(19), w.y.rem_euclid(19)),
+                    iv2(q.rem_euclid(19), r.rem_euclid(19))
+                );
             }
         }
         // 19 distinct canonical chunks (= kg_hex slot_count for k = 1).
@@ -918,40 +1071,80 @@ mod tests {
 
     #[test]
     fn lod_ring_selects_far_chunks_with_hysteresis() {
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(2.0, 2.0), ..Default::default() };
-        let chunks: Vec<IVec2> = (-3..=3).flat_map(|q| (-3..=3).map(move |r| iv2(q, r))).collect();
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        };
+        let chunks: Vec<IVec2> = (-3..=3)
+            .flat_map(|q| (-3..=3).map(move |r| iv2(q, r)))
+            .collect();
         let none = std::collections::HashSet::new();
-        assert!(cfg.lod_low_chunks(chunks.clone(), Vec2::ZERO, Vec2::ZERO, 0.0, 1.0, &none).is_empty(), "0 = off");
+        assert!(
+            cfg.lod_low_chunks(chunks.clone(), Vec2::ZERO, Vec2::ZERO, 0.0, 1.0, &none)
+                .is_empty(),
+            "0 = off"
+        );
         // The chunk centre of (0, 0) is the origin cell.
-        assert!(cfg.chunk_center_pos(iv2(0, 0)).length() < 1e-4);
+        assert!(cfg.chunk_center_pos(iv2(0, 0)).magnitude() < 1e-4);
         let low = cfg.lod_low_chunks(chunks.clone(), Vec2::ZERO, Vec2::ZERO, 20.0, 4.0, &none);
         for c in &chunks {
-            let d = cfg.chunk_center_pos(*c).length();
+            let d = cfg.chunk_center_pos(*c).magnitude();
             assert_eq!(low.contains(c), d > 20.0, "{c:?} at {d}");
         }
         assert!(!low.is_empty() && low.len() < chunks.len());
         // Moving the focus a little towards a low chunk keeps it low (hysteresis) ...
-        let far = *low.iter().min_by(|a, b| cfg.chunk_center_pos(**a).length().partial_cmp(&cfg.chunk_center_pos(**b).length()).unwrap()).unwrap();
+        let far = *low
+            .iter()
+            .min_by(|a, b| {
+                cfg.chunk_center_pos(**a)
+                    .magnitude()
+                    .partial_cmp(&cfg.chunk_center_pos(**b).magnitude())
+                    .unwrap()
+            })
+            .unwrap();
         let p = cfg.chunk_center_pos(far);
-        let nudge = p.normalized() * (p.length() - 20.0 + 1.0);
+        let nudge = p.unitized() * (p.magnitude() - 20.0 + 1.0);
         let again = cfg.lod_low_chunks(chunks.clone(), nudge, nudge, 20.0, 4.0, &low);
         assert!(again.contains(&far));
         // ... without hysteresis it would flip back to full detail.
-        assert!(!cfg.lod_low_chunks(chunks, nudge, nudge, 20.0, 4.0, &none).contains(&far));
+        assert!(
+            !cfg.lod_low_chunks(chunks, nudge, nudge, 20.0, 4.0, &none)
+                .contains(&far)
+        );
     }
 
     #[test]
     fn lod_ring_keeps_the_focus_to_eye_segment_full() {
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(2.0, 2.0), ..Default::default() };
-        let chunks: Vec<IVec2> = (-6..=6).flat_map(|q| (-6..=6).map(move |r| iv2(q, r))).collect();
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        };
+        let chunks: Vec<IVec2> = (-6..=6)
+            .flat_map(|q| (-6..=6).map(move |r| iv2(q, r)))
+            .collect();
         let none = std::collections::HashSet::new();
         // Third-person camera pulled back 60 m from the focus: a plain ring around the focus
         // drops the camera's foreground, the segment keeps everything between them.
         let (focus, eye) = (Vec2::ZERO, v2(60.0, 0.0));
         let ring = cfg.lod_low_chunks(chunks.clone(), focus, focus, 20.0, 4.0, &none);
         let seg = cfg.lod_low_chunks(chunks.clone(), focus, eye, 20.0, 4.0, &none);
-        let near_eye = *chunks.iter().min_by(|a, b| (cfg.chunk_center_pos(**a) - eye).length().partial_cmp(&(cfg.chunk_center_pos(**b) - eye).length()).unwrap()).unwrap();
-        assert!(ring.contains(&near_eye), "a focus-only ring drops the camera's surroundings");
+        let near_eye = *chunks
+            .iter()
+            .min_by(|a, b| {
+                (cfg.chunk_center_pos(**a) - eye)
+                    .magnitude()
+                    .partial_cmp(&(cfg.chunk_center_pos(**b) - eye).magnitude())
+                    .unwrap()
+            })
+            .unwrap();
+        assert!(
+            ring.contains(&near_eye),
+            "a focus-only ring drops the camera's surroundings"
+        );
         assert!(!seg.contains(&near_eye), "the segment keeps them");
         for c in &chunks {
             let d = segment_distance(cfg.chunk_center_pos(*c), focus, eye);

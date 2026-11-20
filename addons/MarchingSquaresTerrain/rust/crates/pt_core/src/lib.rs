@@ -9,18 +9,18 @@ pub mod atlas;
 pub mod autotex;
 pub mod brush;
 pub mod build;
-pub mod cells;
 pub mod celldata;
+pub mod cells;
 pub mod clipboard;
 pub mod data;
 pub mod erosion;
-pub mod flipbook;
 pub mod fire;
+pub mod flipbook;
 pub mod godot_res;
 pub mod grass;
 pub mod grid;
-pub mod hexmap;
 pub mod heightmap;
+pub mod hexmap;
 pub mod math;
 pub mod mesh;
 pub mod meta;
@@ -58,7 +58,12 @@ pub fn mesh_chunk(store: &TerrainStore, chunk: IVec2, blend: square::BlendMode) 
 }
 
 /// [`mesh_chunk`] at a level of detail.
-pub fn mesh_chunk_detail(store: &TerrainStore, chunk: IVec2, blend: square::BlendMode, detail: Detail) -> Option<Soup> {
+pub fn mesh_chunk_detail(
+    store: &TerrainStore,
+    chunk: IVec2,
+    blend: square::BlendMode,
+    detail: Detail,
+) -> Option<Soup> {
     let data = store.chunks.get(&chunk)?;
     let mut soup = Soup::default();
     match (store.config.grid, detail) {

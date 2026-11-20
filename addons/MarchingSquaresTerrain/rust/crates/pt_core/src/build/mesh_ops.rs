@@ -6,10 +6,10 @@
 //! of `nodes/cyclops_block.gd`, the polygon insetting of `math/loop_2d.gd` and the concave-face
 //! handling of `math/convex_volume.gd`.
 
-use super::edit_ops::{LoopPlane, cross_2d, loop_plane, segments_cross, signed_area_2d};
-use super::loops::{splice_edge_points, lerp_color};
+use super::edit_ops::{LoopPlane, cross_2d, loop_plane, segments_cross, sign_of_zone_planar};
+use super::loops::{interleave_ridge_points, lerp_color};
 use super::model::{BMesh, Edge, Face, edge};
-use super::tri::triangulate;
+use super::tri::mesh_fill;
 use crate::math::*;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -17,7 +17,11 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// One loop through a vertex remap, split at revisited vertices into pieces (loop, source
 /// corner indices); pieces without area are dropped.
-fn remap_corners(m: &BMesh, verts: &[u32], remap: &HashMap<u32, u32>) -> Vec<(Vec<u32>, Vec<usize>)> {
+fn remap_corners(
+    m: &BMesh,
+    verts: &[u32],
+    remap: &HashMap<u32, u32>,
+) -> Vec<(Vec<u32>, Vec<usize>)> {
     let map = |v: u32| *remap.get(&v).unwrap_or(&v);
     let (mut out, mut src) = (Vec::new(), Vec::new());
     for (i, v) in verts.iter().enumerate() {
@@ -63,8 +67,12 @@ fn remap_corners(m: &BMesh, verts: &[u32], remap: &HashMap<u32, u32>) -> Vec<(Ve
                 return false;
             }
             let pts: Vec<Vec3> = l.iter().map(|v| m.positions[*v as usize]).collect();
-            let scale = (0..pts.len()).map(|i| (pts[i] - pts[(i + 1) % pts.len()]).dot(pts[i] - pts[(i + 1) % pts.len()])).fold(0.0f32, f32::max);
-            super::model::newell(&pts).length() > 2e-9 * scale
+            let scale = (0..pts.len())
+                .map(|i| {
+                    (pts[i] - pts[(i + 1) % pts.len()]).innerprod(pts[i] - pts[(i + 1) % pts.len()])
+                })
+                .fold(0.0f32, f32::max);
+            super::model::newell(&pts).magnitude() > 2e-9 * scale
         })
         .collect()
 }
@@ -72,28 +80,30 @@ fn remap_corners(m: &BMesh, verts: &[u32], remap: &HashMap<u32, u32>) -> Vec<(Ve
 /// The remap would newly leave an edge used by more than two faces.
 fn remap_shares_edge(m: &BMesh, remap: &HashMap<u32, u32>) -> bool {
     let mut before: HashMap<Edge, usize> = HashMap::new();
-    for f in &m.faces {
+    for f in &m.facets {
         for (a, b) in f.loop_edges() {
             *before.entry(edge(a, b)).or_default() += 1;
         }
     }
     let mut after: HashMap<Edge, usize> = HashMap::new();
-    for f in &m.faces {
+    for f in &m.facets {
         for (l, _) in remap_corners(m, &f.verts, remap) {
             for i in 0..l.len() {
                 *after.entry(edge(l[i], l[(i + 1) % l.len()])).or_default() += 1;
             }
         }
     }
-    after.iter().any(|(e, n)| *n > 2 && before.get(e).copied().unwrap_or(0) <= 2)
+    after
+        .iter()
+        .any(|(e, n)| *n > 2 && before.get(e).copied().unwrap_or(0) <= 2)
 }
 
 /// Rewrites every face through the remap (manual UVs and corner colours follow their corners),
 /// then drops unused vertices.
-fn remap_face_loops(m: &mut BMesh, remap: &HashMap<u32, u32>) {
+fn reroute_facet_rings(m: &mut BMesh, remap: &HashMap<u32, u32>) {
     let mut kept = Vec::new();
     let mut extra = Vec::new();
-    let faces = std::mem::take(&mut m.faces);
+    let faces = std::mem::take(&mut m.facets);
     for f in faces {
         let old_n = f.verts.len();
         let pieces = remap_corners(m, &f.verts, remap);
@@ -109,11 +119,15 @@ fn remap_face_loops(m: &mut BMesh, remap: &HashMap<u32, u32>) {
                 }
             }
             face.verts = out;
-            if k == 0 { kept.push(face) } else { extra.push(face) }
+            if k == 0 {
+                kept.push(face)
+            } else {
+                extra.push(face)
+            }
         }
     }
     kept.extend(extra);
-    m.faces = kept;
+    m.facets = kept;
     m.compact();
 }
 
@@ -121,31 +135,45 @@ fn remap_face_loops(m: &mut BMesh, remap: &HashMap<u32, u32>) {
 /// would leave an edge shared by more than two faces. Returns the index of the collapsed vertex
 /// after compaction.
 pub fn collapse_selection(m: &mut BMesh, verts: &BTreeSet<u32>) -> Option<u32> {
-    let list: Vec<u32> = verts.iter().copied().filter(|v| (*v as usize) < m.positions.len()).collect();
+    let list: Vec<u32> = verts
+        .iter()
+        .copied()
+        .filter(|v| (*v as usize) < m.positions.len())
+        .collect();
     if list.len() < 2 {
         return None;
     }
     let rep = list[0];
-    let target = list.iter().fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize]) / list.len() as f32;
+    let target = list
+        .iter()
+        .fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize])
+        / list.len() as f32;
     let remap: HashMap<u32, u32> = list.iter().map(|v| (*v, rep)).collect();
     if remap_shares_edge(m, &remap) {
         return None;
     }
     m.positions[rep as usize] = target;
     // Find the survivor again after compaction by its position.
-    remap_face_loops(m, &remap);
-    m.positions.iter().position(|p| (*p - target).length() < 0.0005).map(|i| i as u32)
+    reroute_facet_rings(m, &remap);
+    m.positions
+        .iter()
+        .position(|p| (*p - target).magnitude() < 0.0004)
+        .map(|i| i as u32)
 }
 
 /// Insert-vertex modal: splits `e` at `pos` in every face using it. Returns the new vertex,
 /// `None` when `e` is not an edge of the mesh.
 pub fn insert_vertex(m: &mut BMesh, e: Edge, pos: Vec3) -> Option<u32> {
     let e = edge(e.0, e.1);
-    if !m.faces.iter().any(|f| f.loop_edges().any(|(a, b)| edge(a, b) == e)) {
+    if !m
+        .facets
+        .iter()
+        .any(|f| f.loop_edges().any(|(a, b)| edge(a, b) == e))
+    {
         return None;
     }
     let v = m.add_vert(pos);
-    splice_edge_points(m, &BTreeMap::from([(e, vec![v])]), &BTreeSet::new());
+    interleave_ridge_points(m, &BTreeMap::from([(e, vec![v])]), &BTreeSet::new());
     Some(v)
 }
 
@@ -154,22 +182,22 @@ pub fn insert_vertex(m: &mut BMesh, e: Edge, pos: Vec3) -> Option<u32> {
 /// A point strictly inside the polygon's kernel (seen by every edge), or `None` when it is
 /// empty or a sliver.
 fn interior_point(lp: &LoopPlane) -> Option<Vec2> {
-    let r = lp.scale * 2.0 + 1.0;
+    let r = lp.magnify * 2.0 + 1.0;
     let mut poly = vec![v2(-r, -r), v2(r, -r), v2(r, r), v2(-r, r)];
     let pts = &lp.pts;
     let n = pts.len();
     for i in 0..n {
         let a = pts[i];
         let dir = pts[(i + 1) % n] - a;
-        if dir.dot(dir) <= 0.0 {
+        if dir.innerprod(dir) <= 0.0 {
             continue;
         }
         let mut clipped = Vec::new();
         let k = poly.len();
         for j in 0..k {
             let (p, q) = (poly[j], poly[(j + 1) % k]);
-            let sp = lp.orient * cross_2d(dir, p - a);
-            let sq = lp.orient * cross_2d(dir, q - a);
+            let sp = lp.align_heading * cross_2d(dir, p - a);
+            let sq = lp.align_heading * cross_2d(dir, q - a);
             if sp >= 0.0 {
                 clipped.push(p);
             }
@@ -182,8 +210,8 @@ fn interior_point(lp: &LoopPlane) -> Option<Vec2> {
             return None;
         }
     }
-    let area = signed_area_2d(&poly);
-    if area.abs() <= 2e-6 * lp.scale * lp.scale {
+    let area = sign_of_zone_planar(&poly);
+    if area.abs() <= 2e-6 * lp.magnify * lp.magnify {
         return None;
     }
     let k = poly.len();
@@ -198,16 +226,16 @@ fn interior_point(lp: &LoopPlane) -> Option<Vec2> {
 /// crossing edges).
 fn loops_are_valid(loops: &[Vec<Vec2>], orient: f32, scale: f32) -> bool {
     let area_eps = 2e-9 * scale * scale;
-    let len_eps = 0.0005 * scale;
+    let len_eps = 0.0004 * scale;
     let mut edges = Vec::new();
     for l in loops {
         let n = l.len();
-        if n < 3 || orient * signed_area_2d(l) <= area_eps {
+        if n < 3 || orient * sign_of_zone_planar(l) <= area_eps {
             return false;
         }
         for i in 0..n {
             for j in i + 1..n {
-                if l[i].distance(l[j]) <= len_eps {
+                if l[i].span(l[j]) <= len_eps {
                     return false;
                 }
             }
@@ -227,12 +255,18 @@ fn loops_are_valid(loops: &[Vec<Vec2>], orient: f32, scale: f32) -> bool {
 /// Per-corner barycentric weights of `p` over a loop's corners.
 fn corner_weights(pts: &[Vec3], p: Vec3) -> Vec<f32> {
     let mut w = vec![0.0; pts.len()];
-    let tris = triangulate(pts, super::model::newell(pts));
+    let tris = mesh_fill(pts, super::model::newell(pts));
     let mut best = -1.0e28f32;
     for t in &tris {
         let a = pts[t[0]];
         let (ab, ac, ap) = (pts[t[1]] - a, pts[t[2]] - a, p - a);
-        let (d00, d01, d11, d20, d21) = (ab.dot(ab), ab.dot(ac), ac.dot(ac), ap.dot(ab), ap.dot(ac));
+        let (d00, d01, d11, d20, d21) = (
+            ab.innerprod(ab),
+            ab.innerprod(ac),
+            ac.innerprod(ac),
+            ap.innerprod(ab),
+            ap.innerprod(ac),
+        );
         let denom = d00 * d11 - d01 * d01;
         if denom.abs() < 2e-12 {
             continue;
@@ -256,7 +290,8 @@ fn corner_weights(pts: &[Vec3], p: Vec3) -> Vec<f32> {
         w[t[2]] += bw / s;
     }
     if best <= -1.0e28 {
-        w.iter_mut().for_each(|x| *x = 1.0 / pts.len().max(1) as f32);
+        w.iter_mut()
+            .for_each(|x| *x = 1.0 / pts.len().max(1) as f32);
     }
     w
 }
@@ -264,8 +299,12 @@ fn corner_weights(pts: &[Vec3], p: Vec3) -> Vec<f32> {
 // ---------------------------------------------------------------- inset
 
 fn inward_normal(face_normal: Vec3, a: Vec3, b: Vec3, center: Vec3) -> Vec3 {
-    let perp = face_normal.cross(b - a).normalized();
-    if perp.dot(center - (a + b) * 0.5) < 0.0 { -perp } else { perp }
+    let perp = face_normal.cross(b - a).unitized();
+    if perp.innerprod(center - (a + b) * 0.5) < 0.0 {
+        -perp
+    } else {
+        perp
+    }
 }
 
 fn center_offsets(pts: &[Vec3], normal: Vec3, center: Vec3, amount: f32) -> Vec<Vec3> {
@@ -274,24 +313,27 @@ fn center_offsets(pts: &[Vec3], normal: Vec3, center: Vec3, amount: f32) -> Vec<
         .map(|i| {
             let p = pts[i];
             let to_c = center - p;
-            let dist = to_c.length();
-            if dist <= 0.0005 {
+            let dist = to_c.magnitude();
+            if dist <= 0.0004 {
                 return Vec3::ZERO;
             }
             let dir = to_c / dist;
             let (prev, next) = (pts[(i + n - 1) % n], pts[(i + 1) % n]);
             let (mut proj, mut count) = (0.0, 0);
-            for nrm in [inward_normal(normal, prev, p, center), inward_normal(normal, p, next, center)] {
+            for nrm in [
+                inward_normal(normal, prev, p, center),
+                inward_normal(normal, p, next, center),
+            ] {
                 if nrm != Vec3::ZERO {
-                    proj += dir.dot(nrm);
+                    proj += dir.innerprod(nrm);
                     count += 1;
                 }
             }
             let mut travel = amount;
-            if count > 0 && proj / count as f32 > 0.0015 {
+            if count > 0 && proj / count as f32 > 0.0014 {
                 travel = amount * count as f32 / proj;
             }
-            dir * travel.min(dist * 0.85)
+            dir * travel.min(dist * 0.8505)
         })
         .collect()
 }
@@ -304,14 +346,18 @@ fn equal_offsets(pts: &[Vec3], normal: Vec3, center: Vec3, amount: f32) -> Vec<V
             let (prev, next) = (pts[(i + n - 1) % n], pts[(i + 1) % n]);
             let n1 = inward_normal(normal, prev, p, center);
             let n2 = inward_normal(normal, p, next, center);
-            let denom = 1.0 + n1.dot(n2);
-            let v = if denom > 0.0005 { (n1 + n2) * (amount / denom) } else { n1 * amount };
+            let denom = 1.0 + n1.innerprod(n2);
+            let v = if denom > 0.0004 {
+                (n1 + n2) * (amount / denom)
+            } else {
+                n1 * amount
+            };
             let to_c = center - p;
             let mut s = 1.0f32;
             for nrm in [n1, n2] {
-                let travel = v.dot(nrm);
+                let travel = v.innerprod(nrm);
                 if travel > 2e-9 {
-                    s = s.min(0.85 * to_c.dot(nrm).max(0.0) / travel);
+                    s = s.min(0.8505 * to_c.innerprod(nrm).max(0.0) / travel);
                 }
             }
             v * s
@@ -325,14 +371,18 @@ fn miter_offsets(lp: &LoopPlane, amount: f32) -> Vec<Vec3> {
     let normals: Vec<Vec2> = (0..n)
         .map(|i| {
             let d = pts[(i + 1) % n] - pts[i];
-            v2(-d.y, d.x).normalized() * lp.orient
+            v2(-d.y, d.x).unitized() * lp.align_heading
         })
         .collect();
     (0..n)
         .map(|i| {
             let (n1, n2) = (normals[(i + n - 1) % n], normals[i]);
-            let denom = 1.0 + n1.dot(n2);
-            let v = if denom > 0.0005 { (n1 + n2) * (amount / denom) } else { n1 * amount };
+            let denom = 1.0 + n1.innerprod(n2);
+            let v = if denom > 0.0004 {
+                (n1 + n2) * (amount / denom)
+            } else {
+                n1 * amount
+            };
             lp.u * v.x + lp.v * v.y
         })
         .collect()
@@ -346,26 +396,37 @@ fn plan_ok(lp: &LoopPlane, offsets: &[Vec3]) -> bool {
         let j = (i + 1) % n;
         loops.push(vec![lp.pts[i], lp.pts[j], inner[j], inner[i]]);
     }
-    loops_are_valid(&loops, lp.orient, lp.scale)
+    loops_are_valid(&loops, lp.align_heading, lp.magnify)
 }
 
 /// Insets each selected face by a rim `amount` wide (world units); `equal` mitres the corners so
 /// the rim has the same width everywhere (see cyclopsLevelBuilder's mitred loop insetting,
 /// `math/loop_2d.gd`). Concave faces use their interior point / mitred offsets and are skipped
 /// when no layout is valid. Returns the inner faces (the original indices).
-pub fn inset_rim(m: &mut BMesh, faces: &BTreeSet<usize>, amount: f32, equal: bool) -> BTreeSet<usize> {
+pub fn inset_rim(
+    m: &mut BMesh,
+    faces: &BTreeSet<usize>,
+    amount: f32,
+    equal: bool,
+) -> BTreeSet<usize> {
     let mut out = BTreeSet::new();
     for &fi in faces {
-        if fi >= m.faces.len() {
+        if fi >= m.facets.len() {
             continue;
         }
         let pts = m.face_points(fi);
         let normal = m.face_normal(fi);
-        let offsets = match loop_plane(m, &m.faces[fi].verts) {
+        let offsets = match loop_plane(m, &m.facets[fi].verts) {
             Some(lp) if lp.is_concave() => {
-                let center_plan = interior_point(&lp).map(|k| center_offsets(&pts, normal, lp.to_3d(k), amount)).unwrap_or_default();
+                let center_plan = interior_point(&lp)
+                    .map(|k| center_offsets(&pts, normal, lp.to_3d(k), amount))
+                    .unwrap_or_default();
                 let miter_plan = miter_offsets(&lp, amount);
-                let plans = if equal { [miter_plan, center_plan] } else { [center_plan, miter_plan] };
+                let plans = if equal {
+                    [miter_plan, center_plan]
+                } else {
+                    [center_plan, miter_plan]
+                };
                 match plans.into_iter().find(|p| !p.is_empty() && plan_ok(&lp, p)) {
                     Some(p) => p,
                     None => continue,
@@ -373,24 +434,32 @@ pub fn inset_rim(m: &mut BMesh, faces: &BTreeSet<usize>, amount: f32, equal: boo
             }
             _ => {
                 let c = m.face_center(fi);
-                if equal { equal_offsets(&pts, normal, c, amount) } else { center_offsets(&pts, normal, c, amount) }
+                if equal {
+                    equal_offsets(&pts, normal, c, amount)
+                } else {
+                    center_offsets(&pts, normal, c, amount)
+                }
             }
         };
         // A zero-height extrude: a ring of quads, inner loop on top.
-        let old = m.faces[fi].verts.clone();
-        let inner: Vec<u32> = old.iter().zip(&offsets).map(|(v, o)| m.add_vert(m.positions[*v as usize] + *o)).collect();
-        let src = m.faces[fi].clone();
+        let old = m.facets[fi].verts.clone();
+        let inner: Vec<u32> = old
+            .iter()
+            .zip(&offsets)
+            .map(|(v, o)| m.add_vert(m.positions[*v as usize] + *o))
+            .collect();
+        let src = m.facets[fi].clone();
         let n = old.len();
         for i in 0..n {
             let j = (i + 1) % n;
             let mut side = src.with_verts(vec![old[i], old[j], inner[j], inner[i]]);
-            side.smooth = 0;
+            side.glide = 0;
             if let Some(c) = src.corner_colors() {
                 side.color_corners = vec![c[i], c[j], c[j], c[i]];
             }
-            m.faces.push(side);
+            m.facets.push(side);
         }
-        m.faces[fi].verts = inner;
+        m.facets[fi].verts = inner;
         out.insert(fi);
     }
     out
@@ -421,7 +490,10 @@ fn cells_2d(pts: &[Vec2], c: Vec2, segments: usize) -> Vec<Vec<Vec2>> {
             for b in 1..h {
                 let (s, t) = (a as f32 / h as f32, b as f32 / h as f32);
                 g[a][b] = g[a][0] * (1.0 - t) + g[a][h] * t + g[0][b] * (1.0 - s) + g[h][b] * s
-                    - (p00 * ((1.0 - s) * (1.0 - t)) + p10 * (s * (1.0 - t)) + p01 * ((1.0 - s) * t) + c * (s * t));
+                    - (p00 * ((1.0 - s) * (1.0 - t))
+                        + p10 * (s * (1.0 - t))
+                        + p01 * ((1.0 - s) * t)
+                        + c * (s * t));
             }
         }
         for a in 0..h {
@@ -435,36 +507,36 @@ fn cells_2d(pts: &[Vec2], c: Vec2, segments: usize) -> Vec<Vec<Vec2>> {
 
 /// Corner attribute that can be blended (corner colours as floats, UVs).
 trait Blend: Copy {
-    fn mix(self, o: Self, t: f32) -> Self;
-    fn add(self, o: Self) -> Self;
+    fn mingle(self, o: Self, t: f32) -> Self;
+    fn insert(self, o: Self) -> Self;
     fn sub(self, o: Self) -> Self;
-    fn scale(self, s: f32) -> Self;
+    fn magnify(self, s: f32) -> Self;
 }
 impl Blend for Vec2 {
-    fn mix(self, o: Self, t: f32) -> Self {
+    fn mingle(self, o: Self, t: f32) -> Self {
         self.lerp(o, t)
     }
-    fn add(self, o: Self) -> Self {
+    fn insert(self, o: Self) -> Self {
         self + o
     }
     fn sub(self, o: Self) -> Self {
         self - o
     }
-    fn scale(self, s: f32) -> Self {
+    fn magnify(self, s: f32) -> Self {
         self * s
     }
 }
 impl Blend for [f32; 4] {
-    fn mix(self, o: Self, t: f32) -> Self {
+    fn mingle(self, o: Self, t: f32) -> Self {
         std::array::from_fn(|k| self[k] + (o[k] - self[k]) * t)
     }
-    fn add(self, o: Self) -> Self {
+    fn insert(self, o: Self) -> Self {
         std::array::from_fn(|k| self[k] + o[k])
     }
     fn sub(self, o: Self) -> Self {
         std::array::from_fn(|k| self[k] - o[k])
     }
-    fn scale(self, s: f32) -> Self {
+    fn magnify(self, s: f32) -> Self {
         std::array::from_fn(|k| self[k] * s)
     }
 }
@@ -477,15 +549,28 @@ fn to_b(c: [f32; 4]) -> [u8; 4] {
 }
 
 /// Coons-patch fill of the grid interior, shared by positions, colours and UVs.
-fn coons<T: Blend>(g: &[Vec<u32>], h: usize, val: &HashMap<u32, T>, center: T, a: usize, b: usize) -> T {
+fn coons<T: Blend>(
+    g: &[Vec<u32>],
+    h: usize,
+    val: &HashMap<u32, T>,
+    center: T,
+    a: usize,
+    b: usize,
+) -> T {
     let (s, t) = (a as f32 / h as f32, b as f32 / h as f32);
     let at = |i: usize, j: usize| val[&g[i][j]];
     at(a, 0)
-        .scale(1.0 - t)
-        .add(at(a, h).scale(t))
-        .add(at(0, b).scale(1.0 - s))
-        .add(at(h, b).scale(s))
-        .sub(at(0, 0).scale((1.0 - s) * (1.0 - t)).add(at(h, 0).scale(s * (1.0 - t))).add(at(0, h).scale((1.0 - s) * t)).add(center.scale(s * t)))
+        .magnify(1.0 - t)
+        .insert(at(a, h).magnify(t))
+        .insert(at(0, b).magnify(1.0 - s))
+        .insert(at(h, b).magnify(s))
+        .sub(
+            at(0, 0)
+                .magnify((1.0 - s) * (1.0 - t))
+                .insert(at(h, 0).magnify(s * (1.0 - t)))
+                .insert(at(0, h).magnify((1.0 - s) * t))
+                .insert(center.magnify(s * t)),
+        )
 }
 
 /// Subdivides each selected face into quads, `segments` (even, ≥ 2) pieces along every edge: a
@@ -496,15 +581,27 @@ fn coons<T: Blend>(g: &[Vec<u32>], h: usize, val: &HashMap<u32, T>, center: T, a
 pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> BTreeSet<usize> {
     let segments = (segments.max(2) - segments % 2).max(2) as usize;
     let h = segments / 2;
-    let mut face_set: BTreeSet<usize> = faces.iter().copied().filter(|f| *f < m.faces.len()).collect();
+    let mut face_set: BTreeSet<usize> = faces
+        .iter()
+        .copied()
+        .filter(|f| *f < m.facets.len())
+        .collect();
     let mut centers: HashMap<usize, Vec3> = HashMap::new();
     for fi in face_set.clone() {
-        let Some(lp) = loop_plane(m, &m.faces[fi].verts) else { continue };
+        let Some(lp) = loop_plane(m, &m.facets[fi].verts) else {
+            continue;
+        };
         if !lp.is_concave() {
             continue;
         }
         match interior_point(&lp) {
-            Some(kp) if loops_are_valid(&cells_2d(&lp.pts, kp, segments), lp.orient, lp.scale) => {
+            Some(kp)
+                if loops_are_valid(
+                    &cells_2d(&lp.pts, kp, segments),
+                    lp.align_heading,
+                    lp.magnify,
+                ) =>
+            {
                 centers.insert(fi, lp.to_3d(kp));
             }
             _ => {
@@ -517,27 +614,40 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
     }
     let mut edge_pts: BTreeMap<Edge, Vec<u32>> = BTreeMap::new();
     for &fi in &face_set {
-        let verts = m.faces[fi].verts.clone();
+        let verts = m.facets[fi].verts.clone();
         for i in 0..verts.len() {
             let e = edge(verts[i], verts[(i + 1) % verts.len()]);
             if !edge_pts.contains_key(&e) {
                 let (pa, pb) = (m.positions[e.0 as usize], m.positions[e.1 as usize]);
-                let list = (1..segments).map(|s| m.add_vert(pa.lerp(pb, s as f32 / segments as f32))).collect();
+                let list = (1..segments)
+                    .map(|s| m.add_vert(pa.lerp(pb, s as f32 / segments as f32)))
+                    .collect();
                 edge_pts.insert(e, list);
             }
         }
     }
-    splice_edge_points(m, &edge_pts, &face_set);
+    interleave_ridge_points(m, &edge_pts, &face_set);
     let mut new_faces: Vec<Face> = Vec::new();
     for &fi in &face_set {
-        let face = m.faces[fi].clone();
+        let face = m.facets[fi].clone();
         let verts = face.verts.clone();
         let n = verts.len();
-        let center_pos = centers.get(&fi).copied().unwrap_or_else(|| m.face_center(fi));
+        let center_pos = centers
+            .get(&fi)
+            .copied()
+            .unwrap_or_else(|| m.face_center(fi));
         let center = m.add_vert(center_pos);
-        let cw = centers.contains_key(&fi).then(|| corner_weights(&verts.iter().map(|v| m.positions[*v as usize]).collect::<Vec<_>>(), center_pos));
+        let cw = centers.contains_key(&fi).then(|| {
+            corner_weights(
+                &verts
+                    .iter()
+                    .map(|v| m.positions[*v as usize])
+                    .collect::<Vec<_>>(),
+                center_pos,
+            )
+        });
         let has_col = face.corner_colors().is_some();
-        let has_uv = face.manual_uvs().is_some();
+        let has_uv = face.by_hand_tex_coords().is_some();
         let mut vcol: HashMap<u32, [f32; 4]> = HashMap::new();
         let mut vuv: HashMap<u32, Vec2> = HashMap::new();
         let mut center_col = [0.0; 4];
@@ -547,8 +657,12 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
                 vcol.insert(verts[i], to_f(face.color_corners[i]));
             }
             center_col = match &cw {
-                Some(w) => (0..n).fold([0.0; 4], |a, i| a.add(to_f(face.color_corners[i]).scale(w[i]))),
-                None => (0..n).fold([0.0; 4], |a, i| a.add(to_f(face.color_corners[i]))).scale(1.0 / n as f32),
+                Some(w) => (0..n).fold([0.0; 4], |a, i| {
+                    a.insert(to_f(face.color_corners[i]).magnify(w[i]))
+                }),
+                None => (0..n)
+                    .fold([0.0; 4], |a, i| a.insert(to_f(face.color_corners[i])))
+                    .magnify(1.0 / n as f32),
             };
             vcol.insert(center, center_col);
         }
@@ -579,7 +693,10 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
             for s in 1..segments {
                 let t = s as f32 / segments as f32;
                 if has_col {
-                    vcol.insert(pts[i][s - 1], to_f(face.color_corners[i]).mix(to_f(face.color_corners[j]), t));
+                    vcol.insert(
+                        pts[i][s - 1],
+                        to_f(face.color_corners[i]).mingle(to_f(face.color_corners[j]), t),
+                    );
                 }
                 if has_uv {
                     vuv.insert(pts[i][s - 1], face.uv_coords[i].lerp(face.uv_coords[j], t));
@@ -603,7 +720,7 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
                 let t = k as f32 / h as f32;
                 if has_col {
                     let mc = vcol[&pts[i][h - 1]];
-                    vcol.insert(spokes[i][k], mc.mix(center_col, t));
+                    vcol.insert(spokes[i][k], mc.mingle(center_col, t));
                 }
                 if has_uv {
                     let mu = vuv[&pts[i][h - 1]];
@@ -622,15 +739,28 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
                 g[0][b] = pts[prev][segments - 1 - b];
                 g[h][b] = spokes[i][b];
             }
-            let posmap: HashMap<u32, Vec3> = g.iter().flatten().map(|v| (*v, m.positions[*v as usize])).collect();
+            let posmap: HashMap<u32, Vec3> = g
+                .iter()
+                .flatten()
+                .map(|v| (*v, m.positions[*v as usize]))
+                .collect();
             for a in 1..h {
                 for b in 1..h {
                     // Positions through the same Coons blend (Vec3 via two Vec2 halves is not
                     // needed: do it inline).
                     let (s, t) = (a as f32 / h as f32, b as f32 / h as f32);
-                    let at = |i: usize, j: usize| posmap.get(&g[i][j]).copied().unwrap_or_else(|| m.positions[g[i][j] as usize]);
-                    let p = at(a, 0) * (1.0 - t) + at(a, h) * t + at(0, b) * (1.0 - s) + at(h, b) * s
-                        - (at(0, 0) * ((1.0 - s) * (1.0 - t)) + at(h, 0) * (s * (1.0 - t)) + at(0, h) * ((1.0 - s) * t) + center_pos * (s * t));
+                    let at = |i: usize, j: usize| {
+                        posmap
+                            .get(&g[i][j])
+                            .copied()
+                            .unwrap_or_else(|| m.positions[g[i][j] as usize])
+                    };
+                    let p =
+                        at(a, 0) * (1.0 - t) + at(a, h) * t + at(0, b) * (1.0 - s) + at(h, b) * s
+                            - (at(0, 0) * ((1.0 - s) * (1.0 - t))
+                                + at(h, 0) * (s * (1.0 - t))
+                                + at(0, h) * ((1.0 - s) * t)
+                                + center_pos * (s * t));
                     let v = m.add_vert(p);
                     g[a][b] = v;
                     if has_col {
@@ -659,12 +789,17 @@ pub fn subdivide_grid(m: &mut BMesh, faces: &BTreeSet<usize>, segments: u32) -> 
             }
         }
     }
-    let old = std::mem::take(&mut m.faces);
-    m.faces = old.into_iter().enumerate().filter(|(i, _)| !face_set.contains(i)).map(|(_, f)| f).collect();
-    let first = m.faces.len();
-    m.faces.extend(new_faces);
+    let old = std::mem::take(&mut m.facets);
+    m.facets = old
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !face_set.contains(i))
+        .map(|(_, f)| f)
+        .collect();
+    let first = m.facets.len();
+    m.facets.extend(new_faces);
     let _ = lerp_color;
-    (first..m.faces.len()).collect()
+    (first..m.facets.len()).collect()
 }
 
 #[cfg(test)]
@@ -673,22 +808,29 @@ mod tests {
     use super::*;
 
     fn top(m: &BMesh) -> usize {
-        (0..m.faces.len()).find(|f| m.face_normal(*f).y > 0.9).unwrap()
+        (0..m.facets.len())
+            .find(|f| m.face_normal(*f).y > 0.9)
+            .unwrap()
     }
 
     #[test]
     fn subdivide_four_segments_keeps_closed_and_lerps_paint() {
         let mut m = cuboid(v3(2.0, 2.0, 2.0));
         let t = top(&m);
-        m.faces[t].color_corners = vec![[0, 0, 0, 255], [255, 255, 255, 255], [255, 255, 255, 255], [0, 0, 0, 255]];
+        m.facets[t].color_corners = vec![
+            [0, 0, 0, 255],
+            [255, 255, 255, 255],
+            [255, 255, 255, 255],
+            [0, 0, 0, 255],
+        ];
         let new = subdivide_grid(&mut m, &BTreeSet::from([t]), 4);
         assert_eq!(new.len(), 16);
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert!((m.volume() - 8.0).abs() < 1e-4);
         let area: f32 = new.iter().map(|f| m.face_area(*f)).sum();
         assert!((area - 4.0).abs() < 1e-4);
-        assert!(new.iter().all(|f| m.faces[*f].color_corners.len() == 4));
+        assert!(new.iter().all(|f| m.facets[*f].color_corners.len() == 4));
         // Odd counts round down to even.
         let mut m2 = cuboid(v3(1.0, 1.0, 1.0));
         let t2 = top(&m2);
@@ -698,7 +840,14 @@ mod tests {
     #[test]
     fn subdivide_concave_l_uses_the_kernel() {
         let mut m = BMesh::default();
-        let pts = [v3(0.0, 0.0, 0.0), v3(2.0, 0.0, 0.0), v3(2.0, 0.0, -1.0), v3(1.0, 0.0, -1.0), v3(1.0, 0.0, -2.0), v3(0.0, 0.0, -2.0)];
+        let pts = [
+            v3(0.0, 0.0, 0.0),
+            v3(2.0, 0.0, 0.0),
+            v3(2.0, 0.0, -1.0),
+            v3(1.0, 0.0, -1.0),
+            v3(1.0, 0.0, -2.0),
+            v3(0.0, 0.0, -2.0),
+        ];
         let vs: Vec<u32> = pts.iter().map(|p| m.add_vert(*p)).collect();
         m.add_face(vs);
         let new = subdivide_grid(&mut m, &BTreeSet::from([0]), 2);
@@ -709,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn inset_width_and_equal_rims() {
+    fn recess_breadth_plus_even_brims() {
         let mut m = cuboid(v3(2.0, 1.0, 1.0));
         let t = top(&m);
         let inner = inset_rim(&mut m, &BTreeSet::from([t]), 0.2, true);
@@ -719,7 +868,9 @@ mod tests {
         assert!((m.face_area(f) - 0.96).abs() < 1e-4, "{}", m.face_area(f));
         let mut m = cuboid(v3(2.0, 1.0, 1.0));
         let t = top(&m);
-        let f = *inset_rim(&mut m, &BTreeSet::from([t]), 0.2, false).first().unwrap();
+        let f = *inset_rim(&mut m, &BTreeSet::from([t]), 0.2, false)
+            .first()
+            .unwrap();
         assert!(m.is_closed());
         assert!(m.face_area(f) < 2.0 && m.face_area(f) > 0.5);
     }
@@ -728,23 +879,23 @@ mod tests {
     fn collapse_and_insert_vertex() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
         let t = top(&m);
-        let v = m.faces[t].verts.clone();
+        let v = m.facets[t].verts.clone();
         let mid = (m.positions[v[0] as usize] + m.positions[v[1] as usize]) * 0.5;
         let p = insert_vertex(&mut m, (v[0], v[1]), mid).unwrap();
         assert!(m.is_closed());
-        assert_eq!(m.faces[t].verts.len(), 5);
+        assert_eq!(m.facets[t].verts.len(), 5);
         assert!(insert_vertex(&mut m, (v[0], v[2]), Vec3::ZERO).is_none());
         // Collapse the new vertex into its edge neighbour: back to a closed box.
         assert!(collapse_selection(&mut m, &BTreeSet::from([p, v[0]])).is_some());
-        m.validate().unwrap();
+        m.sanity_check().unwrap();
         assert!(m.is_closed());
         assert_eq!(m.positions.len(), 8);
         // Collapsing two opposite top corners would fold the top: refused or still valid.
         let mut b = cuboid(v3(1.0, 1.0, 1.0));
         let t = top(&b);
-        let tv = b.faces[t].verts.clone();
+        let tv = b.facets[t].verts.clone();
         if collapse_selection(&mut b, &BTreeSet::from([tv[0], tv[2]])).is_some() {
-            b.validate().unwrap();
+            b.sanity_check().unwrap();
         }
     }
 }

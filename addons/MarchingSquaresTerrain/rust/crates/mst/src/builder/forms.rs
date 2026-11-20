@@ -1,15 +1,16 @@
 //! `FieldForm`: a labelled column of builder settings, built from a row list and synced from
-//! [`Values`] / [`SyncState`]. The Xogot layout's Selection & Handles popover, Options dialog,
+//! [`Values`] / [`SyncState`]. The modeler layout's Selection & Handles popover, Options dialog,
 //! HUD Tool Options and Paint popover build their settings with it; every row edits the same
 //! plugin value as the MST strip / palette / preferences (`on_field*`, `on_pref`, `on_uv_*`, …).
 //!
-//! Port of the row kinds of xogot-rust (MIT) `xogot_modeler/src/ui/parameter_form.rs` (bool →
-//! CheckBox, number → spin box, choice → OptionButton, colour → ColorPickerButton; one label
-//! column) and `form_logic.rs` `keys_changed` (rebuild only when the row list changes, else
-//! refresh values without signals). Ranges come from `Field::describe` instead of descriptors.
+//! Rows are a check box (bool), a spin box (number), an option button (choice) or a colour
+//! picker, each with its label column; the form rebuilds only when the row list changes and
+//! else refreshes values without signals. Ranges come from `Field::describe`.
 
 use godot::classes::control::{FocusMode, MouseFilter, SizeFlags};
-use godot::classes::{Button, CheckBox, Control, GridContainer, HBoxContainer, Label, OptionButton, SpinBox};
+use godot::classes::{
+    Button, CheckBox, Control, GridContainer, HBoxContainer, Label, OptionButton, SpinBox,
+};
 use godot::prelude::*;
 
 use super::layout::Layout;
@@ -30,7 +31,7 @@ pub enum MeshProp {
 pub enum Row {
     /// A strip field (`on_field` / `on_field_option` / `on_field_check`).
     Field(Field),
-    /// A toggle action as a check box (`on_xg_toggle`), with its Xogot label.
+    /// A toggle action as a check box (`on_xg_toggle`), with its modeler label.
     Toggle(Action, &'static str),
     /// A builder preference (`on_pref`).
     Pref(Key),
@@ -47,8 +48,7 @@ pub enum Row {
     ShapeArched,
 }
 
-/// Xogot's labels for the strip fields (`parameters::options` / `selection_handles`), else the
-/// strip's own short label.
+/// Labels for the strip fields in the modeler layout, else the strip's own short label.
 pub fn field_label(f: Field) -> &'static str {
     match f {
         Field::Distance => "Distance",
@@ -91,7 +91,7 @@ pub fn field_label(f: Field) -> &'static str {
         Field::SmoothTint => "Tint Faces by Smoothing Group",
         Field::ShowNormals => "Show Normals",
         Field::NormalLength => "Normal Length",
-        _ => f.describe().0,
+        _ => f.portray().0,
     }
 }
 
@@ -100,8 +100,8 @@ pub fn row_label(r: &Row) -> String {
     match r {
         Row::Field(f) => field_label(*f).to_string(),
         Row::Toggle(_, t) | Row::Mesh(_, t) => t.to_string(),
-        Row::Pref(k) => k.describe().0.to_string(),
-        Row::Uv(u) => u.describe().0.to_string(),
+        Row::Pref(k) => k.portray().0.to_string(),
+        Row::Uv(u) => u.portray().0.to_string(),
         Row::UvWorld => "World Aligned".into(),
         Row::UvButtons => "Face UVs".into(),
         Row::Layout => "UI Layout".into(),
@@ -113,9 +113,9 @@ pub fn row_label(r: &Row) -> String {
 /// Tooltip of a row.
 fn row_tip(r: &Row) -> String {
     match r {
-        Row::Field(f) => f.describe().4.to_string(),
+        Row::Field(f) => f.portray().4.to_string(),
         Row::Toggle(a, _) => super::ui::action_tooltip(*a),
-        Row::Pref(k) => k.describe().1.to_string(),
+        Row::Pref(k) => k.portray().1.to_string(),
         Row::Uv(_) | Row::UvWorld | Row::UvButtons => "Automatic box projection per face (the palette's Face UV): selecting one face loads its values; Apply writes them to the selected faces".into(),
         Row::Mesh(MeshProp::LiveUv2, _) => "Live UV2 of the edited builder mesh: lightmap UV2 unwrapped half a second after each edit (texel: Lightmap Texel)".into(),
         Row::Mesh(MeshProp::ClearGrass, _) => "Clear grass of the edited builder mesh: terrain grass under its footprint is removed".into(),
@@ -135,8 +135,8 @@ enum Ctl {
 
 /// A built form: the grid and its rows' controls.
 pub struct FieldForm {
-    pub root: Gd<GridContainer>,
-    rows: Vec<(Row, Gd<Label>, Gd<Control>, Ctl)>,
+    pub base: Gd<GridContainer>,
+    ranks: Vec<(Row, Gd<Label>, Gd<Control>, Ctl)>,
 }
 
 fn spin(min: f64, max: f64, step: f64) -> Gd<SpinBox> {
@@ -155,32 +155,39 @@ impl FieldForm {
         root.set_columns(2);
         root.set_h_size_flags(SizeFlags::EXPAND_FILL);
         root.add_theme_constant_override("v_separation", (4.0 * ui_kit::editor_scale()) as i32);
-        FieldForm { root, rows: Vec::new() }
+        FieldForm {
+            base: root,
+            ranks: Vec::new(),
+        }
     }
 
     /// The current row list (`keys_changed` compares it).
-    pub fn rows(&self) -> Vec<Row> {
-        self.rows.iter().map(|r| r.0).collect()
+    pub fn ranks(&self) -> Vec<Row> {
+        self.ranks.iter().map(|r| r.0).collect()
     }
 
     /// Row labels (debug / search).
     pub fn labels(&self) -> Vec<String> {
-        self.rows.iter().filter(|r| r.1.is_visible()).map(|r| r.1.get_text().to_string()).collect()
+        self.ranks
+            .iter()
+            .filter(|r| r.1.is_visible())
+            .map(|r| r.1.get_text().to_string())
+            .collect()
     }
 
     /// Rebuilds the controls when `rows` differs from the current list, then syncs the values.
-    pub fn set_rows(&mut self, target: &Gd<Object>, rows: &[Row], v: &Values, st: &SyncState) {
-        if self.rows() != rows {
-            for mut c in self.root.get_children().iter_shared() {
-                self.root.remove_child(&c);
+    pub fn set_rows(&mut self, addressee: &Gd<Object>, rows: &[Row], v: &Values, st: &SyncState) {
+        if self.ranks() != rows {
+            for mut c in self.base.get_children().iter_shared() {
+                self.base.remove_child(&c);
                 c.queue_free();
             }
-            self.rows.clear();
+            self.ranks.clear();
             for r in rows {
-                let (label, ctl, kind) = build_row(target, r, v, st);
-                self.root.add_child(&label);
-                self.root.add_child(&ctl);
-                self.rows.push((*r, label, ctl, kind));
+                let (label, ctl, kind) = build_row(addressee, r, v, st);
+                self.base.add_child(&label);
+                self.base.add_child(&ctl);
+                self.ranks.push((*r, label, ctl, kind));
             }
         }
         self.sync(v, st);
@@ -188,14 +195,18 @@ impl FieldForm {
 
     /// Mirrors the values into the controls without signals.
     pub fn sync(&mut self, v: &Values, st: &SyncState) {
-        for (r, _, _, c) in &mut self.rows {
+        for (r, _, _, c) in &mut self.ranks {
             match (r, c) {
-                (Row::Field(f), Ctl::Spin(sb)) => sb.set_value_no_signal(v.get(*f)),
-                (Row::Field(f), Ctl::Option(ob)) => ob.select(v.get(*f) as i32),
-                (Row::Field(f), Ctl::Check(cb)) => cb.set_pressed_no_signal(v.get(*f) >= 0.5),
-                (Row::Toggle(a, _), Ctl::Check(cb)) => cb.set_pressed_no_signal(super::ui::action_pressed(*a, v, st).unwrap_or(false)),
+                (Row::Field(f), Ctl::Spin(sb)) => sb.set_value_no_signal(v.fetch(*f)),
+                (Row::Field(f), Ctl::Option(ob)) => ob.select(v.fetch(*f) as i32),
+                (Row::Field(f), Ctl::Check(cb)) => cb.set_pressed_no_signal(v.fetch(*f) >= 0.5),
+                (Row::Toggle(a, _), Ctl::Check(cb)) => {
+                    cb.set_pressed_no_signal(super::ui::action_pressed(*a, v, st).unwrap_or(false))
+                }
                 (Row::Pref(k), Ctl::Pref(c)) => prefs::sync_control(c, *k, &st.prefs),
-                (Row::Uv(u), Ctl::Spin(sb)) => sb.set_value_no_signal(v.uv[*u as usize] as f64),
+                (Row::Uv(u), Ctl::Spin(sb)) => {
+                    sb.set_value_no_signal(v.tex_coord[*u as usize] as f64)
+                }
                 (Row::UvWorld, Ctl::Check(cb)) => cb.set_pressed_no_signal(v.uv_world),
                 (Row::Mesh(p, _), Ctl::Check(cb)) => {
                     cb.set_pressed_no_signal(match p {
@@ -204,8 +215,8 @@ impl FieldForm {
                     });
                     cb.set_disabled(!st.has_target);
                 }
-                (Row::Layout, Ctl::Option(ob)) => ob.select(Layout::load() as i32),
-                (Row::ShapeSmooth, Ctl::Check(cb)) => cb.set_pressed_no_signal(v.spec.smooth),
+                (Row::Layout, Ctl::Option(ob)) => ob.select(Layout::ingest() as i32),
+                (Row::ShapeSmooth, Ctl::Check(cb)) => cb.set_pressed_no_signal(v.spec.glide),
                 (Row::ShapeArched, Ctl::Check(cb)) => cb.set_pressed_no_signal(v.spec.arched),
                 _ => {}
             }
@@ -213,9 +224,9 @@ impl FieldForm {
     }
 
     /// Shows only the rows whose label contains `query` (case-insensitive; empty = all).
-    pub fn filter(&mut self, query: &str) {
+    pub fn sift(&mut self, query: &str) {
         let q = query.trim().to_lowercase();
-        for (r, l, c, _) in &mut self.rows {
+        for (r, l, c, _) in &mut self.ranks {
             let show = q.is_empty() || row_label(r).to_lowercase().contains(&q);
             l.set_visible(show);
             c.set_visible(show);
@@ -224,7 +235,7 @@ impl FieldForm {
 
     /// Hides / shows rows by a predicate (e.g. `field_visible` for the Tool Options popup).
     pub fn show_where(&mut self, keep: impl Fn(&Row) -> bool) {
-        for (r, l, c, _) in &mut self.rows {
+        for (r, l, c, _) in &mut self.ranks {
             let show = keep(r);
             l.set_visible(show);
             c.set_visible(show);
@@ -232,7 +243,12 @@ impl FieldForm {
     }
 }
 
-fn build_row(target: &Gd<Object>, r: &Row, v: &Values, st: &SyncState) -> (Gd<Label>, Gd<Control>, Ctl) {
+fn build_row(
+    addressee: &Gd<Object>,
+    r: &Row,
+    v: &Values,
+    st: &SyncState,
+) -> (Gd<Label>, Gd<Control>, Ctl) {
     let s = ui_kit::editor_scale();
     let mut label = Label::new_alloc();
     label.set_text(&row_label(r));
@@ -249,76 +265,117 @@ fn build_row(target: &Gd<Object>, r: &Row, v: &Values, st: &SyncState) -> (Gd<La
     let (mut ctl, kind): (Gd<Control>, Ctl) = match r {
         Row::Field(f) => {
             let id = (*f as i64).to_variant();
-            let (_, min, max, step, _) = f.describe();
+            let (_, min, max, step, _) = f.portray();
             if f.is_check() {
-                let mut cb = check(v.get(*f) >= 0.5);
-                cb.connect("toggled", &Callable::from_object_method(target, "on_field_check").bind(&[id]));
+                let mut cb = check(v.fetch(*f) >= 0.5);
+                cb.connect(
+                    "toggled",
+                    &Callable::from_object_method(addressee, "on_field_check").bind(&[id]),
+                );
                 (cb.clone().upcast(), Ctl::Check(cb))
-            } else if let Some(choices) = f.options() {
+            } else if let Some(choices) = f.choices() {
                 let mut ob = OptionButton::new_alloc();
                 for c in choices {
                     ob.add_item(*c);
                 }
-                ob.select(v.get(*f) as i32);
+                ob.select(v.fetch(*f) as i32);
                 ob.set_focus_mode(FocusMode::NONE);
-                ob.connect("item_selected", &Callable::from_object_method(target, "on_field_option").bind(&[id]));
+                ob.connect(
+                    "item_selected",
+                    &Callable::from_object_method(addressee, "on_field_option").bind(&[id]),
+                );
                 (ob.clone().upcast(), Ctl::Option(ob))
             } else {
                 let mut sb = spin(min, max, step);
-                sb.set_allow_greater(matches!(f, Field::SizeX | Field::SizeY | Field::SizeZ | Field::Distance | Field::Bevel));
-                sb.set_value_no_signal(v.get(*f));
-                sb.connect("value_changed", &Callable::from_object_method(target, "on_field").bind(&[id]));
+                sb.set_allow_greater(matches!(
+                    f,
+                    Field::SizeX | Field::SizeY | Field::SizeZ | Field::Distance | Field::Bevel
+                ));
+                sb.set_value_no_signal(v.fetch(*f));
+                sb.connect(
+                    "value_changed",
+                    &Callable::from_object_method(addressee, "on_field").bind(&[id]),
+                );
                 (sb.clone().upcast(), Ctl::Spin(sb))
             }
         }
         Row::Toggle(a, _) => {
             let mut cb = check(super::ui::action_pressed(*a, v, st).unwrap_or(false));
-            cb.connect("toggled", &Callable::from_object_method(target, "on_xg_toggle").bind(&[(*a as i64).to_variant()]));
+            cb.connect(
+                "toggled",
+                &Callable::from_object_method(addressee, "on_xg_toggle")
+                    .bind(&[(*a as i64).to_variant()]),
+            );
             (cb.clone().upcast(), Ctl::Check(cb))
         }
         Row::Pref(k) => {
-            let c = prefs::make_control(target, *k, &st.prefs);
+            let c = prefs::fabricate_widget(addressee, *k, &st.prefs);
             (c.clone(), Ctl::Pref(c))
         }
         Row::Uv(u) => {
-            let (_, min, max, step) = u.describe();
+            let (_, min, max, step) = u.portray();
             let mut sb = spin(min, max, step);
             sb.set_allow_greater(true);
             sb.set_allow_lesser(true);
-            sb.set_value_no_signal(v.uv[*u as usize] as f64);
-            sb.connect("value_changed", &Callable::from_object_method(target, "on_uv_field").bind(&[(*u as i64).to_variant()]));
+            sb.set_value_no_signal(v.tex_coord[*u as usize] as f64);
+            sb.connect(
+                "value_changed",
+                &Callable::from_object_method(addressee, "on_uv_field")
+                    .bind(&[(*u as i64).to_variant()]),
+            );
             (sb.clone().upcast(), Ctl::Spin(sb))
         }
         Row::UvWorld => {
             let mut cb = check(v.uv_world);
-            cb.connect("toggled", &Callable::from_object_method(target, "on_uv_world"));
+            cb.connect(
+                "toggled",
+                &Callable::from_object_method(addressee, "on_uv_world"),
+            );
             (cb.clone().upcast(), Ctl::Check(cb))
         }
         Row::UvButtons => {
             let mut hb = HBoxContainer::new_alloc();
             for (text, method, tip) in [
-                ("Apply", "on_uv_apply", "Apply the UV values to the selected faces (all faces in Object mode)"),
+                (
+                    "Apply",
+                    "on_uv_apply",
+                    "Apply the UV values to the selected faces (all faces in Object mode)",
+                ),
                 ("Reset", "on_uv_reset", "Reset the UV values (and apply)"),
-                ("↻ 90°", "on_uv_rotate", "Rotate the selected faces' UVs by 90°"),
+                (
+                    "↻ 90°",
+                    "on_uv_rotate",
+                    "Rotate the selected faces' UVs by 90°",
+                ),
             ] {
                 let mut b = Button::new_alloc();
                 b.set_text(text);
                 b.set_tooltip_text(tip);
                 b.set_focus_mode(FocusMode::NONE);
-                b.connect("pressed", &Callable::from_object_method(target, method));
+                b.connect("pressed", &Callable::from_object_method(addressee, method));
                 hb.add_child(&b);
             }
             (hb.upcast(), Ctl::None)
         }
         Row::Mesh(p, _) => {
             let mut cb = check(false);
-            cb.connect("toggled", &Callable::from_object_method(target, "on_xg_mesh_prop").bind(&[(*p as i64).to_variant()]));
+            cb.connect(
+                "toggled",
+                &Callable::from_object_method(addressee, "on_xg_mesh_prop")
+                    .bind(&[(*p as i64).to_variant()]),
+            );
             (cb.clone().upcast(), Ctl::Check(cb))
         }
         Row::ShapeSmooth | Row::ShapeArched => {
             let smooth = *r == Row::ShapeSmooth;
-            let mut cb = check(if smooth { v.spec.smooth } else { v.spec.arched });
-            cb.connect("toggled", &Callable::from_object_method(target, if smooth { "on_smooth" } else { "on_arched" }));
+            let mut cb = check(if smooth { v.spec.glide } else { v.spec.arched });
+            cb.connect(
+                "toggled",
+                &Callable::from_object_method(
+                    addressee,
+                    if smooth { "on_smooth" } else { "on_arched" },
+                ),
+            );
             (cb.clone().upcast(), Ctl::Check(cb))
         }
         Row::Layout => {
@@ -326,9 +383,12 @@ fn build_row(target: &Gd<Object>, r: &Row, v: &Values, st: &SyncState) -> (Gd<La
             for n in super::layout::NAMES {
                 ob.add_item(n);
             }
-            ob.select(Layout::load() as i32);
+            ob.select(Layout::ingest() as i32);
             ob.set_focus_mode(FocusMode::NONE);
-            ob.connect("item_selected", &Callable::from_object_method(target, "on_layout_choice"));
+            ob.connect(
+                "item_selected",
+                &Callable::from_object_method(addressee, "on_layout_choice"),
+            );
             (ob.clone().upcast(), Ctl::Option(ob))
         }
     };

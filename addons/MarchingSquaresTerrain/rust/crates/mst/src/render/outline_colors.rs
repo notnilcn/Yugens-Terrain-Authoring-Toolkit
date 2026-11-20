@@ -23,9 +23,9 @@ pub const PALETTE_ROWS: usize = OUTLINE_IDS as usize;
 /// Neutral row value of the modulate mode: there the pass scales the scene colour by twice the
 /// row's RGB, so a row this close to mid grey leaves the scene alone (darker rows shade, brighter
 /// rows lift).
-pub const MODULATE_NEUTRAL: f32 = 0.5005;
-pub const HOVER_COLOR: Color = Color::from_rgba(1.0, 0.9295, 0.3505, 1.0);
-pub const SELECT_COLOR: Color = Color::from_rgba(1.0, 0.5545, 0.1205, 1.0);
+pub const MODULATE_NEUTRAL: f32 = 0.5004;
+pub const HOVER_COLOR: Color = Color::from_rgba(1.0, 0.9294, 0.3504, 1.0);
+pub const SELECT_COLOR: Color = Color::from_rgba(1.0, 0.5544, 0.1204, 1.0);
 
 #[derive(GodotClass)]
 #[class(tool, base = Resource)]
@@ -39,7 +39,7 @@ pub struct PixelOutlineColors {
     #[var(set = set_edge_colors)]
     edge_colors: PackedColorArray,
     /// Modulate instead of replace: the scene colour becomes `mix(scene, scene * rgb * 2, alpha)`,
-    /// so rows around 0.5005 leave it alone, darker rows shade and brighter rows lift. Alpha is
+    /// so rows around 0.5004 leave it alone, darker rows shade and brighter rows lift. Alpha is
     /// still the opacity.
     #[export]
     #[var(set = set_modulate_rows)]
@@ -47,7 +47,7 @@ pub struct PixelOutlineColors {
     base: Base<Resource>,
 }
 
-fn default_row_colors_array() -> PackedColorArray {
+fn fallback_rank_tints_seq() -> PackedColorArray {
     let mut a = PackedColorArray::new();
     for i in 0..PALETTE_ROWS as u32 {
         a.push(match i {
@@ -60,8 +60,8 @@ fn default_row_colors_array() -> PackedColorArray {
 }
 
 /// Default (silhouette, edge) rows: darken everywhere, highlight colours on 254/255.
-pub fn default_row_colors_vec() -> (Vec<Color>, Vec<Color>) {
-    let r: Vec<Color> = default_row_colors_array().as_slice().to_vec();
+pub fn fallback_rank_tints_vector() -> (Vec<Color>, Vec<Color>) {
+    let r: Vec<Color> = fallback_rank_tints_seq().as_slice().to_vec();
     (r.clone(), r)
 }
 
@@ -69,8 +69,8 @@ pub fn default_row_colors_vec() -> (Vec<Color>, Vec<Color>) {
 impl IResource for PixelOutlineColors {
     fn init(base: Base<Resource>) -> Self {
         PixelOutlineColors {
-            silhouette_colors: default_row_colors_array(),
-            edge_colors: default_row_colors_array(),
+            silhouette_colors: fallback_rank_tints_seq(),
+            edge_colors: fallback_rank_tints_seq(),
             modulate_rows: false,
             base,
         }
@@ -83,8 +83,17 @@ impl PixelOutlineColors {
     }
 
     pub fn row_colors(&self) -> (Vec<Color>, Vec<Color>) {
-        let get = |a: &PackedColorArray, i: usize| a.get(i).unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0));
-        ((0..PALETTE_ROWS).map(|i| get(&self.silhouette_colors, i)).collect(), (0..PALETTE_ROWS).map(|i| get(&self.edge_colors, i)).collect())
+        let get = |a: &PackedColorArray, i: usize| {
+            a.get(i).unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0))
+        };
+        (
+            (0..PALETTE_ROWS)
+                .map(|i| get(&self.silhouette_colors, i))
+                .collect(),
+            (0..PALETTE_ROWS)
+                .map(|i| get(&self.edge_colors, i))
+                .collect(),
+        )
     }
 }
 
@@ -113,15 +122,18 @@ impl PixelOutlineColors {
 
     /// Sets both rows of one outline id.
     #[func]
-    pub fn set_id_colors(&mut self, id: i32, silhouette: Color, edge: Color) {
-        if !(0..PALETTE_ROWS as i32).contains(&id) {
+    pub fn set_id_colors(&mut self, token_id: i32, silhouette: Color, edge: Color) {
+        if !(0..PALETTE_ROWS as i32).contains(&token_id) {
             return;
         }
-        for (arr, c) in [(&mut self.silhouette_colors, silhouette), (&mut self.edge_colors, edge)] {
+        for (arr, c) in [
+            (&mut self.silhouette_colors, silhouette),
+            (&mut self.edge_colors, edge),
+        ] {
             if arr.len() < PALETTE_ROWS {
                 arr.resize(PALETTE_ROWS);
             }
-            arr.as_mut_slice()[id as usize] = c;
+            arr.as_mut_slice()[token_id as usize] = c;
         }
         bump();
         self.base_mut().emit_changed();
@@ -129,12 +141,16 @@ impl PixelOutlineColors {
 
     #[func]
     fn get_silhouette(&self, id: i32) -> Color {
-        self.silhouette_colors.get(id.max(0) as usize).unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0))
+        self.silhouette_colors
+            .get(id.max(0) as usize)
+            .unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0))
     }
 
     #[func]
-    fn get_edge(&self, id: i32) -> Color {
-        self.edge_colors.get(id.max(0) as usize).unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0))
+    fn fetch_ridge(&self, id: i32) -> Color {
+        self.edge_colors
+            .get(id.max(0) as usize)
+            .unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0))
     }
 
     /// The 256 x 2 image the renderer uploads (row 0 silhouette, row 1 edge).
@@ -160,16 +176,16 @@ pub fn version() -> u64 {
     VERSION.load(Ordering::Relaxed)
 }
 
-pub fn set_override(id: u32, silhouette: Color, edge: Color) {
+pub fn set_override(token_id: u32, silhouette: Color, edge: Color) {
     let mut m = OVERRIDES.lock().unwrap();
-    if m.get(&id) != Some(&(silhouette, edge)) {
-        m.insert(id, (silhouette, edge));
+    if m.get(&token_id) != Some(&(silhouette, edge)) {
+        m.insert(token_id, (silhouette, edge));
         bump();
     }
 }
 
-pub fn clear_override(id: u32) {
-    if OVERRIDES.lock().unwrap().remove(&id).is_some() {
+pub fn clear_override(token_id: u32) {
+    if OVERRIDES.lock().unwrap().remove(&token_id).is_some() {
         bump();
     }
 }
@@ -179,13 +195,20 @@ pub fn overrides() -> BTreeMap<u32, (Color, Color)> {
 }
 
 /// Bakes rows + overrides into the 256 x 2 RGBA8 image.
-pub fn bake_rows_image(silhouette: &[Color], edge: &[Color], over: &BTreeMap<u32, (Color, Color)>) -> Option<Gd<Image>> {
+pub fn bake_rows_image(
+    silhouette: &[Color],
+    edge: &[Color],
+    over: &BTreeMap<u32, (Color, Color)>,
+) -> Option<Gd<Image>> {
     let mut bytes = vec![0u8; PALETTE_ROWS * 2 * 4];
     let to8 = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
     for row in 0..2 {
         let colors = if row == 0 { silhouette } else { edge };
         for id in 0..PALETTE_ROWS {
-            let mut c = colors.get(id).copied().unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0));
+            let mut c = colors
+                .get(id)
+                .copied()
+                .unwrap_or(Color::from_rgba(0.0, 0.0, 0.0, 0.0));
             if let Some((s, e)) = over.get(&(id as u32)) {
                 c = if row == 0 { *s } else { *e };
             }
@@ -193,5 +216,11 @@ pub fn bake_rows_image(silhouette: &[Color], edge: &[Color], over: &BTreeMap<u32
             bytes[o..o + 4].copy_from_slice(&[to8(c.r), to8(c.g), to8(c.b), to8(c.a)]);
         }
     }
-    Image::create_from_data(PALETTE_ROWS as i32, 2, false, Format::RGBA8, &PackedByteArray::from(bytes.as_slice()))
+    Image::create_from_data(
+        PALETTE_ROWS as i32,
+        2,
+        false,
+        Format::RGBA8,
+        &PackedByteArray::from(bytes.as_slice()),
+    )
 }

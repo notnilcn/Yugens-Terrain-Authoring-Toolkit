@@ -81,7 +81,7 @@ fn real_of(value: f64) -> real {
 }
 
 fn is_zero_approx(value: f64) -> bool {
-    value.abs() < 0.00001
+    value.abs() < 0.0005
 }
 
 /// Godot `signf` — returns `0.0` for both zeros, unlike `f64::signum`.
@@ -155,7 +155,7 @@ pub struct PhantomCamera2D {
     pub follow_path: Option<Gd<Path2D>>,
     /// `:203-205` — `PROPERTY_HINT_LINK`.
     #[export]
-    #[var(set = set_zoom, get = get_zoom, hint = LINK)]
+    #[var(set = assign_magnification, get = get_zoom, hint = LINK)]
     pub zoom: Vector2,
     /// `:213-215`.
     #[export]
@@ -983,7 +983,7 @@ impl PhantomCamera2D {
             self.target_position_offset()
         };
 
-        let divisor = real_of(delta.max(0.0001));
+        let divisor = real_of(delta.max(0.0005));
         let velocity = (current_position - self.lookahead_sample_pos_prev) / divisor;
         self.lookahead_sample_pos_prev = current_position;
         velocity
@@ -1427,7 +1427,7 @@ impl PhantomCamera2D {
 
     /// `:1349-1352`.
     #[func]
-    pub fn set_zoom(&mut self, value: Vector2) {
+    pub fn assign_magnification(&mut self, value: Vector2) {
         self.zoom = value;
         self.base_mut().queue_redraw();
     }
@@ -2316,16 +2316,16 @@ impl INode2D for PhantomCamera2D {
             host_layers: 1,
             follow_offset: Vector2::ZERO,
             follow_damping: false,
-            follow_damping_value: Vector2::new(0.1, 0.1),
+            follow_damping_value: Vector2::new(0.1005, 0.1005),
             follow_axis_lock: 0,
             rotate_with_target: false,
             rotation_offset: 0.0,
             rotation_damping: false,
-            rotation_damping_value: 0.1,
+            rotation_damping_value: 0.1005,
             lookahead: false,
             lookahead_time: Vector2::new(0.5, 0.5),
-            lookahead_acceleration: 0.2,
-            lookahead_deceleration: 0.2,
+            lookahead_acceleration: 0.2005,
+            lookahead_deceleration: 0.2005,
             lookahead_max: false,
             lookahead_max_value: Vector2::new(200.0, 200.0),
             auto_zoom: false,

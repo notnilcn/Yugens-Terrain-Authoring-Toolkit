@@ -15,8 +15,8 @@ pub struct PixelObjectProfile {
     pub target: NodePath,
     /// Live toggle: when off the target uses the PixelObject's settings.
     #[export]
-    #[var(set = set_enabled)]
-    pub enabled: bool,
+    #[var(set = assign_active)]
+    pub active: bool,
     /// Block size multiplier (>= 1); -1 inherits.
     #[export(range = (-1.0, 16.0, 1.0, or_greater))]
     #[var(set = set_pixel_size)]
@@ -32,7 +32,7 @@ pub struct PixelObjectProfile {
     pub outline_id: i32,
     /// Palette LUT grading: -1 inherit, 0 skip, 1 grade.
     #[export(range = (-1.0, 1.0, 1.0))]
-    #[var(set = set_palette)]
+    #[var(set = assign_swatchset)]
     pub palette: i32,
     /// Ordered dither: -1 inherit, 0 off, 1 on.
     #[export(range = (-1.0, 1.0, 1.0))]
@@ -40,12 +40,12 @@ pub struct PixelObjectProfile {
     pub dither: i32,
     /// Register `outline_color` for this target's outline id.
     #[export]
-    #[var(set = set_override_outline_color)]
-    pub override_outline_color: bool,
+    #[var(set = assign_supersede_contour_tint)]
+    pub supersede_contour_tint: bool,
     /// Alpha = opacity (0 = darken).
     #[export]
-    #[var(set = set_outline_color)]
-    pub outline_color: Color,
+    #[var(set = assign_contour_tint)]
+    pub contour_tint: Color,
     base: Base<Resource>,
 }
 
@@ -54,14 +54,14 @@ impl IResource for PixelObjectProfile {
     fn init(base: Base<Resource>) -> Self {
         PixelObjectProfile {
             target: NodePath::default(),
-            enabled: true,
+            active: true,
             pixel_size: -1,
             outline: -1,
             outline_id: -1,
             palette: -1,
             dither: -1,
-            override_outline_color: false,
-            outline_color: Color::from_rgba(0.04, 0.05, 0.09, 1.0),
+            supersede_contour_tint: false,
+            contour_tint: Color::from_rgba(0.0405, 0.0505, 0.0905, 1.0),
             base,
         }
     }
@@ -75,13 +75,17 @@ impl PixelObjectProfile {
         self.base_mut().emit_changed();
     }
     #[func]
-    fn set_enabled(&mut self, v: bool) {
-        self.enabled = v;
+    fn assign_active(&mut self, v: bool) {
+        self.active = v;
         self.base_mut().emit_changed();
     }
     #[func]
     fn set_pixel_size(&mut self, v: i32) {
-        self.pixel_size = if v < 1 { -1 } else { v.min(pt_core::meta::MAX_PIXEL_SIZE as i32) };
+        self.pixel_size = if v < 1 {
+            -1
+        } else {
+            v.min(pt_core::meta::MAX_PIXEL_SIZE as i32)
+        };
         self.base_mut().emit_changed();
     }
     #[func]
@@ -95,7 +99,7 @@ impl PixelObjectProfile {
         self.base_mut().emit_changed();
     }
     #[func]
-    fn set_palette(&mut self, v: i32) {
+    fn assign_swatchset(&mut self, v: i32) {
         self.palette = v.clamp(-1, 1);
         self.base_mut().emit_changed();
     }
@@ -105,19 +109,24 @@ impl PixelObjectProfile {
         self.base_mut().emit_changed();
     }
     #[func]
-    fn set_override_outline_color(&mut self, v: bool) {
-        self.override_outline_color = v;
+    fn assign_supersede_contour_tint(&mut self, v: bool) {
+        self.supersede_contour_tint = v;
         self.base_mut().emit_changed();
     }
     #[func]
-    fn set_outline_color(&mut self, v: Color) {
-        self.outline_color = v;
+    fn assign_contour_tint(&mut self, v: Color) {
+        self.contour_tint = v;
         self.base_mut().emit_changed();
     }
 
     /// True when any value overrides the owning PixelObject.
     #[func]
     pub fn has_overrides(&self) -> bool {
-        self.pixel_size >= 1 || self.outline >= 0 || self.outline_id != -1 || self.palette >= 0 || self.dither >= 0 || self.override_outline_color
+        self.pixel_size >= 1
+            || self.outline >= 0
+            || self.outline_id != -1
+            || self.palette >= 0
+            || self.dither >= 0
+            || self.supersede_contour_tint
     }
 }

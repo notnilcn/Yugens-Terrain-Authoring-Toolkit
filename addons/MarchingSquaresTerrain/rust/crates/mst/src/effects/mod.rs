@@ -25,7 +25,7 @@ use crate::util::is_editor;
 /// children), turns its `_process` on or off and refreshes its configuration warnings.
 /// Returns whether the feature is on. The node's own `visible` is never touched (it is saved).
 pub fn gate(node: &Gd<impl Inherits<Node>>, f: Feature) -> bool {
-    let on = features::enabled(f);
+    let on = features::active(f);
     crate::writes::set_internals_visible(node, on);
     let mut n = node.clone().upcast::<Node>();
     n.set_process(on);
@@ -65,7 +65,7 @@ impl Rng {
 /// The camera effects follow: the 3D editor camera in the editor, else the viewport's camera.
 pub fn active_camera(node: &Gd<Node>) -> Option<Gd<Camera3D>> {
     if is_editor() {
-        crate::render::editor_preview::EditorHost::find().and_then(|h| h.camera())
+        crate::render::editor_preview::EditorHost::locate().and_then(|h| h.camera())
     } else {
         node.get_viewport().and_then(|vp| vp.get_camera_3d())
     }
@@ -107,7 +107,8 @@ pub fn find_in_scene(node: &Gd<Node>, class: &'static str) -> Option<Gd<Node>> {
     let root: Gd<Node> = if is_editor() {
         godot::classes::EditorInterface::singleton().get_edited_scene_root()?
     } else {
-        tree.get_current_scene().unwrap_or_else(|| tree.get_root().upcast())
+        tree.get_current_scene()
+            .unwrap_or_else(|| tree.get_root().upcast())
     };
     let now = godot::classes::Time::singleton().get_ticks_msec();
     let root_id = root.instance_id();
@@ -118,7 +119,11 @@ pub fn find_in_scene(node: &Gd<Node>, class: &'static str) -> Option<Gd<Node>> {
         Stale,
     }
     let cached = SCENE_LOOKUPS.with_borrow(|m| match m.get(class) {
-        Some((rid, Some(n), _)) if *rid == root_id && n.is_instance_valid() && n.is_inside_tree() => Cached::Hit(n.clone()),
+        Some((rid, Some(n), _))
+            if *rid == root_id && n.is_instance_valid() && n.is_inside_tree() =>
+        {
+            Cached::Hit(n.clone())
+        }
         Some((rid, None, retry_at)) if *rid == root_id && now < *retry_at => Cached::Miss,
         _ => Cached::Stale,
     });
@@ -130,7 +135,13 @@ pub fn find_in_scene(node: &Gd<Node>, class: &'static str) -> Option<Gd<Node>> {
     let found = if root.is_class(class) {
         Some(root.clone())
     } else {
-        root.find_children_ex("*").type_(class).recursive(true).owned(false).done().iter_shared().next()
+        root.find_children_ex("*")
+            .type_(class)
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .next()
     };
     SCENE_LOOKUPS.with_borrow_mut(|m| m.insert(class, (root_id, found.clone(), now + 1000)));
     found
@@ -139,9 +150,10 @@ pub fn find_in_scene(node: &Gd<Node>, class: &'static str) -> Option<Gd<Node>> {
 /// Terrain height at a world XZ through `MarchingSquaresTerrain.get_height_at`, or `fallback`.
 pub fn ground_height(terrain: &mut Option<Gd<Node>>, p: Vector3, fallback: f32) -> f32 {
     match terrain {
-        Some(t) if t.is_instance_valid() => {
-            t.call("get_height_at", &[p.to_variant(), fallback.to_variant()]).try_to::<f32>().unwrap_or(fallback)
-        }
+        Some(t) if t.is_instance_valid() => t
+            .call("get_height_at", &[p.to_variant(), fallback.to_variant()])
+            .try_to::<f32>()
+            .unwrap_or(fallback),
         _ => fallback,
     }
 }

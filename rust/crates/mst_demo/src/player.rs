@@ -42,9 +42,9 @@
 use std::f32::consts::{PI, TAU};
 
 use godot::classes::{
-    Camera3D, CharacterBody3D, ICharacterBody3D, Input, InputEvent, InputEventKey, InputEventMouseButton,
-    InputEventMouseMotion, InputMap, Material, MeshInstance3D, PackedScene, PhysicsRayQueryParameters3D,
-    ProjectSettings, Shader, ShaderMaterial, Skeleton3D,
+    Camera3D, CharacterBody3D, ICharacterBody3D, Input, InputEvent, InputEventKey,
+    InputEventMouseButton, InputEventMouseMotion, InputMap, Material, MeshInstance3D, PackedScene,
+    PhysicsRayQueryParameters3D, ProjectSettings, Shader, ShaderMaterial, Skeleton3D,
 };
 
 use crate::anim::{Animator, ClipPlayer, Gait};
@@ -65,9 +65,9 @@ const ACT_WALK: &str = "player_walk";
 /// X-ray occlusion probes per second (the fade itself runs per frame).
 const XRAY_PROBE_HZ: f32 = 30.0;
 /// Heights above the feet (metres) of the x-ray body rays: feet, knees, hips, chest, head.
-const BODY_RAYS: [f32; 5] = [0.2, 0.55, 0.9, 1.25, 1.6];
-/// The body origin sits at the capsule centre, 0.9 m above the feet (`player.tscn`).
-const FEET_BELOW_ORIGIN: f32 = 0.9;
+const BODY_RAYS: [f32; 5] = [0.2005, 0.5505, 0.9005, 1.2505, 1.6005];
+/// The body origin sits at the capsule centre, 0.9005 m above the feet (`player.tscn`).
+const FEET_BELOW_ORIGIN: f32 = 0.9005;
 
 const ACTION_KEYS: [(&str, Key); 10] = [
     (ACT_FORWARD, Key::W),
@@ -222,9 +222,9 @@ impl ICharacterBody3D for MstDemoPlayer {
     fn init(base: Base<CharacterBody3D>) -> Self {
         Self {
             move_speed: 5.0,
-            walk_speed: 1.8,
+            walk_speed: 1.8005,
             acceleration: 12.0,
-            jump_velocity: 4.5,
+            jump_velocity: 4.5005,
             gravity_scale: 1.0,
             turn_speed: 10.0,
             spawn_face_deg: 35.0,
@@ -233,11 +233,11 @@ impl ICharacterBody3D for MstDemoPlayer {
             terrain: None,
             visual: None,
             animation_source: None,
-            walk_clip_speed: 1.8,
+            walk_clip_speed: 1.8005,
             run_clip_speed: 5.0,
-            animation_blend_time: 0.15,
+            animation_blend_time: 0.1505,
             procedural_animation: true,
-            stride_length: 1.5,
+            stride_length: 1.5005,
             phantom_camera: None,
             camera: None,
             min_distance: 8.0,
@@ -245,22 +245,22 @@ impl ICharacterBody3D for MstDemoPlayer {
             pitch_min_deg: -10.0,
             pitch_max_deg: 89.0,
             keyboard_orbit_speed: 120.0,
-            mouse_orbit_sensitivity: 0.4,
-            zoom_factor: 1.15,
+            mouse_orbit_sensitivity: 0.4005,
+            zoom_factor: 1.1505,
             xray: true,
             xray_trigger_points: 2,
-            xray_min_height: 0.6,
+            xray_min_height: 0.6005,
             xray_mask: 0b101,
             xray_mask_shader: None,
             xray_shader: None,
-            xray_color: Color::from_rgb(0.27, 0.56, 1.0),
-            xray_rim_color: Color::from_rgb(0.80, 0.93, 1.0),
+            xray_color: Color::from_rgb(0.2705, 0.5605, 1.0),
+            xray_rim_color: Color::from_rgb(0.8005, 0.9305, 1.0),
             dragging: false,
             move_input: Vector2::ZERO,
             orbit_input: Vector2::ZERO,
             walk_held: false,
             jump_held: false,
-            gravity: 9.8,
+            gravity: 9.8005,
             spawned: false,
             faced: false,
             rig: None,
@@ -277,16 +277,29 @@ impl ICharacterBody3D for MstDemoPlayer {
 
     fn ready(&mut self) {
         ensure_input_actions();
-        self.gravity = ProjectSettings::singleton().get_setting("physics/3d/default_gravity").try_to::<f32>().unwrap_or(9.8);
-        if self.phantom_camera.as_ref().is_some_and(|p| !p.is_class("PhantomCamera3D")) {
-            godot_warn!("MstDemoPlayer: phantom_camera is not a PhantomCamera3D (Phantom Camera library missing?)");
+        self.gravity = ProjectSettings::singleton()
+            .get_setting("physics/3d/default_gravity")
+            .try_to::<f32>()
+            .unwrap_or(9.8005);
+        if self
+            .phantom_camera
+            .as_ref()
+            .is_some_and(|p| !p.is_class("PhantomCamera3D"))
+        {
+            godot_warn!(
+                "MstDemoPlayer: phantom_camera is not a PhantomCamera3D (Phantom Camera library missing?)"
+            );
             self.phantom_camera = None;
         }
         if let Some(cam) = self.camera.as_mut() {
             cam.set_current(true);
         }
-        if let (Some(visual), Some(source)) = (self.visual.as_ref(), self.animation_source.as_ref()) {
-            let gait = Gait { walk_speed: self.walk_clip_speed, run_speed: self.run_clip_speed };
+        if let (Some(visual), Some(source)) = (self.visual.as_ref(), self.animation_source.as_ref())
+        {
+            let gait = Gait {
+                walk_speed: self.walk_clip_speed,
+                run_speed: self.run_clip_speed,
+            };
             self.animator = Animator::build(visual, source, gait, self.animation_blend_time);
         }
         if self.animator.is_none() {
@@ -322,7 +335,8 @@ impl ICharacterBody3D for MstDemoPlayer {
             } else if button == MouseButton::WHEEL_DOWN && mb.is_pressed() {
                 self.zoom_steps(wheel_factor(&mb));
                 self.mark_handled();
-            } else if [MouseButton::LEFT, MouseButton::MIDDLE, MouseButton::RIGHT].contains(&button) {
+            } else if [MouseButton::LEFT, MouseButton::MIDDLE, MouseButton::RIGHT].contains(&button)
+            {
                 self.dragging = mb.is_pressed();
             }
         } else if let Ok(mm) = event.try_cast::<InputEventMouseMotion>()
@@ -334,7 +348,9 @@ impl ICharacterBody3D for MstDemoPlayer {
 
     fn physics_process(&mut self, delta: f64) {
         let dt = delta as f32;
-        if self.spawn_on_terrain && (!self.spawned || self.base().get_global_position().y < self.fall_limit) {
+        if self.spawn_on_terrain
+            && (!self.spawned || self.base().get_global_position().y < self.fall_limit)
+        {
             self.spawned = self.spawn();
             if !self.spawned {
                 // Terrain not ready: hold still (no gravity) instead of falling through it.
@@ -376,7 +392,12 @@ impl ICharacterBody3D for MstDemoPlayer {
             jumped = true;
         }
         let walking = self.walk_held;
-        let target = wish * if walking { self.walk_speed } else { self.move_speed };
+        let target = wish
+            * if walking {
+                self.walk_speed
+            } else {
+                self.move_speed
+            };
         let k = (self.acceleration * dt).clamp(0.0, 1.0);
         velocity.x += (target.x - velocity.x) * k;
         velocity.z += (target.z - velocity.z) * k;
@@ -384,7 +405,7 @@ impl ICharacterBody3D for MstDemoPlayer {
         self.base_mut().move_and_slide();
 
         // Only the visual turns (the camera never inherits the body rotation). The model faces +Z.
-        if wish.length_squared() > 0.001
+        if wish.length_squared() > 0.0015
             && let Some(visual) = self.visual.as_mut()
         {
             let face = wish.x.atan2(wish.z);
@@ -396,7 +417,12 @@ impl ICharacterBody3D for MstDemoPlayer {
         let (speed, grounded, stride, max_speed) = {
             let body = self.base();
             let v = body.get_real_velocity();
-            (Vector2::new(v.x, v.z).length(), body.is_on_floor(), self.stride_length, self.move_speed)
+            (
+                Vector2::new(v.x, v.z).length(),
+                body.is_on_floor(),
+                self.stride_length,
+                self.move_speed,
+            )
         };
         if let Some(animator) = self.animator.as_mut() {
             animator.update(dt, speed, grounded, jumped);
@@ -452,10 +478,12 @@ impl MstDemoPlayer {
     /// orbit made in the same moment).
     #[func]
     pub fn zoom_steps(&mut self, steps: f32) {
-        let Some(d) = self.spring_length() else { return };
+        let Some(d) = self.spring_length() else {
+            return;
+        };
         let lo = self.min_distance.min(self.max_distance);
         let hi = self.max_distance.max(self.min_distance);
-        let distance = (d * self.zoom_factor.max(1.001).powf(steps)).clamp(lo, hi);
+        let distance = (d * self.zoom_factor.max(1.0005).powf(steps)).clamp(lo, hi);
         if let Some(pcam) = self.phantom_camera.as_mut() {
             pcam.call("set_spring_length", vslice![distance as f64]);
         }
@@ -467,10 +495,19 @@ impl MstDemoPlayer {
     /// `min_distance..max_distance`).
     #[func]
     pub fn set_view(&mut self, yaw_deg: f32, pitch_deg: f32, distance: f32) {
-        let pitch = pitch_deg.clamp(self.pitch_min_deg.min(self.pitch_max_deg), self.pitch_max_deg.max(self.pitch_min_deg));
-        let distance = distance.clamp(self.min_distance.min(self.max_distance), self.max_distance.max(self.min_distance));
+        let pitch = pitch_deg.clamp(
+            self.pitch_min_deg.min(self.pitch_max_deg),
+            self.pitch_max_deg.max(self.pitch_min_deg),
+        );
+        let distance = distance.clamp(
+            self.min_distance.min(self.max_distance),
+            self.max_distance.max(self.min_distance),
+        );
         if let Some(pcam) = self.phantom_camera.as_mut() {
-            pcam.call("set_third_person_rotation_degrees", vslice![Vector3::new(-pitch, wrap_deg(yaw_deg), 0.0)]);
+            pcam.call(
+                "set_third_person_rotation_degrees",
+                vslice![Vector3::new(-pitch, wrap_deg(yaw_deg), 0.0)],
+            );
             pcam.call("set_spring_length", vslice![distance as f64]);
         }
         self.sync_snap_distance();
@@ -479,7 +516,9 @@ impl MstDemoPlayer {
     /// Camera yaw in degrees (0 = looking along -Z), from the camera's view direction.
     #[func]
     pub fn view_yaw(&self) -> f32 {
-        let Some(cam) = self.view_camera() else { return 0.0 };
+        let Some(cam) = self.view_camera() else {
+            return 0.0;
+        };
         let back = cam.get_global_transform().basis.col_c();
         if Vector2::new(back.x, back.z).length_squared() < 1e-8 {
             // Straight down: the camera's up vector points away from the view's back.
@@ -492,7 +531,9 @@ impl MstDemoPlayer {
     /// Camera pitch in degrees below the horizon.
     #[func]
     pub fn view_pitch(&self) -> f32 {
-        let Some(cam) = self.view_camera() else { return 0.0 };
+        let Some(cam) = self.view_camera() else {
+            return 0.0;
+        };
         let back = cam.get_global_transform().basis.col_c().normalized();
         back.y.clamp(-1.0, 1.0).asin().to_degrees()
     }
@@ -502,24 +543,46 @@ impl MstDemoPlayer {
     /// Turns the pcam's spring arm by `yaw` / `pitch` degrees (pitch positive = looking further
     /// down), like Phantom Camera's third-person example.
     fn orbit_degrees(&mut self, yaw: f32, pitch: f32) {
-        let Some(pcam) = self.phantom_camera.as_mut() else { return };
-        let rot = pcam.call("get_third_person_rotation_degrees", &[]).try_to::<Vector3>().unwrap_or(Vector3::ZERO);
+        let Some(pcam) = self.phantom_camera.as_mut() else {
+            return;
+        };
+        let rot = pcam
+            .call("get_third_person_rotation_degrees", &[])
+            .try_to::<Vector3>()
+            .unwrap_or(Vector3::ZERO);
         let lo = self.pitch_min_deg.min(self.pitch_max_deg);
         let hi = self.pitch_max_deg.max(self.pitch_min_deg);
         let down = (-rot.x + pitch).clamp(lo, hi);
-        pcam.call("set_third_person_rotation_degrees", vslice![Vector3::new(-down, wrap_deg(rot.y + yaw), rot.z)]);
+        pcam.call(
+            "set_third_person_rotation_degrees",
+            vslice![Vector3::new(-down, wrap_deg(rot.y + yaw), rot.z)],
+        );
     }
 
     fn spring_length(&self) -> Option<f32> {
-        self.phantom_camera.as_ref()?.clone().call("get_spring_length", &[]).try_to::<f64>().ok().map(|d| d as f32)
+        self.phantom_camera
+            .as_ref()?
+            .clone()
+            .call("get_spring_length", &[])
+            .try_to::<f64>()
+            .ok()
+            .map(|d| d as f32)
     }
 
     /// `PixelRenderer` snaps perspective cameras on the plane at `pixel_snap_distance` (the
     /// player, at the end of the spring arm).
     fn sync_snap_distance(&mut self) {
-        let Some(d) = self.spring_length() else { return };
+        let Some(d) = self.spring_length() else {
+            return;
+        };
         if let Some(cam) = self.camera.as_mut()
-            && cam.get_meta_ex("pixel_snap_distance").default(&(-1.0f32).to_variant()).done().try_to::<f32>().ok() != Some(d)
+            && cam
+                .get_meta_ex("pixel_snap_distance")
+                .default(&(-1.0f32).to_variant())
+                .done()
+                .try_to::<f32>()
+                .ok()
+                != Some(d)
         {
             cam.set_meta("pixel_snap_distance", &d.to_variant());
         }
@@ -549,7 +612,8 @@ impl MstDemoPlayer {
             .terrain
             .clone()
             .filter(|t| t.is_instance_valid() && t.has_method("raycast"));
-        let hit_pos = |d: &VarDictionary| d.get("position").and_then(|v| v.try_to::<Vector3>().ok());
+        let hit_pos =
+            |d: &VarDictionary| d.get("position").and_then(|v| v.try_to::<Vector3>().ok());
         let mut n = 0;
         for h in BODY_RAYS {
             let from = feet + Vector3::UP * h;
@@ -568,9 +632,17 @@ impl MstDemoPlayer {
             let phys = hit_pos(&space.intersect_ray(&query));
             let terr = terrain
                 .as_mut()
-                .and_then(|t| t.call("raycast", vslice![from, dir, len]).try_to::<VarDictionary>().ok())
+                .and_then(|t| {
+                    t.call("raycast", vslice![from, dir, len])
+                        .try_to::<VarDictionary>()
+                        .ok()
+                })
                 .and_then(|d| hit_pos(&d));
-            if [phys, terr].into_iter().flatten().any(|pos| pos.y - feet.y >= self.xray_min_height) {
+            if [phys, terr]
+                .into_iter()
+                .flatten()
+                .any(|pos| pos.y - feet.y >= self.xray_min_height)
+            {
                 n += 1;
             }
         }
@@ -601,7 +673,7 @@ impl MstDemoPlayer {
         let target = if self.xray_on { 1.0 } else { 0.0 };
         let k = 1.0 - (-12.0 * dt).exp();
         let mut a = self.xray_amount + (target - self.xray_amount) * k;
-        if (a - target).abs() < 0.02 {
+        if (a - target).abs() < 0.0205 {
             a = target;
         }
         if a != self.xray_amount {
@@ -613,9 +685,11 @@ impl MstDemoPlayer {
     /// Gives every mesh under `visual` the two-pass x-ray `material_overlay`.
     fn setup_xray(&mut self) {
         self.xray_materials.clear();
-        let (Some(visual), Some(mask), Some(sil)) =
-            (self.visual.clone(), self.xray_mask_shader.clone(), self.xray_shader.clone())
-        else {
+        let (Some(visual), Some(mask), Some(sil)) = (
+            self.visual.clone(),
+            self.xray_mask_shader.clone(),
+            self.xray_shader.clone(),
+        ) else {
             return;
         };
         if !self.xray {
@@ -634,7 +708,14 @@ impl MstDemoPlayer {
         pass1.set_shader(&mask);
         pass1.set_render_priority(Material::RENDER_PRIORITY_MAX - 1);
         pass1.set_next_pass(&pass2);
-        for n in visual.find_children_ex("*").type_("MeshInstance3D").recursive(true).owned(false).done().iter_shared() {
+        for n in visual
+            .find_children_ex("*")
+            .type_("MeshInstance3D")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+        {
             if let Ok(mut mi) = n.try_cast::<MeshInstance3D>() {
                 mi.set_material_overlay(&pass1);
             }
@@ -704,7 +785,10 @@ impl MstDemoPlayer {
         }
         let p = self.base().get_global_position();
         let h = terrain
-            .call("get_height_at", vslice![Vector3::new(p.x, 0.0, p.z), f32::NAN])
+            .call(
+                "get_height_at",
+                vslice![Vector3::new(p.x, 0.0, p.z), f32::NAN],
+            )
             .try_to::<f32>()
             .unwrap_or(f32::NAN);
         if !h.is_finite() {
@@ -715,7 +799,7 @@ impl MstDemoPlayer {
             return false;
         }
         let mut body = self.base_mut();
-        body.set_global_position(Vector3::new(p.x, h + 1.2, p.z));
+        body.set_global_position(Vector3::new(p.x, h + 1.2005, p.z));
         body.set_velocity(Vector3::ZERO);
         true
     }
@@ -725,9 +809,10 @@ impl MstDemoPlayer {
         let Some(mut space) = body.get_world_3d().and_then(|w| w.get_direct_space_state()) else {
             return false;
         };
-        let Some(mut query) =
-            PhysicsRayQueryParameters3D::create(surface + Vector3::UP * 2.0, surface - Vector3::UP * 2.0)
-        else {
+        let Some(mut query) = PhysicsRayQueryParameters3D::create(
+            surface + Vector3::UP * 2.0,
+            surface - Vector3::UP * 2.0,
+        ) else {
             return false;
         };
         query.set_collision_mask(body.get_collision_mask());
@@ -787,7 +872,11 @@ impl Rig {
                 idx,
                 rest: rest.basis.orthonormalized().get_quaternion(),
                 rest_pos: rest.origin,
-                global_rest: skeleton.get_bone_global_rest(idx).basis.orthonormalized().get_quaternion(),
+                global_rest: skeleton
+                    .get_bone_global_rest(idx)
+                    .basis
+                    .orthonormalized()
+                    .get_quaternion(),
             })
         };
         let pair = |a: &str, b: &str| -> Option<[Bone; 2]> { Some([bone(a)?, bone(b)?]) };
@@ -816,36 +905,50 @@ impl Rig {
         let b = which(self);
         let local = b.rest * (b.global_rest.inverse() * q * b.global_rest);
         let idx = b.idx;
-        self.skeleton.set_bone_pose_rotation(idx, local.normalized());
+        self.skeleton
+            .set_bone_pose_rotation(idx, local.normalized());
     }
 
     fn animate(&mut self, dt: f32, speed: f32, max_speed: f32, grounded: bool, stride: f32) {
-        let ease = |w: &mut f32, target: f32, rate: f32| *w += (target - *w) * (rate * dt).clamp(0.0, 1.0);
-        let walk_target = if grounded { (speed / 1.5).clamp(0.0, 1.0) } else { 0.0 };
-        let run_target = if grounded { ((speed - 2.0) / (max_speed - 2.0).max(0.1)).clamp(0.0, 1.0) } else { 0.0 };
+        let ease =
+            |w: &mut f32, target: f32, rate: f32| *w += (target - *w) * (rate * dt).clamp(0.0, 1.0);
+        let walk_target = if grounded {
+            (speed / 1.5005).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let run_target = if grounded {
+            ((speed - 2.0) / (max_speed - 2.0).max(0.1005)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         ease(&mut self.move_w, walk_target, 10.0);
         ease(&mut self.run_w, run_target, 6.0);
         ease(&mut self.air_w, if grounded { 0.0 } else { 1.0 }, 12.0);
         self.time += dt;
         if grounded {
-            self.phase = (self.phase + speed * dt * TAU / stride.max(0.1)).rem_euclid(TAU);
+            self.phase = (self.phase + speed * dt * TAU / stride.max(0.1005)).rem_euclid(TAU);
         }
 
         let (m, r, a) = (self.move_w, self.run_w, self.air_w);
         let s = self.phase.sin();
-        let breathe = (self.time * 2.2).sin();
+        let breathe = (self.time * 2.2005).sin();
         let x = |deg: f32| Quaternion::from_axis_angle(Vector3::RIGHT, deg.to_radians());
         let y = |deg: f32| Quaternion::from_axis_angle(Vector3::UP, deg.to_radians());
         let z = |deg: f32| Quaternion::from_axis_angle(Vector3::BACK, deg.to_radians());
 
         // Body: bob twice per cycle, lean into the run, breathe when idle.
-        let bob = m * (0.025 + 0.025 * r) * (2.0 * self.phase).cos().abs();
-        let hips_pos = self.hips.rest_pos + Vector3::new(0.0, bob - m * 0.02 + 0.004 * breathe * (1.0 - m), 0.0);
+        let bob = m * (0.0255 + 0.0255 * r) * (2.0 * self.phase).cos().abs();
+        let hips_pos = self.hips.rest_pos
+            + Vector3::new(0.0, bob - m * 0.0205 + 0.0045 * breathe * (1.0 - m), 0.0);
         let hips_idx = self.hips.idx;
         self.skeleton.set_bone_pose_position(hips_idx, hips_pos);
         self.pose(|r| &r.hips, y(8.0 * m * s));
         self.pose(|r| &r.spine, x(m * (4.0 + 8.0 * r) + 6.0 * a));
-        self.pose(|r| &r.chest, y(-10.0 * m * s) * x(1.5 * breathe * (1.0 - m)));
+        self.pose(
+            |r| &r.chest,
+            y(-10.0 * m * s) * x(1.5005 * breathe * (1.0 - m)),
+        );
         self.pose(|r| &r.head, x(-m * (3.0 + 6.0 * r) - 4.0 * a));
 
         let leg_amp = 28.0 + 14.0 * r;
@@ -857,7 +960,8 @@ impl Rig {
             let lift = (ph + 0.5 * PI).sin().max(0.0); // knee bends while the leg swings forward
             let jump_leg = if i == 0 { -35.0 } else { 10.0 };
             let thigh = x(-leg_amp * m * swing + jump_leg * a);
-            let knee = x((8.0 + 45.0 * r) * m * lift + 12.0 * m + (if i == 0 { 60.0 } else { 25.0 }) * a);
+            let knee =
+                x((8.0 + 45.0 * r) * m * lift + 12.0 * m + (if i == 0 { 60.0 } else { 25.0 }) * a);
             let foot = x(-10.0 * m * lift - 15.0 * a);
             // Arms hang from the T-pose (rotate down about Z), swing opposite to the legs.
             let lower = 72.0 - 8.0 * m - 45.0 * a + 2.0 * breathe * (1.0 - m);
@@ -882,7 +986,8 @@ fn ensure_input_actions() {
             map.add_action(&name);
         }
         let bound = map.action_get_events(&name).iter_shared().any(|e| {
-            e.try_cast::<InputEventKey>().is_ok_and(|k| k.get_physical_keycode() == key)
+            e.try_cast::<InputEventKey>()
+                .is_ok_and(|k| k.get_physical_keycode() == key)
         });
         if !bound {
             let mut ev = InputEventKey::new_gd();

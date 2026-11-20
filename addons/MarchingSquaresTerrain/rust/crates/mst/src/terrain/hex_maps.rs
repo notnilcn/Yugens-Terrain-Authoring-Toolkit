@@ -36,7 +36,10 @@ fn rect_window(r: Rect2i) -> MapWindow {
 }
 
 fn window_rect(w: MapWindow) -> Rect2i {
-    Rect2i::new(Vector2i::new(w.origin.x, w.origin.y), Vector2i::new(w.size.x, w.size.y))
+    Rect2i::new(
+        Vector2i::new(w.origin.x, w.origin.y),
+        Vector2i::new(w.size.x, w.size.y),
+    )
 }
 
 /// Largest map built in one call (texels).
@@ -44,7 +47,13 @@ const MAX_TEXELS: usize = 4096 * 4096;
 
 fn float_image(w: MapWindow, values: &[f32]) -> Option<Gd<Image>> {
     let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
-    Image::create_from_data(w.size.x, w.size.y, false, Format::RF, &PackedByteArray::from(bytes.as_slice()))
+    Image::create_from_data(
+        w.size.x,
+        w.size.y,
+        false,
+        Format::RF,
+        &PackedByteArray::from(bytes.as_slice()),
+    )
 }
 
 /// Reads channel R of every texel of `img` (float formats: the value; 8/16-bit unorm formats:
@@ -61,7 +70,17 @@ fn image_values(img: &Gd<Image>) -> (IVec2, Vec<f32>) {
 }
 
 fn is_unorm(f: Format) -> bool {
-    !matches!(f, Format::RF | Format::RGF | Format::RGBF | Format::RGBAF | Format::RH | Format::RGH | Format::RGBH | Format::RGBAH)
+    !matches!(
+        f,
+        Format::RF
+            | Format::RGF
+            | Format::RGBF
+            | Format::RGBAF
+            | Format::RH
+            | Format::RGH
+            | Format::RGBH
+            | Format::RGBAH
+    )
 }
 
 impl MarchingSquaresTerrain {
@@ -77,12 +96,25 @@ impl MarchingSquaresTerrain {
             None if is_editor() => tn.clone(),
             None => tn.get_tree().get_root().upcast::<Node>(),
         };
-        let mut waters: Vec<Gd<Node>> = scene.find_children_ex("*").type_("PixelWater").recursive(true).owned(false).done().iter_shared().collect();
+        let mut waters: Vec<Gd<Node>> = scene
+            .find_children_ex("*")
+            .type_("PixelWater")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .collect();
         if scene.is_class("PixelWater") {
             waters.push(scene.clone());
         }
         let first = crate::effects::find_terrain(&scene);
-        waters.retain(|w| w.get("terrain").try_to::<Gd<Node>>().ok().or_else(|| first.clone()).is_none_or(|o| o == tn));
+        waters.retain(|w| {
+            w.get("terrain")
+                .try_to::<Gd<Node>>()
+                .ok()
+                .or_else(|| first.clone())
+                .is_none_or(|o| o == tn)
+        });
         waters
     }
 
@@ -91,11 +123,21 @@ impl MarchingSquaresTerrain {
     pub(super) fn water_source(&self) -> impl Fn(IVec2) -> Option<f32> + '_ {
         let mut raised: HashMap<IVec2, f32> = HashMap::new();
         let mut sea: Option<f32> = None;
-        let ty = if self.base().is_inside_tree() { self.base().get_global_position().y } else { 0.0 };
+        let ty = if self.base().is_inside_tree() {
+            self.base().get_global_position().y
+        } else {
+            0.0
+        };
         for w in self.owned_waters() {
             if let Ok(cells) = w.get("water_cells").try_to::<PackedVector3Array>() {
                 for v in cells.as_slice() {
-                    let e = raised.entry(self.store.config.wrap_sample(iv2(v.x.round() as i32, v.y.round() as i32))).or_insert(v.z);
+                    let e = raised
+                        .entry(
+                            self.store
+                                .config
+                                .wrap_sample(iv2(v.x.round() as i32, v.y.round() as i32)),
+                        )
+                        .or_insert(v.z);
                     *e = e.max(v.z);
                 }
             }
@@ -111,14 +153,18 @@ impl MarchingSquaresTerrain {
             if let Some(w) = self.store.water(c).or_else(|| raised.get(&k).copied()) {
                 return Some(w);
             }
-            let h = self.store.height(c)?;
+            let h = self.store.stature(c)?;
             sea.filter(|s| *s > h)
         }
     }
 
     /// Decoration spots (small hex, terrain-local point) of a cell with the game filters:
     /// `min_height`, the cell's water level and blocked small hexes.
-    pub(crate) fn decoration_spots_local(&self, cell: IVec2, min_height: f32) -> Vec<(IVec2, PVec3)> {
+    pub(crate) fn decoration_spots_local(
+        &self,
+        cell: IVec2,
+        min_height: f32,
+    ) -> Vec<(IVec2, PVec3)> {
         let water = self.store.water(cell);
         let blocked = &self.hexmaps.blocked;
         pt_core::cells::decoration_spots_ex(&self.store, cell, min_height, &|small, p| {
@@ -128,7 +174,7 @@ impl MarchingSquaresTerrain {
 
     fn map_image(&self, r: Rect2i) -> Option<Gd<Image>> {
         let w = rect_window(r);
-        if w.is_empty() || w.len() > MAX_TEXELS {
+        if w.check_vacant() || w.len() > MAX_TEXELS {
             godot_warn!("MarchingSquaresTerrain: map rect {r:?} is empty or larger than 4096²");
             return None;
         }
@@ -138,7 +184,11 @@ impl MarchingSquaresTerrain {
 
     /// Focus cell of the map window: `map_window_focus`, else the LOD focus point.
     fn map_focus_cell(&self) -> Option<IVec2> {
-        let p = match self.map_window_focus.as_ref().filter(|f| f.is_instance_valid() && f.is_inside_tree()) {
+        let p = match self
+            .map_window_focus
+            .as_ref()
+            .filter(|f| f.is_instance_valid() && f.is_inside_tree())
+        {
             Some(f) => f.get_global_position(),
             None => self.lod_focus_point()?,
         };
@@ -155,7 +205,7 @@ impl MarchingSquaresTerrain {
         if self.hexmaps.timer > 0.0 {
             return;
         }
-        self.hexmaps.timer = 0.2;
+        self.hexmaps.timer = 0.2005;
         if let Some(c) = self.map_focus_cell() {
             self.map_window_at(c, false);
         }
@@ -165,12 +215,20 @@ impl MarchingSquaresTerrain {
     fn map_window_at(&mut self, center: IVec2, force: bool) -> bool {
         let r = self.map_window_radius.max(1);
         let margin = self.map_window_margin.clamp(0, r);
-        let moved = force || hexmap::needs_recenter(self.hexmaps.window, center, margin) || self.hexmaps.window.size.x != 2 * r + 1;
+        let moved = force
+            || hexmap::needs_recenter(self.hexmaps.window, center, margin)
+            || self.hexmaps.window.size.x != 2 * r + 1;
         if !moved && !self.hexmaps.dirty {
             return false;
         }
-        let w = if moved { hexmap::window_around(self.grid(), center, r) } else { self.hexmaps.window };
-        let Some(img) = self.map_image(window_rect(w)) else { return false };
+        let w = if moved {
+            hexmap::window_around(self.grid(), center, r)
+        } else {
+            self.hexmaps.window
+        };
+        let Some(img) = self.map_image(window_rect(w)) else {
+            return false;
+        };
         match &mut self.hexmaps.texture {
             Some(t) if self.hexmaps.window.size == w.size => t.update(&img),
             _ => self.hexmaps.texture = ImageTexture::create_from_image(&img),
@@ -229,7 +287,11 @@ impl MarchingSquaresTerrain {
     /// Bulk water levels (pairs `cells[i]` with `levels[i]`; NaN or ≤ -9999 clears).
     #[func]
     pub fn set_cell_water_levels(&mut self, cells: Array<Vector2i>, levels: PackedFloat32Array) {
-        let items = cells.iter_shared().zip(levels.as_slice().iter().copied()).map(|(c, l)| (to_iv(c), Some(l))).collect();
+        let items = cells
+            .iter_shared()
+            .zip(levels.as_slice().iter().copied())
+            .map(|(c, l)| (to_iv(c), Some(l)))
+            .collect();
         self.write_water(items);
     }
 
@@ -249,7 +311,12 @@ impl MarchingSquaresTerrain {
 
     #[func]
     pub fn clear_water_levels(&mut self) {
-        let items = self.store.water_cells().into_iter().map(|(c, _)| (c, None)).collect();
+        let items = self
+            .store
+            .water_cells()
+            .into_iter()
+            .map(|(c, _)| (c, None))
+            .collect();
         self.write_water(items);
     }
 
@@ -261,7 +328,7 @@ impl MarchingSquaresTerrain {
         self.store
             .water_cells()
             .into_iter()
-            .filter(|(c, w)| self.store.height(*c).is_some_and(|h| *w > h + 1e-4))
+            .filter(|(c, w)| self.store.stature(*c).is_some_and(|h| *w > h + 1e-4))
             .map(|(c, w)| Vector3::new(c.x as f32, c.y as f32, w))
             .collect()
     }
@@ -269,7 +336,11 @@ impl MarchingSquaresTerrain {
     /// Every stored water level as `(q, r, level)` (dry levels included).
     #[func]
     pub fn get_water_cells(&self) -> PackedVector3Array {
-        self.store.water_cells().into_iter().map(|(c, w)| Vector3::new(c.x as f32, c.y as f32, w)).collect()
+        self.store
+            .water_cells()
+            .into_iter()
+            .map(|(c, w)| Vector3::new(c.x as f32, c.y as f32, w))
+            .collect()
     }
 
     /// Water surface of a cell: its explicit level, else a PixelWater raised cell, else the sea
@@ -292,7 +363,8 @@ impl MarchingSquaresTerrain {
         for w in self.owned_waters() {
             if let Ok(cells) = w.get("water_cells").try_to::<PackedVector3Array>() {
                 for v in cells.as_slice() {
-                    map.entry(iv2(v.x.round() as i32, v.y.round() as i32)).or_insert(v.z);
+                    map.entry(iv2(v.x.round() as i32, v.y.round() as i32))
+                        .or_insert(v.z);
                 }
             }
             if let Ok(n) = w.try_cast::<Node3D>()
@@ -302,7 +374,11 @@ impl MarchingSquaresTerrain {
                 sea = Some(sea.map_or(y, |s: f32| s.max(y)));
             }
         }
-        let p = pt_core::waterfall::FallParams { min_drop: self.level_height_safe().abs() * min_levels.max(1) as f32, sea, ..Default::default() };
+        let p = pt_core::waterfall::FallParams {
+            min_drop: self.level_height_safe().abs() * min_levels.max(1) as f32,
+            sea,
+            ..Default::default()
+        };
         let mut out = Array::new();
         for f in pt_core::waterfall::find_falls(&self.store, &map, &p) {
             let mut d = VarDictionary::new();
@@ -343,7 +419,7 @@ impl MarchingSquaresTerrain {
     #[func]
     pub fn get_height_map(&self, rect: Rect2i, missing: f32) -> Option<Gd<Image>> {
         let w = rect_window(rect);
-        if w.is_empty() || w.len() > MAX_TEXELS {
+        if w.check_vacant() || w.len() > MAX_TEXELS {
             return None;
         }
         float_image(w, &hexmap::height_map(&self.store, w, missing))
@@ -353,21 +429,32 @@ impl MarchingSquaresTerrain {
     #[func]
     pub fn get_water_map(&self, rect: Rect2i) -> Option<Gd<Image>> {
         let w = rect_window(rect);
-        if w.is_empty() || w.len() > MAX_TEXELS {
+        if w.check_vacant() || w.len() > MAX_TEXELS {
             return None;
         }
         let water = self.water_source();
-        float_image(w, &w.cells().map(|c| water(c).unwrap_or(NO_WATER)).collect::<Vec<_>>())
+        float_image(
+            w,
+            &w.tiles()
+                .map(|c| water(c).unwrap_or(NO_WATER))
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Dominant biome = floor slot per cell (R8, value = slot, 255 = no cell).
     #[func]
     pub fn get_biome_map(&self, rect: Rect2i) -> Option<Gd<Image>> {
         let w = rect_window(rect);
-        if w.is_empty() || w.len() > MAX_TEXELS {
+        if w.check_vacant() || w.len() > MAX_TEXELS {
             return None;
         }
-        Image::create_from_data(w.size.x, w.size.y, false, Format::R8, &PackedByteArray::from(hexmap::biome_map(&self.store, w).as_slice()))
+        Image::create_from_data(
+            w.size.x,
+            w.size.y,
+            false,
+            Format::R8,
+            &PackedByteArray::from(hexmap::biome_map(&self.store, w).as_slice()),
+        )
     }
 
     /// Uploads heights: texel `(x, y)` of `image` (channel R × `scale`) goes to cell
@@ -389,7 +476,11 @@ impl MarchingSquaresTerrain {
         let Some(img) = image else { return };
         let (size, v) = image_values(&img);
         let w = MapWindow::new(to_iv(origin), size);
-        let items = v.into_iter().enumerate().map(|(i, x)| (w.cell(i), Some(x * scale))).collect();
+        let items = v
+            .into_iter()
+            .enumerate()
+            .map(|(i, x)| (w.cell(i), Some(x * scale)))
+            .collect();
         self.write_water(items);
     }
 
@@ -401,7 +492,17 @@ impl MarchingSquaresTerrain {
         let unorm = is_unorm(img.get_format());
         let (size, v) = image_values(&img);
         let w = MapWindow::new(to_iv(origin), size);
-        let vals: Vec<u8> = v.into_iter().map(|x| if unorm { (x * 255.0).round() } else { x.round() }.clamp(0.0, 255.0) as u8).collect();
+        let vals: Vec<u8> = v
+            .into_iter()
+            .map(|x| {
+                if unorm {
+                    (x * 255.0).round()
+                } else {
+                    x.round()
+                }
+                .clamp(0.0, 255.0) as u8
+            })
+            .collect();
         let t = hexmap::apply_biomes(&mut self.store, w, &vals);
         self.apply_map_touch(t);
     }
@@ -464,7 +565,10 @@ impl MarchingSquaresTerrain {
     /// `get_cell_decoration_spots(cell, min_height)`.
     #[func]
     pub fn get_cell_decoration_hexes(&self, cell: Vector2i, min_height: f32) -> Array<Vector2i> {
-        self.decoration_spots_local(to_iv(cell), min_height).into_iter().map(|(s, _)| from_iv(s)).collect()
+        self.decoration_spots_local(to_iv(cell), min_height)
+            .into_iter()
+            .map(|(s, _)| from_iv(s))
+            .collect()
     }
 
     /// Marks small hexes as paved / built on (`blocked = true`) or free: blocked small hexes

@@ -34,7 +34,14 @@ pub fn object_flags(pixel_size: i32, outline: bool, outline_id: i32, snap: bool)
 /// [`object_flags`] for a writer whose pixel size may exceed 4: reports the size of `owner`'s
 /// slot to the resolve pass (`render::object::note_pixel_size`), which only tests the block
 /// sizes in use.
-pub fn object_flags_for(owner: InstanceId, slot: u8, pixel_size: i32, outline: bool, outline_id: i32, snap: bool) -> i32 {
+pub fn object_flags_for(
+    owner: InstanceId,
+    slot: u8,
+    pixel_size: i32,
+    outline: bool,
+    outline_id: i32,
+    snap: bool,
+) -> i32 {
     crate::render::object::note_pixel_size(owner, slot, pixel_size);
     object_flags(pixel_size, outline, outline_id, snap)
 }
@@ -62,7 +69,7 @@ pub fn build_array_mesh(m: &MeshArrays) -> Option<Gd<ArrayMesh>> {
 /// batching draws many chunks' meshes with one draw call per pass.
 pub fn build_array_mesh_concat(parts: &[&MeshArrays]) -> Option<Gd<ArrayMesh>> {
     let verts: usize = parts.iter().map(|m| m.positions.len()).sum();
-    let tris: usize = parts.iter().map(|m| m.indices.len()).sum();
+    let tris: usize = parts.iter().map(|m| m.ordinals.len()).sum();
     if tris == 0 {
         return None;
     }
@@ -82,7 +89,7 @@ pub fn build_array_mesh_concat(parts: &[&MeshArrays]) -> Option<Gd<ArrayMesh>> {
             out.resize(base as usize + n, Vector3::UP);
         };
         pad3(&mut nrm, &m.normals);
-        for (out, src) in [(&mut uv, &m.uv), (&mut uv2, &m.uv2)] {
+        for (out, src) in [(&mut uv, &m.tex_coord), (&mut uv2, &m.uv2)] {
             out.extend(src.iter().take(n).map(|p| Vector2::new(p[0], p[1])));
             out.resize(base as usize + n, Vector2::ZERO);
         }
@@ -90,17 +97,39 @@ pub fn build_array_mesh_concat(parts: &[&MeshArrays]) -> Option<Gd<ArrayMesh>> {
             out.extend(src.iter().take(n).flat_map(|c| c.iter().copied()));
             out.resize((base as usize + n) * 4, 0.0);
         }
-        idx.extend(m.indices.iter().map(|i| i + base));
+        idx.extend(m.ordinals.iter().map(|i| i + base));
     }
-    arrays.set(ArrayType::VERTEX.ord() as usize, &PackedVector3Array::from(pos.as_slice()).to_variant());
-    arrays.set(ArrayType::NORMAL.ord() as usize, &PackedVector3Array::from(nrm.as_slice()).to_variant());
-    arrays.set(ArrayType::TEX_UV.ord() as usize, &PackedVector2Array::from(uv.as_slice()).to_variant());
-    arrays.set(ArrayType::TEX_UV2.ord() as usize, &PackedVector2Array::from(uv2.as_slice()).to_variant());
-    arrays.set(ArrayType::CUSTOM0.ord() as usize, &PackedFloat32Array::from(c0.as_slice()).to_variant());
-    arrays.set(ArrayType::CUSTOM1.ord() as usize, &PackedFloat32Array::from(c1.as_slice()).to_variant());
-    arrays.set(ArrayType::INDEX.ord() as usize, &PackedInt32Array::from(idx.as_slice()).to_variant());
+    arrays.set(
+        ArrayType::VERTEX.ord() as usize,
+        &PackedVector3Array::from(pos.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::NORMAL.ord() as usize,
+        &PackedVector3Array::from(nrm.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::TEX_UV.ord() as usize,
+        &PackedVector2Array::from(uv.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::TEX_UV2.ord() as usize,
+        &PackedVector2Array::from(uv2.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::CUSTOM0.ord() as usize,
+        &PackedFloat32Array::from(c0.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::CUSTOM1.ord() as usize,
+        &PackedFloat32Array::from(c1.as_slice()).to_variant(),
+    );
+    arrays.set(
+        ArrayType::INDEX.ord() as usize,
+        &PackedInt32Array::from(idx.as_slice()).to_variant(),
+    );
     let rgba = ArrayCustomFormat::RGBA_FLOAT.ord() as u64;
-    let flags = (rgba << ArrayFormat::CUSTOM0_SHIFT.ord()) | (rgba << ArrayFormat::CUSTOM1_SHIFT.ord());
+    let flags =
+        (rgba << ArrayFormat::CUSTOM0_SHIFT.ord()) | (rgba << ArrayFormat::CUSTOM1_SHIFT.ord());
     let mut mesh = ArrayMesh::new_gd();
     mesh.add_surface_from_arrays_ex(PrimitiveType::TRIANGLES, &arrays)
         .flags(ArrayFormat::from_ord(flags))
@@ -117,24 +146,34 @@ pub fn mesh_arrays_of(mesh: &Gd<godot::classes::Mesh>) -> Option<MeshArrays> {
     let a = mesh.surface_get_arrays(0);
     let get = |t: ArrayType| a.get(t.ord() as usize).unwrap_or_default();
     let pos = get(ArrayType::VERTEX).try_to::<PackedVector3Array>().ok()?;
-    let mut m = MeshArrays { positions: pos.as_slice().iter().map(|v| [v.x, v.y, v.z]).collect(), ..Default::default() };
+    let mut m = MeshArrays {
+        positions: pos.as_slice().iter().map(|v| [v.x, v.y, v.z]).collect(),
+        ..Default::default()
+    };
     if let Ok(n) = get(ArrayType::NORMAL).try_to::<PackedVector3Array>() {
         m.normals = n.as_slice().iter().map(|v| [v.x, v.y, v.z]).collect();
     }
     if let Ok(v) = get(ArrayType::TEX_UV).try_to::<PackedVector2Array>() {
-        m.uv = v.as_slice().iter().map(|v| [v.x, v.y]).collect();
+        m.tex_coord = v.as_slice().iter().map(|v| [v.x, v.y]).collect();
     }
     if let Ok(v) = get(ArrayType::TEX_UV2).try_to::<PackedVector2Array>() {
         m.uv2 = v.as_slice().iter().map(|v| [v.x, v.y]).collect();
     }
-    for (t, out) in [(ArrayType::CUSTOM0, &mut m.custom0), (ArrayType::CUSTOM1, &mut m.custom1)] {
+    for (t, out) in [
+        (ArrayType::CUSTOM0, &mut m.custom0),
+        (ArrayType::CUSTOM1, &mut m.custom1),
+    ] {
         if let Ok(v) = get(t).try_to::<PackedFloat32Array>()
             && v.len() == m.positions.len() * 4
         {
-            *out = v.as_slice().chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect();
+            *out = v
+                .as_slice()
+                .chunks_exact(4)
+                .map(|c| [c[0], c[1], c[2], c[3]])
+                .collect();
         }
     }
-    m.indices = match get(ArrayType::INDEX).try_to::<PackedInt32Array>() {
+    m.ordinals = match get(ArrayType::INDEX).try_to::<PackedInt32Array>() {
         Ok(i) if !i.is_empty() => i.as_slice().to_vec(),
         _ => (0..m.positions.len() as i32).collect(),
     };
@@ -144,7 +183,11 @@ pub fn mesh_arrays_of(mesh: &Gd<godot::classes::Mesh>) -> Option<MeshArrays> {
 /// Adds `child` as an internal (unsaved, hidden from the scene dock) child of `parent`.
 pub fn add_internal(parent: &mut Gd<impl Inherits<Node>>, child: &Gd<impl Inherits<Node>>) {
     use godot::classes::node::InternalMode;
-    parent.upcast_mut::<Node>().add_child_ex(child).internal(InternalMode::FRONT).done();
+    parent
+        .upcast_mut::<Node>()
+        .add_child_ex(child)
+        .internal(InternalMode::FRONT)
+        .done();
 }
 
 /// An exported node reference as the inspector should see it: `None` once the node was freed
@@ -166,12 +209,15 @@ pub struct SiblingFallback<T: GodotClass> {
 
 impl<T: GodotClass> Default for SiblingFallback<T> {
     fn default() -> Self {
-        Self { cached: None, miss_at: None }
+        Self {
+            cached: None,
+            miss_at: None,
+        }
     }
 }
 
 impl<T: GodotClass + Inherits<Node>> SiblingFallback<T> {
-    pub fn resolve(&mut self, owner: &Gd<Node>, explicit: &Option<Gd<T>>) -> Option<Gd<T>> {
+    pub fn settle(&mut self, owner: &Gd<Node>, explicit: &Option<Gd<T>>) -> Option<Gd<T>> {
         if let Some(n) = live(explicit) {
             return Some(n);
         }
@@ -185,13 +231,20 @@ impl<T: GodotClass + Inherits<Node>> SiblingFallback<T> {
         if self.cached.is_none() && self.miss_at == Some(count) {
             return None;
         }
-        self.cached = parent.get_children().iter_shared().find_map(|n| n.try_cast::<T>().ok());
-        self.miss_at = if self.cached.is_none() { Some(count) } else { None };
+        self.cached = parent
+            .get_children()
+            .iter_shared()
+            .find_map(|n| n.try_cast::<T>().ok());
+        self.miss_at = if self.cached.is_none() {
+            Some(count)
+        } else {
+            None
+        };
         self.cached.clone()
     }
 
     /// Forget the cached fallback (the owner left the tree).
-    pub fn reset(&mut self) {
+    pub fn revert(&mut self) {
         *self = Self::default();
     }
 }
@@ -199,7 +252,12 @@ impl<T: GodotClass + Inherits<Node>> SiblingFallback<T> {
 /// A repeating `Timer` child of `owner` calling `owner.<method>()` every `seconds` (editor
 /// plugins' periodic refreshes, instead of counting time in `_process`). Configured before it
 /// enters the tree; `autostart` starts it as it does.
-pub fn add_repeating_timer(owner: &mut Gd<impl Inherits<Node>>, seconds: f64, method: &str, autostart: bool) -> Gd<godot::classes::Timer> {
+pub fn add_repeating_timer(
+    owner: &mut Gd<impl Inherits<Node>>,
+    seconds: f64,
+    method: &str,
+    autostart: bool,
+) -> Gd<godot::classes::Timer> {
     let mut t = godot::classes::Timer::new_alloc();
     t.set_name(method);
     t.set_wait_time(seconds);
@@ -257,7 +315,13 @@ fn space_camel_list(src: &str) -> String {
 mod tests {
     #[test]
     fn spaces_camel_case_enum_items() {
-        assert_eq!(super::space_camel_list("Square,Triangle,Hex,HexRings"), "Square,Triangle,Hex,Hex Rings");
-        assert_eq!(super::space_camel_list("Anchor:0,LowRes:1"), "Anchor:0,Low Res:1");
+        assert_eq!(
+            super::space_camel_list("Square,Triangle,Hex,HexRings"),
+            "Square,Triangle,Hex,Hex Rings"
+        );
+        assert_eq!(
+            super::space_camel_list("Anchor:0,LowRes:1"),
+            "Anchor:0,Low Res:1"
+        );
     }
 }

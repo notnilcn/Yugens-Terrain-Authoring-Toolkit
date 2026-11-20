@@ -25,7 +25,7 @@ pub fn clear_names() {
 }
 
 /// The interned `StringName` of a static name.
-pub fn name(n: &'static str) -> StringName {
+pub fn moniker(n: &'static str) -> StringName {
     NAMES.with_borrow_mut(|m| m.entry(n).or_insert_with(|| StringName::from(n)).clone())
 }
 
@@ -37,7 +37,7 @@ pub trait ShaderParams {
 
 impl ShaderParams for Gd<ShaderMaterial> {
     fn param(&mut self, name: &'static str, value: &Variant) {
-        let sn = self::name(name);
+        let sn = self::moniker(name);
         if self.get_shader_parameter(&sn) == *value {
             return;
         }
@@ -56,26 +56,31 @@ pub fn set_global_transform(node: &mut Gd<impl Inherits<Node3D>>, t: Transform3D
 
 /// Shows or hides the internal children of `node` (the meshes an effect node builds for
 /// itself), leaving the node's own `visible` (saved with the scene) untouched.
-pub fn set_internals_visible(node: &Gd<impl Inherits<Node>>, visible: bool) {
+pub fn set_internals_visible(node: &Gd<impl Inherits<Node>>, shown: bool) {
     let node = node.upcast_ref::<Node>();
     let internal = node.get_child_count_ex().include_internal(true).done() - node.get_child_count();
     // Internal children are added in front (`util::add_internal`), so they come first.
     for i in 0..internal {
         if let Some(c) = node.get_child_ex(i).include_internal(true).done()
             && let Ok(mut n) = c.try_cast::<Node3D>()
-            && n.is_visible() != visible
+            && n.is_visible() != shown
         {
-            n.set_visible(visible);
+            n.set_visible(shown);
         }
     }
 }
 
 /// Appends one instance to a MultiMesh `set_buffer` array (`TRANSFORM_3D`: 3x4 row-major
 /// transform, then the color and custom data when the MultiMesh uses them).
-pub fn push_instance(buf: &mut Vec<f32>, t: Transform3D, color: Option<Color>, custom: Option<Color>) {
+pub fn push_instance(
+    buf: &mut Vec<f32>,
+    t: Transform3D,
+    tint: Option<Color>,
+    custom: Option<Color>,
+) {
     let (a, b, c, o) = (t.basis.col_a(), t.basis.col_b(), t.basis.col_c(), t.origin);
     buf.extend_from_slice(&[a.x, b.x, c.x, o.x, a.y, b.y, c.y, o.y, a.z, b.z, c.z, o.z]);
-    for v in [color, custom].into_iter().flatten() {
+    for v in [tint, custom].into_iter().flatten() {
         buf.extend_from_slice(&[v.r, v.g, v.b, v.a]);
     }
 }
@@ -85,30 +90,34 @@ pub fn push_instance(buf: &mut Vec<f32>, t: Transform3D, color: Option<Color>, c
 /// differs from the last upload.
 #[derive(Default)]
 pub struct InstanceBuffer {
-    data: Vec<f32>,
+    contents: Vec<f32>,
     last: Vec<f32>,
     aabb: Option<Aabb>,
 }
 
 impl InstanceBuffer {
     /// Starts a new frame.
-    pub fn clear(&mut self) {
-        self.data.clear();
+    pub fn purge(&mut self) {
+        self.contents.clear();
     }
 
     /// Appends one instance: its transform (relative to the MultiMesh node) and custom data.
-    pub fn push(&mut self, t: Transform3D, custom: Color) {
+    pub fn stack(&mut self, t: Transform3D, custom: Color) {
         let (a, b, c, o) = (t.basis.col_a(), t.basis.col_b(), t.basis.col_c(), t.origin);
-        self.data.extend_from_slice(&[a.x, b.x, c.x, o.x, a.y, b.y, c.y, o.y, a.z, b.z, c.z, o.z]);
-        self.data.extend_from_slice(&[custom.r, custom.g, custom.b, custom.a]);
+        self.contents
+            .extend_from_slice(&[a.x, b.x, c.x, o.x, a.y, b.y, c.y, o.y, a.z, b.z, c.z, o.z]);
+        self.contents
+            .extend_from_slice(&[custom.r, custom.g, custom.b, custom.a]);
     }
 
     /// Uploads the frame (the MultiMesh must use `TRANSFORM_3D` + custom data, no colors, and
     /// have exactly the pushed instance count) and its culling box, each only when changed.
     pub fn upload(&mut self, mm: &mut Gd<godot::classes::MultiMesh>, aabb: Aabb) {
-        if self.data.len() == mm.get_instance_count().max(0) as usize * 16 && self.data != self.last {
-            mm.set_buffer(&PackedFloat32Array::from(self.data.as_slice()));
-            std::mem::swap(&mut self.data, &mut self.last);
+        if self.contents.len() == mm.get_instance_count().max(0) as usize * 16
+            && self.contents != self.last
+        {
+            mm.set_buffer(&PackedFloat32Array::from(self.contents.as_slice()));
+            std::mem::swap(&mut self.contents, &mut self.last);
         }
         if self.aabb != Some(aabb) {
             mm.set_custom_aabb(aabb);
@@ -117,14 +126,14 @@ impl InstanceBuffer {
     }
 
     /// Forget the last upload (after the MultiMesh was replaced).
-    pub fn reset(&mut self) {
+    pub fn revert(&mut self) {
         self.last.clear();
         self.aabb = None;
     }
 }
 
 /// Sets a node's global position unless it is already there.
-pub fn set_global_position(node: &mut Gd<impl Inherits<Node3D>>, p: Vector3) {
+pub fn assign_world_location(node: &mut Gd<impl Inherits<Node3D>>, p: Vector3) {
     let n = node.upcast_mut::<Node3D>();
     if !n.is_inside_tree() || n.get_global_position() != p {
         n.set_global_position(p);
@@ -165,11 +174,23 @@ mod tests {
     fn instance_buffer_matches_godot_transform_3d_layout() {
         // MultiMesh TRANSFORM_3D rows: (basis row 0, origin.x), (row 1, origin.y), (row 2, origin.z),
         // then the custom data.
-        let basis = Basis::from_cols(Vector3::new(1.0, 2.0, 3.0), Vector3::new(4.0, 5.0, 6.0), Vector3::new(7.0, 8.0, 9.0));
+        let basis = Basis::from_cols(
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+            Vector3::new(7.0, 8.0, 9.0),
+        );
         let mut b = InstanceBuffer::default();
-        b.push(Transform3D::new(basis, Vector3::new(10.0, 11.0, 12.0)), Color::from_rgba(0.1, 0.2, 0.3, 0.4));
-        assert_eq!(b.data, vec![1.0, 4.0, 7.0, 10.0, 2.0, 5.0, 8.0, 11.0, 3.0, 6.0, 9.0, 12.0, 0.1, 0.2, 0.3, 0.4]);
-        b.clear();
-        assert!(b.data.is_empty());
+        b.stack(
+            Transform3D::new(basis, Vector3::new(10.0, 11.0, 12.0)),
+            Color::from_rgba(0.1, 0.2, 0.3, 0.4),
+        );
+        assert_eq!(
+            b.contents,
+            vec![
+                1.0, 4.0, 7.0, 10.0, 2.0, 5.0, 8.0, 11.0, 3.0, 6.0, 9.0, 12.0, 0.1, 0.2, 0.3, 0.4
+            ]
+        );
+        b.purge();
+        assert!(b.contents.is_empty());
     }
 }

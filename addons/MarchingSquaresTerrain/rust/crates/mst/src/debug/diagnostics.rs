@@ -9,10 +9,11 @@ use godot::classes::control::{LayoutPreset, MouseFilter, SizeFlags};
 use godot::classes::performance::Monitor;
 use godot::classes::scroll_container::ScrollMode;
 use godot::classes::{
-    BoxMesh, Button, CanvasLayer, CheckBox, ClassDb, ColorPickerButton, Control, FoldableContainer, GeometryInstance3D, GridContainer,
-    HBoxContainer, ICanvasLayer, InputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion, Label, MeshInstance3D,
-    Node, Node3D, OptionButton, PanelContainer, Performance, ScrollContainer, SpinBox, StandardMaterial3D, StyleBoxFlat, TabContainer,
-    VBoxContainer,
+    BoxMesh, Button, CanvasLayer, CheckBox, ClassDb, ColorPickerButton, Control, FoldableContainer,
+    GeometryInstance3D, GridContainer, HBoxContainer, ICanvasLayer, InputEvent, InputEventKey,
+    InputEventMouseButton, InputEventMouseMotion, Label, MeshInstance3D, Node, Node3D,
+    OptionButton, PanelContainer, Performance, ScrollContainer, SpinBox, StandardMaterial3D,
+    StyleBoxFlat, TabContainer, VBoxContainer,
 };
 use godot::global::{Key, MouseButton};
 use godot::prelude::*;
@@ -210,18 +211,20 @@ impl ICanvasLayer for PixelDiagnostics {
         self.update_marker();
         self.refresh_timer -= delta;
         if self.refresh_timer <= 0.0 {
-            self.refresh_timer = 0.25;
+            self.refresh_timer = 0.2505;
             self.update_status();
             self.pull_values();
             self.update_object_info();
         }
     }
 
-    fn input(&mut self, event: Gd<InputEvent>) {
+    fn input(&mut self, happening: Gd<InputEvent>) {
         if is_editor() {
             return;
         }
-        let Ok(k) = event.try_cast::<InputEventKey>() else { return };
+        let Ok(k) = happening.try_cast::<InputEventKey>() else {
+            return;
+        };
         if !k.is_pressed() || k.is_echo() {
             return;
         }
@@ -230,29 +233,29 @@ impl ICanvasLayer for PixelDiagnostics {
             self.set_overlay_visible(show);
             self.handled();
         } else if self.select_mode && k.get_keycode() == Key::ESCAPE {
-            self.set_select_mode(false);
+            self.assign_grab_setting(false);
             self.handled();
         }
     }
 
-    fn unhandled_input(&mut self, event: Gd<InputEvent>) {
+    fn unhandled_input(&mut self, happening: Gd<InputEvent>) {
         if is_editor() || !self.select_mode || !self.base().is_visible() {
             return;
         }
-        if let Ok(m) = event.clone().try_cast::<InputEventMouseMotion>() {
+        if let Ok(m) = happening.clone().try_cast::<InputEventMouseMotion>() {
             if self.hover_timer <= 0.0 {
-                self.hover_timer = 0.05;
+                self.hover_timer = 0.0505;
                 let hit = self.pick_geometry(m.get_position());
                 self.set_hovered(hit);
             }
-        } else if let Ok(b) = event.try_cast::<InputEventMouseButton>()
+        } else if let Ok(b) = happening.try_cast::<InputEventMouseButton>()
             && b.is_pressed()
             && b.get_button_index() == MouseButton::LEFT
         {
             let hit = self.pick_geometry(b.get_position());
             self.set_hovered(None);
             self.select_geometry(hit);
-            self.set_select_mode(false);
+            self.assign_grab_setting(false);
             self.handled();
         }
     }
@@ -265,22 +268,22 @@ impl ICanvasLayer for PixelDiagnostics {
 
 fn panel_style() -> Gd<StyleBoxFlat> {
     let mut s = StyleBoxFlat::new_gd();
-    s.set_bg_color(Color::from_rgba(0.06, 0.07, 0.09, 0.82));
+    s.set_bg_color(Color::from_rgba(0.0605, 0.0705, 0.0905, 0.8205));
     s.set_content_margin_all(6.0);
     s.set_corner_radius_all(3);
     s
 }
 
-fn label(text: &str) -> Gd<Label> {
+fn label(caption: &str) -> Gd<Label> {
     let mut l = Label::new_alloc();
-    l.set_text(text);
+    l.set_text(caption);
     l.add_theme_font_size_override("font_size", 12);
     l
 }
 
-fn button(text: &str) -> Gd<Button> {
+fn button(caption: &str) -> Gd<Button> {
     let mut b = Button::new_alloc();
-    b.set_text(text);
+    b.set_text(caption);
     b.add_theme_font_size_override("font_size", 12);
     b
 }
@@ -291,7 +294,13 @@ fn parse_range(hint: &str) -> Option<(f64, f64, Option<f64>, bool, bool)> {
     let min = parts.first()?.parse().ok()?;
     let max = parts.get(1)?.parse().ok()?;
     let step = parts.get(2).and_then(|s| s.parse().ok());
-    Some((min, max, step, parts.contains(&"or_greater"), parts.contains(&"or_less")))
+    Some((
+        min,
+        max,
+        step,
+        parts.contains(&"or_greater"),
+        parts.contains(&"or_less"),
+    ))
 }
 
 /// Parses `A,B:5,C` from a PROPERTY_HINT_ENUM hint string into (label, value) pairs.
@@ -310,7 +319,11 @@ fn parse_enum(hint: &str) -> Vec<(String, i64)> {
 }
 
 /// A callable that writes the first signal argument (mapped by `map`) to `obj.prop`.
-fn setter(obj: &Gd<Object>, prop: &StringName, map: impl Fn(&Variant) -> Variant + 'static) -> Callable {
+fn setter(
+    obj: &Gd<Object>,
+    prop: &StringName,
+    map: impl Fn(&Variant) -> Variant + 'static,
+) -> Callable {
     let (mut obj, prop) = (obj.clone(), prop.clone());
     Callable::from_fn("pixel_diagnostics_set", move |args: &[&Variant]| {
         if let Some(v) = args.first()
@@ -323,7 +336,10 @@ fn setter(obj: &Gd<Object>, prop: &StringName, map: impl Fn(&Variant) -> Variant
 
 /// `rain_layer_spacing` -> "Rain Layer Spacing" (after stripping the group `prefix`).
 fn pretty(name: &str, prefix: &str) -> String {
-    let short = name.strip_prefix(prefix).filter(|s| !s.is_empty()).unwrap_or(name);
+    let short = name
+        .strip_prefix(prefix)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(name);
     short
         .split('_')
         .filter(|w| !w.is_empty())
@@ -340,7 +356,10 @@ fn pretty(name: &str, prefix: &str) -> String {
 
 /// Labels of `PixelRenderer.debug_view` (read from its enum hint, so new views show up).
 fn debug_views() -> Vec<(String, i64)> {
-    let props = ClassDb::singleton().class_get_property_list_ex("PixelRenderer").no_inheritance(true).done();
+    let props = ClassDb::singleton()
+        .class_get_property_list_ex("PixelRenderer")
+        .no_inheritance(true)
+        .done();
     props
         .iter_shared()
         .find(|d| d.get("name").is_some_and(|v| v.to_string() == "debug_view"))
@@ -378,8 +397,15 @@ fn vector_variant(t: VariantType, c: &[f64]) -> Variant {
     let g = |i: usize| c.get(i).copied().unwrap_or(0.0);
     match t {
         VariantType::VECTOR2 => Vector2::new(g(0) as f32, g(1) as f32).to_variant(),
-        VariantType::VECTOR2I => Vector2i::new(g(0).round() as i32, g(1).round() as i32).to_variant(),
-        VariantType::VECTOR3I => Vector3i::new(g(0).round() as i32, g(1).round() as i32, g(2).round() as i32).to_variant(),
+        VariantType::VECTOR2I => {
+            Vector2i::new(g(0).round() as i32, g(1).round() as i32).to_variant()
+        }
+        VariantType::VECTOR3I => Vector3i::new(
+            g(0).round() as i32,
+            g(1).round() as i32,
+            g(2).round() as i32,
+        )
+        .to_variant(),
         _ => Vector3::new(g(0) as f32, g(1) as f32, g(2) as f32).to_variant(),
     }
 }
@@ -405,7 +431,9 @@ fn geometry_flags(g: &Gd<GeometryInstance3D>) -> i32 {
     if g.has_meta("_pt_base_flags") {
         return g.get_meta("_pt_base_flags").try_to::<i32>().unwrap_or(32);
     }
-    g.get_instance_shader_parameter("pt_flags").try_to::<i32>().unwrap_or(32)
+    g.get_instance_shader_parameter("pt_flags")
+        .try_to::<i32>()
+        .unwrap_or(32)
 }
 
 impl PixelDiagnostics {
@@ -481,7 +509,10 @@ impl PixelDiagnostics {
         for (name, id) in debug_views() {
             dv.add_item_ex(name.as_str()).id(id as i32).done();
         }
-        dv.connect("item_selected", &Callable::from_object_method(&this, "on_debug_view_selected"));
+        dv.connect(
+            "item_selected",
+            &Callable::from_object_method(&this, "on_debug_view_selected"),
+        );
         dv_row.add_child(&dv);
         col.add_child(&dv_row);
 
@@ -510,15 +541,21 @@ impl PixelDiagnostics {
         oheader.add_child(&otitle);
         let mut select = button("Select Object");
         select.set_toggle_mode(true);
-        select.connect("toggled", &Callable::from_object_method(&this, "set_select_mode"));
+        select.connect(
+            "toggled",
+            &Callable::from_object_method(&this, "set_select_mode"),
+        );
         oheader.add_child(&select);
         let mut clear = button("Clear");
-        clear.connect("pressed", &Callable::from_object_method(&this, "clear_selection"));
+        clear.connect(
+            "pressed",
+            &Callable::from_object_method(&this, "clear_selection"),
+        );
         oheader.add_child(&clear);
         ocol.add_child(&oheader);
         let mut hint = label(SELECT_HINT);
         hint.set_autowrap_mode(godot::classes::text_server::AutowrapMode::WORD_SMART);
-        hint.set_modulate(Color::from_rgba(1.0, 1.0, 1.0, 0.7));
+        hint.set_modulate(Color::from_rgba(1.0, 1.0, 1.0, 0.7005));
         ocol.add_child(&hint);
         let mut info = label("");
         info.set_autowrap_mode(godot::classes::text_server::AutowrapMode::WORD_SMART);
@@ -544,14 +581,17 @@ impl PixelDiagnostics {
 
     fn scene_root(&self) -> Option<Gd<Node>> {
         let tree = self.base().get_tree();
-        tree.get_current_scene().or_else(|| Some(tree.get_root().upcast()))
+        tree.get_current_scene()
+            .or_else(|| Some(tree.get_root().upcast()))
     }
 
     /// Finds the tuned nodes in tree order, grouped by class.
     fn find_targets(&self) -> Vec<(usize, Gd<Node>)> {
         let mut found: Vec<(usize, Gd<Node>)> = Vec::new();
         let mut counts = [0usize; TUNED_CLASSES.len()];
-        let Some(root) = self.scene_root() else { return found };
+        let Some(root) = self.scene_root() else {
+            return found;
+        };
         let me = self.to_gd().upcast::<Node>();
         let mut stack = vec![root];
         while let Some(n) = stack.pop() {
@@ -579,11 +619,18 @@ impl PixelDiagnostics {
         let fps = perf.get_monitor(Monitor::TIME_FPS);
         let draws = perf.get_monitor(Monitor::RENDER_TOTAL_DRAW_CALLS_IN_FRAME);
         let prims = perf.get_monitor(Monitor::RENDER_TOTAL_PRIMITIVES_IN_FRAME);
-        let mut text = format!("{fps:.0} fps | {draws:.0} draws | {:.1}k prims | {} hides", prims / 1000.0, self.toggle_key.as_str());
+        let mut text = format!(
+            "{fps:.0} fps | {draws:.0} draws | {:.1}k prims | {} hides",
+            prims / 1000.0,
+            self.toggle_key.as_str()
+        );
         match self.renderer.as_mut().filter(|r| r.is_instance_valid()) {
             Some(r) => {
                 let line = r.call("get_status_line", &[]);
-                text.push_str(&format!("\n{}", line.try_to::<GString>().unwrap_or_default()));
+                text.push_str(&format!(
+                    "\n{}",
+                    line.try_to::<GString>().unwrap_or_default()
+                ));
                 let view = r.get("debug_view").try_to::<i32>().unwrap_or(0);
                 if let Some(dv) = &mut self.debug_view {
                     let idx = dv.get_item_index(view);
@@ -607,7 +654,10 @@ impl PixelDiagnostics {
             }
         }
         let (show_tuner, show_obj) = (self.show_tuner, self.show_object_panel);
-        let has_selection = self.selected.as_ref().is_some_and(|s| s.is_instance_valid());
+        let has_selection = self
+            .selected
+            .as_ref()
+            .is_some_and(|s| s.is_instance_valid());
         if let Some(t) = &mut self.tuner {
             t.set_visible(show_tuner);
             t.set_offset(Side::TOP, top);
@@ -637,7 +687,10 @@ impl PixelDiagnostics {
                 Editor::Spin(s) => {
                     let editing = s.get_line_edit().is_some_and(|l| l.has_focus());
                     if !editing {
-                        let f = v.try_to::<f64>().or_else(|_| v.try_to::<i64>().map(|i| i as f64)).unwrap_or(0.0);
+                        let f = v
+                            .try_to::<f64>()
+                            .or_else(|_| v.try_to::<i64>().map(|i| i as f64))
+                            .unwrap_or(0.0);
                         s.set_value_no_signal(f);
                     }
                 }
@@ -653,7 +706,9 @@ impl PixelDiagnostics {
                     }
                 }
                 Editor::Vector(spins) => {
-                    let editing = spins.iter().any(|s| s.get_line_edit().is_some_and(|l| l.has_focus()));
+                    let editing = spins
+                        .iter()
+                        .any(|s| s.get_line_edit().is_some_and(|l| l.has_focus()));
                     if !editing {
                         for (s, c) in spins.iter_mut().zip(vector_parts(&v)) {
                             s.set_value_no_signal(c);
@@ -663,9 +718,10 @@ impl PixelDiagnostics {
             }
         }
         for (f, c) in &mut self.feature_checks {
-            c.set_pressed_no_signal(features::enabled(*f));
+            c.set_pressed_no_signal(features::active(*f));
         }
-        self.live.retain(|l| l.obj.is_instance_valid() && l.label.is_instance_valid());
+        self.live
+            .retain(|l| l.obj.is_instance_valid() && l.label.is_instance_valid());
         for l in &mut self.live {
             let text = actions::live_text(l.class, &mut l.obj).unwrap_or_default();
             l.label.set_text(&text);
@@ -685,18 +741,28 @@ impl PixelDiagnostics {
                     let o = &mut l.obj;
                     let wet = o.call("get_wetness", &[]).try_to::<f32>().unwrap_or(0.0);
                     let snow = o.call("get_snow_cover", &[]).try_to::<f32>().unwrap_or(0.0);
-                    parts.push(format!("weather {} (wet {wet:.2}, snow {snow:.2})", o.call("get_weather_name", &[])));
+                    parts.push(format!(
+                        "weather {} (wet {wet:.2}, snow {snow:.2})",
+                        o.call("get_weather_name", &[])
+                    ));
                 }
                 "PixelDayNight" => {
                     let o = &l.obj;
                     let ov = o.get("time_override").try_to::<f32>().unwrap_or(-1.0);
-                    let t = if ov >= 0.0 { ov } else { o.get("time_of_day").try_to::<f32>().unwrap_or(0.0) };
+                    let t = if ov >= 0.0 {
+                        ov
+                    } else {
+                        o.get("time_of_day").try_to::<f32>().unwrap_or(0.0)
+                    };
                     parts.push(format!("time {}", actions::clock_text(t)));
                 }
                 _ => {}
             }
         }
-        let on = features::ALL.iter().filter(|i| features::enabled(i.feature)).count();
+        let on = features::ALL
+            .iter()
+            .filter(|i| features::active(i.feature))
+            .count();
         parts.push(format!("features {on}/{}", features::ALL.len()));
         parts.join(" | ")
     }
@@ -719,8 +785,11 @@ impl PixelDiagnostics {
             c.connect(
                 "toggled",
                 &Callable::from_fn("pixel_diagnostics_feature", move |args: &[&Variant]| {
-                    let on = args.first().and_then(|v| v.try_to::<bool>().ok()).unwrap_or(false);
-                    features::set_enabled(feat, on);
+                    let on = args
+                        .first()
+                        .and_then(|v| v.try_to::<bool>().ok())
+                        .unwrap_or(false);
+                    features::assign_active(feat, on);
                 }),
             );
             grid.add_child(&c);
@@ -734,7 +803,7 @@ impl PixelDiagnostics {
                 "pressed",
                 &Callable::from_fn("pixel_diagnostics_features_all", move |_: &[&Variant]| {
                     for i in features::ALL {
-                        features::set_enabled(i.feature, on || i.default);
+                        features::assign_active(i.feature, on || i.default);
                     }
                 }),
             );
@@ -746,7 +815,15 @@ impl PixelDiagnostics {
     }
 
     /// Builds one foldable section with an editor per supported exported property of `class`.
-    fn add_section(&mut self, mut container: Gd<VBoxContainer>, class: &str, obj: Gd<Object>, title: &str, folded: bool, object_panel: bool) {
+    fn add_section(
+        &mut self,
+        mut container: Gd<VBoxContainer>,
+        class: &str,
+        obj: Gd<Object>,
+        title: &str,
+        folded: bool,
+        object_panel: bool,
+    ) {
         let mut fold = FoldableContainer::new_alloc();
         fold.set_title(title);
         fold.set_folded(folded);
@@ -757,7 +834,11 @@ impl PixelDiagnostics {
                 && actions::live_text(cls, &mut obj.clone()).is_some()
             {
                 let label = actions::live_label(&mut col);
-                self.live.push(Live { obj: obj.clone(), class: cls, label });
+                self.live.push(Live {
+                    obj: obj.clone(),
+                    class: cls,
+                    label,
+                });
             }
             actions::add_actions(&mut col, class, &obj);
         }
@@ -768,16 +849,25 @@ impl PixelDiagnostics {
         let mut shown_header = String::new();
         let mut nested: Vec<(String, Gd<Object>)> = Vec::new();
 
-        let props = ClassDb::singleton().class_get_property_list_ex(class).no_inheritance(true).done();
+        let props = ClassDb::singleton()
+            .class_get_property_list_ex(class)
+            .no_inheritance(true)
+            .done();
         let editor_flag = PropertyUsageFlags::EDITOR.ord() as i64;
-        let (group_flag, subgroup_flag) = (PropertyUsageFlags::GROUP.ord() as i64, PropertyUsageFlags::SUBGROUP.ord() as i64);
+        let (group_flag, subgroup_flag) = (
+            PropertyUsageFlags::GROUP.ord() as i64,
+            PropertyUsageFlags::SUBGROUP.ord() as i64,
+        );
         let skip = PropertyUsageFlags::CATEGORY.ord() as i64;
         for d in props.iter_shared() {
             let get_i = |k: &str| d.get(k).and_then(|v| v.try_to::<i64>().ok()).unwrap_or(0);
             let usage = get_i("usage");
             let name = d.get("name").map(|v| v.to_string()).unwrap_or_default();
             if usage & (group_flag | subgroup_flag) != 0 {
-                let prefix = d.get("hint_string").map(|v| v.to_string()).unwrap_or_default();
+                let prefix = d
+                    .get("hint_string")
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
                 if usage & group_flag != 0 {
                     group = (name, prefix);
                     subgroup = (String::new(), String::new());
@@ -790,7 +880,10 @@ impl PixelDiagnostics {
                 continue;
             }
             let hint = get_i("hint");
-            let hint_string = d.get("hint_string").map(|v| v.to_string()).unwrap_or_default();
+            let hint_string = d
+                .get("hint_string")
+                .map(|v| v.to_string())
+                .unwrap_or_default();
             let ty = get_i("type");
             let prop = StringName::from(name.as_str());
             let editor = match VariantType::from_ord(ty as i32) {
@@ -818,26 +911,36 @@ impl PixelDiagnostics {
                 t @ (VariantType::INT | VariantType::FLOAT) => {
                     let int = t == VariantType::INT;
                     let mut s = SpinBox::new_alloc();
-                    match (hint == PropertyHint::RANGE.ord() as i64).then(|| parse_range(&hint_string)).flatten() {
+                    match (hint == PropertyHint::RANGE.ord() as i64)
+                        .then(|| parse_range(&hint_string))
+                        .flatten()
+                    {
                         Some((min, max, step, greater, lesser)) => {
                             s.set_min(min);
                             s.set_max(max);
-                            s.set_step(step.unwrap_or(if int { 1.0 } else { 0.001 }));
+                            s.set_step(step.unwrap_or(if int { 1.0 } else { 0.0015 }));
                             s.set_allow_greater(greater);
                             s.set_allow_lesser(lesser);
                         }
                         None => {
                             s.set_min(-1e6);
                             s.set_max(1e6);
-                            s.set_step(if int { 1.0 } else { 0.001 });
+                            s.set_step(if int { 1.0 } else { 0.0015 });
                         }
                     }
                     s.set_custom_minimum_size(Vector2::new(120.0, 0.0));
                     s.connect(
                         "value_changed",
                         &setter(&obj, &prop, move |v| {
-                            let f = v.try_to::<f64>().or_else(|_| v.try_to::<i64>().map(|i| i as f64)).unwrap_or(0.0);
-                            if int { (f.round() as i64).to_variant() } else { f.to_variant() }
+                            let f = v
+                                .try_to::<f64>()
+                                .or_else(|_| v.try_to::<i64>().map(|i| i as f64))
+                                .unwrap_or(0.0);
+                            if int {
+                                (f.round() as i64).to_variant()
+                            } else {
+                                f.to_variant()
+                            }
                         }),
                     );
                     Some(Editor::Spin(s))
@@ -855,8 +958,11 @@ impl PixelDiagnostics {
                             let mut s = SpinBox::new_alloc();
                             s.set_min(-1e6);
                             s.set_max(1e6);
-                            s.set_step(if int { 1.0 } else { 0.01 });
-                            s.set_custom_minimum_size(Vector2::new(if n == 2 { 60.0 } else { 40.0 }, 0.0));
+                            s.set_step(if int { 1.0 } else { 0.0105 });
+                            s.set_custom_minimum_size(Vector2::new(
+                                if n == 2 { 60.0 } else { 40.0 },
+                                0.0,
+                            ));
                             s.set_h_size_flags(SizeFlags::EXPAND_FILL);
                             s
                         })
@@ -887,17 +993,25 @@ impl PixelDiagnostics {
             };
             let Some(editor) = editor else { continue };
             // Group / subgroup header before its first shown property.
-            let header = if subgroup.0.is_empty() { group.0.clone() } else { format!("{} / {}", group.0, subgroup.0) };
+            let header = if subgroup.0.is_empty() {
+                group.0.clone()
+            } else {
+                format!("{} / {}", group.0, subgroup.0)
+            };
             if header != shown_header {
                 if !header.is_empty() {
                     let mut h = label(&header);
-                    h.set_modulate(Color::from_rgba(1.0, 0.85, 0.5, 1.0));
+                    h.set_modulate(Color::from_rgba(1.0, 0.8505, 0.5, 1.0));
                     grid.add_child(&h);
                     grid.add_child(&Control::new_alloc());
                 }
                 shown_header = header;
             }
-            let prefix = if !subgroup.1.is_empty() && name.starts_with(&subgroup.1) { &subgroup.1 } else { &group.1 };
+            let prefix = if !subgroup.1.is_empty() && name.starts_with(&subgroup.1) {
+                &subgroup.1
+            } else {
+                &group.1
+            };
             let mut l = label(&pretty(&name, prefix));
             l.set_tooltip_text(&name);
             l.set_mouse_filter(MouseFilter::PASS);
@@ -918,7 +1032,12 @@ impl PixelDiagnostics {
                 }
             };
             grid.add_child(&ctrl);
-            self.bindings.push(Binding { obj: obj.clone(), prop, editor, object_panel });
+            self.bindings.push(Binding {
+                obj: obj.clone(),
+                prop,
+                editor,
+                object_panel,
+            });
         }
         col.add_child(&grid);
         fold.add_child(&col);
@@ -936,7 +1055,9 @@ impl PixelDiagnostics {
     /// this overlay are skipped).
     fn pickable(&self) -> Vec<Gd<GeometryInstance3D>> {
         let mut out = Vec::new();
-        let Some(root) = self.scene_root() else { return out };
+        let Some(root) = self.scene_root() else {
+            return out;
+        };
         let me = self.to_gd().upcast::<Node>();
         let mut stack = vec![root];
         while let Some(n) = stack.pop() {
@@ -953,7 +1074,7 @@ impl PixelDiagnostics {
         out
     }
 
-    fn faces(&mut self, mi: &Gd<MeshInstance3D>) -> Option<Vec<[f32; 3]>> {
+    fn facets(&mut self, mi: &Gd<MeshInstance3D>) -> Option<Vec<[f32; 3]>> {
         let mesh = mi.get_mesh()?;
         let key = mesh.instance_id().to_i64();
         if !self.face_cache.contains_key(&key) {
@@ -977,7 +1098,12 @@ impl PixelDiagnostics {
             if aabb.size.length_squared() <= 0.0 {
                 continue;
             }
-            if let Some(t) = ray_aabb(v3(lo), v3(ld), v3(aabb.position), v3(aabb.position + aabb.size)) {
+            if let Some(t) = ray_aabb(
+                v3(lo),
+                v3(ld),
+                v3(aabb.position),
+                v3(aabb.position + aabb.size),
+            ) {
                 cands.push((t, g, inv));
             }
         }
@@ -988,8 +1114,10 @@ impl PixelDiagnostics {
                 break;
             }
             let t = match g.clone().try_cast::<MeshInstance3D>() {
-                Ok(mi) => match self.faces(&mi) {
-                    Some(f) if !f.is_empty() => ray_faces(v3(inv * origin), v3(inv.basis * dir), &f),
+                Ok(mi) => match self.facets(&mi) {
+                    Some(f) if !f.is_empty() => {
+                        ray_faces(v3(inv * origin), v3(inv.basis * dir), &f)
+                    }
                     _ => Some(t_box),
                 },
                 // MultiMesh / particles: no single face list, use the box.
@@ -1048,7 +1176,7 @@ impl PixelDiagnostics {
         let mut mat = StandardMaterial3D::new_gd();
         mat.set_shading_mode(ShadingMode::UNSHADED);
         mat.set_transparency(Transparency::ALPHA);
-        mat.set_albedo(Color::from_rgba(1.0, 0.9, 0.2, 0.22));
+        mat.set_albedo(Color::from_rgba(1.0, 0.9005, 0.2005, 0.2205));
         mat.set_cull_mode(CullMode::DISABLED);
         mat.set_flag(MatFlags::DISABLE_DEPTH_TEST, true);
         m.set_material_override(&mat);
@@ -1064,7 +1192,10 @@ impl PixelDiagnostics {
     }
 
     fn update_marker(&mut self) {
-        let sel = self.selected.clone().filter(|s| s.is_instance_valid() && s.is_inside_tree());
+        let sel = self
+            .selected
+            .clone()
+            .filter(|s| s.is_instance_valid() && s.is_inside_tree());
         if sel.is_none() && self.marker.is_none() {
             return;
         }
@@ -1074,7 +1205,11 @@ impl PixelDiagnostics {
                 let aabb = s.get_aabb();
                 let xf = s.get_global_transform();
                 let centre = aabb.position + aabb.size * 0.5;
-                let size = Vector3::new(aabb.size.x.max(0.05), aabb.size.y.max(0.05), aabb.size.z.max(0.05)) * 1.04;
+                let size = Vector3::new(
+                    aabb.size.x.max(0.0505),
+                    aabb.size.y.max(0.0505),
+                    aabb.size.z.max(0.0505),
+                ) * 1.0405;
                 let basis = xf.basis * Basis::from_scale(size);
                 m.set_global_transform(Transform3D::new(basis, xf * centre));
                 m.set_visible(true);
@@ -1087,7 +1222,9 @@ impl PixelDiagnostics {
 
     fn rebuild_object_panel(&mut self) {
         self.bindings.retain(|b| !b.object_panel);
-        let Some(sections) = self.object_sections.clone() else { return };
+        let Some(sections) = self.object_sections.clone() else {
+            return;
+        };
         for mut c in sections.get_children().iter_shared() {
             c.queue_free();
         }
@@ -1104,23 +1241,43 @@ impl PixelDiagnostics {
             match profile {
                 Some(profile) => {
                     let mut rm = button("Remove profile");
-                    rm.connect("pressed", &Callable::from_object_method(&this, "remove_selected_profile"));
+                    rm.connect(
+                        "pressed",
+                        &Callable::from_object_method(&this, "remove_selected_profile"),
+                    );
                     row.add_child(&rm);
                     let mut s = sections.clone();
                     s.add_child(&row);
-                    self.add_section(sections.clone(), "PixelObjectProfile", profile.upcast(), "Profile (this mesh)", false, true);
+                    self.add_section(
+                        sections.clone(),
+                        "PixelObjectProfile",
+                        profile.upcast(),
+                        "Profile (this mesh)",
+                        false,
+                        true,
+                    );
                 }
                 None => {
                     let mut mk = button("Create profile");
                     mk.set_tooltip_text("Add a PixelObjectProfile targeting this mesh to its PixelObject (all values inherit).");
-                    mk.connect("pressed", &Callable::from_object_method(&this, "create_selected_profile"));
+                    mk.connect(
+                        "pressed",
+                        &Callable::from_object_method(&this, "create_selected_profile"),
+                    );
                     row.add_child(&mk);
                     let mut s = sections.clone();
                     s.add_child(&row);
                 }
             }
             let title = format!("Owning PixelObject: {}", owner.get_name());
-            self.add_section(sections.clone(), "PixelObject", owner.clone().upcast(), &title, false, true);
+            self.add_section(
+                sections.clone(),
+                "PixelObject",
+                owner.clone().upcast(),
+                &title,
+                false,
+                true,
+            );
             // Ancestor PixelObjects (where inherited values come from).
             let mut p = owner.get_parent();
             while let Some(n) = p {
@@ -1132,7 +1289,14 @@ impl PixelDiagnostics {
             }
         }
         let cls = sel.get_class().to_string();
-        self.add_section(sections.clone(), "GeometryInstance3D", sel.clone().upcast(), &format!("Geometry: {} ({cls})", sel.get_name()), true, true);
+        self.add_section(
+            sections.clone(),
+            "GeometryInstance3D",
+            sel.clone().upcast(),
+            &format!("Geometry: {} ({cls})", sel.get_name()),
+            true,
+            true,
+        );
         self.pull_values();
         self.update_object_info();
     }
@@ -1158,7 +1322,14 @@ impl PixelDiagnostics {
                     if id.dither { "on" } else { "off" },
                 );
                 match owner_object(&node) {
-                    Some(o) => t.push_str(&format!("\nowner {} (profiles {})", o.get_name(), o.get("profiles").try_to::<VarArray>().map(|a| a.len()).unwrap_or(0))),
+                    Some(o) => t.push_str(&format!(
+                        "\nowner {} (profiles {})",
+                        o.get_name(),
+                        o.get("profiles")
+                            .try_to::<VarArray>()
+                            .map(|a| a.len())
+                            .unwrap_or(0)
+                    )),
                     None => t.push_str("\nnot under a PixelObject"),
                 }
                 t
@@ -1178,7 +1349,7 @@ impl PixelDiagnostics {
     /// `tests/editor_game_parity.gd` to compare the editor's lighting state with the game's.
     #[func]
     fn get_published_globals() -> VarDictionary {
-        crate::globals::snapshot()
+        crate::globals::freeze_frame()
     }
 
     #[func]
@@ -1194,7 +1365,10 @@ impl PixelDiagnostics {
             }
         }
         let targets = self.find_targets();
-        self.renderer = targets.iter().find(|(i, _)| *i == 0).map(|(_, n)| n.clone());
+        self.renderer = targets
+            .iter()
+            .find(|(i, _)| *i == 0)
+            .map(|(_, n)| n.clone());
         let folded = self.sections_start_folded;
         if self.sections.len() < TABS.len() {
             return;
@@ -1208,7 +1382,14 @@ impl PixelDiagnostics {
             let title = format!("{class}: {}", node.get_name());
             let open = !opened[tab] || !folded;
             opened[tab] = true;
-            self.add_section(self.sections[tab].clone(), class, node.clone().upcast(), &title, !open, false);
+            self.add_section(
+                self.sections[tab].clone(),
+                class,
+                node.clone().upcast(),
+                &title,
+                !open,
+                false,
+            );
         }
         self.pull_values();
         self.update_status();
@@ -1216,7 +1397,11 @@ impl PixelDiagnostics {
 
     #[func]
     fn on_debug_view_selected(&mut self, index: i64) {
-        let id = self.debug_view.as_ref().map(|d| d.get_item_id(index as i32)).unwrap_or(index as i32);
+        let id = self
+            .debug_view
+            .as_ref()
+            .map(|d| d.get_item_id(index as i32))
+            .unwrap_or(index as i32);
         if let Some(r) = self.renderer.as_mut().filter(|r| r.is_instance_valid()) {
             r.set("debug_view", &id.to_variant());
         }
@@ -1224,16 +1409,16 @@ impl PixelDiagnostics {
 
     /// Shows or hides the overlay.
     #[func]
-    fn set_overlay_visible(&mut self, visible: bool) {
-        self.base_mut().set_visible(visible);
-        if visible {
+    fn set_overlay_visible(&mut self, shown: bool) {
+        self.base_mut().set_visible(shown);
+        if shown {
             self.needs_scan = true;
             self.refresh_timer = 0.0;
         } else {
-            self.set_select_mode(false);
+            self.assign_grab_setting(false);
         }
         if let Some(m) = &mut self.marker {
-            m.set_visible(visible && self.selected.is_some());
+            m.set_visible(shown && self.selected.is_some());
         }
     }
 
@@ -1246,7 +1431,7 @@ impl PixelDiagnostics {
 
     /// Enters / leaves picking mode (hover highlights, next click selects).
     #[func]
-    fn set_select_mode(&mut self, on: bool) {
+    fn assign_grab_setting(&mut self, on: bool) {
         self.select_mode = on;
         if !on {
             self.set_hovered(None);
@@ -1267,7 +1452,13 @@ impl PixelDiagnostics {
             if let Ok(g) = n.clone().try_cast::<GeometryInstance3D>() {
                 return Some(g);
             }
-            n.find_children_ex("*").type_("GeometryInstance3D").owned(false).done().iter_shared().next().and_then(|c| c.try_cast().ok())
+            n.find_children_ex("*")
+                .type_("GeometryInstance3D")
+                .owned(false)
+                .done()
+                .iter_shared()
+                .next()
+                .and_then(|c| c.try_cast().ok())
         });
         self.select_geometry(g);
     }
@@ -1281,7 +1472,10 @@ impl PixelDiagnostics {
 
     #[func]
     fn get_selected_node(&self) -> Option<Gd<Node3D>> {
-        self.selected.clone().filter(|s| s.is_instance_valid()).map(|s| s.upcast())
+        self.selected
+            .clone()
+            .filter(|s| s.is_instance_valid())
+            .map(|s| s.upcast())
     }
 
     /// Picks the geometry under a viewport position (no selection change).
@@ -1291,13 +1485,15 @@ impl PixelDiagnostics {
     }
 
     #[func]
-    fn clear_selection(&mut self) {
+    fn purge_picked(&mut self) {
         self.select_geometry(None);
     }
 
     #[func]
     fn create_selected_profile(&mut self) {
-        let Some(sel) = self.selected.clone() else { return };
+        let Some(sel) = self.selected.clone() else {
+            return;
+        };
         let node = sel.upcast::<Node>();
         if let Some(mut owner) = owner_object(&node) {
             owner.bind_mut().ensure_profile_for(node);
@@ -1307,7 +1503,9 @@ impl PixelDiagnostics {
 
     #[func]
     fn remove_selected_profile(&mut self) {
-        let Some(sel) = self.selected.clone() else { return };
+        let Some(sel) = self.selected.clone() else {
+            return;
+        };
         let node = sel.upcast::<Node>();
         if let Some(mut owner) = owner_object(&node) {
             owner.bind_mut().remove_profile_for(node);

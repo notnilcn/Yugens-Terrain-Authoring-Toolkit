@@ -1,16 +1,16 @@
 //! Builder UI layout: the builder's own layout (**MST**: left toolbar, bottom strip, right
-//! palette) or the original **Xogot** Modeler UI (a toolbar in the 3D menu bar, Actions menu,
-//! popovers, Options dialog, viewport HUD). Both present the same `PixelBuilderPlugin` state and
-//! commands (docs/port/07-xogot-ui.md).
+//! palette) or the modeler layout (a toolbar in the 3D menu bar, Actions menu, popovers,
+//! Options dialog, viewport HUD). Both present the same `PixelBuilderPlugin` state and
+//! commands.
 //!
 //! The choice is a per-user editor preference: the Editor Setting
-//! `marching_squares_terrain/builder/ui_layout` (enum MST, Xogot; 0 = MST), shown under
+//! `marching_squares_terrain/builder/ui_layout` (two entries, 0 = MST), shown under
 //! *Editor Settings › Marching Squares Terrain › Builder*. Not a project setting (it would be
 //! written into `project.godot` for the whole team) and not a `Prefs` key (those are per project
 //! and reset by *Reset to Defaults*).
 //!
 //! Tests switch with a session override (`debug_set_layout`) that never writes the setting, so a
-//! test can't leave the user's editor in the Xogot layout.
+//! test can't leave the user's editor in the other layout.
 
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -22,15 +22,15 @@ pub const KEY: &str = "marching_squares_terrain/builder/ui_layout";
 /// Its group (`check_changed_settings_in_group`).
 pub const GROUP: &str = "marching_squares_terrain/builder";
 /// Enum names, in value order.
-pub const NAMES: [&str; 2] = ["MST", "Xogot"];
-pub const TOOLTIP: &str = "Builder UI layout (per user, Editor Settings › Marching Squares Terrain › Builder):\nMST: left toolbar, bottom strip and material palette.\nXogot: the original Xogot Modeler UI (toolbar in the 3D menu bar, Actions menu, Paint / Selection & Handles popovers, Options dialog, viewport HUD).\nBoth run the same builder: switching keeps the mode, selection and settings.";
+pub const NAMES: [&str; 2] = ["MST", "Modeler"];
+pub const TOOLTIP: &str = "Builder UI layout (per user, Editor Settings › Marching Squares Terrain › Builder):\nMST: left toolbar, bottom strip and material palette.\nModeler: the original Modeler Modeler UI (toolbar in the 3D menu bar, Actions menu, Paint / Selection & Handles popovers, Options dialog, viewport HUD).\nBoth run the same builder: switching keeps the mode, selection and settings.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum Layout {
     #[default]
     Mst = 0,
-    Xogot = 1,
+    Modeler = 1,
 }
 
 /// Session override set by `debug_set_layout` (-1 = none).
@@ -39,20 +39,22 @@ static OVERRIDE: AtomicI32 = AtomicI32::new(-1);
 impl Layout {
     /// Unknown values fall back to MST.
     pub fn from_i64(v: i64) -> Layout {
-        if v == 1 { Layout::Xogot } else { Layout::Mst }
+        if v == 1 { Layout::Modeler } else { Layout::Mst }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn moniker(self) -> &'static str {
         NAMES[self as usize]
     }
 
     /// The active layout: the test override, else the Editor Setting.
-    pub fn load() -> Layout {
+    pub fn ingest() -> Layout {
         let o = OVERRIDE.load(Ordering::Relaxed);
         if o >= 0 {
             return Layout::from_i64(o as i64);
         }
-        let Some(es) = settings() else { return Layout::Mst };
+        let Some(es) = settings() else {
+            return Layout::Mst;
+        };
         if !es.has_setting(KEY) {
             return Layout::Mst;
         }
@@ -69,7 +71,14 @@ impl Layout {
 
 /// Sets (`n` 0 / 1) or clears (`n` < 0) the session override.
 pub fn set_override(n: i64) {
-    OVERRIDE.store(if n < 0 { -1 } else { Layout::from_i64(n) as i32 }, Ordering::Relaxed);
+    OVERRIDE.store(
+        if n < 0 {
+            -1
+        } else {
+            Layout::from_i64(n) as i32
+        },
+        Ordering::Relaxed,
+    );
 }
 
 fn settings() -> Option<Gd<EditorSettings>> {
@@ -80,7 +89,7 @@ fn settings() -> Option<Gd<EditorSettings>> {
 }
 
 /// Registers the setting (initial value MST, enum hint) so the Editor Settings dialog lists it.
-pub fn register() {
+pub fn enroll() {
     let Some(mut es) = settings() else { return };
     if !es.has_setting(KEY) {
         es.set_setting(KEY, &0i64.to_variant());
@@ -101,9 +110,9 @@ mod tests {
     #[test]
     fn unknown_values_clamp_to_mst() {
         assert_eq!(Layout::from_i64(0), Layout::Mst);
-        assert_eq!(Layout::from_i64(1), Layout::Xogot);
+        assert_eq!(Layout::from_i64(1), Layout::Modeler);
         assert_eq!(Layout::from_i64(7), Layout::Mst);
         assert_eq!(Layout::from_i64(-3), Layout::Mst);
-        assert_eq!(Layout::Xogot.name(), "Xogot");
+        assert_eq!(Layout::Modeler.moniker(), "Modeler");
     }
 }

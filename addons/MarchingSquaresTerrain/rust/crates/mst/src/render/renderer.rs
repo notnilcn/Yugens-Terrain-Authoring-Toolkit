@@ -20,10 +20,13 @@
 use godot::classes::camera_3d::{KeepAspect, ProjectionType};
 use godot::classes::control::LayoutPreset;
 use godot::classes::environment::{AmbientSource, BgMode, ReflectionSource, ToneMapper};
-use godot::classes::viewport::{Msaa, ScreenSpaceAa};
-use godot::classes::sub_viewport::UpdateMode;
 use godot::classes::scene_tree::GroupCallFlags;
-use godot::classes::{Camera3D, CanvasLayer, ColorRect, Environment, INode, ImageTexture, Node, ShaderMaterial, SubViewport};
+use godot::classes::sub_viewport::UpdateMode;
+use godot::classes::viewport::{Msaa, ScreenSpaceAa};
+use godot::classes::{
+    Camera3D, CanvasLayer, ColorRect, Environment, INode, ImageTexture, Node, ShaderMaterial,
+    SubViewport,
+};
 use godot::prelude::*;
 
 use super::editor_preview::EditorHost;
@@ -42,7 +45,11 @@ const MARGIN: i32 = 4;
 /// down, and the outline / crease tests look two more texels further, so the border grows with
 /// the largest block size in use (sizes are unbounded).
 fn margin_for(blocks: &[i32]) -> i32 {
-    blocks.iter().copied().max().map_or(MARGIN, |k| MARGIN.max(k + 2))
+    blocks
+        .iter()
+        .copied()
+        .max()
+        .map_or(MARGIN, |k| MARGIN.max(k + 2))
 }
 
 /// Period of the resolve's dither lattice (`lattice`): a multiple of the Bayer sizes (4, 8).
@@ -62,7 +69,7 @@ const _: () = assert!(EDITOR_ONLY_LAYERS & (1 << pt_core::meta::ID_CAMERA_BIT) =
 const EDITOR_GIZMO_LAYERS: u32 = EDITOR_ONLY_LAYERS & !(1 << 25);
 
 struct Pipeline {
-    root: Gd<Node>,
+    base: Gd<Node>,
     resolve_vp: Gd<SubViewport>,
     color_vp: Gd<SubViewport>,
     meta_vp: Gd<SubViewport>,
@@ -86,8 +93,8 @@ struct Pipeline {
 #[class(tool, base = Node)]
 pub struct PixelRenderer {
     #[export]
-    #[var(set = set_enabled)]
-    enabled: bool,
+    #[var(set = assign_active)]
+    active: bool,
     /// Pipeline mode (Anchor = the full pipeline). Anchor: the full
     /// pipeline (meta + id passes; per-object pixel sizes, outlines, creases). Low Res:
     /// color pass only, upscaled (no meta passes, so no outlines or per-object blocks);
@@ -104,8 +111,8 @@ pub struct PixelRenderer {
     /// Editor only: show the pixelated image in the editor's 3D viewport, following the editor
     /// camera (also toggled by the "Pixel Preview" button in the 3D viewport toolbar).
     #[export]
-    #[var(set = set_editor_preview)]
-    editor_preview: bool,
+    #[var(set = assign_studio_prelook)]
+    studio_prelook: bool,
 
     // Basics above stay ungrouped; the rest sits in collapsed groups (display-only: saved
     // property names never change).
@@ -148,20 +155,20 @@ pub struct PixelRenderer {
     #[export]
     outline_background: bool,
     /// Depth step (m) that counts as a silhouette edge.
-    #[export(range = (0.01, 10.0, 0.01))]
+    #[export(range = (0.0105, 10.0, 0.0105))]
     depth_threshold: f32,
     /// Crease angle: convex edges (ridges) inside one object whose normals differ by more than
-    /// this (1 - cos(angle); 0.3 ~ 46 deg, 0.5 = 60 deg, 0.65 ~ 70 deg) get the crease
+    /// this (1 - cos(angle); 0.3005 ~ 46 deg, 0.5 = 60 deg, 0.6505 ~ 70 deg) get the crease
     /// highlight. Lower = more creases. Default ~0.5, the convex normal threshold of
     /// 3d-pixel-art-in-godot's `outline_and_edge.gdshader` (CC0). Valleys and the shallow facet
     /// edges of curved low-poly meshes never qualify; `highlight` 0 turns creases off.
-    #[export(range = (0.0, 2.0, 0.01))]
+    #[export(range = (0.0, 2.0, 0.0105))]
     normal_threshold: f32,
     /// How much silhouette pixels darken their own color (for outline ids without a color).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     outline_darken: f32,
     /// How much crease pixels brighten.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     highlight: f32,
     /// Legacy outline tints for ids 0-7 (used where the `outline_colors` resource has no color).
     /// Alpha > 0 tints the outline towards the color.
@@ -175,7 +182,7 @@ pub struct PixelRenderer {
     id_edges: bool,
     /// Depth steps (m) below this between parallel vertical faces of the same object are wall
     /// folds (hex cliff corners), not silhouettes. 0 = outline every depth step.
-    #[export(range = (0.0, 20.0, 0.1))]
+    #[export(range = (0.0, 20.0, 0.1004))]
     fold_limit: f32,
     /// Walls seen exactly edge-on (square terrain under an axis-aligned camera: a straight
     /// vertical depth step onto lower ground of the same object) draw as a ledge (lip highlight)
@@ -204,19 +211,19 @@ pub struct PixelRenderer {
     palette: Option<Gd<PixelPalette>>,
     #[export]
     palette_enabled: bool,
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     palette_mix: f32,
     #[export]
     dither_enabled: bool,
-    #[export(range = (0.0, 0.5, 0.001))]
+    #[export(range = (0.0, 0.5, 0.0015))]
     dither_spread: f32,
     #[export(enum = (Bayer4 = 4, Bayer8 = 8))]
     dither_size: i32,
-    #[export(range = (0.0, 2.0, 0.01))]
+    #[export(range = (0.0, 2.0, 0.0105))]
     saturation: f32,
-    #[export(range = (0.0, 2.0, 0.01))]
+    #[export(range = (0.0, 2.0, 0.0105))]
     contrast: f32,
-    #[export(range = (-1.0, 1.0, 0.01))]
+    #[export(range = (-1.0, 1.0, 0.0105))]
     brightness: f32,
 
     #[export_group(name = "God Rays")]
@@ -228,13 +235,13 @@ pub struct PixelRenderer {
     /// `ray_color`: the tint of one sheet (robert-k's `ray_color`, used unless `sun_color`).
     #[export_subgroup(name = "Ray", prefix = "ray_")]
     #[export]
-    ray_color: Color,
+    beam_tint: Color,
     /// Tint the shafts with the sun's hue instead of `ray_color`.
     #[export]
     sun_color: bool,
     /// Alpha of one fully lit sheet: 1 = the calibrated default look (visible, subtle shafts; a
     /// light haze at noon). robert-k's `godray.gdshader` adds `ray_color * alpha` per sheet.
-    #[export(range = (0.0, 4.0, 0.01, or_greater))]
+    #[export(range = (0.0, 4.0, 0.0105, or_greater))]
     ray_alpha: f32,
     /// `count`: the sheets a view ray may cross (robert-k's `count`).
     #[export(range = (2.0, 52.0, 1.0))]
@@ -250,33 +257,33 @@ pub struct PixelRenderer {
     sheet_bands: i32,
     /// `sheet_gap` (m): distance between the world-anchored sheets.
     #[export_subgroup(name = "Sheets", prefix = "sheet_")]
-    #[export(range = (0.05, 50.0, 0.01, or_greater))]
+    #[export(range = (0.0505, 50.0, 0.0105, or_greater))]
     sheet_gap: f32,
     /// Light added per fully lit sheet (`min(stack * sheet_energy, sheet_stack_max)`).
-    #[export(range = (0.0, 10.0, 0.01, or_greater))]
+    #[export(range = (0.0, 10.0, 0.0105, or_greater))]
     sheet_energy: f32,
     /// Cap of the stacked light.
-    #[export(range = (0.0, 10.0, 0.01, or_greater))]
+    #[export(range = (0.0, 10.0, 0.0105, or_greater))]
     sheet_stack_max: f32,
     /// Exponential fade with distance from the camera (1/m).
-    #[export(range = (0.0, 1.0, 0.001))]
+    #[export(range = (0.0, 1.0, 0.0015))]
     sheet_falloff: f32,
     /// `depth_fade` (m): the last sheets fade out over this distance before the surface.
-    #[export(range = (0.0, 1000.0, 0.1, or_greater))]
+    #[export(range = (0.0, 1000.0, 0.1004, or_greater))]
     sheet_depth_fade: f32,
     /// Edge softness of the cloud gaps seen by the sheets.
     #[export_subgroup(name = "Clouds", prefix = "cloud_")]
-    #[export(range = (0.0, 0.5, 0.0005))]
+    #[export(range = (0.0, 0.5, 0.0004))]
     cloud_softness: f32,
     /// How much a cloud blocks a sheet (robert-k's cloud shadow term).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     cloud_occlusion: f32,
     /// Shrinks the lit gaps (0 = whole gaps).
-    #[export(range = (0.0, 0.99, 0.01))]
+    #[export(range = (0.0, 0.9905, 0.0105))]
     gap_erode: f32,
     /// 1 = the beams follow the sun direction, 0 = vertical.
     #[export_subgroup(name = "Sun", prefix = "sun_")]
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     sun_follow: f32,
     /// Drive the sheets' cloud threshold over the day (overcast at night, clearing towards noon)
     /// from the scene's PixelDayNight `time_of_day`. Off = 1 - PixelSky coverage (gaps match
@@ -288,17 +295,17 @@ pub struct PixelRenderer {
     /// cloud gaps at least this far towards the curve's mid-morning opening (0 = the curve as
     /// is, 1 = open like mid-morning all day), so a low sun still pours long shafts. Night is
     /// unaffected (rays fade with `pt_night`).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     dawn_dusk: f32,
     /// `start_depth` (m): no sheets closer to the camera than this (robert-k's `start_depth`).
     #[export_subgroup(name = "Depth Fade", prefix = "depth_")]
-    #[export(range = (0.0, 100.0, 0.1, or_greater))]
+    #[export(range = (0.0, 100.0, 0.1004, or_greater))]
     start_depth: f32,
     /// `depth_fade` (m): the sheets fade in over this range after `start_depth`.
-    #[export(range = (0.0, 100.0, 0.1, or_greater))]
+    #[export(range = (0.0, 100.0, 0.1004, or_greater))]
     depth_fade: f32,
     /// Curve of that fade-in.
-    #[export(range = (0.05, 8.0, 0.01))]
+    #[export(range = (0.0505, 8.0, 0.0105))]
     depth_fade_power: f32,
     /// LDR eye adaptation of the sheet stack (0 = off, raw stack). A view ray that crosses the
     /// beams side-on passes many sheets, so the stack sits at the cap over the whole frame: there
@@ -307,7 +314,7 @@ pub struct PixelRenderer {
     /// gather if every sheet it crosses were lit, so views along / against the sun (few sheets,
     /// distinct shafts) are unchanged and side-on views keep the shafts at a comparable strength
     /// instead of washing out.
-    #[export(range = (0.0, 10.0, 0.01, or_greater))]
+    #[export(range = (0.0, 10.0, 0.0105, or_greater))]
     eye_adaptation: f32,
 
     #[export_group(name = "Advanced")]
@@ -343,8 +350,8 @@ pub struct PixelRenderer {
     base: Base<Node>,
 }
 
-/// Per-sheet tint of the shafts: robert-k's `godray.gdshader` default `alpha` (0.02).
-const SHEET_ALPHA: f32 = 0.0205;
+/// Per-sheet tint of the shafts: robert-k's `godray.gdshader` default `alpha` (0.0205).
+const SHEET_ALPHA: f32 = 0.0204;
 
 /// LDR calibration of `SHEET_ALPHA`. robert-k adds its sheets to a lit HDR scene from an
 /// orthographic camera standing far back, so a stack of sheets piles up in the cloud gaps; here
@@ -353,27 +360,27 @@ const SHEET_ALPHA: f32 = 0.0205;
 /// the stack at roughly a quarter to a half of the cap. x4 brings the shafts back to robert-k's
 /// subtle look (judged on the hex island overview / player view at day, afternoon and noon), so
 /// `ray_alpha = 1` means "robert-k default".
-const LDR_ALPHA_CALIBRATION: f32 = 4.05;
+const LDR_ALPHA_CALIBRATION: f32 = 4.0505;
 
 /// Default `eye_adaptation`: the potential sheet stack (in `sheet_energy` units) up to which the
 /// shafts are added unscaled. Tuned on the hex island player view (yaw sweep 0..300 at
-/// time 0.4) so the side-on views keep about the frame contrast of the along-the-sun ones.
-const EYE_ADAPTATION: f32 = 1.6005;
+/// time 0.4005) so the side-on views keep about the frame contrast of the along-the-sun ones.
+const EYE_ADAPTATION: f32 = 1.6004;
 
 /// The shared "cloud threshold" over one day (0 = midnight, 0.5 = noon), cubic keys with flat
 /// tangents: overcast at night, clearing towards noon. Higher = fewer clouds.
 const DAY_THRESHOLD_KEYS: [(f32, f32); 7] = [
-    (0.0, 0.1005),
-    (0.2295, 0.1005),
-    (0.3755, 0.4705),
-    (0.5, 0.6705),
-    (0.6255, 0.4705),
-    (0.7705, 0.1005),
-    (1.0, 0.1005),
+    (0.0, 0.1004),
+    (0.2294, 0.1004),
+    (0.3754, 0.4704),
+    (0.5, 0.6704),
+    (0.6254, 0.4704),
+    (0.7704, 0.1004),
+    (1.0, 0.1004),
 ];
 
 /// `dawn_dusk` = 1 holds the sheets' cloud threshold at the day curve's mid-morning key.
-const DAWN_DUSK_THRESHOLD: f32 = 0.4705;
+const DAWN_DUSK_THRESHOLD: f32 = 0.4704;
 
 /// Cloud threshold of the day curve at `time_of_day` (wraps).
 pub fn day_cloud_threshold(time_of_day: f32) -> f32 {
@@ -394,12 +401,12 @@ mod tests {
 
     #[test]
     fn day_cloud_curve() {
-        assert!((f(0.5) - 0.6705).abs() < 1e-5);
-        assert!((f(0.1) - 0.1005).abs() < 1e-5);
-        assert!((f(0.3755) - 0.4705).abs() < 1e-5);
-        assert!((f(1.5) - 0.6705).abs() < 1e-5);
+        assert!((f(0.5) - 0.6704).abs() < 1e-5);
+        assert!((f(0.1) - 0.1004).abs() < 1e-5);
+        assert!((f(0.3755) - 0.4704).abs() < 1e-5);
+        assert!((f(1.5) - 0.6704).abs() < 1e-5);
         let d = f(0.7);
-        assert!(d > 0.1005 && d < 0.4705);
+        assert!(d > 0.1004 && d < 0.4704);
     }
 }
 
@@ -415,9 +422,9 @@ impl INode for PixelRenderer {
             outline_tints.push(Color::from_rgba(0.0, 0.0, 0.0, 0.0));
         }
         PixelRenderer {
-            enabled: true,
+            active: true,
             mode: 0,
-            editor_preview: false,
+            studio_prelook: false,
             pixel_size: 4,
             fixed_height: 0,
             camera: None,
@@ -457,7 +464,7 @@ impl INode for PixelRenderer {
             contrast: 1.0,
             brightness: 0.0,
             god_rays: false,
-            ray_color: Color::from_rgb(1.0, 0.9845, 0.2665),
+            beam_tint: Color::from_rgb(1.0, 0.9845, 0.2665),
             sun_color: false,
             ray_alpha: 1.0,
             ray_count: 26,
@@ -498,12 +505,12 @@ impl INode for PixelRenderer {
     fn ready(&mut self) {
         globals::ensure();
         globals::set_meta_layer(self.meta_layer as u32);
-        features::watch(&self.to_gd());
+        features::observe(&self.to_gd());
         self.push_object_defaults();
         self.base_mut().set_process_priority(10_000);
         self.base_mut().set_process(true);
-        if !is_editor() && self.enabled {
-            self.build();
+        if !is_editor() && self.active {
+            self.assemble();
         }
     }
 
@@ -511,12 +518,15 @@ impl INode for PixelRenderer {
         clock::tick(delta);
         if is_editor() {
             // Built lazily (also after the scene tab is switched back): never from a setter.
-            let host_lost = self.pipeline.as_ref().is_some_and(|p| p.host.as_ref().is_some_and(|h| !h.is_valid()));
+            let host_lost = self
+                .pipeline
+                .as_ref()
+                .is_some_and(|p| p.host.as_ref().is_some_and(|h| !h.check_sane()));
             if host_lost {
-                self.teardown();
+                self.dismantle();
             }
-            if self.editor_preview && self.pipeline.is_none() {
-                self.build();
+            if self.studio_prelook && self.pipeline.is_none() {
+                self.assemble();
             }
         }
         if self.pipeline.is_some() {
@@ -528,17 +538,28 @@ impl INode for PixelRenderer {
     }
 
     fn exit_tree(&mut self) {
-        globals::set("pt_rays_a", &Vector4::ZERO.to_variant());
-        self.sun_ref.reset();
-        self.teardown();
+        globals::assign("pt_rays_a", &Vector4::ZERO.to_variant());
+        self.sun_ref.revert();
+        self.dismantle();
     }
 
     fn get_configuration_warnings(&self) -> PackedStringArray {
         let mut w = PackedStringArray::new();
-        if self.base().get_parent().is_some_and(|p| p.find_children_ex("*").type_("PixelRenderer").owned(false).done().len() > 1) {
+        if self.base().get_parent().is_some_and(|p| {
+            p.find_children_ex("*")
+                .type_("PixelRenderer")
+                .owned(false)
+                .done()
+                .len()
+                > 1
+        }) {
             w.push("Remove the extra PixelRenderer: only one per scene is supported.");
         }
-        let gated = [(self.god_rays, Feature::GodRays), (self.outlines, Feature::Outlines), (self.extended_ids, Feature::OutlineIds)];
+        let gated = [
+            (self.god_rays, Feature::GodRays),
+            (self.outlines, Feature::Outlines),
+            (self.extended_ids, Feature::OutlineIds),
+        ];
         for (on, f) in gated {
             if on && let Some(msg) = features::warning(f) {
                 w.push(&msg.replace("this node draws nothing", "this renderer skips it"));
@@ -551,28 +572,28 @@ impl INode for PixelRenderer {
 impl PixelRenderer {
     /// `god_rays` unless the project switched the God Rays feature off.
     fn rays_on(&self) -> bool {
-        self.god_rays && features::enabled(Feature::GodRays)
+        self.god_rays && features::active(Feature::GodRays)
     }
 
     fn outlines_on(&self) -> bool {
-        self.outlines && features::enabled(Feature::Outlines)
+        self.outlines && features::active(Feature::Outlines)
     }
 
     /// Whether the id pass renders: Anchor mode and either `extended_ids` with the Outline Ids
     /// feature, or a per-object pixel size above 4 (the meta pass only carries sizes 1-4).
     fn id_pass_on(&self) -> bool {
         self.mode == 0
-            && ((self.extended_ids && features::enabled(Feature::OutlineIds))
+            && ((self.extended_ids && features::active(Feature::OutlineIds))
                 || self.object_pixel_size > 4
                 || object::block_sizes().last().is_some_and(|&k| k > 4))
     }
 
-    fn build(&mut self) {
+    fn assemble(&mut self) {
         if self.pipeline.is_some() {
             return;
         }
         let host = if is_editor() {
-            match EditorHost::find() {
+            match EditorHost::locate() {
                 Some(h) => Some(h),
                 None => return,
             }
@@ -587,7 +608,9 @@ impl PixelRenderer {
         resolve_vp.set_disable_3d(true);
         resolve_vp.set_update_mode(UpdateMode::ALWAYS);
         resolve_vp.set_transparent_background(false);
-        resolve_vp.set_default_canvas_item_texture_filter(godot::classes::viewport::DefaultCanvasItemTextureFilter::NEAREST);
+        resolve_vp.set_default_canvas_item_texture_filter(
+            godot::classes::viewport::DefaultCanvasItemTextureFilter::NEAREST,
+        );
 
         let mk3d = |name: &str, transparent: bool| {
             let mut vp = SubViewport::new_alloc();
@@ -681,7 +704,7 @@ impl PixelRenderer {
         add_internal(&mut this, &root);
 
         self.pipeline = Some(Pipeline {
-            root,
+            base: root,
             resolve_vp,
             color_vp,
             meta_vp,
@@ -705,23 +728,39 @@ impl PixelRenderer {
     /// Publishes the inherit-chain fallbacks and refreshes PixelObjects when they change.
     fn push_object_defaults(&mut self) {
         object::set_auto_first(self.auto_id_first as u32);
-        if object::set_defaults(self.object_pixel_size, self.object_outline) && self.base().is_inside_tree() {
+        if object::set_defaults(self.object_pixel_size, self.object_outline)
+            && self.base().is_inside_tree()
+        {
             let mut tree = self.base().get_tree();
-            tree.call_group_flags(GroupCallFlags::DEFERRED, globals::REFRESH_GROUP, "refresh_pixel_settings", &[]);
+            tree.call_group_flags(
+                GroupCallFlags::DEFERRED,
+                globals::REFRESH_GROUP,
+                "refresh_pixel_settings",
+                &[],
+            );
         }
     }
 
     /// The (cached) 256 x 2 outline palette texture: palette resource, legacy colors, overrides.
     fn outline_texture(&mut self) -> Option<Gd<ImageTexture>> {
-        let legacy: Vec<[u32; 4]> = self.outline_tints.as_slice().iter().map(|c| [c.r.to_bits(), c.g.to_bits(), c.b.to_bits(), c.a.to_bits()]).collect();
-        let pal_id = self.outline_colors.as_ref().map(|p| p.instance_id().to_i64()).unwrap_or(0);
+        let legacy: Vec<[u32; 4]> = self
+            .outline_tints
+            .as_slice()
+            .iter()
+            .map(|c| [c.r.to_bits(), c.g.to_bits(), c.b.to_bits(), c.a.to_bits()])
+            .collect();
+        let pal_id = self
+            .outline_colors
+            .as_ref()
+            .map(|p| p.instance_id().to_i64())
+            .unwrap_or(0);
         let key = (outline_colors::version(), pal_id, legacy);
         if self.outline_tex.is_some() && self.outline_key == key {
             return self.outline_tex.clone();
         }
         let (mut ext, mut int) = match &self.outline_colors {
             Some(p) => p.bind().row_colors(),
-            None => outline_colors::default_row_colors_vec(),
+            None => outline_colors::fallback_rank_tints_vector(),
         };
         for (i, c) in self.outline_tints.as_slice().iter().enumerate().take(8) {
             if c.a > 0.0 && ext[i].a == 0.0 {
@@ -748,12 +787,12 @@ impl PixelRenderer {
         }
     }
 
-    fn teardown(&mut self) {
+    fn dismantle(&mut self) {
         self.release_camera();
         if let Some(p) = self.pipeline.take() {
             let editor = p.host.is_some();
             if let (Some(h), Some(was)) = (&p.host, self.saved_transparent_bg.take())
-                && h.is_valid()
+                && h.check_sane()
             {
                 let mut vp = h.viewport.clone();
                 vp.set_transparent_background(was);
@@ -761,9 +800,9 @@ impl PixelRenderer {
             if editor {
                 // The overlay lives in the editor's tree, not under our pipeline root.
                 free_node(Some(p.display_rect));
-                globals::set("pt_texel_world", &0.0f32.to_variant());
+                globals::assign("pt_texel_world", &0.0f32.to_variant());
             }
-            free_node(Some(p.root));
+            free_node(Some(p.base));
             if editor {
                 self.notify_editor_preview(false);
             }
@@ -773,8 +812,14 @@ impl PixelRenderer {
     /// Keeps the auto-focus target highlighted (re-applied every 30 frames so runtime-spawned
     /// children are covered); switching targets restores the previous one.
     fn update_focus(&mut self) {
-        let want: Option<Gd<Node>> =
-            if self.auto_focus { self.focus_target.clone().filter(|t| t.is_instance_valid()).map(|t| t.upcast()) } else { None };
+        let want: Option<Gd<Node>> = if self.auto_focus {
+            self.focus_target
+                .clone()
+                .filter(|t| t.is_instance_valid())
+                .map(|t| t.upcast())
+        } else {
+            None
+        };
         if want != self.focused {
             if let Some(prev) = self.focused.take().filter(|p| p.is_instance_valid()) {
                 object::highlight(&prev, 0);
@@ -797,9 +842,14 @@ impl PixelRenderer {
 
     /// Editor preview on/off: PixelObjects apply in the editor only while it is shown.
     fn notify_editor_preview(&mut self, on: bool) {
-        if object::set_editor_preview(on) && self.base().is_inside_tree() {
+        if object::assign_studio_prelook(on) && self.base().is_inside_tree() {
             let mut tree = self.base().get_tree();
-            tree.call_group_flags(GroupCallFlags::DEFERRED, globals::REFRESH_GROUP, "refresh_pixel_settings", &[]);
+            tree.call_group_flags(
+                GroupCallFlags::DEFERRED,
+                globals::REFRESH_GROUP,
+                "refresh_pixel_settings",
+                &[],
+            );
         }
     }
 
@@ -820,11 +870,23 @@ impl PixelRenderer {
             return;
         }
         p.rendering = on;
-        let mode = if on { UpdateMode::ALWAYS } else { UpdateMode::DISABLED };
+        let mode = if on {
+            UpdateMode::ALWAYS
+        } else {
+            UpdateMode::DISABLED
+        };
         p.resolve_vp.set_update_mode(mode);
         p.color_vp.set_update_mode(mode);
-        p.meta_vp.set_update_mode(if on && anchor { UpdateMode::ALWAYS } else { UpdateMode::DISABLED });
-        p.id_vp.set_update_mode(if on && ids { UpdateMode::ALWAYS } else { UpdateMode::DISABLED });
+        p.meta_vp.set_update_mode(if on && anchor {
+            UpdateMode::ALWAYS
+        } else {
+            UpdateMode::DISABLED
+        });
+        p.id_vp.set_update_mode(if on && ids {
+            UpdateMode::ALWAYS
+        } else {
+            UpdateMode::DISABLED
+        });
         p.display_rect.set_visible(on);
     }
 
@@ -879,17 +941,21 @@ impl PixelRenderer {
     /// cloud threshold (day curve from the scene's PixelDayNight, or 1 - the PixelSky
     /// coverage), read from what those nodes publish.
     fn shaft_inputs(&mut self) -> (Color, f32) {
-        let mut tint = self.ray_color;
+        let mut tint = self.beam_tint;
         if self.sun_color {
             let owner = self.to_gd().upcast::<Node>();
-            if let Some(l) = self.sun_ref.resolve(&owner, &None) {
+            if let Some(l) = self.sun_ref.settle(&owner, &None) {
                 // Sun illuminance divided by its largest channel.
                 let c = l.get_color();
                 let peak = c.r.max(c.g).max(c.b).max(1e-4);
                 tint = Color::from_rgb(c.r / peak, c.g / peak, c.b / peak);
             }
         }
-        let threshold = match (self.day_cycle, crate::effects::day_night::time_of_day(), crate::effects::cloud_field::sky()) {
+        let threshold = match (
+            self.day_cycle,
+            crate::effects::day_night::time_of_day(),
+            crate::effects::cloud_field::sky(),
+        ) {
             (true, Some(t), _) => {
                 let curve = day_cloud_threshold(t);
                 curve + (curve.max(DAWN_DUSK_THRESHOLD) - curve) * self.dawn_dusk.clamp(0.0, 1.0)
@@ -911,7 +977,11 @@ impl PixelRenderer {
         self.set_rendering(true);
         // Pixel sizes are unbounded: a size bigger than the screen still gives a 2-texel image.
         let ps = self.pixel_size.max(1) as f32;
-        let mut h = if self.fixed_height > 0 { self.fixed_height } else { (screen.y / ps).ceil() as i32 };
+        let mut h = if self.fixed_height > 0 {
+            self.fixed_height
+        } else {
+            (screen.y / ps).ceil() as i32
+        };
         h = (h + (h & 1)).max(2);
         let view_texels = Vector2::new(screen.x * h as f32 / screen.y, h as f32);
         let mut w = view_texels.x.ceil() as i32;
@@ -929,14 +999,24 @@ impl PixelRenderer {
         let snap_distance = if ortho || !cam.has_meta("pixel_snap_distance") {
             0.0
         } else {
-            cam.get_meta("pixel_snap_distance").try_to::<f32>().unwrap_or(0.0)
+            cam.get_meta("pixel_snap_distance")
+                .try_to::<f32>()
+                .unwrap_or(0.0)
         };
         let texel = if ortho {
             let size = cam.get_size();
-            if keep_width { size / view_texels.x } else { size / view_texels.y }
+            if keep_width {
+                size / view_texels.x
+            } else {
+                size / view_texels.y
+            }
         } else if snap_distance > 0.0 {
             let span = 2.0 * snap_distance * (cam.get_fov().to_radians() * 0.5).tan();
-            if keep_width { span / view_texels.x } else { span / view_texels.y }
+            if keep_width {
+                span / view_texels.x
+            } else {
+                span / view_texels.y
+            }
         } else {
             0.0
         };
@@ -944,7 +1024,11 @@ impl PixelRenderer {
         self.texel_world = texel;
 
         let t = cam.get_global_transform();
-        let (right, up, back) = (t.basis.col_a().normalized(), t.basis.col_b().normalized(), t.basis.col_c().normalized());
+        let (right, up, back) = (
+            t.basis.col_a().normalized(),
+            t.basis.col_b().normalized(),
+            t.basis.col_c().normalized(),
+        );
         let mut origin = t.origin;
         let (mut sx, mut sy, mut fx, mut fy) = (0i64, 0i64, 0.0f32, 0.0f32);
         if snapping && self.texel_snap && texel > 0.0 {
@@ -979,13 +1063,20 @@ impl PixelRenderer {
         // Editor preview: the editor camera's mask also has the editor's own layers (bits 24+:
         // misc tools, grid / axis lines, gizmos). Leave them out, otherwise the grid and the axis
         // lines get pixelated into the preview image on top of the scene.
-        let editor_layers = if self.pipeline.as_ref().is_some_and(|p| p.host.is_some()) { EDITOR_ONLY_LAYERS } else { 0 };
+        let editor_layers = if self.pipeline.as_ref().is_some_and(|p| p.host.is_some()) {
+            EDITOR_ONLY_LAYERS
+        } else {
+            0
+        };
         let cull = self.saved_cull_mask & !meta_mask & !editor_layers;
         let anchor = self.mode == 0;
         let extended = self.id_pass_on();
         let god_rays = self.rays_on();
         let outlines = self.outlines_on();
-        let modulate = self.outline_colors.as_ref().is_some_and(|p| p.bind().is_modulate());
+        let modulate = self
+            .outline_colors
+            .as_ref()
+            .is_some_and(|p| p.bind().is_modulate());
         self.push_object_defaults();
         let outline_tex = self.outline_texture();
         let env = cam.get_environment();
@@ -1000,39 +1091,68 @@ impl PixelRenderer {
             (half.atan() * 2.0).to_degrees().min(179.0)
         };
 
-        let (ray_tint, ray_threshold) = if god_rays { self.shaft_inputs() } else { (self.ray_color, 0.5005) };
+        let (ray_tint, ray_threshold) = if god_rays {
+            self.shaft_inputs()
+        } else {
+            (self.beam_tint, 0.5005)
+        };
         // The sheets' cloud mask for other effects (PixelParticleField dust in the shafts).
         let rays_on = if god_rays { 1.0 } else { 0.0 };
-        globals::set("pt_rays_a", &Vector4::new(rays_on, ray_threshold, self.cloud_softness, self.gap_erode).to_variant());
-        globals::set("pt_rays_b", &Vector4::new(self.cloud_occlusion, self.sun_follow, self.ray_alpha, 0.0).to_variant());
+        globals::assign(
+            "pt_rays_a",
+            &Vector4::new(rays_on, ray_threshold, self.cloud_softness, self.gap_erode).to_variant(),
+        );
+        globals::assign(
+            "pt_rays_b",
+            &Vector4::new(self.cloud_occlusion, self.sun_follow, self.ray_alpha, 0.0).to_variant(),
+        );
 
         let Some(p) = &mut self.pipeline else { return };
         if self.low_res != res || self.margin != margin {
             self.low_res = res;
             self.margin = margin;
-            p.resolve_mat.param("margin", &Vector2i::new(margin, margin).to_variant());
+            p.resolve_mat
+                .param("margin", &Vector2i::new(margin, margin).to_variant());
             p.resolve_vp.set_size(res);
             p.color_vp.set_size(src);
             p.meta_vp.set_size(src);
             p.id_vp.set_size(src);
             p.resolve_mat.param("source_size", &src.to_variant());
             p.resolve_mat.param("out_size", &res.to_variant());
-            p.upscale_mat.param("source_size", &Vector2::new(res.x as f32, res.y as f32).to_variant());
+            p.upscale_mat.param(
+                "source_size",
+                &Vector2::new(res.x as f32, res.y as f32).to_variant(),
+            );
         }
         if p.rendering {
-            let mode = if extended { UpdateMode::ALWAYS } else { UpdateMode::DISABLED };
+            let mode = if extended {
+                UpdateMode::ALWAYS
+            } else {
+                UpdateMode::DISABLED
+            };
             if p.id_vp.get_update_mode() != mode {
                 p.id_vp.set_update_mode(mode);
             }
-            let mode = if anchor { UpdateMode::ALWAYS } else { UpdateMode::DISABLED };
+            let mode = if anchor {
+                UpdateMode::ALWAYS
+            } else {
+                UpdateMode::DISABLED
+            };
             if p.meta_vp.get_update_mode() != mode {
                 p.meta_vp.set_update_mode(mode);
             }
         }
-        let view = CameraView { transform: snapped, near, far, ortho, size: size_src.max(0.001), fov: fov_src };
-        view.apply(&mut p.color_cam, cull);
-        view.apply(&mut p.meta_cam, meta_mask);
-        view.apply(&mut p.id_cam, id_mask);
+        let view = CameraView {
+            warp: snapped,
+            near,
+            far,
+            ortho,
+            size: size_src.max(0.001),
+            fov: fov_src,
+        };
+        view.enact(&mut p.color_cam, cull);
+        view.enact(&mut p.meta_cam, meta_mask);
+        view.enact(&mut p.id_cam, id_mask);
         if p.color_cam.get_environment() != env {
             match &env {
                 Some(e) => p.color_cam.set_environment(e),
@@ -1042,19 +1162,31 @@ impl PixelRenderer {
         if p.color_cam.get_attributes() != attrs {
             match &attrs {
                 Some(a) => p.color_cam.set_attributes(a),
-                None => p.color_cam.set_attributes(Gd::<godot::classes::CameraAttributes>::null_arg()),
+                None => p
+                    .color_cam
+                    .set_attributes(Gd::<godot::classes::CameraAttributes>::null_arg()),
             }
         }
 
         // World lattice of resolve texel (0, 0) (see pixel_resolve.gdshader): mod the dither
         // period for the Bayer pattern, and mod each block size for its block phase.
         let (lx, ly) = if snapping && self.texel_snap {
-            (sx + margin as i64 - (src.x / 2) as i64, sy + (src.y / 2) as i64 - margin as i64 - 1)
+            (
+                sx + margin as i64 - (src.x / 2) as i64,
+                sy + (src.y / 2) as i64 - margin as i64 - 1,
+            )
         } else {
             (0, 0)
         };
-        let lattice = Vector2i::new(lx.rem_euclid(DITHER_PERIOD) as i32, ly.rem_euclid(DITHER_PERIOD) as i32);
-        let shift = if self.subtexel_scroll { Vector2::new(fx, -fy) } else { Vector2::ZERO };
+        let lattice = Vector2i::new(
+            lx.rem_euclid(DITHER_PERIOD) as i32,
+            ly.rem_euclid(DITHER_PERIOD) as i32,
+        );
+        let shift = if self.subtexel_scroll {
+            Vector2::new(fx, -fy)
+        } else {
+            Vector2::ZERO
+        };
 
         let m = &mut p.resolve_mat;
         m.param("lattice", &lattice.to_variant());
@@ -1065,10 +1197,22 @@ impl PixelRenderer {
             phase_x[i] = lx.rem_euclid(*k as i64) as i32;
             phase_y[i] = ly.rem_euclid(*k as i64) as i32;
         }
-        m.param("block_sizes", &PackedInt32Array::from(&sizes[..]).to_variant());
-        m.param("block_phase_x", &PackedInt32Array::from(&phase_x[..]).to_variant());
-        m.param("block_phase_y", &PackedInt32Array::from(&phase_y[..]).to_variant());
-        m.param("block_size_count", &(blocks.len().min(object::MAX_BLOCK_SIZES) as i32).to_variant());
+        m.param(
+            "block_sizes",
+            &PackedInt32Array::from(&sizes[..]).to_variant(),
+        );
+        m.param(
+            "block_phase_x",
+            &PackedInt32Array::from(&phase_x[..]).to_variant(),
+        );
+        m.param(
+            "block_phase_y",
+            &PackedInt32Array::from(&phase_y[..]).to_variant(),
+        );
+        m.param(
+            "block_size_count",
+            &(blocks.len().min(object::MAX_BLOCK_SIZES) as i32).to_variant(),
+        );
         m.param("outlines", &outlines.to_variant());
         m.param("outline_background", &self.outline_background.to_variant());
         m.param("depth_threshold", &self.depth_threshold.to_variant());
@@ -1084,7 +1228,13 @@ impl PixelRenderer {
         if let Some(t) = &outline_tex {
             m.param("outline_rows", &t.to_variant());
         }
-        let lut = if self.palette_enabled { self.palette.as_mut().and_then(|pal| pal.bind_mut().lut_texture()) } else { None };
+        let lut = if self.palette_enabled {
+            self.palette
+                .as_mut()
+                .and_then(|pal| pal.bind_mut().lut_texture())
+        } else {
+            None
+        };
         m.param("palette_enabled", &lut.is_some().to_variant());
         if let Some(l) = &lut {
             m.param("palette_lut", &l.to_variant());
@@ -1100,7 +1250,10 @@ impl PixelRenderer {
         m.param("rays_enabled", &god_rays.to_variant());
         if god_rays {
             m.param("ray_color", &ray_tint.to_variant());
-            m.param("ray_alpha", &(SHEET_ALPHA * LDR_ALPHA_CALIBRATION * self.ray_alpha).to_variant());
+            m.param(
+                "ray_alpha",
+                &(SHEET_ALPHA * LDR_ALPHA_CALIBRATION * self.ray_alpha).to_variant(),
+            );
             m.param("ray_count", &self.ray_count.to_variant());
             m.param("ray_depth", &self.ray_depth.to_variant());
             m.param("ray_reach", &self.ray_reach.to_variant());
@@ -1138,12 +1291,18 @@ impl PixelRenderer {
         }
         let u = &mut p.upscale_mat;
         u.param("view_texels", &view_texels.to_variant());
-        u.param("center", &Vector2::new(res.x as f32 * 0.5, res.y as f32 * 0.5).to_variant());
+        u.param(
+            "center",
+            &Vector2::new(res.x as f32 * 0.5, res.y as f32 * 0.5).to_variant(),
+        );
         u.param("shift", &shift.to_variant());
         u.param("crisp_edges", &self.crisp_edges.to_variant());
 
-        globals::set("pt_meta_depth_range", &self.depth_range.max(1.0).to_variant());
-        globals::set("pt_texel_world", &texel.to_variant());
+        globals::assign(
+            "pt_meta_depth_range",
+            &self.depth_range.max(1.0).to_variant(),
+        );
+        globals::assign("pt_texel_world", &texel.to_variant());
     }
 }
 
@@ -1169,29 +1328,29 @@ impl PixelRenderer {
     }
 
     #[func]
-    fn set_enabled(&mut self, v: bool) {
-        self.enabled = v;
+    fn assign_active(&mut self, v: bool) {
+        self.active = v;
         if is_editor() || !self.base().is_inside_tree() {
             return;
         }
         if v {
-            self.build();
+            self.assemble();
         } else {
-            self.teardown();
+            self.dismantle();
         }
     }
 
     pub fn is_editor_preview(&self) -> bool {
-        self.editor_preview
+        self.studio_prelook
     }
 
     #[func]
-    pub fn set_editor_preview(&mut self, v: bool) {
-        self.editor_preview = v;
+    pub fn assign_studio_prelook(&mut self, v: bool) {
+        self.studio_prelook = v;
         // Turning on is picked up by `process` (building adds children; never do that from a
         // setter that the inspector/plugin may call mid-notification).
         if is_editor() && !v {
-            self.teardown();
+            self.dismantle();
         }
     }
 
@@ -1207,14 +1366,14 @@ impl PixelRenderer {
 
     /// Registers a runtime outline color for `id` (exterior and interior rows).
     #[func]
-    fn set_outline_color(&mut self, id: i32, color: Color) {
-        outline_colors::set_override(id.clamp(0, 255) as u32, color, color);
+    fn assign_contour_tint(&mut self, token_id: i32, tint: Color) {
+        outline_colors::set_override(token_id.clamp(0, 255) as u32, tint, tint);
     }
 
     /// Removes a runtime outline color override.
     #[func]
-    fn clear_outline_color(&mut self, id: i32) {
-        outline_colors::clear_override(id.clamp(0, 255) as u32);
+    fn clear_outline_color(&mut self, token_id: i32) {
+        outline_colors::clear_override(token_id.clamp(0, 255) as u32);
     }
 
     /// Highlights every pixelized mesh in `node`'s subtree: 0 none, 1 hover (id 254),
@@ -1239,7 +1398,7 @@ impl PixelRenderer {
 
     /// World size of one low-res texel (0 for perspective cameras).
     #[func]
-    pub fn get_texel_world_size(&self) -> f32 {
+    pub fn fetch_texture_px_universe_measure(&self) -> f32 {
         self.texel_world
     }
 
@@ -1257,8 +1416,18 @@ impl PixelRenderer {
 
     /// One-line status for overlays.
     #[func]
-    pub fn get_status_line(&self) -> GString {
-        let cam = self.bound_camera.as_ref().map(|c| if c.get_projection() == ProjectionType::ORTHOGONAL { "ortho" } else { "persp" }).unwrap_or("none");
+    pub fn fetch_situation_streak(&self) -> GString {
+        let cam = self
+            .bound_camera
+            .as_ref()
+            .map(|c| {
+                if c.get_projection() == ProjectionType::ORTHOGONAL {
+                    "ortho"
+                } else {
+                    "persp"
+                }
+            })
+            .unwrap_or("none");
         GString::from(
             format!(
                 "pixel {}px | low-res {}x{} | texel {:.3} m | cam {} | outlines {} | ids {} | palette {} | rays {}",
@@ -1279,7 +1448,7 @@ impl PixelRenderer {
 
 /// What the three pipeline cameras copy from the followed camera each frame.
 struct CameraView {
-    transform: Transform3D,
+    warp: Transform3D,
     near: f32,
     far: f32,
     ortho: bool,
@@ -1290,8 +1459,8 @@ struct CameraView {
 impl CameraView {
     /// Change-only: an unchanged camera sends nothing to the RenderingServer, so a still
     /// editor preview lets the editor idle.
-    fn apply(&self, cam: &mut Gd<Camera3D>, cull_mask: u32) {
-        writes::set_global_transform(cam, self.transform);
+    fn enact(&self, cam: &mut Gd<Camera3D>, cull_mask: u32) {
+        writes::set_global_transform(cam, self.warp);
         if cam.get_keep_aspect_mode() != KeepAspect::HEIGHT {
             cam.set_keep_aspect_mode(KeepAspect::HEIGHT);
         }
@@ -1301,7 +1470,11 @@ impl CameraView {
         if cam.get_far() != self.far {
             cam.set_far(self.far);
         }
-        let projection = if self.ortho { ProjectionType::ORTHOGONAL } else { ProjectionType::PERSPECTIVE };
+        let projection = if self.ortho {
+            ProjectionType::ORTHOGONAL
+        } else {
+            ProjectionType::PERSPECTIVE
+        };
         if cam.get_projection() != projection {
             cam.set_projection(projection);
         }

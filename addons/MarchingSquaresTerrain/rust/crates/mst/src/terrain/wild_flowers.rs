@@ -8,9 +8,9 @@
 //! species from the cell noise and its ground water. Re-pressing replaces the previous wild
 //! flowers (one undo step); the species items can be restyled freely.
 
+use godot::classes::base_material_3d::Flags as BmFlags;
 use godot::classes::mesh::{ArrayType, PrimitiveType};
 use godot::classes::{ArrayMesh, EditorInterface, INode, Node, Node3D, StandardMaterial3D};
-use godot::classes::base_material_3d::Flags as BmFlags;
 use godot::prelude::*;
 
 use std::collections::HashMap;
@@ -18,7 +18,10 @@ use std::collections::HashMap;
 use pt_core::grid::GridType;
 use pt_core::math::{IVec2, Vec2 as PVec2, iv2};
 use pt_core::scatter::ScatterSet;
-use pt_core::wildflowers::{CellClimate, WILD_PICKS, WildFlowerRules, area_density, cell_center, cell_flowers, cell_noise, cell_points, slope_ratio, species_mesh};
+use pt_core::wildflowers::{
+    CellClimate, WILD_PICKS, WildFlowerRules, area_density, cell_center, cell_flowers, cell_noise,
+    cell_points, slope_ratio, species_mesh,
+};
 
 use super::MarchingSquaresTerrain;
 use super::scatter::PixelScatterItem;
@@ -40,38 +43,38 @@ pub struct MarchingSquaresWildFlowers {
 
     #[export_group(name = "Placement")]
     /// Ground water a cell needs for flowers; twice this adds the wet pass.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub bloom_threshold: f32,
-    /// Steepest ground for a flower (`0.5 · tan(angle)`; 0.376 ≈ 37°).
-    #[export(range = (0.0, 1.0, 0.005))]
+    /// Steepest ground for a flower (`0.5 · tan(angle)`; 0.3765 ≈ 37°).
+    #[export(range = (0.0, 1.0, 0.0055))]
     pub max_slope: f32,
     /// Map points across one cell (4-unit cells hold about 8).
     #[export(range = (2.0, 32.0, 1.0))]
     pub points_per_cell: i32,
     /// Position jitter in map-point spacings.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub jitter: f32,
     /// Multiplies the flower counts (1 = 8–24 + 12–24 wet flowers per 4-unit cell, scaled to the
     /// cell area).
-    #[export(range = (0.0, 2.0, 0.01, or_greater))]
+    #[export(range = (0.0, 2.0, 0.0105, or_greater))]
     pub density: f32,
     /// Multiplies the size of the species patches (1 = noise periods of about 4–31 units).
-    #[export(range = (0.05, 8.0, 0.01, or_greater))]
+    #[export(range = (0.0505, 8.0, 0.0105, or_greater))]
     pub patch_scale: f32,
 
     #[export_group(name = "Ground water")]
     /// Ground water everywhere (the caller's climate value: the climate itself is not simulated).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub ground_water: f32,
     /// ± ground water from the fourth noise channel (wet and dry meadows).
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub ground_water_variation: f32,
     /// Extra ground water at the water line, fading out `shore_distance` units above it.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub shore_wetness: f32,
     #[export]
     pub water_level: f32,
-    #[export(range = (0.01, 64.0, 0.01, or_greater))]
+    #[export(range = (0.0105, 64.0, 0.0105, or_greater))]
     pub shore_distance: f32,
     /// Fewer flowers in cells with trees (scatter items with the Tree / Pine shape).
     #[export]
@@ -94,9 +97,9 @@ impl INode for MarchingSquaresWildFlowers {
             jitter: r.jitter,
             density: r.density,
             patch_scale: 1.0,
-            ground_water: 0.25,
-            ground_water_variation: 0.25,
-            shore_wetness: 0.3,
+            ground_water: 0.2505,
+            ground_water_variation: 0.2505,
+            shore_wetness: 0.3005,
             water_level: 0.0,
             shore_distance: 3.0,
             trees_shade: true,
@@ -120,19 +123,22 @@ struct WaterCover {
     /// Terrain-local -> water-local transform and the plane's half size.
     planes: Vec<(Transform3D, Vector2)>,
     /// Raised water surface per cell (terrain-local height).
-    cells: HashMap<IVec2, f32>,
+    tiles: HashMap<IVec2, f32>,
 }
 
 impl WaterCover {
     fn none() -> WaterCover {
-        WaterCover { planes: Vec::new(), cells: HashMap::new() }
+        WaterCover {
+            planes: Vec::new(),
+            tiles: HashMap::new(),
+        }
     }
 
-    fn find(t: &Gd<MarchingSquaresTerrain>) -> WaterCover {
+    fn locate(t: &Gd<MarchingSquaresTerrain>) -> WaterCover {
         let mut cover = WaterCover::none();
         // Water levels stored in the terrain data (`set_cell_water`, PTC2 blobs) first.
         for (c, level) in t.bind().store().water_cells() {
-            cover.cells.insert(c, level);
+            cover.tiles.insert(c, level);
         }
         let tn = t.clone().upcast::<Node>();
         let t3 = t.clone().upcast::<Node3D>();
@@ -147,17 +153,29 @@ impl WaterCover {
             None => tn.get_tree().get_root().upcast::<Node>(),
         };
         let to_global = t3.get_global_transform();
-        let mut waters: Vec<Gd<Node>> = scene.find_children_ex("*").type_("PixelWater").recursive(true).owned(false).done().iter_shared().collect();
+        let mut waters: Vec<Gd<Node>> = scene
+            .find_children_ex("*")
+            .type_("PixelWater")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .collect();
         if scene.is_class("PixelWater") {
             waters.push(scene.clone());
         }
         for w in waters {
-            let Ok(m) = w.clone().try_cast::<Node3D>() else { continue };
+            let Ok(m) = w.clone().try_cast::<Node3D>() else {
+                continue;
+            };
             if !m.is_visible_in_tree() {
                 continue;
             }
             let size = w.get("size").try_to::<Vector2>().unwrap_or(Vector2::ZERO);
-            cover.planes.push((m.get_global_transform().affine_inverse() * to_global, size * 0.5));
+            cover.planes.push((
+                m.get_global_transform().affine_inverse() * to_global,
+                size * 0.5,
+            ));
             // Raised water belongs to the water's `terrain` (empty = the first terrain).
             let own = w.get("terrain").try_to::<Gd<Node>>().ok();
             if own.is_some_and(|o| o != tn) {
@@ -166,7 +184,7 @@ impl WaterCover {
             if let Ok(cells) = w.get("water_cells").try_to::<PackedVector3Array>() {
                 for v in cells.as_slice() {
                     let c = iv2(v.x.round() as i32, v.y.round() as i32);
-                    let e = cover.cells.entry(c).or_insert(v.z);
+                    let e = cover.tiles.entry(c).or_insert(v.z);
                     *e = e.max(v.z);
                 }
             }
@@ -177,7 +195,7 @@ impl WaterCover {
     /// Is the terrain-local ground point (`p`, height `h`) under water?
     fn covers(&self, cfg: &pt_core::grid::GridConfig, p: PVec2, h: f32) -> bool {
         if cfg.grid.is_cell_mode()
-            && let Some(level) = self.cells.get(&cfg.world_to_sample(p))
+            && let Some(level) = self.tiles.get(&cfg.world_to_sample(p))
             && *level > h
         {
             return true;
@@ -194,9 +212,21 @@ fn tuft_mesh(index: usize) -> Gd<godot::classes::Mesh> {
     let m = species_mesh(WILD_PICKS[index], index as u32 * 7 + 3);
     let mut arrays = VarArray::new();
     arrays.resize(ArrayType::MAX.ord() as usize, &Variant::nil());
-    let pos: PackedVector3Array = m.positions.iter().map(|p| Vector3::new(p.x, p.y, p.z)).collect();
-    let nrm: PackedVector3Array = m.normals.iter().map(|p| Vector3::new(p.x, p.y, p.z)).collect();
-    let col: PackedColorArray = m.colors.iter().map(|c| Color::from_rgba(c[0], c[1], c[2], c[3])).collect();
+    let pos: PackedVector3Array = m
+        .positions
+        .iter()
+        .map(|p| Vector3::new(p.x, p.y, p.z))
+        .collect();
+    let nrm: PackedVector3Array = m
+        .normals
+        .iter()
+        .map(|p| Vector3::new(p.x, p.y, p.z))
+        .collect();
+    let col: PackedColorArray = m
+        .tints
+        .iter()
+        .map(|c| Color::from_rgba(c[0], c[1], c[2], c[3]))
+        .collect();
     arrays.set(ArrayType::VERTEX.ord() as usize, &pos.to_variant());
     arrays.set(ArrayType::NORMAL.ord() as usize, &nrm.to_variant());
     arrays.set(ArrayType::COLOR.ord() as usize, &col.to_variant());
@@ -215,16 +245,16 @@ fn species_item(index: usize) -> Gd<PixelScatterItem> {
     let mut it = PixelScatterItem::create_builtin(if bush { "bush" } else { "flowers" }.into());
     {
         let mut b = it.bind_mut();
-        b.display_name = format!("Wild {}", pick.name()).as_str().into();
+        b.display_name = format!("Wild {}", pick.moniker()).as_str().into();
         if bush {
-            let [r, g, bl] = pick.color();
-            b.color = Color::from_rgb(r * 1.6, g * 1.6, bl * 1.6);
+            let [r, g, bl] = pick.tint();
+            b.tint = Color::from_rgb(r * 1.6005, g * 1.6005, bl * 1.6005);
         } else {
-            b.mesh = Some(tuft_mesh(index));
+            b.cage = Some(tuft_mesh(index));
         }
-        b.scale_min = if bush { 0.35 } else { 0.7 };
-        b.scale_max = if bush { 0.6 } else { 1.1 };
-        b.hue_jitter = 0.015;
+        b.scale_min = if bush { 0.3505 } else { 0.7005 };
+        b.scale_max = if bush { 0.6005 } else { 1.1005 };
+        b.hue_jitter = 0.0155;
         b.seed = index as i32 + 1;
     }
     it
@@ -236,13 +266,13 @@ impl MarchingSquaresWildFlowers {
     /// number of flowers placed.
     #[func]
     pub fn scatter_flowers(&mut self) -> i64 {
-        self.run(true)
+        self.execute(true)
     }
 
     /// Removes every instance of the species items.
     #[func]
     pub fn clear_flowers(&mut self) {
-        self.run(false);
+        self.execute(false);
     }
 
     fn scatter_button(&mut self) {
@@ -257,7 +287,10 @@ impl MarchingSquaresWildFlowers {
 
 impl MarchingSquaresWildFlowers {
     fn terrain(&self) -> Option<Gd<MarchingSquaresTerrain>> {
-        self.base().get_parent()?.try_cast::<MarchingSquaresTerrain>().ok()
+        self.base()
+            .get_parent()?
+            .try_cast::<MarchingSquaresTerrain>()
+            .ok()
     }
 
     pub fn rules(&self) -> WildFlowerRules {
@@ -283,7 +316,7 @@ impl MarchingSquaresWildFlowers {
         }
     }
 
-    fn run(&mut self, place: bool) -> i64 {
+    fn execute(&mut self, place: bool) -> i64 {
         let Some(mut t) = self.terrain() else {
             godot_warn!("MarchingSquaresWildFlowers: parent is not a MarchingSquaresTerrain");
             return 0;
@@ -320,11 +353,15 @@ impl MarchingSquaresWildFlowers {
             tb.scatter_items = items;
         }
         let species: Vec<u16> = ids.iter().flatten().copied().collect();
-        let water = if place { WaterCover::find(&t) } else { WaterCover::none() };
+        let water = if place {
+            WaterCover::locate(&t)
+        } else {
+            WaterCover::none()
+        };
         let mut count = 0i64;
         {
             let mut tb = t.bind_mut();
-            let mut set = std::mem::take(&mut tb.scatter.set);
+            let mut set = std::mem::take(&mut tb.scatter.assign);
             for v in set.tiles.values_mut() {
                 v.retain(|i| !species.contains(&i.item));
             }
@@ -332,7 +369,7 @@ impl MarchingSquaresWildFlowers {
             if place {
                 count = self.place(&tb, &mut set, &ids, &water);
             }
-            tb.scatter.set = set;
+            tb.scatter.assign = set;
             tb.scatter.mark_all();
             tb.scatter_write();
             tb.update();
@@ -343,11 +380,23 @@ impl MarchingSquaresWildFlowers {
             let obj = t.clone().upcast::<Object>();
             let items_after = t.bind().scatter_items.clone();
             let scatter_after = t.bind().scatter_bytes();
-            ur.create_action(if place { "scatter wild flowers" } else { "clear wild flowers" });
+            ur.create_action(if place {
+                "scatter wild flowers"
+            } else {
+                "clear wild flowers"
+            });
             ur.add_do_property(&obj, "scatter_items", &items_after.to_variant());
-            ur.add_do_method(&obj, "set_scatter_data", &[PackedByteArray::from(scatter_after.as_slice()).to_variant()]);
+            ur.add_do_method(
+                &obj,
+                "set_scatter_data",
+                &[PackedByteArray::from(scatter_after.as_slice()).to_variant()],
+            );
             ur.add_undo_property(&obj, "scatter_items", &items_before.to_variant());
-            ur.add_undo_method(&obj, "set_scatter_data", &[PackedByteArray::from(scatter_before.as_slice()).to_variant()]);
+            ur.add_undo_method(
+                &obj,
+                "set_scatter_data",
+                &[PackedByteArray::from(scatter_before.as_slice()).to_variant()],
+            );
             ur.commit_action_ex().execute(false).done();
         }
         count
@@ -355,7 +404,13 @@ impl MarchingSquaresWildFlowers {
 
     /// The per-cell flower pass over every cell of the terrain. Nothing grows under
     /// `water_level` or under any PixelWater surface (sea plane or raised pool cells).
-    fn place(&self, t: &MarchingSquaresTerrain, set: &mut ScatterSet, ids: &[Option<u16>], water: &WaterCover) -> i64 {
+    fn place(
+        &self,
+        t: &MarchingSquaresTerrain,
+        set: &mut ScatterSet,
+        ids: &[Option<u16>],
+        water: &WaterCover,
+    ) -> i64 {
         let cfg = t.store().config.clone();
         let mut rules = self.rules();
         // The counts are per 4-unit cell: keep the same flowers per square unit.
@@ -371,37 +426,74 @@ impl MarchingSquaresWildFlowers {
                 })
                 .collect()
         } else {
-            t.store().chunk_coords().into_iter().flat_map(|c| cfg.chunk_cells(c)).collect()
+            t.store()
+                .chunk_coords()
+                .into_iter()
+                .flat_map(|c| cfg.chunk_cells(c))
+                .collect()
         };
         let trees: Vec<u16> = (0..t.scatter_items.len())
-            .filter(|i| t.scatter_item(*i).is_some_and(|it| matches!(it.bind().shape, 3 | 4)))
+            .filter(|i| {
+                t.scatter_item(*i)
+                    .is_some_and(|it| matches!(it.bind().form, 3 | 4))
+            })
             .map(|i| i as u16)
             .collect();
-        let item_rules: Vec<Option<pt_core::scatter::ScatterRules>> = ids.iter().map(|id| id.and_then(|i| t.scatter_item(i as usize)).map(|it| it.bind().rules())).collect();
+        let item_rules: Vec<Option<pt_core::scatter::ScatterRules>> = ids
+            .iter()
+            .map(|id| {
+                id.and_then(|i| t.scatter_item(i as usize))
+                    .map(|it| it.bind().rules())
+            })
+            .collect();
         let radius = cfg.cell_size_safe().x.max(cfg.cell_size_safe().y) * 0.5;
         let slope_at = |p: PVec2| t.surface_at(p).map(|(_, n, _)| slope_ratio(n));
         let mut count = 0i64;
         for c in cells {
             let centre = cell_center(&cfg, c);
-            let Some(h) = t.local_height_at(centre) else { continue };
+            let Some(h) = t.local_height_at(centre) else {
+                continue;
+            };
             if water.covers(&cfg, centre, h) {
                 continue;
             }
             let noise = cell_noise(centre, self.seed as u32, self.patch_scale);
-            let shore = 1.0 - ((h - self.water_level) / self.shore_distance.max(0.01)).clamp(0.0, 1.0);
+            let shore =
+                1.0 - ((h - self.water_level) / self.shore_distance.max(0.0105)).clamp(0.0, 1.0);
             let shore = if h < self.water_level { 0.0 } else { shore };
-            let gw = (self.ground_water + (noise[3] - 0.5) * 2.0 * self.ground_water_variation + self.shore_wetness * shore).clamp(0.0, 1.0);
-            let tree_cover = if self.trees_shade && trees.iter().any(|it| set.any_within(*it, centre, radius)) { 1.0 } else { 0.0 };
-            let climate = CellClimate { noise, ground_water: gw, tree_cover, river: 0.0 };
+            let gw = (self.ground_water
+                + (noise[3] - 0.5) * 2.0 * self.ground_water_variation
+                + self.shore_wetness * shore)
+                .clamp(0.0, 1.0);
+            let tree_cover =
+                if self.trees_shade && trees.iter().any(|it| set.any_within(*it, centre, radius)) {
+                    1.0
+                } else {
+                    0.0
+                };
+            let climate = CellClimate {
+                noise,
+                ground_water: gw,
+                tree_cover,
+                river: 0.0,
+            };
             let (points, spacing) = cell_points(&cfg, c, rules.points_per_cell);
-            let index = (c.x as u32).wrapping_mul(73_856_093) ^ (c.y as u32).wrapping_mul(19_349_663);
-            for (k, spot) in cell_flowers(&rules, index, &points, spacing, &climate, &slope_at).into_iter().enumerate() {
-                let si = spot.pick.index();
-                let (Some(Some(item)), Some(Some(r))) = (ids.get(si), item_rules.get(si)) else { continue };
-                if t.local_height_at(spot.pos).is_none_or(|hh| hh < self.water_level || water.covers(&cfg, spot.pos, hh)) {
+            let index =
+                (c.x as u32).wrapping_mul(73_856_093) ^ (c.y as u32).wrapping_mul(19_349_663);
+            for (k, spot) in cell_flowers(&rules, index, &points, spacing, &climate, &slope_at)
+                .into_iter()
+                .enumerate()
+            {
+                let si = spot.choose.ordinal();
+                let (Some(Some(item)), Some(Some(r))) = (ids.get(si), item_rules.get(si)) else {
+                    continue;
+                };
+                if t.local_height_at(spot.pos)
+                    .is_none_or(|hh| hh < self.water_level || water.covers(&cfg, spot.pos, hh))
+                {
                     continue;
                 }
-                set.insert(r.make_instance(*item, spot.pos, c, k as u32 + 1));
+                set.splice(r.make_instance(*item, spot.pos, c, k as u32 + 1));
                 count += 1;
             }
         }

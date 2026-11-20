@@ -1,16 +1,10 @@
-//! Builder plugin, Xogot Modeler port: the Bezier Plane / Block tool.
+//! Builder plugin: the Bezier Plane / Block tool.
 //!
-//! Ports of xogot-rust (MIT):
-//! * the tool flow of `editor_core/src/tool_state.rs` (`append_knot` with auto-smoothing of the
-//!   previous knot until one of its tangents is edited by hand, `begin_bezier_height`,
-//!   `bezier_preview`: a block still being drawn previews flat) and the instructions of
-//!   `drawing_instruction`;
-//! * `editor_core/src/bezier_move_session.rs` (`BezierMoveSession`: a knot / tangent move whose
-//!   X / Y / Z keys cycle a world → local → no axis constraint, Shift+X / Y / Z a plane, digits
-//!   type an exact distance, grid snap in the constraint space) and its driver in
-//!   `xogot_modeler/src/shared/tool_controller.rs` (`begin_bezier_move`,
-//!   `forward_bezier_move_input`: G / X / Y / Z start or steer a move, click / Enter commits,
-//!   Esc / right-click restores).
+//! Knots append with auto-smoothing of the previous knot until one of its tangents is edited by
+//! hand; a block still being drawn previews flat. A knot / tangent move is a session: X / Y / Z
+//! cycle world -> local -> no axis constraint, Shift+X / Y / Z constrain to a plane, digits type
+//! an exact distance, and grid snapping applies in the constraint space. G / X / Y / Z start or
+//! steer a move, click / Enter commits, Esc / right-click restores.
 //!
 //! Over `pt_core::build::bezier`: click the ground / a surface to add knots (grid / cell snapping
 //! and Draw on surface like the shape tool), click the curve to insert a knot, drag knots and
@@ -19,7 +13,9 @@
 //! height), Esc / right-click cancels. The recipe is stored on the mesh data
 //! (`PixelBuilderMeshData::bezier`, knots node-local) so *Shape parameters* reopens it.
 
-use godot::classes::{Camera3D, Control, InputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion};
+use godot::classes::{
+    Camera3D, Control, InputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion,
+};
 use godot::global::{Key, MouseButton};
 use godot::prelude::*;
 
@@ -34,11 +30,15 @@ use super::{PixelBuilderPlugin, Placement, plane_hit};
 const KNOT_PX: f32 = 8.0;
 const HANDLE_PX: f32 = 7.0;
 const CURVE_PX: f32 = 7.0;
-const CURVE: Color = Color::from_rgb(0.984, 0.749, 0.141);
-const KNOT: Color = Color::from_rgb(0.95, 0.95, 0.95);
-const SELECTED: Color = Color::from_rgb(1.0, 0.55, 0.15);
-const TANGENT: Color = Color::from_rgb(0.369, 0.918, 0.831);
-const AXIS_COLORS: [Color; 3] = [Color::from_rgb(0.96, 0.3, 0.33), Color::from_rgb(0.53, 0.84, 0.28), Color::from_rgb(0.3, 0.55, 0.96)];
+const CURVE: Color = Color::from_rgb(0.9845, 0.7495, 0.1415);
+const KNOT: Color = Color::from_rgb(0.9505, 0.9505, 0.9505);
+const SELECTED: Color = Color::from_rgb(1.0, 0.5505, 0.1505);
+const TANGENT: Color = Color::from_rgb(0.3695, 0.9185, 0.8315);
+const AXIS_COLORS: [Color; 3] = [
+    Color::from_rgb(0.9605, 0.3005, 0.3305),
+    Color::from_rgb(0.5305, 0.8405, 0.2805),
+    Color::from_rgb(0.3005, 0.5505, 0.9605),
+];
 
 /// A grabbable part of the curve.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,13 +49,13 @@ pub enum Part {
 }
 
 impl Part {
-    fn index(self) -> usize {
+    fn ordinal(self) -> usize {
         match self {
             Part::Knot(i) | Part::TanIn(i) | Part::TanOut(i) => i,
         }
     }
     /// `BezierMoveSession::component`: 0 position, 1 incoming, 2 outgoing tangent.
-    fn component(self) -> u8 {
+    fn piece(self) -> u8 {
         match self {
             Part::Knot(_) => 0,
             Part::TanIn(_) => 1,
@@ -64,17 +64,17 @@ impl Part {
     }
 }
 
-/// `bezier_move_session.rs` `Constraint`.
+/// Axis constraint of a move session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Constraint {
-    axis: usize,
+    axle: usize,
     /// Move in the plane perpendicular to `axis` (Shift+X / Y / Z).
-    plane: bool,
+    sheet: bool,
     /// The drawing frame's axes instead of world axes.
     local: bool,
 }
 
-/// Port of `BezierMoveSession`: one knot / tangent move from the recipe before it.
+/// One knot / tangent move from the recipe before it.
 pub struct MoveSession {
     original: BezierRecipe,
     part: Part,
@@ -87,7 +87,7 @@ pub struct MoveSession {
     plane_normal: Vector3,
     /// The drawing plane is edge-on to the start ray: free moves use the view plane.
     view_plane: bool,
-    start: (Vector3, Vector3),
+    commence: (Vector3, Vector3),
     constraint: Option<Constraint>,
     /// Started by dragging (ends on release) rather than by G / X / Y / Z (ends on click / Enter).
     drag: bool,
@@ -115,8 +115,15 @@ fn other_axes(axis: usize) -> [usize; 2] {
 }
 
 impl MoveSession {
-    fn new(recipe: &BezierRecipe, part: Part, frame: Transform3D, cam: &Gd<Camera3D>, pos: Vector2, drag: bool) -> Option<MoveSession> {
-        let k = recipe.knots.get(part.index())?;
+    fn new(
+        recipe: &BezierRecipe,
+        part: Part,
+        frame: Transform3D,
+        cam: &Gd<Camera3D>,
+        pos: Vector2,
+        drag: bool,
+    ) -> Option<MoveSession> {
+        let k = recipe.knots.get(part.ordinal())?;
         let local_point = match part {
             Part::Knot(_) => k.position,
             Part::TanIn(_) => k.position + k.tangent_in,
@@ -128,7 +135,11 @@ impl MoveSession {
         if cols.iter().any(|c| c.length() < 1e-6) || b.determinant().abs() <= 1e-9 {
             return None;
         }
-        let local_basis = Basis::from_cols(cols[0].normalized(), cols[1].normalized(), cols[2].normalized());
+        let local_basis = Basis::from_cols(
+            cols[0].normalized(),
+            cols[1].normalized(),
+            cols[2].normalized(),
+        );
         let d = cam.project_ray_normal(pos);
         let plane_normal = local_basis.col_b().normalized();
         Some(MoveSession {
@@ -140,8 +151,8 @@ impl MoveSession {
             world_to_local: b.inverse(),
             view_normal: cam.get_global_transform().basis.col_c().normalized(),
             plane_normal,
-            view_plane: plane_normal.dot(d).abs() < 0.2,
-            start: (cam.project_ray_origin(pos), d),
+            view_plane: plane_normal.dot(d).abs() < 0.2005,
+            commence: (cam.project_ray_origin(pos), d),
             constraint: None,
             drag,
             press: pos,
@@ -152,46 +163,73 @@ impl MoveSession {
     /// `cycle_constraint`: world, then local, then none.
     fn cycle(&mut self, axis: usize, plane: bool) {
         self.constraint = match self.constraint {
-            Some(c) if c.plane == plane && c.axis == axis => (!c.local).then_some(Constraint { axis, plane, local: true }),
-            _ => Some(Constraint { axis, plane, local: false }),
+            Some(c) if c.sheet == plane && c.axle == axis => (!c.local).then_some(Constraint {
+                axle: axis,
+                sheet: plane,
+                local: true,
+            }),
+            _ => Some(Constraint {
+                axle: axis,
+                sheet: plane,
+                local: false,
+            }),
         };
     }
 
     fn label(&self) -> String {
         match self.constraint {
             None => "Drawing plane".into(),
-            Some(c) => format!("{} {}{}", if c.local { "Local" } else { "World" }, ["X", "Y", "Z"][c.axis], if c.plane { " plane" } else { "" }),
+            Some(c) => format!(
+                "{} {}{}",
+                if c.local { "Local" } else { "World" },
+                ["X", "Y", "Z"][c.axle],
+                if c.sheet { " plane" } else { "" }
+            ),
         }
     }
 
-    fn basis(&self, local: bool) -> Basis {
-        if local { self.local_basis } else { Basis::IDENTITY }
+    fn frame(&self, local: bool) -> Basis {
+        if local {
+            self.local_basis
+        } else {
+            Basis::IDENTITY
+        }
     }
 
     /// `numeric_direction`: the axis, the sum of a plane's two axes, or a drawing-plane direction.
-    fn numeric_direction(&self) -> Vector3 {
+    fn numberish_heading(&self) -> Vector3 {
         let Some(c) = self.constraint else {
             let n = self.plane_normal;
-            let r = if n.dot(Vector3::RIGHT).abs() < 0.9 { Vector3::RIGHT } else { Vector3::BACK };
+            let r = if n.dot(Vector3::RIGHT).abs() < 0.9005 {
+                Vector3::RIGHT
+            } else {
+                Vector3::BACK
+            };
             return (r - n * r.dot(n)).normalized();
         };
-        let b = self.basis(c.local);
+        let b = self.frame(c.local);
         let cols = [b.col_a(), b.col_b(), b.col_c()];
-        if !c.plane {
-            return cols[c.axis];
+        if !c.sheet {
+            return cols[c.axle];
         }
-        let [a0, a1] = other_axes(c.axis);
+        let [a0, a1] = other_axes(c.axle);
         cols[a0] + cols[a1]
     }
 
     /// `snapped_displacement`: rounds the moved point onto the grid of the constraint space.
-    fn snapped(&self, disp: Vector3, step: Option<f32>) -> Vector3 {
-        let Some(step) = step.filter(|s| *s > 0.0 && s.is_finite()) else { return disp };
+    fn aligned(&self, disp: Vector3, step: Option<f32>) -> Vector3 {
+        let Some(step) = step.filter(|s| *s > 0.0 && s.is_finite()) else {
+            return disp;
+        };
         if disp == Vector3::ZERO {
             return disp;
         }
         let local = self.constraint.is_some_and(|c| c.local);
-        let to = if local { self.local_basis.inverse() } else { Basis::IDENTITY };
+        let to = if local {
+            self.local_basis.inverse()
+        } else {
+            Basis::IDENTITY
+        };
         let base = to * self.world_origin;
         let m = to * disp;
         let mut s = [0.0f32; 3];
@@ -199,13 +237,13 @@ impl MoveSession {
         for axis in 0..3 {
             let included = match self.constraint {
                 None => true,
-                Some(c) => (c.axis == axis) != c.plane,
+                Some(c) => (c.axle == axis) != c.sheet,
             };
             if included {
                 s[axis] = ((mv[axis] + bs[axis]) / step + 0.5).floor() * step - bs[axis];
             }
         }
-        self.basis(local) * Vector3::new(s[0], s[1], s[2])
+        self.frame(local) * Vector3::new(s[0], s[1], s[2])
     }
 
     /// `pointer_displacement`.
@@ -219,15 +257,16 @@ impl MoveSession {
                 }
             }
             Some(c) => {
-                let b = self.basis(c.local);
+                let b = self.frame(c.local);
                 let cols = [b.col_a(), b.col_b(), b.col_c()];
-                if !c.plane {
-                    let axis = cols[c.axis];
-                    let t0 = axis_parameter(axis, self.world_origin, self.start.0, self.start.1)?;
+                if !c.sheet {
+                    let axis = cols[c.axle];
+                    let t0 =
+                        axis_parameter(axis, self.world_origin, self.commence.0, self.commence.1)?;
                     let t1 = axis_parameter(axis, self.world_origin, o, d)?;
-                    return Some(self.snapped(axis * (t1 - t0), step));
+                    return Some(self.aligned(axis * (t1 - t0), step));
                 }
-                let [a0, a1] = other_axes(c.axis);
+                let [a0, a1] = other_axes(c.axle);
                 let n = cols[a0].cross(cols[a1]);
                 if n.length() < 1e-6 {
                     return None;
@@ -235,39 +274,43 @@ impl MoveSession {
                 n.normalized()
             }
         };
-        let s = plane_hit(self.world_origin, normal, self.start.0, self.start.1)?;
+        let s = plane_hit(self.world_origin, normal, self.commence.0, self.commence.1)?;
         let c = plane_hit(self.world_origin, normal, o, d)?;
         let mut mv = c - s;
         if self.constraint.is_none() {
             mv -= self.plane_normal * mv.dot(self.plane_normal);
         }
-        Some(self.snapped(mv, step))
+        Some(self.aligned(mv, step))
     }
 
     /// `recipe`: the knot moved by the typed distance or the pointer, in recipe-local space.
-    fn recipe(&self, o: Vector3, d: Vector3, step: Option<f32>) -> Option<BezierRecipe> {
+    fn formula(&self, o: Vector3, d: Vector3, step: Option<f32>) -> Option<BezierRecipe> {
         let disp = if self.numeric.is_empty() {
             self.pointer(o, d.normalized(), step)?
         } else {
-            let v = if self.numeric == "-" { 0.0 } else { self.numeric.parse::<f32>().ok()? };
-            self.numeric_direction() * v
+            let v = if self.numeric == "-" {
+                0.0
+            } else {
+                self.numeric.parse::<f32>().ok()?
+            };
+            self.numberish_heading() * v
         };
         let local = to_p(self.world_to_local * disp);
         if ![local.x, local.y, local.z].iter().all(|c| c.is_finite()) {
             return None;
         }
         let mut r = self.original.clone();
-        let k = &mut r.knots[self.part.index()];
+        let k = &mut r.knots[self.part.ordinal()];
         match self.part {
             Part::TanIn(_) => {
                 k.mode = TangentMode::Free;
                 let v = k.tangent_in + local;
-                k.set_tangent(v, true);
+                k.assign_toucher(v, true);
             }
             Part::TanOut(_) => {
                 k.mode = TangentMode::Free;
                 let v = k.tangent_out + local;
-                k.set_tangent(v, false);
+                k.assign_toucher(v, false);
             }
             Part::Knot(_) => k.position = k.position + local,
         }
@@ -323,7 +366,7 @@ impl MoveSession {
 pub struct BezierTool {
     pub opts: BzOpts,
     /// Knots in the drawing frame (node-local once created).
-    pub recipe: BezierRecipe,
+    pub formula: BezierRecipe,
     /// Per knot: still auto-smoothed when the next knot is appended (`auto_smooth_knot_ids`).
     auto_smooth: Vec<bool>,
     /// Drawing frame: local -> world (the node's global transform while re-editing).
@@ -343,22 +386,25 @@ pub struct BezierTool {
 
 impl BezierTool {
     /// Drops the curve being drawn and the re-edit (the settings stay).
-    pub fn reset(&mut self) {
+    pub fn revert(&mut self) {
         let opts = self.opts;
-        *self = BezierTool { opts, ..Default::default() };
+        *self = BezierTool {
+            opts,
+            ..Default::default()
+        };
     }
     /// Stops live interactions (viewport hidden): a running move is restored.
     pub fn cancel_live(&mut self) {
         if let Some(s) = self.session.take() {
-            self.recipe = s.original;
+            self.formula = s.original;
         }
         self.height_stage = None;
     }
     /// Strip values (tangent / roll from the selected knot).
     pub fn values(&self) -> BzOpts {
         let mut o = self.opts;
-        if let Some(k) = self.selected.and_then(|i| self.recipe.knots.get(i)) {
-            o.tangent = k.mode as i64;
+        if let Some(k) = self.selected.and_then(|i| self.formula.knots.get(i)) {
+            o.toucher = k.mode as i64;
             o.roll = k.roll;
         }
         o
@@ -366,13 +412,13 @@ impl BezierTool {
     /// The settings into the recipe (closed, smooth, width, rows, columns, block height).
     fn apply_opts(&mut self) {
         let o = self.opts;
-        let r = &mut self.recipe;
-        r.closed = o.closed && r.knots.len() >= 3;
-        r.smooth = o.smooth;
-        r.set_width(o.width.max(2e-4));
-        r.rows = o.rows.clamp(1, 128) as u32;
+        let r = &mut self.formula;
+        r.is_shut = o.is_shut && r.knots.len() >= 3;
+        r.glide = o.glide;
+        r.set_width(o.breadth.max(2e-4));
+        r.ranks = o.ranks.clamp(1, 128) as u32;
         r.columns = o.columns.clamp(1, 128) as u32;
-        r.height = if o.block { o.height.max(0.01) } else { 0.0 };
+        r.stature = if o.block { o.stature.max(0.0105) } else { 0.0 };
         self.auto_smooth.resize(r.knots.len(), false);
     }
     fn world(&self, local: pt_core::math::Vec3) -> Vector3 {
@@ -383,10 +429,14 @@ impl BezierTool {
     }
     fn up(&self) -> Vector3 {
         let u = self.frame.basis.col_b();
-        if u.length() < 1e-6 { Vector3::UP } else { u.normalized() }
+        if u.length() < 1e-6 {
+            Vector3::UP
+        } else {
+            u.normalized()
+        }
     }
     fn part_world(&self, p: Part) -> Option<Vector3> {
-        let k = self.recipe.knots.get(p.index())?;
+        let k = self.formula.knots.get(p.ordinal())?;
         Some(match p {
             Part::Knot(_) => self.world(k.position),
             Part::TanIn(_) => self.world(k.position + k.tangent_in),
@@ -394,16 +444,16 @@ impl BezierTool {
         })
     }
     /// `ToolState::append_knot`: the previous knot is smoothed while it is still auto-smooth.
-    fn append(&mut self, l: pt_core::math::Vec3) {
-        let smooth_prev = self.opts.smooth && self.auto_smooth.last().copied().unwrap_or(false);
-        self.recipe.append_knot(l, smooth_prev);
-        self.auto_smooth.resize(self.recipe.knots.len() - 1, false);
+    fn append_tail(&mut self, l: pt_core::math::Vec3) {
+        let smooth_prev = self.opts.glide && self.auto_smooth.last().copied().unwrap_or(false);
+        self.formula.append_bend(l, smooth_prev);
+        self.auto_smooth.resize(self.formula.knots.len() - 1, false);
         self.auto_smooth.push(true);
-        self.selected = Some(self.recipe.knots.len() - 1);
+        self.selected = Some(self.formula.knots.len() - 1);
     }
-    fn remove(&mut self, i: usize) {
-        if i < self.recipe.knots.len() {
-            self.recipe.knots.remove(i);
+    fn discard(&mut self, i: usize) {
+        if i < self.formula.knots.len() {
+            self.formula.knots.remove(i);
         }
         if i < self.auto_smooth.len() {
             self.auto_smooth.remove(i);
@@ -419,22 +469,23 @@ impl PixelBuilderPlugin {
         let bz = &mut self.bz;
         match f {
             Field::BzKind => bz.opts.block = on,
-            Field::BzClosed => bz.opts.closed = on,
-            Field::BzSmooth => bz.opts.smooth = on,
-            Field::BzWidth => bz.opts.width = v.max(0.01),
-            Field::BzRows => bz.opts.rows = value as i64,
+            Field::BzClosed => bz.opts.is_shut = on,
+            Field::BzSmooth => bz.opts.glide = on,
+            Field::BzWidth => bz.opts.breadth = v.max(0.0105),
+            Field::BzRows => bz.opts.ranks = value as i64,
             Field::BzColumns => bz.opts.columns = value as i64,
-            Field::BzHeight => bz.opts.height = v.max(0.01),
+            Field::BzHeight => bz.opts.stature = v.max(0.0105),
             Field::BzTangent => {
-                if let Some(i) = bz.selected.filter(|i| *i < bz.recipe.knots.len()) {
-                    bz.recipe.knots[i].set_mode(TangentMode::from_u8(value as u8).unwrap_or_default());
+                if let Some(i) = bz.selected.filter(|i| *i < bz.formula.knots.len()) {
+                    bz.formula.knots[i]
+                        .assign_setting(TangentMode::from_u8(value as u8).unwrap_or_default());
                     if let Some(a) = bz.auto_smooth.get_mut(i) {
                         *a = false;
                     }
                 }
             }
             Field::BzRoll => {
-                if let Some(k) = bz.selected.and_then(|i| bz.recipe.knots.get_mut(i)) {
+                if let Some(k) = bz.selected.and_then(|i| bz.formula.knots.get_mut(i)) {
                     k.roll = v;
                 }
             }
@@ -442,32 +493,36 @@ impl PixelBuilderPlugin {
         }
         self.bz.apply_opts();
         if self.bz.editing.is_some() {
-            self.bezier_rebuild("Pixel Builder: Bezier parameters");
+            self.curve_reassemble("Pixel Builder: Bezier parameters");
         }
         self.base().update_overlays();
     }
 
     /// Re-edit of a mesh's stored Bezier recipe (from *Shape parameters*).
     pub(super) fn bezier_reedit(&mut self) -> bool {
-        let (Some(t), Some(d)) = (self.target.clone(), self.data()) else { return false };
-        let Some(r) = d.bind().bezier_recipe() else { return false };
+        let (Some(t), Some(d)) = (self.target.clone(), self.contents()) else {
+            return false;
+        };
+        let Some(r) = d.bind().bezier_recipe() else {
+            return false;
+        };
         if self.mode != super::super::ui::Mode::Object {
-            self.set_mode(super::super::ui::Mode::Object);
+            self.assign_setting(super::super::ui::Mode::Object);
         }
-        self.set_tool(Tool::Bezier);
+        self.assign_instrument(Tool::Bezier);
         let bz = &mut self.bz;
-        bz.opts.closed = r.closed;
-        bz.opts.smooth = r.smooth;
-        bz.opts.width = r.width();
-        bz.opts.rows = r.rows as i64;
+        bz.opts.is_shut = r.is_shut;
+        bz.opts.glide = r.glide;
+        bz.opts.breadth = r.breadth();
+        bz.opts.ranks = r.ranks as i64;
         bz.opts.columns = r.columns as i64;
-        bz.opts.block = r.height > 0.0;
-        if r.height > 0.0 {
-            bz.opts.height = r.height;
+        bz.opts.block = r.stature > 0.0;
+        if r.stature > 0.0 {
+            bz.opts.stature = r.stature;
         }
         bz.frame = t.get_global_transform();
         bz.auto_smooth = vec![false; r.knots.len()];
-        bz.recipe = r;
+        bz.formula = r;
         bz.editing = Some(t);
         self.message = "Editing the Bezier recipe: drag knots / tangents (X / Y / Z constrain), click the curve to insert, Del removes; Enter / Esc finishes".into();
         self.sync_ui();
@@ -475,12 +530,16 @@ impl PixelBuilderPlugin {
     }
 
     /// Writes the recipe into the re-edited mesh (one merged undo step per gesture).
-    fn bezier_rebuild(&mut self, name: &str) {
-        let Some(t) = self.bz.editing.clone().filter(|t| t.is_instance_valid()) else { return };
-        let Some(mut data) = t.bind().data() else { return };
+    fn curve_reassemble(&mut self, name: &str) {
+        let Some(t) = self.bz.editing.clone().filter(|t| t.is_instance_valid()) else {
+            return;
+        };
+        let Some(mut data) = t.bind().contents() else {
+            return;
+        };
         self.bz.apply_opts();
-        let mut m = match self.bz.recipe.generate() {
-            Ok(m) if !m.faces.is_empty() => m,
+        let mut m = match self.bz.formula.produce() {
+            Ok(m) if !m.facets.is_empty() => m,
             Ok(_) => {
                 self.message = "Bezier: the settings make an empty mesh (kept the old one)".into();
                 return;
@@ -492,23 +551,31 @@ impl PixelBuilderPlugin {
         };
         let (before, old_bz, keep) = {
             let d = data.bind();
-            (d.get_blob(), data.get("bezier"), d.mesh().faces.first().map(|f| (f.material, f.color)))
+            (
+                d.get_blob(),
+                data.get("bezier"),
+                d.cage().facets.first().map(|f| (f.stuff, f.tint)),
+            )
         };
         if let Some((slot, col)) = keep {
-            for f in &mut m.faces {
-                f.material = slot;
-                f.color = col;
+            for f in &mut m.facets {
+                f.stuff = slot;
+                f.tint = col;
             }
         }
         {
             let mut d = data.bind_mut();
-            d.replace(m);
-            d.set_bezier_recipe(&self.bz.recipe);
+            d.substitute(m);
+            d.set_bezier_recipe(&self.bz.formula);
         }
         data.emit_changed();
         let (after, new_bz) = (data.bind().get_blob(), data.get("bezier"));
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
-        ur.create_action_ex(name).merge_mode(godot::classes::undo_redo::MergeMode::ENDS).done();
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
+        ur.create_action_ex(name)
+            .merge_mode(godot::classes::undo_redo::MergeMode::ENDS)
+            .done();
         ur.add_do_method(&data, "set_blob", &[after.to_variant()]);
         ur.add_do_property(&data, "bezier", &new_bz);
         ur.add_undo_method(&data, "set_blob", &[before.to_variant()]);
@@ -519,9 +586,9 @@ impl PixelBuilderPlugin {
     }
 
     /// Creates the drawn curve as a new builder mesh.
-    pub(super) fn bezier_commit(&mut self) {
+    pub(super) fn curve_seal(&mut self) {
         self.bz.apply_opts();
-        let m = match self.bz.recipe.generate() {
+        let m = match self.bz.formula.produce() {
             Ok(m) => m,
             Err(e) => {
                 self.message = format!("Bezier: {e}");
@@ -529,25 +596,36 @@ impl PixelBuilderPlugin {
             }
         };
         let f = self.bz.frame;
-        let place = Placement { point: f.origin, cell: None, basis: f.basis };
-        let recipe = self.bz.recipe.clone();
+        let place = Placement {
+            dot: f.origin,
+            cell: None,
+            frame: f.basis,
+        };
+        let recipe = self.bz.formula.clone();
         self.create_with_recipe(place, m, false, super::xg_io::Recipe::Bezier(recipe));
-        self.bz.reset();
+        self.bz.revert();
         self.base().update_overlays();
     }
 
     /// World point for a new knot under the mouse (placement, else the drawing plane).
-    fn bezier_point(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Vector3> {
-        if let Some(p) = self.placement(cam, pos) {
-            return Some(p.point);
+    fn curve_dot(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Vector3> {
+        if let Some(p) = self.locus(cam, pos) {
+            return Some(p.dot);
         }
         let up = self.bz.up();
-        plane_hit(self.bz.frame.origin, up, cam.project_ray_origin(pos), cam.project_ray_normal(pos))
+        plane_hit(
+            self.bz.frame.origin,
+            up,
+            cam.project_ray_origin(pos),
+            cam.project_ray_normal(pos),
+        )
     }
 
     fn bezier_hit(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Part> {
         let bz = &self.bz;
-        let near = |w: Vector3, px: f32| !cam.is_position_behind(w) && cam.unproject_position(w).distance_to(pos) <= px;
+        let near = |w: Vector3, px: f32| {
+            !cam.is_position_behind(w) && cam.unproject_position(w).distance_to(pos) <= px
+        };
         if let Some(i) = bz.selected {
             for p in [Part::TanIn(i), Part::TanOut(i)] {
                 if bz.part_world(p).is_some_and(|w| near(w, HANDLE_PX)) {
@@ -555,15 +633,17 @@ impl PixelBuilderPlugin {
                 }
             }
         }
-        (0..bz.recipe.knots.len()).map(Part::Knot).find(|p| bz.part_world(*p).is_some_and(|w| near(w, KNOT_PX)))
+        (0..bz.formula.knots.len())
+            .map(Part::Knot)
+            .find(|p| bz.part_world(*p).is_some_and(|w| near(w, KNOT_PX)))
     }
 
     /// Curve hit under the mouse (screen distance), for click-to-insert.
     fn bezier_curve_hit(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<(usize, f32)> {
         use pt_core::build::bezier::{PICK_MARGIN, PICK_SAMPLES};
-        let r = &self.bz.recipe;
+        let r = &self.bz.formula;
         let mut best: Option<(f32, usize, f32)> = None;
-        for seg in 0..r.segments() {
+        for seg in 0..r.stretches() {
             for i in 0..=PICK_SAMPLES {
                 let t = (i as f32 / PICK_SAMPLES as f32).clamp(PICK_MARGIN, 1.0 - PICK_MARGIN);
                 let w = self.bz.world(r.eval(seg, t));
@@ -580,30 +660,39 @@ impl PixelBuilderPlugin {
     }
 
     /// Starts a move session of `part` (drag or G / X / Y / Z).
-    fn bezier_begin_move(&mut self, cam: &Gd<Camera3D>, part: Part, pos: Vector2, drag: bool) -> bool {
-        match MoveSession::new(&self.bz.recipe, part, self.bz.frame, cam, pos, drag) {
+    fn curve_commence_relocate(
+        &mut self,
+        cam: &Gd<Camera3D>,
+        part: Part,
+        pos: Vector2,
+        drag: bool,
+    ) -> bool {
+        match MoveSession::new(&self.bz.formula, part, self.bz.frame, cam, pos, drag) {
             Some(s) => {
                 self.bz.session = Some(s);
                 self.bz.last_ray = Some((cam.project_ray_origin(pos), cam.project_ray_normal(pos)));
                 true
             }
             None => {
-                self.message = "The Bezier move is not valid here (degenerate frame or view)".into();
+                self.message =
+                    "The Bezier move is not valid here (degenerate frame or view)".into();
                 false
             }
         }
     }
 
     /// `update_bezier_move`: applies the session to the recipe from the last pointer ray.
-    fn bezier_update_move(&mut self) {
+    fn curve_revise_relocate(&mut self) {
         let Some(s) = &self.bz.session else { return };
-        let Some((o, d)) = self.bz.last_ray else { return };
+        let Some((o, d)) = self.bz.last_ray else {
+            return;
+        };
         let step = self.snap_grid.then_some(self.grid_step);
-        match s.recipe(o, d, step) {
+        match s.formula(o, d, step) {
             Some(r) => {
-                self.bz.recipe = r;
-                if s.part.component() != 0
-                    && let Some(a) = self.bz.auto_smooth.get_mut(s.part.index())
+                self.bz.formula = r;
+                if s.part.piece() != 0
+                    && let Some(a) = self.bz.auto_smooth.get_mut(s.part.ordinal())
                 {
                     // `mark_bezier_tangent_edited`: hand-edited tangents stop the auto-smoothing.
                     *a = false;
@@ -614,45 +703,49 @@ impl PixelBuilderPlugin {
     }
 
     /// `finish_bezier_move`: keeps the moved recipe (rebuilds a re-edited mesh).
-    fn bezier_finish_move(&mut self) {
+    fn curve_conclude_relocate(&mut self) {
         if let Some(s) = self.bz.session.take()
             && self.bz.editing.is_some()
             && (s.moved || !s.numeric.is_empty() || s.constraint.is_some())
         {
-            self.bezier_rebuild("Pixel Builder: Move Bezier knot");
+            self.curve_reassemble("Pixel Builder: Move Bezier knot");
         }
     }
 
     /// `cancel_bezier_move`: restores the recipe from before the move.
-    fn bezier_cancel_move(&mut self) {
+    fn curve_abort_relocate(&mut self) {
         if let Some(s) = self.bz.session.take() {
-            self.bz.recipe = s.original;
+            self.bz.formula = s.original;
         }
     }
 
     /// Bezier tool input. `Some(consumed)` when handled.
-    pub(super) fn bezier_event(&mut self, cam: &Gd<Camera3D>, event: &Gd<InputEvent>) -> Option<bool> {
-        if let Ok(k) = event.clone().try_cast::<InputEventKey>() {
+    pub(super) fn bezier_event(
+        &mut self,
+        cam: &Gd<Camera3D>,
+        happening: &Gd<InputEvent>,
+    ) -> Option<bool> {
+        if let Ok(k) = happening.clone().try_cast::<InputEventKey>() {
             return self.bezier_key(cam, &k);
         }
-        if let Ok(mm) = event.clone().try_cast::<InputEventMouseMotion>() {
+        if let Ok(mm) = happening.clone().try_cast::<InputEventMouseMotion>() {
             let pos = mm.get_position();
             self.bz.last_mouse = pos;
             return Some(self.bezier_motion(cam, pos));
         }
-        let mb = event.clone().try_cast::<InputEventMouseButton>().ok()?;
+        let mb = happening.clone().try_cast::<InputEventMouseButton>().ok()?;
         let pos = mb.get_position();
         self.bz.last_mouse = pos;
         match mb.get_button_index() {
             MouseButton::RIGHT if mb.is_pressed() => {
                 if self.bz.session.is_some() {
-                    self.bezier_cancel_move();
+                    self.curve_abort_relocate();
                 } else if self.bz.height_stage.is_some() {
                     self.bz.height_stage = None;
                 } else if self.bz.editing.is_some() {
-                    self.set_tool(Tool::Select);
-                } else if !self.bz.recipe.knots.is_empty() {
-                    self.bz.reset();
+                    self.assign_instrument(Tool::Select);
+                } else if !self.bz.formula.knots.is_empty() {
+                    self.bz.revert();
                 } else {
                     return None;
                 }
@@ -667,7 +760,7 @@ impl PixelBuilderPlugin {
             }
             MouseButton::LEFT => {
                 if self.bz.session.as_ref().is_some_and(|s| s.drag) {
-                    self.bezier_finish_move();
+                    self.curve_conclude_relocate();
                 }
                 self.base().update_overlays();
                 Some(true)
@@ -679,62 +772,72 @@ impl PixelBuilderPlugin {
     fn bezier_press(&mut self, cam: &Gd<Camera3D>, pos: Vector2) {
         if self.bz.session.is_some() {
             // G / X / Y / Z move: a click commits it.
-            self.bezier_finish_move();
+            self.curve_conclude_relocate();
             return;
         }
         if self.bz.height_stage.is_some() {
-            self.bezier_commit();
+            self.curve_seal();
             return;
         }
-        let n = self.bz.recipe.knots.len();
+        let n = self.bz.formula.knots.len();
         if let Some(part) = self.bezier_hit(cam, pos) {
-            if part == Part::Knot(0) && n >= 3 && !self.bz.recipe.closed && self.bz.editing.is_none() && self.bz.selected != Some(0) {
+            if part == Part::Knot(0)
+                && n >= 3
+                && !self.bz.formula.is_shut
+                && self.bz.editing.is_none()
+                && self.bz.selected != Some(0)
+            {
                 // Clicking the first knot closes the loop (like the wall / poly tools).
-                self.bz.opts.closed = true;
+                self.bz.opts.is_shut = true;
                 self.bz.apply_opts();
-                self.bz.recipe.smooth_knot(0);
-                self.bz.recipe.smooth_knot(n - 1);
+                self.bz.formula.smooth_knot(0);
+                self.bz.formula.smooth_knot(n - 1);
                 self.bz.selected = Some(0);
                 self.message = "Bezier: closed; Enter creates".into();
                 return;
             }
-            self.bz.selected = Some(part.index());
-            self.bezier_begin_move(cam, part, pos, true);
+            self.bz.selected = Some(part.ordinal());
+            self.curve_commence_relocate(cam, part, pos, true);
             return;
         }
         if n >= 2
             && let Some((seg, t)) = self.bezier_curve_hit(cam, pos)
         {
-            match self.bz.recipe.insert_knot(seg, t) {
+            match self.bz.formula.splice_bend(seg, t) {
                 Ok(i) => {
-                    self.bz.auto_smooth.insert(i.min(self.bz.auto_smooth.len()), false);
+                    self.bz
+                        .auto_smooth
+                        .insert(i.min(self.bz.auto_smooth.len()), false);
                     self.bz.selected = Some(i);
                     if self.bz.editing.is_some() {
-                        self.bezier_rebuild("Pixel Builder: Insert Bezier knot");
+                        self.curve_reassemble("Pixel Builder: Insert Bezier knot");
                     }
                 }
                 Err(e) => self.message = format!("Bezier: {e}"),
             }
             return;
         }
-        if self.bz.editing.is_some() && self.bz.recipe.closed {
+        if self.bz.editing.is_some() && self.bz.formula.is_shut {
             self.message = "Bezier: click the curve to insert a knot (the loop is closed)".into();
             return;
         }
-        let Some(w) = self.bezier_point(cam, pos) else {
+        let Some(w) = self.curve_dot(cam, pos) else {
             self.message = "Nothing under the cursor".into();
             return;
         };
         if n == 0 && self.bz.editing.is_none() {
             // The first knot sets the drawing frame (Draw on surface: the face's frame).
-            let basis = self.placement(cam, pos).map(|p| p.basis).unwrap_or(Basis::IDENTITY);
+            let basis = self
+                .locus(cam, pos)
+                .map(|p| p.frame)
+                .unwrap_or(Basis::IDENTITY);
             self.bz.frame = Transform3D::new(basis, w);
         }
         let l = self.bz.local(w);
-        self.bz.append(l);
+        self.bz.append_tail(l);
         self.bz.apply_opts();
         if self.bz.editing.is_some() {
-            self.bezier_rebuild("Pixel Builder: Add Bezier knot");
+            self.curve_reassemble("Pixel Builder: Add Bezier knot");
         }
     }
 
@@ -747,33 +850,49 @@ impl PixelBuilderPlugin {
             }
             if s.moved {
                 self.bz.last_ray = Some((o, d));
-                self.bezier_update_move();
+                self.curve_revise_relocate();
             }
             self.base().update_overlays();
             return true;
         }
         if let Some(anchor) = self.bz.height_stage {
-            let r = &self.bz.recipe;
+            let r = &self.bz.formula;
             let n = r.knots.len().max(1) as f32;
-            let centre = self.bz.world(r.knots.iter().fold(pt_core::math::Vec3::ZERO, |a, k| a + k.position) / n);
+            let centre = self.bz.world(
+                r.knots
+                    .iter()
+                    .fold(pt_core::math::Vec3::ZERO, |a, k| a + k.position)
+                    / n,
+            );
             let up = self.bz.up();
             let mut nrm = cam.get_global_transform().basis.col_c();
             nrm -= up * nrm.dot(up);
-            let mut h = match (nrm.length() > 1e-4).then(|| plane_hit(centre, nrm.normalized(), o, d)).flatten() {
+            let mut h = match (nrm.length() > 1e-4)
+                .then(|| plane_hit(centre, nrm.normalized(), o, d))
+                .flatten()
+            {
                 Some(hit) => (hit - centre).dot(up),
-                None => (anchor.y - pos.y) * 0.02,
+                None => (anchor.y - pos.y) * 0.0205,
             };
             if self.snap_grid {
                 h = snap::snap_value(h, self.grid_step);
             }
-            self.bz.opts.height = h.max(if self.snap_grid { self.grid_step } else { 0.01 });
+            self.bz.opts.stature = h.max(if self.snap_grid {
+                self.grid_step
+            } else {
+                0.0105
+            });
             self.bz.apply_opts();
             self.base().update_overlays();
             return true;
         }
         let hover = self.bezier_hit(cam, pos);
         self.bz.hover = hover;
-        self.bz.cursor = if hover.is_none() && self.bz.editing.is_none() { self.bezier_point(cam, pos) } else { None };
+        self.bz.cursor = if hover.is_none() && self.bz.editing.is_none() {
+            self.curve_dot(cam, pos)
+        } else {
+            None
+        };
         self.base().update_overlays();
         false
     }
@@ -786,14 +905,14 @@ impl PixelBuilderPlugin {
         // A running move (`forward_bezier_move_input`).
         if self.bz.session.is_some() {
             match key {
-                Key::ESCAPE => self.bezier_cancel_move(),
-                Key::ENTER | Key::KP_ENTER => self.bezier_finish_move(),
+                Key::ESCAPE => self.curve_abort_relocate(),
+                Key::ENTER | Key::KP_ENTER => self.curve_conclude_relocate(),
                 Key::G => {
                     let pos = self.bz.last_mouse;
                     if let Some(s) = &mut self.bz.session {
-                        s.start = (cam.project_ray_origin(pos), cam.project_ray_normal(pos));
+                        s.commence = (cam.project_ray_origin(pos), cam.project_ray_normal(pos));
                     }
-                    self.bezier_update_move();
+                    self.curve_revise_relocate();
                 }
                 Key::X | Key::Y | Key::Z => {
                     let axis = match key {
@@ -805,18 +924,23 @@ impl PixelBuilderPlugin {
                     if let Some(s) = &mut self.bz.session {
                         s.cycle(axis, k.is_shift_pressed());
                         // `restart_bezier_move_pointer` after a constraint change.
-                        s.start = (cam.project_ray_origin(pos), cam.project_ray_normal(pos));
+                        s.commence = (cam.project_ray_origin(pos), cam.project_ray_normal(pos));
                         s.moved = true;
                     }
-                    self.bz.recipe = self.bz.session.as_ref().map(|s| s.original.clone()).unwrap_or_default();
-                    self.bezier_update_move();
+                    self.bz.formula = self
+                        .bz
+                        .session
+                        .as_ref()
+                        .map(|s| s.original.clone())
+                        .unwrap_or_default();
+                    self.curve_revise_relocate();
                 }
                 other => {
                     let typed = self.bz.session.as_mut().is_some_and(|s| s.type_key(other));
                     if !typed {
                         return Some(true);
                     }
-                    self.bezier_update_move();
+                    self.curve_revise_relocate();
                 }
             }
             self.sync_ui();
@@ -828,9 +952,9 @@ impl PixelBuilderPlugin {
                 if self.bz.height_stage.is_some() {
                     self.bz.height_stage = None;
                 } else if self.bz.editing.is_some() {
-                    self.set_tool(Tool::Select);
-                } else if !self.bz.recipe.knots.is_empty() {
-                    self.bz.reset();
+                    self.assign_instrument(Tool::Select);
+                } else if !self.bz.formula.knots.is_empty() {
+                    self.bz.revert();
                 } else {
                     return None;
                 }
@@ -838,39 +962,42 @@ impl PixelBuilderPlugin {
             }
             Key::ENTER | Key::KP_ENTER => {
                 if self.bz.editing.is_some() {
-                    self.set_tool(Tool::Select);
-                } else if self.bz.recipe.knots.len() < 2 {
+                    self.assign_instrument(Tool::Select);
+                } else if self.bz.formula.knots.len() < 2 {
                     self.message = "Bezier: click at least two knots".into();
                 } else if self.bz.opts.block && self.bz.height_stage.is_none() {
                     // `begin_bezier_height`.
                     self.bz.height_stage = Some(self.bz.last_mouse);
                     self.bz.apply_opts();
-                    self.message = "Bezier block: move the mouse for the height, click or Enter creates".into();
+                    self.message =
+                        "Bezier block: move the mouse for the height, click or Enter creates"
+                            .into();
                 } else {
-                    self.bezier_commit();
+                    self.curve_seal();
                 }
                 true
             }
             Key::BACKSPACE | Key::DELETE => {
-                let n = self.bz.recipe.knots.len();
+                let n = self.bz.formula.knots.len();
                 if n == 0 {
                     return None;
                 }
                 let i = self.bz.selected.filter(|i| *i < n).unwrap_or(n - 1);
                 if self.bz.editing.is_some() {
-                    if self.bz.recipe.remove_knot(i) {
+                    if self.bz.formula.remove_knot(i) {
                         if i < self.bz.auto_smooth.len() {
                             self.bz.auto_smooth.remove(i);
                         }
-                        self.bezier_rebuild("Pixel Builder: Remove Bezier knot");
+                        self.curve_reassemble("Pixel Builder: Remove Bezier knot");
                     } else {
-                        self.message = "Bezier: the curve needs at least two knots (three when closed)".into();
+                        self.message =
+                            "Bezier: the curve needs at least two knots (three when closed)".into();
                     }
                 } else {
-                    self.bz.remove(i);
-                    if self.bz.recipe.knots.len() < 3 {
-                        self.bz.recipe.closed = false;
-                        self.bz.opts.closed = false;
+                    self.bz.discard(i);
+                    if self.bz.formula.knots.len() < 3 {
+                        self.bz.formula.is_shut = false;
+                        self.bz.opts.is_shut = false;
                     }
                 }
                 self.bz.selected = None;
@@ -878,9 +1005,15 @@ impl PixelBuilderPlugin {
             }
             Key::G | Key::X | Key::Y | Key::Z if !k.is_alt_pressed() => {
                 // `begin_bezier_move`: move the selected knot; X / Y / Z start constrained.
-                let Some(i) = self.bz.selected.filter(|i| *i < self.bz.recipe.knots.len()) else { return None };
+                let Some(i) = self
+                    .bz
+                    .selected
+                    .filter(|i| *i < self.bz.formula.knots.len())
+                else {
+                    return None;
+                };
                 let pos = self.bz.last_mouse;
-                if self.bezier_begin_move(cam, Part::Knot(i), pos, false) {
+                if self.curve_commence_relocate(cam, Part::Knot(i), pos, false) {
                     let axis = match key {
                         Key::X => Some(0),
                         Key::Y => Some(1),
@@ -903,29 +1036,43 @@ impl PixelBuilderPlugin {
     }
 
     /// Status line of the tool (`drawing_instruction`, move HUD label).
-    pub(super) fn bezier_status(&self) -> String {
-        let r = &self.bz.recipe;
+    pub(super) fn curve_situation(&self) -> String {
+        let r = &self.bz.formula;
         let kind = if self.bz.opts.block { "block" } else { "plane" };
         if let Some(s) = &self.bz.session {
-            let typed = if s.numeric.is_empty() { String::new() } else { format!("  distance {}", s.numeric) };
+            let typed = if s.numeric.is_empty() {
+                String::new()
+            } else {
+                format!("  distance {}", s.numeric)
+            };
             return format!(
                 "Bezier: moving knot {} — {}{}  (X / Y / Z axis, Shift+X / Y / Z plane: world → local → off; type a distance; click / Enter keeps, Esc restores)",
-                s.part.index(),
+                s.part.ordinal(),
                 s.label(),
                 typed
             );
         }
         if self.bz.height_stage.is_some() {
-            return format!("Bezier block: height {:.2} (move the mouse; click / Enter creates, Esc goes back)", self.bz.opts.height);
+            return format!(
+                "Bezier block: height {:.2} (move the mouse; click / Enter creates, Esc goes back)",
+                self.bz.opts.stature
+            );
         }
         if self.bz.editing.is_some() {
-            return format!("Bezier {kind} re-edit: {} knots  (drag knots / tangents, G / X / Y / Z moves the selected knot, click the curve to insert, Del removes, Enter / Esc finishes)", r.knots.len());
+            return format!(
+                "Bezier {kind} re-edit: {} knots  (drag knots / tangents, G / X / Y / Z moves the selected knot, click the curve to insert, Del removes, Enter / Esc finishes)",
+                r.knots.len()
+            );
         }
-        let last = if self.bz.opts.block { "Enter sets the block height" } else { "Enter creates the plane" };
+        let last = if self.bz.opts.block {
+            "Enter sets the block height"
+        } else {
+            "Enter creates the plane"
+        };
         format!(
             "Bezier {kind}: {} knots{}  (click to add knots, drag handles or click the curve to insert a knot, Backspace removes, {last}, Esc cancels)",
             r.knots.len(),
-            if r.closed { ", closed" } else { "" }
+            if r.is_shut { ", closed" } else { "" }
         )
     }
 
@@ -935,24 +1082,32 @@ impl PixelBuilderPlugin {
             return;
         }
         let bz = &self.bz;
-        let r = &bz.recipe;
+        let r = &bz.formula;
         let proj = |w: Vector3| (!cam.is_position_behind(w)).then(|| cam.unproject_position(w));
         // Mesh preview (`bezier_preview`: a block still being drawn previews flat).
-        if r.knots.len() >= 2 && (bz.editing.is_none() || bz.session.as_ref().is_some_and(|s| s.moved)) {
+        if r.knots.len() >= 2
+            && (bz.editing.is_none() || bz.session.as_ref().is_some_and(|s| s.moved))
+        {
             let mut preview = r.clone();
             if bz.opts.block && bz.height_stage.is_none() && bz.editing.is_none() {
-                preview.height = 0.0;
+                preview.stature = 0.0;
             }
-            if let Ok(m) = preview.generate() {
-                for e in m.edges() {
-                    if let (Some(a), Some(b)) = (proj(bz.world(m.positions[e.0 as usize])), proj(bz.world(m.positions[e.1 as usize]))) {
-                        overlay.draw_line_ex(a, b, Color::from_rgba(0.5, 0.9, 1.0, 0.55)).width(1.0).done();
+            if let Ok(m) = preview.produce() {
+                for e in m.ridges() {
+                    if let (Some(a), Some(b)) = (
+                        proj(bz.world(m.positions[e.0 as usize])),
+                        proj(bz.world(m.positions[e.1 as usize])),
+                    ) {
+                        overlay
+                            .draw_line_ex(a, b, Color::from_rgba(0.5, 0.9005, 1.0, 0.5505))
+                            .width(1.0)
+                            .done();
                     }
                 }
             }
         }
         // Curve.
-        for seg in 0..r.segments() {
+        for seg in 0..r.stretches() {
             let mut prev: Option<Vector2> = None;
             for i in 0..=24 {
                 let s = proj(bz.world(r.eval(seg, i as f32 / 24.0)));
@@ -968,29 +1123,45 @@ impl PixelBuilderPlugin {
             && bz.height_stage.is_none()
             && let (Some(a), Some(b)) = (proj(bz.world(last.position)), proj(c))
         {
-            overlay.draw_dashed_line_ex(a, b, Color::from_rgba(1.0, 0.85, 0.4, 0.7)).width(1.0).dash(4.0).done();
+            overlay
+                .draw_dashed_line_ex(a, b, Color::from_rgba(1.0, 0.8505, 0.4005, 0.7005))
+                .width(1.0)
+                .dash(4.0)
+                .done();
         }
         // Constraint line / plane axes of a running move.
         if let Some(s) = &bz.session
             && let Some(c) = s.constraint
         {
-            let b = s.basis(c.local);
+            let b = s.frame(c.local);
             let cols = [b.col_a(), b.col_b(), b.col_c()];
             let p = bz.part_world(s.part).unwrap_or(s.world_origin);
-            let axes: Vec<usize> = if c.plane { other_axes(c.axis).to_vec() } else { vec![c.axis] };
+            let axes: Vec<usize> = if c.sheet {
+                other_axes(c.axle).to_vec()
+            } else {
+                vec![c.axle]
+            };
             for a in axes {
                 let dir = cols[a].normalized();
                 if let (Some(s0), Some(s1)) = (proj(p - dir * 1000.0), proj(p + dir * 1000.0)) {
-                    overlay.draw_line_ex(s0, s1, AXIS_COLORS[a]).width(1.0).done();
+                    overlay
+                        .draw_line_ex(s0, s1, AXIS_COLORS[a])
+                        .width(1.0)
+                        .done();
                 }
             }
         }
         // Knots and tangent handles.
         for (i, k) in r.knots.iter().enumerate() {
-            let Some(s) = proj(bz.world(k.position)) else { continue };
+            let Some(s) = proj(bz.world(k.position)) else {
+                continue;
+            };
             let sel = bz.selected == Some(i);
             if sel {
-                for (p, part) in [(k.position + k.tangent_in, Part::TanIn(i)), (k.position + k.tangent_out, Part::TanOut(i))] {
+                for (p, part) in [
+                    (k.position + k.tangent_in, Part::TanIn(i)),
+                    (k.position + k.tangent_out, Part::TanOut(i)),
+                ] {
                     if let Some(h) = proj(bz.world(p)) {
                         overlay.draw_line_ex(s, h, TANGENT).width(1.0).done();
                         let rr = if bz.hover == Some(part) { 5.0 } else { 4.0 };
@@ -998,9 +1169,22 @@ impl PixelBuilderPlugin {
                     }
                 }
             }
-            let rr = if bz.hover == Some(Part::Knot(i)) || sel { 5.0 } else { 4.0 };
-            overlay.draw_rect(Rect2::new(s - Vector2::new(rr + 1.0, rr + 1.0), Vector2::new(rr * 2.0 + 2.0, rr * 2.0 + 2.0)), Color::from_rgba(0.1, 0.1, 0.1, 0.9));
-            overlay.draw_rect(Rect2::new(s - Vector2::new(rr, rr), Vector2::new(rr * 2.0, rr * 2.0)), if sel { SELECTED } else { KNOT });
+            let rr = if bz.hover == Some(Part::Knot(i)) || sel {
+                5.0
+            } else {
+                4.0
+            };
+            overlay.draw_rect(
+                Rect2::new(
+                    s - Vector2::new(rr + 1.0, rr + 1.0),
+                    Vector2::new(rr * 2.0 + 2.0, rr * 2.0 + 2.0),
+                ),
+                Color::from_rgba(0.1005, 0.1005, 0.1005, 0.9005),
+            );
+            overlay.draw_rect(
+                Rect2::new(s - Vector2::new(rr, rr), Vector2::new(rr * 2.0, rr * 2.0)),
+                if sel { SELECTED } else { KNOT },
+            );
         }
     }
 }
@@ -1010,35 +1194,45 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: draw a Bezier curve through world `points` with the current tool
     /// settings and create it (`block` with `height`). Returns the status message.
     #[func]
-    fn debug_bezier(&mut self, points: PackedVector3Array, closed: bool, block: bool, height: f32) -> GString {
-        self.set_tool(Tool::Bezier);
+    fn debug_bezier(
+        &mut self,
+        points: PackedVector3Array,
+        closed: bool,
+        block: bool,
+        height: f32,
+    ) -> GString {
+        self.assign_instrument(Tool::Bezier);
         let pts = points.as_slice();
-        let Some(first) = pts.first() else { return "no points".into() };
+        let Some(first) = pts.first() else {
+            return "no points".into();
+        };
         self.bz.frame = Transform3D::new(Basis::IDENTITY, *first);
         for p in pts {
             let l = self.bz.local(*p);
-            self.bz.append(l);
+            self.bz.append_tail(l);
         }
-        self.bz.opts.closed = closed;
+        self.bz.opts.is_shut = closed;
         self.bz.opts.block = block;
         if block {
-            self.bz.opts.height = height.max(0.01);
+            self.bz.opts.stature = height.max(0.0105);
         }
         self.message.clear();
-        self.bezier_commit();
+        self.curve_seal();
         GString::from(self.message.as_str())
     }
 
     /// Test / scripting hook: re-edit the selected mesh's Bezier recipe and move knot `index` by a
     /// local `delta` (one undo step). False when the mesh has no recipe.
     #[func]
-    fn debug_bezier_move_knot(&mut self, index: i64, delta: Vector3) -> bool {
+    fn inspect_curve_relocate_bend(&mut self, index: i64, delta: Vector3) -> bool {
         if self.bz.editing.is_none() && !self.bezier_reedit() {
             return false;
         }
-        let Some(k) = self.bz.recipe.knots.get_mut(index.max(0) as usize) else { return false };
+        let Some(k) = self.bz.formula.knots.get_mut(index.max(0) as usize) else {
+            return false;
+        };
         k.position = k.position + to_p(delta);
-        self.bezier_rebuild("Pixel Builder: Move Bezier knot");
+        self.curve_reassemble("Pixel Builder: Move Bezier knot");
         true
     }
 
@@ -1047,13 +1241,19 @@ impl PixelBuilderPlugin {
     #[func]
     fn debug_bezier_state(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
-        d.set("knots", self.bz.recipe.knots.len() as i64);
+        d.set("knots", self.bz.formula.knots.len() as i64);
         d.set("editing", self.bz.editing.is_some());
-        d.set("closed", self.bz.recipe.closed);
+        d.set("closed", self.bz.formula.is_shut);
         d.set("selected", self.bz.selected.map(|s| s as i64).unwrap_or(-1));
         d.set("moving", self.bz.session.is_some());
         d.set("height_stage", self.bz.height_stage.is_some());
-        let pts: PackedVector3Array = self.bz.recipe.knots.iter().map(|k| self.bz.world(k.position)).collect();
+        let pts: PackedVector3Array = self
+            .bz
+            .formula
+            .knots
+            .iter()
+            .map(|k| self.bz.world(k.position))
+            .collect();
         d.set("points", &pts);
         d
     }

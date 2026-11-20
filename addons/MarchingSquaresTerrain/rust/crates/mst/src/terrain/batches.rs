@@ -24,7 +24,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::multi_mesh::TransformFormat;
-use godot::classes::{ConcavePolygonShape3D, MeshInstance3D, MultiMesh, MultiMeshInstance3D, Node3D, QuadMesh, StaticBody3D};
+use godot::classes::{
+    ConcavePolygonShape3D, MeshInstance3D, MultiMesh, MultiMeshInstance3D, Node3D, QuadMesh,
+    StaticBody3D,
+};
 use godot::prelude::*;
 
 use pt_core::math::{IVec2, Vec3 as PVec3, iv2};
@@ -62,12 +65,18 @@ fn drop_node(n: Option<Gd<impl Inherits<Node>>>) {
 
 /// Chunks per region edge for chunks of `chunk_cells` cells (1-8).
 pub fn region_chunks(chunk_cells: usize) -> i32 {
-    (REGION_CELLS / chunk_cells.max(1) as f32).sqrt().round().clamp(1.0, 8.0) as i32
+    (REGION_CELLS / chunk_cells.max(1) as f32)
+        .sqrt()
+        .round()
+        .clamp(1.0, 8.0) as i32
 }
 
 /// Chunks per mesh region edge (1-8).
 pub fn mesh_region_chunks(chunk_cells: usize) -> i32 {
-    (MESH_REGION_CELLS / chunk_cells.max(1) as f32).sqrt().round().clamp(1.0, 8.0) as i32
+    (MESH_REGION_CELLS / chunk_cells.max(1) as f32)
+        .sqrt()
+        .round()
+        .clamp(1.0, 8.0) as i32
 }
 
 /// Column instances of one chunk (`hex_edge_instanced`), drawn by its region.
@@ -81,7 +90,7 @@ pub struct ChunkColumns {
     /// Groove rings of the side template (`INSTANCE_CUSTOM.a`).
     pub rings: u32,
     pub low: bool,
-    pub bounds: Option<(PVec3, PVec3)>,
+    pub extent: Option<(PVec3, PVec3)>,
 }
 
 /// CPU state of one chunk (no nodes: its region draws and collides).
@@ -90,7 +99,7 @@ pub struct ChunkNodes {
     /// Render arrays of the CPU-meshed part (None = nothing to draw), drawn by the region mesh.
     pub render: Option<MeshArrays>,
     /// Collision faces (None = no collision), a shape owner on the region body.
-    pub shape: Option<Gd<ConcavePolygonShape3D>>,
+    pub form: Option<Gd<ConcavePolygonShape3D>>,
     pub owner: Option<u32>,
     /// Grass instance buffer (`GRASS_STRIDE` floats per blade).
     pub grass: Vec<f32>,
@@ -118,7 +127,7 @@ impl RegionNodes {
 pub struct Batches {
     /// Chunks per region edge (`region_chunks`, set on reload).
     pub size: i32,
-    root: Option<Gd<Node3D>>,
+    base: Option<Gd<Node3D>>,
     regions: HashMap<IVec2, RegionNodes>,
     /// Regions whose grass / columns must be re-uploaded.
     pub dirty: BTreeSet<IVec2>,
@@ -138,7 +147,7 @@ impl Default for Batches {
     fn default() -> Self {
         Batches {
             size: 1,
-            root: None,
+            base: None,
             regions: HashMap::new(),
             dirty: BTreeSet::new(),
             mesh_size: 1,
@@ -169,7 +178,7 @@ impl Batches {
     }
 
     /// The chunk's grass / columns region and its mesh region must be re-uploaded.
-    pub fn mark(&mut self, chunk: IVec2) {
+    pub fn tag(&mut self, chunk: IVec2) {
         self.dirty.insert(self.region_of(chunk));
         self.mesh_dirty.insert(self.mesh_region_of(chunk));
     }
@@ -179,7 +188,7 @@ impl Batches {
     }
 
     /// Frees every region node (the chunks are rebuilt from scratch).
-    pub fn clear(&mut self) {
+    pub fn purge(&mut self) {
         for (_, r) in self.regions.drain() {
             r.free();
         }
@@ -205,22 +214,26 @@ impl MarchingSquaresTerrain {
     fn batch_look(&self) -> Look {
         Look {
             layers: self.render_layers | globals::meta_mask(),
-            shadows: if self.cast_shadows { ShadowCastingSetting::ON } else { ShadowCastingSetting::OFF },
+            shadows: if self.cast_shadows {
+                ShadowCastingSetting::ON
+            } else {
+                ShadowCastingSetting::OFF
+            },
             grass_on: self.grass_on(),
-            mat: self.terrain_material.clone(),
-            gmat: self.grass_material.clone(),
+            mat: self.land_stuff.clone(),
+            gmat: self.turf_stuff.clone(),
         }
     }
 
     fn batch_root(&mut self) -> Gd<Node3D> {
-        if let Some(r) = self.batches.root.as_ref().filter(|r| r.is_instance_valid()) {
+        if let Some(r) = self.batches.base.as_ref().filter(|r| r.is_instance_valid()) {
             return r.clone();
         }
         let mut root = Node3D::new_alloc();
         root.set_name("Regions");
         let mut this = self.to_gd();
         add_internal(&mut this, &root);
-        self.batches.root = Some(root.clone());
+        self.batches.base = Some(root.clone());
         self.batches.regions.clear();
         self.batches.meshes.clear();
         root
@@ -228,8 +241,10 @@ impl MarchingSquaresTerrain {
 
     /// The chunk's render arrays (drawn by its region's mesh, rebuilt by `batches_flush`).
     pub(super) fn set_chunk_mesh(&mut self, c: IVec2, mesh: Option<MeshArrays>) {
-        let Some(n) = self.nodes.get_mut(&c) else { return };
-        n.render = mesh.filter(|m| !m.indices.is_empty()).map(|mut m| {
+        let Some(n) = self.nodes.get_mut(&c) else {
+            return;
+        };
+        n.render = mesh.filter(|m| !m.ordinals.is_empty()).map(|mut m| {
             m.collision_faces = Vec::new();
             m
         });
@@ -239,28 +254,31 @@ impl MarchingSquaresTerrain {
     /// Replaces the chunk's collision (a shape owner on its region's body). In the editor a
     /// chunk that already collides keeps its old shape while edits keep coming (see
     /// `Batches::pending_collision`); `batches_flush_collision` applies the new faces.
-    pub(super) fn set_chunk_collision(&mut self, c: IVec2, faces: PackedVector3Array) {
-        if is_editor() && self.nodes.get(&c).is_some_and(|n| n.shape.is_some()) {
+    pub(super) fn assign_panel_impact(&mut self, c: IVec2, faces: PackedVector3Array) {
+        if is_editor() && self.nodes.get(&c).is_some_and(|n| n.form.is_some()) {
             self.batches.pending_collision.insert(c, faces);
             self.batches.last_edit_ms = now_ms();
             return;
         }
         self.batches.pending_collision.remove(&c);
-        self.set_chunk_collision_now(c, faces);
+        self.assign_panel_impact_instant(c, faces);
     }
 
     /// Applies deferred editor collision once the terrain was quiet (`force`: now, e.g. before
     /// saving baked collision).
     pub(super) fn batches_flush_collision(&mut self, force: bool) {
-        if self.batches.pending_collision.is_empty() || (!force && now_ms().saturating_sub(self.batches.last_edit_ms) < COLLISION_QUIET_MS) {
+        if self.batches.pending_collision.is_empty()
+            || (!force && now_ms().saturating_sub(self.batches.last_edit_ms) < COLLISION_QUIET_MS)
+        {
             return;
         }
-        let _p = crate::prof::scope("flush.collision");
-        let mut pending: Vec<(IVec2, PackedVector3Array)> = self.batches.pending_collision.drain().collect();
+        let _p = crate::prof::breadth("flush.collision");
+        let mut pending: Vec<(IVec2, PackedVector3Array)> =
+            self.batches.pending_collision.drain().collect();
         pending.sort_by_key(|(c, _)| *c);
         for (c, faces) in pending {
             if self.nodes.contains_key(&c) {
-                self.set_chunk_collision_now(c, faces);
+                self.assign_panel_impact_instant(c, faces);
             }
         }
     }
@@ -270,10 +288,14 @@ impl MarchingSquaresTerrain {
         if let Some(f) = self.batches.pending_collision.get(&c) {
             return f.clone();
         }
-        self.nodes.get(&c).and_then(|n| n.shape.as_ref()).map(|s| s.get_faces()).unwrap_or_default()
+        self.nodes
+            .get(&c)
+            .and_then(|n| n.form.as_ref())
+            .map(|s| s.get_faces())
+            .unwrap_or_default()
     }
 
-    fn set_chunk_collision_now(&mut self, c: IVec2, faces: PackedVector3Array) {
+    fn assign_panel_impact_instant(&mut self, c: IVec2, faces: PackedVector3Array) {
         let shape = (!faces.is_empty()).then(|| {
             let mut s = ConcavePolygonShape3D::new_gd();
             s.set_backface_collision_enabled(true);
@@ -285,8 +307,13 @@ impl MarchingSquaresTerrain {
 
     pub(super) fn set_chunk_shape(&mut self, c: IVec2, shape: Option<Gd<ConcavePolygonShape3D>>) {
         let r = self.batches.region_of(c);
-        let (layer, mask, enabled) = (self.collision_layer, self.collision_mask, self.collision_enabled);
-        let has_body = self.batches.regions.get(&r).and_then(|g| g.body.as_ref()).is_some_and(|b| b.is_instance_valid());
+        let (layer, mask, enabled) = (self.impact_stratum, self.impact_sieve, self.impact_active);
+        let has_body = self
+            .batches
+            .regions
+            .get(&r)
+            .and_then(|g| g.body.as_ref())
+            .is_some_and(|b| b.is_instance_valid());
         if shape.is_some() && !has_body {
             let mut root = self.batch_root();
             let mut b = StaticBody3D::new_alloc();
@@ -296,10 +323,17 @@ impl MarchingSquaresTerrain {
             root.add_child(&b);
             self.batches.regions.entry(r).or_default().body = Some(b);
         }
-        let body = self.batches.regions.get(&r).and_then(|g| g.body.clone()).filter(|b| b.is_instance_valid());
-        let Some(n) = self.nodes.get_mut(&c) else { return };
+        let body = self
+            .batches
+            .regions
+            .get(&r)
+            .and_then(|g| g.body.clone())
+            .filter(|b| b.is_instance_valid());
+        let Some(n) = self.nodes.get_mut(&c) else {
+            return;
+        };
         let Some(mut body) = body else {
-            n.shape = None;
+            n.form = None;
             n.owner = None;
             return;
         };
@@ -325,7 +359,7 @@ impl MarchingSquaresTerrain {
             }
             (None, None) => {}
         }
-        n.shape = shape;
+        n.form = shape;
         if body.get_shape_owners().is_empty() {
             drop_node(Some(body));
             if let Some(g) = self.batches.regions.get_mut(&r) {
@@ -342,13 +376,13 @@ impl MarchingSquaresTerrain {
         self.set_chunk_shape(c, None);
         self.batches.pending_collision.remove(&c);
         self.nodes.remove(&c);
-        self.batches.mark(c);
+        self.batches.tag(c);
     }
 
     /// Frees every chunk and region node (full reload).
     pub(super) fn clear_chunk_nodes(&mut self) {
         self.nodes.clear();
-        self.batches.clear();
+        self.batches.purge();
     }
 
     /// Rebuilds the mesh and re-uploads the grass and column MultiMeshes of the dirty regions.
@@ -357,26 +391,32 @@ impl MarchingSquaresTerrain {
         if self.batches.dirty.is_empty() {
             return;
         }
-        let _p = crate::prof::scope("flush.regions");
+        let _p = crate::prof::breadth("flush.regions");
         let dirty = std::mem::take(&mut self.batches.dirty);
         // Chunks of the dirty regions, in chunk order (identical buffers for identical data).
-        let mut members: BTreeMap<IVec2, Vec<IVec2>> = dirty.iter().map(|r| (*r, Vec::new())).collect();
+        let mut members: BTreeMap<IVec2, Vec<IVec2>> =
+            dirty.iter().map(|r| (*r, Vec::new())).collect();
         for c in self.nodes.keys() {
             if let Some(v) = members.get_mut(&self.batches.region_of(*c)) {
                 v.push(*c);
             }
         }
         let look = self.batch_look();
-        let size = Vector2::new(self.grass_size.x.max(0.01), self.grass_size.y.max(0.01));
+        let size = Vector2::new(self.grass_size.x.max(0.0105), self.grass_size.y.max(0.0105));
         for (r, mut chunks) in members {
             chunks.sort();
             // ---- grass
-            let _pg = crate::prof::scope("regions.grass");
+            let _pg = crate::prof::breadth("regions.grass");
             let mut grass: Vec<f32> = Vec::new();
             for c in &chunks {
                 grass.extend_from_slice(&self.nodes[c].grass);
             }
-            let old = self.batches.regions.get_mut(&r).and_then(|g| g.grass.take()).filter(|n| n.is_instance_valid());
+            let old = self
+                .batches
+                .regions
+                .get_mut(&r)
+                .and_then(|g| g.grass.take())
+                .filter(|n| n.is_instance_valid());
             if grass.is_empty() {
                 drop_node(old);
             } else {
@@ -393,7 +433,8 @@ impl MarchingSquaresTerrain {
                     mmi
                 });
                 if let Some(mut mm) = mmi.get_multimesh() {
-                    if let Some(mut quad) = mm.get_mesh().and_then(|m| m.try_cast::<QuadMesh>().ok())
+                    if let Some(mut quad) =
+                        mm.get_mesh().and_then(|m| m.try_cast::<QuadMesh>().ok())
                         && quad.get_size() != size
                     {
                         quad.set_size(size);
@@ -408,44 +449,77 @@ impl MarchingSquaresTerrain {
                 self.batches.regions.entry(r).or_default().grass = Some(mmi);
             }
             drop(_pg);
-            let _pc = crate::prof::scope("regions.columns");
+            let _pc = crate::prof::breadth("regions.columns");
             // ---- columns: one MultiMesh per template key (a region-wide groove template
             // would look the same, the shader collapses unused rings, but costs ~2x vertices).
             let mut keys: BTreeMap<u32, (Vec<f32>, Option<(PVec3, PVec3)>)> = BTreeMap::new();
             for c in &chunks {
-                let Some(col) = &self.nodes[c].columns else { continue };
+                let Some(col) = &self.nodes[c].columns else {
+                    continue;
+                };
                 let lowf = if col.low { 1.0 } else { 0.0 };
-                for (key, cells, rings) in [(col.side_key, &col.sides, col.rings), (col.top_key, &col.tops, 0)] {
+                for (key, cells, rings) in [
+                    (col.side_key, &col.sides, col.rings),
+                    (col.top_key, &col.tops, 0),
+                ] {
                     if cells.is_empty() {
                         continue;
                     }
                     let e = keys.entry(key).or_default();
                     for cell in cells {
-                        crate::writes::push_instance(&mut e.0, Transform3D::IDENTITY, None, Some(Color::from_rgba(cell.x as f32, cell.y as f32, lowf, rings as f32)));
+                        crate::writes::push_instance(
+                            &mut e.0,
+                            Transform3D::IDENTITY,
+                            None,
+                            Some(Color::from_rgba(
+                                cell.x as f32,
+                                cell.y as f32,
+                                lowf,
+                                rings as f32,
+                            )),
+                        );
                     }
-                    if let Some((lo, hi)) = col.bounds {
+                    if let Some((lo, hi)) = col.extent {
                         e.1 = Some(match e.1 {
-                            Some((a, b)) => (pt_core::math::v3(a.x.min(lo.x), a.y.min(lo.y), a.z.min(lo.z)), pt_core::math::v3(b.x.max(hi.x), b.y.max(hi.y), b.z.max(hi.z))),
+                            Some((a, b)) => (
+                                pt_core::math::v3(a.x.min(lo.x), a.y.min(lo.y), a.z.min(lo.z)),
+                                pt_core::math::v3(b.x.max(hi.x), b.y.max(hi.y), b.z.max(hi.z)),
+                            ),
                             None => (lo, hi),
                         });
                     }
                 }
             }
-            let mut old = self.batches.regions.get_mut(&r).map(|g| std::mem::take(&mut g.columns)).unwrap_or_default();
+            let mut old = self
+                .batches
+                .regions
+                .get_mut(&r)
+                .map(|g| std::mem::take(&mut g.columns))
+                .unwrap_or_default();
             let mut now = BTreeMap::new();
             for (key, (buf, bounds)) in keys {
-                let Some(template) = self.columns_template(key) else { continue };
-                let mut mmi = old.remove(&key).filter(|n| n.is_instance_valid()).unwrap_or_else(|| {
-                    let mut mmi = MultiMeshInstance3D::new_alloc();
-                    mmi.set_name(&format!("Region ({}, {}) {}", r.x, r.y, super::hex_columns::template_name(key)));
-                    let mut mm = MultiMesh::new_gd();
-                    mm.set_transform_format(TransformFormat::TRANSFORM_3D);
-                    mm.set_use_custom_data(true);
-                    mmi.set_multimesh(&mm);
-                    apply_columns_look(&mut mmi, &look);
-                    self.batch_root().add_child(&mmi);
-                    mmi
-                });
+                let Some(template) = self.columns_template(key) else {
+                    continue;
+                };
+                let mut mmi = old
+                    .remove(&key)
+                    .filter(|n| n.is_instance_valid())
+                    .unwrap_or_else(|| {
+                        let mut mmi = MultiMeshInstance3D::new_alloc();
+                        mmi.set_name(&format!(
+                            "Region ({}, {}) {}",
+                            r.x,
+                            r.y,
+                            super::hex_columns::template_name(key)
+                        ));
+                        let mut mm = MultiMesh::new_gd();
+                        mm.set_transform_format(TransformFormat::TRANSFORM_3D);
+                        mm.set_use_custom_data(true);
+                        mmi.set_multimesh(&mm);
+                        apply_columns_look(&mut mmi, &look);
+                        self.batch_root().add_child(&mmi);
+                        mmi
+                    });
                 if let Some(mut mm) = mmi.get_multimesh() {
                     if mm.get_mesh().as_ref() != Some(&template.clone().upcast()) {
                         mm.set_mesh(&template);
@@ -482,9 +556,10 @@ impl MarchingSquaresTerrain {
         if self.batches.mesh_dirty.is_empty() {
             return;
         }
-        let _p = crate::prof::scope("regions.mesh");
+        let _p = crate::prof::breadth("regions.mesh");
         let dirty = std::mem::take(&mut self.batches.mesh_dirty);
-        let mut members: BTreeMap<IVec2, Vec<IVec2>> = dirty.iter().map(|r| (*r, Vec::new())).collect();
+        let mut members: BTreeMap<IVec2, Vec<IVec2>> =
+            dirty.iter().map(|r| (*r, Vec::new())).collect();
         for c in self.nodes.keys() {
             if let Some(v) = members.get_mut(&self.batches.mesh_region_of(*c)) {
                 v.push(*c);
@@ -494,10 +569,17 @@ impl MarchingSquaresTerrain {
         for (r, mut chunks) in members {
             chunks.sort();
             let mesh = {
-                let parts: Vec<&MeshArrays> = chunks.iter().filter_map(|c| self.nodes[c].render.as_ref()).collect();
+                let parts: Vec<&MeshArrays> = chunks
+                    .iter()
+                    .filter_map(|c| self.nodes[c].render.as_ref())
+                    .collect();
                 build_array_mesh_concat(&parts)
             };
-            let old = self.batches.meshes.remove(&r).filter(|n| n.is_instance_valid());
+            let old = self
+                .batches
+                .meshes
+                .remove(&r)
+                .filter(|n| n.is_instance_valid());
             let Some(mesh) = mesh else {
                 drop_node(old);
                 continue;
@@ -517,7 +599,7 @@ impl MarchingSquaresTerrain {
     /// Layers, shadows, materials and collision settings on every chunk / region node.
     pub(super) fn batches_apply_settings(&mut self) {
         let look = self.batch_look();
-        let (layer, mask, enabled) = (self.collision_layer, self.collision_mask, self.collision_enabled);
+        let (layer, mask, enabled) = (self.impact_stratum, self.impact_sieve, self.impact_active);
         for mi in self.batches.meshes.values_mut() {
             if mi.is_instance_valid() {
                 apply_mesh_look(mi, &look);
@@ -548,7 +630,7 @@ impl MarchingSquaresTerrain {
         if n.grass.is_empty() {
             return None;
         }
-        let size = Vector2::new(self.grass_size.x.max(0.01), self.grass_size.y.max(0.01));
+        let size = Vector2::new(self.grass_size.x.max(0.0105), self.grass_size.y.max(0.0105));
         let mut quad = QuadMesh::new_gd();
         quad.set_size(size);
         quad.set_center_offset(Vector3::new(0.0, size.y * 0.5, 0.0));
@@ -564,7 +646,12 @@ impl MarchingSquaresTerrain {
     /// The chunk's own render mesh, built on demand from its arrays (bakes, tests, diagnostics;
     /// the region draws the chunks together).
     pub(super) fn chunk_mesh(&self, c: IVec2) -> Option<Gd<godot::classes::Mesh>> {
-        self.nodes.get(&c)?.render.as_ref().and_then(build_array_mesh).map(|m| m.upcast())
+        self.nodes
+            .get(&c)?
+            .render
+            .as_ref()
+            .and_then(build_array_mesh)
+            .map(|m| m.upcast())
     }
 }
 

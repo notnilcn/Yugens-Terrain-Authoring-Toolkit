@@ -1,7 +1,7 @@
 //! `PixelBuilderMeshData` — the editable polygon mesh of a `PixelBuilderMesh`, stored as one
 //! versioned binary blob (`pt_core::build::blob`) plus material slots.
 //!
-//! The GDScript API (`add_shape`, `extrude`, `inset`, `faces_facing`, …) lets tools and tests
+//! The mesh API (`add_shape`, `extrude`, `inset`, `faces_facing`, ...) lets tools and tests
 //! build geometry procedurally; the editor plugin uses the same operations.
 
 use std::collections::BTreeSet;
@@ -21,8 +21,13 @@ pub fn to_p(v: Vector3) -> PVec3 {
 pub fn from_p(v: PVec3) -> Vector3 {
     Vector3::new(v.x, v.y, v.z)
 }
-pub fn face_set(faces: &PackedInt32Array) -> BTreeSet<usize> {
-    faces.as_slice().iter().filter(|f| **f >= 0).map(|f| *f as usize).collect()
+pub fn facet_batch(faces: &PackedInt32Array) -> BTreeSet<usize> {
+    faces
+        .as_slice()
+        .iter()
+        .filter(|f| **f >= 0)
+        .map(|f| *f as usize)
+        .collect()
 }
 pub fn face_array(faces: &BTreeSet<usize>) -> PackedInt32Array {
     faces.iter().map(|f| *f as i32).collect()
@@ -37,22 +42,22 @@ pub struct PixelBuilderMeshData {
     blob: PackedByteArray,
     /// One material per slot; faces pick a slot. Empty slots use a vertex-color material.
     #[export]
-    #[var(set = set_materials)]
+    #[var(set = assign_stuffs)]
     materials: Array<Option<Gd<Material>>>,
     /// World units per texture repeat for the automatic UVs (1 = a 16 px texture is 16 texels/m).
-    #[export(range = (0.0625, 16.0, 0.0625))]
+    #[export(range = (0.0624, 16.0, 0.0624))]
     #[var(set = set_units_per_repeat)]
     units_per_repeat: f32,
     /// Recipe of the last generated shape (`kind`, `size`, …), used by "Rebuild shape".
     #[export(storage)]
-    shape: VarDictionary,
+    form: VarDictionary,
     /// Bezier Plane / Block recipe (`pt_core::build::bezier::BezierRecipe::encode`, knots in
     /// node-local space); empty for other meshes. "Shape parameters" reopens it in the Bezier tool.
     #[export(storage)]
     #[var]
     bezier: PackedByteArray,
 
-    mesh: BMesh,
+    cage: BMesh,
     /// Bumped on every mesh change (overlays rebuild when it moves; never saved).
     revision: u64,
     base: Base<Resource>,
@@ -65,9 +70,9 @@ impl IResource for PixelBuilderMeshData {
             blob: PackedByteArray::new(),
             materials: Array::new(),
             units_per_repeat: 1.0,
-            shape: VarDictionary::new(),
+            form: VarDictionary::new(),
             bezier: PackedByteArray::new(),
-            mesh: BMesh::default(),
+            cage: BMesh::default(),
             revision: 0,
             base,
         }
@@ -75,20 +80,20 @@ impl IResource for PixelBuilderMeshData {
 }
 
 impl PixelBuilderMeshData {
-    pub fn mesh(&self) -> &BMesh {
-        &self.mesh
+    pub fn cage(&self) -> &BMesh {
+        &self.cage
     }
     pub fn units(&self) -> f32 {
         self.units_per_repeat
     }
-    pub fn material_slots(&self) -> Array<Option<Gd<Material>>> {
+    pub fn stuff_pockets(&self) -> Array<Option<Gd<Material>>> {
         self.materials.clone()
     }
     /// Replaces the mesh (re-encodes the blob). The caller must `emit_changed` afterwards,
     /// outside any bind of this resource.
-    pub fn replace(&mut self, m: BMesh) {
-        self.blob = PackedByteArray::from(blob::encode(&m).as_slice());
-        self.mesh = m;
+    pub fn substitute(&mut self, m: BMesh) {
+        self.blob = PackedByteArray::from(blob::pack(&m).as_slice());
+        self.cage = m;
         self.revision += 1;
     }
     /// Changes with every mesh change (`replace`, `set_blob`).
@@ -96,26 +101,28 @@ impl PixelBuilderMeshData {
         self.revision
     }
     pub fn set_shape_spec(&mut self, s: &ShapeSpec) {
-        self.shape = spec::to_dict(s);
+        self.form = spec::to_dict(s);
         self.bezier = PackedByteArray::new();
     }
     /// Stores a Bezier recipe (and drops the shape recipe: one source per mesh).
     pub fn set_bezier_recipe(&mut self, r: &pt_core::build::bezier::BezierRecipe) {
-        self.bezier = PackedByteArray::from(r.encode().as_slice());
-        self.shape = VarDictionary::new();
+        self.bezier = PackedByteArray::from(r.pack().as_slice());
+        self.form = VarDictionary::new();
     }
     /// The stored Bezier recipe, if this mesh was drawn with the Bezier tool.
     pub fn bezier_recipe(&self) -> Option<pt_core::build::bezier::BezierRecipe> {
-        (!self.bezier.is_empty()).then(|| pt_core::build::bezier::BezierRecipe::decode(self.bezier.as_slice())).flatten()
+        (!self.bezier.is_empty())
+            .then(|| pt_core::build::bezier::BezierRecipe::unpack(self.bezier.as_slice()))
+            .flatten()
     }
     /// The stored shape recipe (`None` for meshes not drawn from a shape).
     pub fn shape_spec(&self) -> Option<ShapeSpec> {
-        (!self.shape.is_empty()).then(|| spec::from_dict(&self.shape, ShapeSpec::default()))
+        (!self.form.is_empty()).then(|| spec::from_dict(&self.form, ShapeSpec::default()))
     }
     fn edit<R>(&mut self, f: impl FnOnce(&mut BMesh) -> R) -> R {
-        let mut m = std::mem::take(&mut self.mesh);
+        let mut m = std::mem::take(&mut self.cage);
         let r = f(&mut m);
-        self.replace(m);
+        self.substitute(m);
         self.base_mut().emit_changed();
         r
     }
@@ -131,9 +138,9 @@ impl PixelBuilderMeshData {
     /// Replaces the mesh from an encoded blob (used by undo/redo).
     #[func]
     pub fn set_blob(&mut self, b: PackedByteArray) {
-        match blob::decode(b.as_slice()) {
+        match blob::unpack(b.as_slice()) {
             Ok(m) => {
-                self.mesh = m;
+                self.cage = m;
                 self.blob = b;
                 self.revision += 1;
             }
@@ -143,40 +150,56 @@ impl PixelBuilderMeshData {
     }
 
     #[func]
-    fn set_materials(&mut self, v: Array<Option<Gd<Material>>>) {
+    fn assign_stuffs(&mut self, v: Array<Option<Gd<Material>>>) {
         self.materials = v;
         self.base_mut().emit_changed();
     }
 
     #[func]
     fn set_units_per_repeat(&mut self, v: f32) {
-        self.units_per_repeat = v.max(0.01);
+        self.units_per_repeat = v.max(0.0105);
         self.base_mut().emit_changed();
     }
 
     #[func]
-    fn get_vertex_count(&self) -> i64 {
-        self.mesh.positions.len() as i64
+    fn fetch_corner_tally(&self) -> i64 {
+        self.cage.positions.len() as i64
     }
     #[func]
-    fn get_face_count(&self) -> i64 {
-        self.mesh.faces.len() as i64
+    fn fetch_facet_tally(&self) -> i64 {
+        self.cage.facets.len() as i64
     }
     #[func]
-    fn get_face_center(&self, face: i64) -> Vector3 {
-        if (face as usize) < self.mesh.faces.len() { from_p(self.mesh.face_center(face as usize)) } else { Vector3::ZERO }
+    fn fetch_facet_midpoint(&self, face: i64) -> Vector3 {
+        if (face as usize) < self.cage.facets.len() {
+            from_p(self.cage.face_center(face as usize))
+        } else {
+            Vector3::ZERO
+        }
     }
     #[func]
-    fn get_face_normal(&self, face: i64) -> Vector3 {
-        if (face as usize) < self.mesh.faces.len() { from_p(self.mesh.face_normal(face as usize)) } else { Vector3::UP }
+    fn fetch_facet_upright(&self, face: i64) -> Vector3 {
+        if (face as usize) < self.cage.facets.len() {
+            from_p(self.cage.face_normal(face as usize))
+        } else {
+            Vector3::UP
+        }
     }
     #[func]
     fn get_face_vertices(&self, face: i64) -> PackedInt32Array {
-        self.mesh.faces.get(face as usize).map(|f| f.verts.iter().map(|v| *v as i32).collect()).unwrap_or_default()
+        self.cage
+            .facets
+            .get(face as usize)
+            .map(|f| f.verts.iter().map(|v| *v as i32).collect())
+            .unwrap_or_default()
     }
     #[func]
     fn get_vertex(&self, v: i64) -> Vector3 {
-        self.mesh.positions.get(v as usize).map(|p| from_p(*p)).unwrap_or_default()
+        self.cage
+            .positions
+            .get(v as usize)
+            .map(|p| from_p(*p))
+            .unwrap_or_default()
     }
     #[func]
     fn set_vertex(&mut self, v: i64, p: Vector3) {
@@ -189,11 +212,11 @@ impl PixelBuilderMeshData {
     /// True if every edge is shared by exactly two faces.
     #[func]
     fn is_closed(&self) -> bool {
-        self.mesh.is_closed()
+        self.cage.is_closed()
     }
 
     #[func]
-    fn clear(&mut self) {
+    fn purge(&mut self) {
         self.edit(|m| *m = BMesh::default());
     }
 
@@ -204,11 +227,17 @@ impl PixelBuilderMeshData {
     /// `arched`, `profile`, `side`,
     /// `material`, `color`, `rotation_y` (degrees). Returns the new face indices.
     #[func]
-    fn add_shape(&mut self, kind: i64, size: Vector3, offset: Vector3, params: VarDictionary) -> PackedInt32Array {
+    fn add_shape(
+        &mut self,
+        kind: i64,
+        size: Vector3,
+        offset: Vector3,
+        params: VarDictionary,
+    ) -> PackedInt32Array {
         let mut s = spec::from_dict(&params, ShapeSpec::default());
-        s.kind = ShapeKind::from_i64(kind);
+        s.sort = ShapeKind::from_i64(kind);
         s.size = to_p(size);
-        let g = build::shapes::generate(&s, None);
+        let g = build::shapes::produce(&s, None);
         self.set_shape_spec(&s);
         self.append_generated(g, offset, &params)
     }
@@ -216,51 +245,77 @@ impl PixelBuilderMeshData {
     /// Appends whole terrain cells as a solid (`cells` in the terrain's sample coordinates;
     /// positions are relative to the centre of `origin`). Returns the new face indices.
     #[func]
-    fn add_terrain_cells(&mut self, terrain: Gd<MarchingSquaresTerrain>, cells: VarArray, origin: Vector2i, height: f32, offset: Vector3, params: VarDictionary) -> PackedInt32Array {
+    fn add_terrain_cells(
+        &mut self,
+        terrain: Gd<MarchingSquaresTerrain>,
+        cells: VarArray,
+        origin: Vector2i,
+        height: f32,
+        offset: Vector3,
+        params: VarDictionary,
+    ) -> PackedInt32Array {
         let cfg = terrain.bind().store().config.clone();
-        let list: Vec<_> = cells.iter_shared().filter_map(|v| v.try_to::<Vector2i>().ok()).map(to_iv).collect();
+        let list: Vec<_> = cells
+            .iter_shared()
+            .filter_map(|v| v.try_to::<Vector2i>().ok())
+            .map(to_iv)
+            .collect();
         let g = build::shapes::cells_prism(&cfg, &list, to_iv(origin), height);
         self.append_generated(g, offset, &params)
     }
 
     /// Faces whose normal is within `max_angle_deg` of `dir` (optionally only among `among`).
     #[func]
-    fn faces_facing(&self, dir: Vector3, max_angle_deg: f32, among: PackedInt32Array) -> PackedInt32Array {
-        let d = to_p(dir).normalized();
+    fn faces_facing(
+        &self,
+        dir: Vector3,
+        max_angle_deg: f32,
+        among: PackedInt32Array,
+    ) -> PackedInt32Array {
+        let d = to_p(dir).unitized();
         let c = max_angle_deg.to_radians().cos();
-        let pool: Vec<usize> = if among.is_empty() { (0..self.mesh.faces.len()).collect() } else { face_set(&among).into_iter().collect() };
-        pool.into_iter().filter(|f| *f < self.mesh.faces.len() && self.mesh.face_normal(*f).dot(d) >= c - 1e-5).map(|f| f as i32).collect()
+        let pool: Vec<usize> = if among.is_empty() {
+            (0..self.cage.facets.len()).collect()
+        } else {
+            facet_batch(&among).into_iter().collect()
+        };
+        pool.into_iter()
+            .filter(|f| {
+                *f < self.cage.facets.len() && self.cage.face_normal(*f).innerprod(d) >= c - 1e-5
+            })
+            .map(|f| f as i32)
+            .collect()
     }
 
     #[func]
     fn extrude(&mut self, faces: PackedInt32Array, distance: f32) -> PackedInt32Array {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         face_array(&self.edit(|m| ops::extrude_selection(m, &s, distance)))
     }
     #[func]
     fn inset(&mut self, faces: PackedInt32Array, amount: f32) -> PackedInt32Array {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         face_array(&self.edit(|m| ops::inset_center(m, &s, amount)))
     }
     #[func]
     fn subdivide(&mut self, faces: PackedInt32Array) -> PackedInt32Array {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         face_array(&self.edit(|m| ops::subdivide_selection(m, &s)))
     }
     #[func]
-    fn delete_faces(&mut self, faces: PackedInt32Array) {
-        let s = face_set(&faces);
-        self.edit(|m| ops::delete_faces(m, &s));
+    fn discard_facets(&mut self, faces: PackedInt32Array) {
+        let s = facet_batch(&faces);
+        self.edit(|m| ops::discard_facets(m, &s));
     }
     #[func]
-    fn flip_faces(&mut self, faces: PackedInt32Array) {
-        let s = face_set(&faces);
-        self.edit(|m| ops::flip_faces(m, &s));
+    fn turnover_facets(&mut self, faces: PackedInt32Array) {
+        let s = facet_batch(&faces);
+        self.edit(|m| ops::turnover_facets(m, &s));
     }
     /// Moves every vertex of `faces` by `delta`.
     #[func]
     fn translate_faces(&mut self, faces: PackedInt32Array, delta: Vector3) {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         self.edit(|m| {
             let v = m.verts_of_faces(&s);
             ops::move_vertices(m, &v, to_p(delta));
@@ -269,135 +324,233 @@ impl PixelBuilderMeshData {
     /// Scales the vertices of `faces` about their centroid.
     #[func]
     fn scale_faces(&mut self, faces: PackedInt32Array, scale: Vector3) {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         self.edit(|m| {
             let v = m.verts_of_faces(&s);
-            let c = v.iter().fold(PVec3::ZERO, |a, i| a + m.positions[*i as usize]) / v.len().max(1) as f32;
+            let c = v
+                .iter()
+                .fold(PVec3::ZERO, |a, i| a + m.positions[*i as usize])
+                / v.len().max(1) as f32;
             ops::scale_vertices(m, &v, c, to_p(scale));
         });
     }
     #[func]
-    fn weld(&mut self, threshold: f32) -> i64 {
-        self.edit(|m| ops::weld_by_distance(m, threshold, None)) as i64
+    fn braze(&mut self, threshold: f32) -> i64 {
+        self.edit(|m| ops::braze_via_span(m, threshold, None)) as i64
     }
     #[func]
-    fn set_faces_material(&mut self, faces: PackedInt32Array, slot: i64) {
-        let s = face_set(&faces);
-        self.edit(|m| ops::set_material(m, &s, slot.clamp(0, 255) as u16));
+    fn assign_facets_stuff(&mut self, faces: PackedInt32Array, slot: i64) {
+        let s = facet_batch(&faces);
+        self.edit(|m| ops::assign_stuff(m, &s, slot.clamp(0, 255) as u16));
     }
     #[func]
-    fn set_faces_color(&mut self, faces: PackedInt32Array, color: Color) {
-        let s = face_set(&faces);
-        let c = color_bytes(color);
-        self.edit(|m| ops::set_color(m, &s, c));
+    fn assign_facets_tint(&mut self, faces: PackedInt32Array, tint: Color) {
+        let s = facet_batch(&faces);
+        let c = color_bytes(tint);
+        self.edit(|m| ops::assign_tint(m, &s, c));
     }
     /// Chamfers edges given as vertex pairs `[a0, b0, a1, b1, …]`. Returns the strip faces.
     #[func]
-    fn bevel(&mut self, edge_pairs: PackedInt32Array, amount: f32) -> PackedInt32Array {
-        let e: BTreeSet<_> = edge_pairs.as_slice().chunks_exact(2).map(|p| build::edge(p[0] as u32, p[1] as u32)).collect();
-        face_array(&self.edit(|m| build::topo::bevel_edges(m, &e, amount)))
+    fn chamfer(&mut self, edge_pairs: PackedInt32Array, amount: f32) -> PackedInt32Array {
+        let e: BTreeSet<_> = edge_pairs
+            .as_slice()
+            .chunks_exact(2)
+            .map(|p| build::edge(p[0] as u32, p[1] as u32))
+            .collect();
+        face_array(&self.edit(|m| build::topo::chamfer_ridges(m, &e, amount)))
     }
     /// Bevels edges (vertex pairs) by `amount` over `segments` strips (rounded and smooth
     /// shaded for segments > 1). Returns the new faces.
     #[func]
-    fn bevel_rounded(&mut self, edge_pairs: PackedInt32Array, amount: f32, segments: i64) -> PackedInt32Array {
-        let e: BTreeSet<_> = edge_pairs.as_slice().chunks_exact(2).map(|p| build::edge(p[0] as u32, p[1] as u32)).collect();
+    fn bevel_rounded(
+        &mut self,
+        edge_pairs: PackedInt32Array,
+        amount: f32,
+        segments: i64,
+    ) -> PackedInt32Array {
+        let e: BTreeSet<_> = edge_pairs
+            .as_slice()
+            .chunks_exact(2)
+            .map(|p| build::edge(p[0] as u32, p[1] as u32))
+            .collect();
         let s = segments.clamp(1, 16) as u32;
-        face_array(&self.edit(|m| build::bevel::bevel_edges(m, &e, amount, s, s > 1)))
+        face_array(&self.edit(|m| build::bevel::chamfer_ridges(m, &e, amount, s, s > 1)))
     }
     /// Splits edges (vertex pairs) into `segments` equal parts (Subdivide edges).
     /// Returns the new vertices.
     #[func]
-    fn subdivide_edges(&mut self, edge_pairs: PackedInt32Array, segments: i64) -> PackedInt32Array {
-        let e: BTreeSet<_> = edge_pairs.as_slice().chunks_exact(2).map(|p| build::edge(p[0] as u32, p[1] as u32)).collect();
+    fn refine_ridges(&mut self, edge_pairs: PackedInt32Array, segments: i64) -> PackedInt32Array {
+        let e: BTreeSet<_> = edge_pairs
+            .as_slice()
+            .chunks_exact(2)
+            .map(|p| build::edge(p[0] as u32, p[1] as u32))
+            .collect();
         let s = segments.clamp(2, 64) as u32;
-        self.edit(|m| build::edit_ops::divide_edges(m, &e, s)).into_iter().map(|v| v as i32).collect()
+        self.edit(|m| build::edit_ops::divide_edges(m, &e, s))
+            .into_iter()
+            .map(|v| v as i32)
+            .collect()
     }
     /// Connects edges (vertex pairs) through their midpoints (Connect edges).
     /// Returns the new chords as vertex pairs.
     #[func]
-    fn connect_edges(&mut self, edge_pairs: PackedInt32Array) -> PackedInt32Array {
-        let e: BTreeSet<_> = edge_pairs.as_slice().chunks_exact(2).map(|p| build::edge(p[0] as u32, p[1] as u32)).collect();
-        self.edit(|m| build::edit_ops::connect_edges(m, &e)).into_iter().flat_map(|(x, y)| [x as i32, y as i32]).collect()
+    fn join_ridges(&mut self, edge_pairs: PackedInt32Array) -> PackedInt32Array {
+        let e: BTreeSet<_> = edge_pairs
+            .as_slice()
+            .chunks_exact(2)
+            .map(|p| build::edge(p[0] as u32, p[1] as u32))
+            .collect();
+        self.edit(|m| build::edit_ops::join_ridges(m, &e))
+            .into_iter()
+            .flat_map(|(x, y)| [x as i32, y as i32])
+            .collect()
     }
     /// Subdivide: `segments` (even) pieces along every edge of the faces. Returns
     /// the new faces.
     #[func]
     fn subdivide_segments(&mut self, faces: PackedInt32Array, segments: i64) -> PackedInt32Array {
-        let s = face_set(&faces);
-        face_array(&self.edit(|m| build::mesh_ops::subdivide_grid(m, &s, segments.clamp(2, 64) as u32)))
+        let s = facet_batch(&faces);
+        face_array(
+            &self.edit(|m| build::mesh_ops::subdivide_grid(m, &s, segments.clamp(2, 64) as u32)),
+        )
     }
     /// Width inset: a rim `amount` wide (metres); `equal` mitres the corners.
     #[func]
-    fn inset_width(&mut self, faces: PackedInt32Array, amount: f32, equal: bool) -> PackedInt32Array {
-        let s = face_set(&faces);
+    fn recess_breadth(
+        &mut self,
+        faces: PackedInt32Array,
+        amount: f32,
+        equal: bool,
+    ) -> PackedInt32Array {
+        let s = facet_batch(&faces);
         face_array(&self.edit(|m| build::mesh_ops::inset_rim(m, &s, amount, equal)))
     }
     /// Collapses vertices into one at their centre; returns it (-1 when refused).
     #[func]
-    fn collapse_vertices(&mut self, verts: PackedInt32Array) -> i64 {
-        let s: BTreeSet<u32> = verts.as_slice().iter().filter(|v| **v >= 0).map(|v| *v as u32).collect();
-        self.edit(|m| build::mesh_ops::collapse_selection(m, &s)).map(|v| v as i64).unwrap_or(-1)
+    fn condense_corners(&mut self, verts: PackedInt32Array) -> i64 {
+        let s: BTreeSet<u32> = verts
+            .as_slice()
+            .iter()
+            .filter(|v| **v >= 0)
+            .map(|v| *v as u32)
+            .collect();
+        self.edit(|m| build::mesh_ops::collapse_selection(m, &s))
+            .map(|v| v as i64)
+            .unwrap_or(-1)
     }
     /// Splits edge (a, b) at local `pos`; returns the new vertex (-1 if (a, b) is no edge).
     #[func]
     fn insert_vertex(&mut self, a: i64, b: i64, pos: Vector3) -> i64 {
-        self.edit(|m| build::mesh_ops::insert_vertex(m, (a as u32, b as u32), to_p(pos))).map(|v| v as i64).unwrap_or(-1)
+        self.edit(|m| build::mesh_ops::insert_vertex(m, (a as u32, b as u32), to_p(pos)))
+            .map(|v| v as i64)
+            .unwrap_or(-1)
     }
     /// Trim walls: a moulding (`profile` 0–5, `depth` x `height`) along the base (`top`: under
     /// the top) of the given wall faces, appended. Returns the new faces.
     #[func]
-    fn trim_walls(&mut self, faces: PackedInt32Array, top: bool, depth: f32, height: f32, profile: i64) -> PackedInt32Array {
-        let s = face_set(&faces);
-        let t = build::trim_walls::trim_walls(&self.mesh, &s, top, depth, height, build::prims::TrimSection::from_u8(profile.clamp(0, 5) as u8), 6, 0.0, true);
+    fn trim_walls(
+        &mut self,
+        faces: PackedInt32Array,
+        top: bool,
+        depth: f32,
+        height: f32,
+        profile: i64,
+    ) -> PackedInt32Array {
+        let s = facet_batch(&faces);
+        let t = build::trim_walls::trim_walls(
+            &self.cage,
+            &s,
+            top,
+            depth,
+            height,
+            build::prims::TrimSection::from_u8(profile.clamp(0, 5) as u8),
+            6,
+            0.0,
+            true,
+        );
         face_array(&self.edit(|m| {
-            let start = m.faces.len();
-            m.append(&t);
-            (start..m.faces.len()).collect::<BTreeSet<usize>>()
+            let start = m.facets.len();
+            m.append_tail(&t);
+            (start..m.facets.len()).collect::<BTreeSet<usize>>()
         }))
     }
     /// Poly shape: the local XZ outline (`points`, y ignored) extruded `height` up at `offset`.
     #[func]
-    fn add_poly(&mut self, points: PackedVector3Array, height: f32, offset: Vector3, params: VarDictionary) -> PackedInt32Array {
-        let pts: Vec<pt_core::math::Vec2> = points.as_slice().iter().map(|p| pt_core::math::v2(p.x, p.z)).collect();
+    fn add_poly(
+        &mut self,
+        points: PackedVector3Array,
+        height: f32,
+        offset: Vector3,
+        params: VarDictionary,
+    ) -> PackedInt32Array {
+        let pts: Vec<pt_core::math::Vec2> = points
+            .as_slice()
+            .iter()
+            .map(|p| pt_core::math::v2(p.x, p.z))
+            .collect();
         let g = build::trim_walls::polygon_solid(&pts, height);
         self.append_generated(g, offset, &params)
     }
     /// Turns the triangulation diagonal of the given quads. Returns how many faces changed.
     #[func]
-    fn flip_face_edge(&mut self, faces: PackedInt32Array) -> i64 {
-        let s = face_set(&faces);
+    fn turnover_facet_ridge(&mut self, faces: PackedInt32Array) -> i64 {
+        let s = facet_batch(&faces);
         self.edit(|m| build::edit_ops::rotate_face_loop(m, &s)) as i64
     }
     /// Gives every face touching the given vertices its own copy. Returns the new vertices.
     #[func]
-    fn split_vertices(&mut self, verts: PackedInt32Array) -> PackedInt32Array {
-        let s: BTreeSet<u32> = verts.as_slice().iter().filter(|v| **v >= 0).map(|v| *v as u32).collect();
-        self.edit(|m| build::edit_ops::unshare_vertices(m, &s)).into_iter().map(|v| v as i32).collect()
+    fn cleave_corners(&mut self, verts: PackedInt32Array) -> PackedInt32Array {
+        let s: BTreeSet<u32> = verts
+            .as_slice()
+            .iter()
+            .filter(|v| **v >= 0)
+            .map(|v| *v as u32)
+            .collect();
+        self.edit(|m| build::edit_ops::unshare_vertices(m, &s))
+            .into_iter()
+            .map(|v| v as i32)
+            .collect()
     }
     /// Splits faces into triangles (all faces when `faces` is empty). Returns the triangles.
     #[func]
-    fn triangulate(&mut self, faces: PackedInt32Array) -> PackedInt32Array {
-        let mut s = face_set(&faces);
+    fn mesh_fill(&mut self, faces: PackedInt32Array) -> PackedInt32Array {
+        let mut s = facet_batch(&faces);
         if s.is_empty() {
-            s = (0..self.mesh.faces.len()).collect();
+            s = (0..self.cage.facets.len()).collect();
         }
-        face_array(&self.edit(|m| ops::triangulate_faces(m, &s)))
+        face_array(&self.edit(|m| ops::mesh_fill_facets(m, &s)))
     }
     /// Appends `other`'s geometry transformed by `xform` (other's local → this mesh's local);
     /// its faces keep their slot numbers. Returns the new faces.
     #[func]
-    fn merge_from(&mut self, other: Gd<PixelBuilderMeshData>, xform: Transform3D) -> PackedInt32Array {
-        let src = if other.instance_id() == self.to_gd().instance_id() { self.mesh.clone() } else { other.bind().mesh().clone() };
-        let xf = build::edit_ops::Affine { x: to_p(xform.basis.col_a()), y: to_p(xform.basis.col_b()), z: to_p(xform.basis.col_c()), origin: to_p(xform.origin) };
+    fn merge_from(
+        &mut self,
+        other: Gd<PixelBuilderMeshData>,
+        xform: Transform3D,
+    ) -> PackedInt32Array {
+        let src = if other.instance_id() == self.to_gd().instance_id() {
+            self.cage.clone()
+        } else {
+            other.bind().cage().clone()
+        };
+        let xf = build::edit_ops::Affine {
+            x: to_p(xform.basis.col_a()),
+            y: to_p(xform.basis.col_b()),
+            z: to_p(xform.basis.col_c()),
+            origin: to_p(xform.origin),
+        };
         face_array(&self.edit(|m| build::edit_ops::merge_blocks(m, &src, &xf, &[])))
     }
     /// Inserts `cuts` edge loops across the quad ring through edge (a, b). Returns the new
     /// loop edges as vertex pairs.
     #[func]
-    fn insert_loop(&mut self, a: i64, b: i64, cuts: i64) -> PackedInt32Array {
-        let es = self.edit(|m| build::loops::loop_cut(m, build::edge(a as u32, b as u32), cuts.clamp(1, 16) as u32));
-        es.into_iter().flat_map(|(x, y)| [x as i32, y as i32]).collect()
+    fn splice_ring(&mut self, a: i64, b: i64, cuts: i64) -> PackedInt32Array {
+        let es = self.edit(|m| {
+            build::loops::loop_cut(m, build::edge(a as u32, b as u32), cuts.clamp(1, 16) as u32)
+        });
+        es.into_iter()
+            .flat_map(|(x, y)| [x as i32, y as i32])
+            .collect()
     }
     /// Bridges two open edges (vertex pairs `[a0, b0, a1, b1]`) with a face; returns it (-1 if not possible).
     #[func]
@@ -406,56 +559,97 @@ impl PixelBuilderMeshData {
         if p.len() < 4 {
             return -1;
         }
-        let (e1, e2) = (build::edge(p[0] as u32, p[1] as u32), build::edge(p[2] as u32, p[3] as u32));
-        self.edit(|m| build::loops::bridge_edges(m, e1, e2)).map(|f| f as i64).unwrap_or(-1)
+        let (e1, e2) = (
+            build::edge(p[0] as u32, p[1] as u32),
+            build::edge(p[2] as u32, p[3] as u32),
+        );
+        self.edit(|m| build::loops::span_ridges(m, e1, e2))
+            .map(|f| f as i64)
+            .unwrap_or(-1)
     }
     /// Adds a copy mirrored across the local `axis` (0 x, 1 y, 2 z) = 0 plane, welding the seam.
     #[func]
     fn mirror(&mut self, axis: i64) {
-        self.edit(|m| build::loops::mirror_copy(m, axis.clamp(0, 2) as usize, true, 0.0015));
+        self.edit(|m| build::loops::mirror_copy(m, axis.clamp(0, 2) as usize, true, 0.0014));
     }
     /// Knife: cuts the polygon `points` (local, on the face plane) into `face`. Returns the new
     /// inner face (-1 if the polygon does not fit the face).
     #[func]
-    fn cut_face(&mut self, face: i64, points: PackedVector3Array) -> i64 {
+    fn slice_facet(&mut self, face: i64, points: PackedVector3Array) -> i64 {
         let pts: Vec<PVec3> = points.as_slice().iter().map(|p| to_p(*p)).collect();
-        self.edit(|m| build::cut::knife_face(m, face.max(0) as usize, &pts)).map(|f| f as i64).unwrap_or(-1)
+        self.edit(|m| build::cut::knife_face(m, face.max(0) as usize, &pts))
+            .map(|f| f as i64)
+            .unwrap_or(-1)
     }
     /// Appends a wall swept along `points` (local, y ignored -> 0; `closed` joins the ends).
     /// `params`: `thickness`, `side` (0 centre, 1 left, 2 right), `material`, `color`.
     #[func]
-    fn add_wall(&mut self, points: PackedVector3Array, closed: bool, height: f32, offset: Vector3, params: VarDictionary) -> PackedInt32Array {
+    fn add_wall(
+        &mut self,
+        points: PackedVector3Array,
+        closed: bool,
+        height: f32,
+        offset: Vector3,
+        params: VarDictionary,
+    ) -> PackedInt32Array {
         let mut s = spec::from_dict(&params, ShapeSpec::default());
-        s.kind = ShapeKind::Wall;
+        s.sort = ShapeKind::Wall;
         s.size.y = height;
-        let pts: Vec<PVec3> = points.as_slice().iter().map(|p| v3(p.x, 0.0, p.z)).collect();
+        let pts: Vec<PVec3> = points
+            .as_slice()
+            .iter()
+            .map(|p| v3(p.x, 0.0, p.z))
+            .collect();
         let g = build::shapes::wall_polyline(&s, &pts, closed);
         self.append_generated(g, offset, &params)
     }
     /// Edges (vertex pairs, flat) of `faces`.
     #[func]
     fn get_face_edges(&self, faces: PackedInt32Array) -> PackedInt32Array {
-        let s = face_set(&faces);
-        self.mesh.edges_of_faces(&s).into_iter().flat_map(|(a, b)| [a as i32, b as i32]).collect()
+        let s = facet_batch(&faces);
+        self.cage
+            .edges_of_faces(&s)
+            .into_iter()
+            .flat_map(|(a, b)| [a as i32, b as i32])
+            .collect()
     }
     /// Merges connected faces into one n-gon; returns its index (-1 if not possible).
     #[func]
-    fn merge_faces(&mut self, faces: PackedInt32Array) -> i64 {
-        let s = face_set(&faces);
-        self.edit(|m| build::topo::merge_faces(m, &s)).map(|f| f as i64).unwrap_or(-1)
+    fn fuse_facets(&mut self, faces: PackedInt32Array) -> i64 {
+        let s = facet_batch(&faces);
+        self.edit(|m| build::topo::fuse_facets(m, &s))
+            .map(|f| f as i64)
+            .unwrap_or(-1)
     }
     /// Sets the UV projection of `faces` (offset / scale in repeats, rotation in degrees).
     #[func]
-    fn set_faces_uv(&mut self, faces: PackedInt32Array, offset: Vector2, scale: Vector2, rotation_deg: f32, world: bool) {
-        let s = face_set(&faces);
-        let uv = build::UvParams { offset: pt_core::math::v2(offset.x, offset.y), scale: pt_core::math::v2(scale.x, scale.y), rotation: rotation_deg, world };
+    fn set_faces_uv(
+        &mut self,
+        faces: PackedInt32Array,
+        offset: Vector2,
+        scale: Vector2,
+        rotation_deg: f32,
+        world: bool,
+    ) {
+        let s = facet_batch(&faces);
+        let uv = build::UvParams {
+            offset: pt_core::math::v2(offset.x, offset.y),
+            magnify: pt_core::math::v2(scale.x, scale.y),
+            rotation: rotation_deg,
+            world,
+        };
         self.edit(|m| ops::set_uv(m, &s, uv));
     }
     /// Wavefront OBJ text of the mesh (object-space UVs).
     #[func]
     fn to_obj(&self, name: GString) -> GString {
-        let opt = build::compile::CompileOptions { units_per_repeat: self.units_per_repeat, ..Default::default() };
-        build::convert::to_obj(&self.mesh, &opt, &name.to_string(), None, &[]).as_str().into()
+        let opt = build::compile::CompileOptions {
+            units_per_repeat: self.units_per_repeat,
+            ..Default::default()
+        };
+        build::convert::to_obj(&self.cage, &opt, &name.to_string(), None, &[])
+            .as_str()
+            .into()
     }
     /// Replaces the mesh with the triangles of `mesh` (coplanar triangles become n-gons,
     /// one slot per surface).
@@ -471,37 +665,54 @@ impl PixelBuilderMeshData {
     /// Makes face windings consistent per connected part ("Conform Normals").
     /// Returns the number of faces flipped.
     #[func]
-    fn conform_normals(&mut self) -> i64 {
-        self.edit(pt_core::build::ops::conform_normals) as i64
+    fn harmonize_uprights(&mut self) -> i64 {
+        self.edit(pt_core::build::ops::harmonize_uprights) as i64
     }
 
     /// UVs a face shows (manual per-corner UVs, else the automatic projection with the node
     /// origin `world_offset`).
     #[func]
     fn get_face_uvs(&self, face: i64, world_offset: Vector3) -> PackedVector2Array {
-        if face < 0 || face as usize >= self.mesh.faces.len() {
+        if face < 0 || face as usize >= self.cage.facets.len() {
             return PackedVector2Array::new();
         }
-        let a = pt_core::build::uv_edit::AutoUv { units_per_repeat: self.units_per_repeat, world_offset: to_p(world_offset) };
-        pt_core::build::uv_edit::face_corner_uvs(&self.mesh, face as usize, &a).iter().map(|p| Vector2::new(p.x, p.y)).collect()
+        let a = pt_core::build::uv_edit::AutoUv {
+            units_per_repeat: self.units_per_repeat,
+            world_offset: to_p(world_offset),
+        };
+        pt_core::build::uv_edit::face_corner_uvs(&self.cage, face as usize, &a)
+            .iter()
+            .map(|p| Vector2::new(p.x, p.y))
+            .collect()
     }
 
     /// True if the face uses manual (UV editor) coordinates.
     #[func]
-    fn is_face_uv_manual(&self, face: i64) -> bool {
-        self.mesh.faces.get(face.max(0) as usize).is_some_and(|f| f.manual_uvs().is_some())
+    fn check_facet_tex_coord_by_hand(&self, face: i64) -> bool {
+        self.cage
+            .facets
+            .get(face.max(0) as usize)
+            .is_some_and(|f| f.by_hand_tex_coords().is_some())
     }
 
     /// Sets manual per-corner UVs (one per corner, else ignored).
     #[func]
     fn set_face_uvs(&mut self, face: i64, uvs: PackedVector2Array) {
-        let n = self.mesh.faces.get(face.max(0) as usize).map(|f| f.verts.len());
+        let n = self
+            .cage
+            .facets
+            .get(face.max(0) as usize)
+            .map(|f| f.verts.len());
         if n != Some(uvs.len()) {
             return;
         }
-        let coords: Vec<pt_core::math::Vec2> = uvs.as_slice().iter().map(|p| pt_core::math::v2(p.x, p.y)).collect();
+        let coords: Vec<pt_core::math::Vec2> = uvs
+            .as_slice()
+            .iter()
+            .map(|p| pt_core::math::v2(p.x, p.y))
+            .collect();
         self.edit(|m| {
-            let f = &mut m.faces[face as usize];
+            let f = &mut m.facets[face as usize];
             f.uv_coords = coords;
             f.uv_manual = true;
         });
@@ -509,67 +720,111 @@ impl PixelBuilderMeshData {
 
     /// Vertex paint, Fill: paints every corner of the faces (`mask` 0 RGBA, 1 RGB, 2 alpha only).
     #[func]
-    fn paint_faces(&mut self, faces: PackedInt32Array, color: Color, mask: i64) {
-        let s = face_set(&faces);
-        self.edit(|m| build::paint::paint_faces(m, &s, [color.r, color.g, color.b, color.a], build::paint::Mask::from_i64(mask)));
+    fn coat_facets(&mut self, faces: PackedInt32Array, tint: Color, mask: i64) {
+        let s = facet_batch(&faces);
+        self.edit(|m| {
+            build::paint::coat_facets(
+                m,
+                &s,
+                [tint.r, tint.g, tint.b, tint.a],
+                build::paint::Mask::from_i64(mask),
+            )
+        });
     }
 
     /// Vertex paint, one brush dab at a local-space point (falloff by `softness`).
     #[func]
-    fn paint_brush(&mut self, center: Vector3, radius: f32, strength: f32, softness: f32, color: Color, mask: i64) {
-        let base = self.mesh.clone();
+    fn paint_brush(
+        &mut self,
+        center: Vector3,
+        radius: f32,
+        strength: f32,
+        softness: f32,
+        tint: Color,
+        mask: i64,
+    ) {
+        let base = self.cage.clone();
         let w = build::paint::dab_weights(&base, |p| p, to_p(center), radius, strength, softness);
-        self.edit(|m| build::paint::paint_weighted(m, &base, &w, [color.r, color.g, color.b, color.a], build::paint::Mask::from_i64(mask)));
+        self.edit(|m| {
+            build::paint::paint_weighted(
+                m,
+                &base,
+                &w,
+                [tint.r, tint.g, tint.b, tint.a],
+                build::paint::Mask::from_i64(mask),
+            )
+        });
     }
 
     /// Inverts the painted alpha (swaps the two layers of a blend material).
     #[func]
     fn invert_alpha(&mut self, faces: PackedInt32Array) {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         self.edit(|m| build::paint::invert_alpha(m, &s));
     }
 
     /// Color of one corner (its vertex-paint color, else the face color).
     #[func]
     fn get_corner_color(&self, face: i64, corner: i64) -> Color {
-        let c = build::paint::to_f(build::paint::sample(&self.mesh, face.max(0) as usize, corner.max(0) as usize));
+        let c = build::paint::to_f(build::paint::probe(
+            &self.cage,
+            face.max(0) as usize,
+            corner.max(0) as usize,
+        ));
         Color::from_rgba(c[0], c[1], c[2], c[3])
     }
 
     /// Removes the vertex-paint colors of the faces (back to the face color).
     #[func]
     fn clear_corner_colors(&mut self, faces: PackedInt32Array) {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         self.edit(|m| build::paint::clear_corner_colors(m, &s));
     }
 
     /// Material slot of a face (-1 if out of range).
     #[func]
     fn get_face_slot(&self, face: i64) -> i64 {
-        self.mesh.faces.get(face.max(0) as usize).map(|f| f.material as i64).unwrap_or(-1)
+        self.cage
+            .facets
+            .get(face.max(0) as usize)
+            .map(|f| f.stuff as i64)
+            .unwrap_or(-1)
     }
 
     /// Frozen automatic-UV projection axis of a face (UV lock; zero = the face normal).
     #[func]
     fn get_face_uv_axis(&self, face: i64) -> Vector3 {
-        self.mesh.faces.get(face.max(0) as usize).map(|f| from_p(f.uv_axis)).unwrap_or(Vector3::ZERO)
+        self.cage
+            .facets
+            .get(face.max(0) as usize)
+            .map(|f| from_p(f.uv_axis))
+            .unwrap_or(Vector3::ZERO)
     }
 
     /// Smoothing group of a face (0 = faceted, -1 if out of range).
     #[func]
     fn get_face_smooth(&self, face: i64) -> i64 {
-        self.mesh.faces.get(face.max(0) as usize).map(|f| f.smooth as i64).unwrap_or(-1)
+        self.cage
+            .facets
+            .get(face.max(0) as usize)
+            .map(|f| f.glide as i64)
+            .unwrap_or(-1)
     }
 
     /// Whether a face's UVs are manual (UV editor / projection) and its corner UVs.
     #[func]
     fn get_face_manual_uvs(&self, face: i64) -> PackedVector2Array {
-        self.mesh.faces.get(face.max(0) as usize).and_then(|f| f.manual_uvs()).map(|c| c.iter().map(|p| Vector2::new(p.x, p.y)).collect()).unwrap_or_default()
+        self.cage
+            .facets
+            .get(face.max(0) as usize)
+            .and_then(|f| f.by_hand_tex_coords())
+            .map(|c| c.iter().map(|p| Vector2::new(p.x, p.y)).collect())
+            .unwrap_or_default()
     }
 
     #[func]
     fn set_faces_smooth(&mut self, faces: PackedInt32Array, group: i64) {
-        let s = face_set(&faces);
+        let s = facet_batch(&faces);
         self.edit(|m| ops::set_smooth(m, &s, group.clamp(0, 65535) as u16));
     }
 }
@@ -579,24 +834,39 @@ pub fn color_bytes(c: Color) -> [u8; 4] {
 }
 
 impl PixelBuilderMeshData {
-    fn append_generated(&mut self, mut g: BMesh, offset: Vector3, params: &VarDictionary) -> PackedInt32Array {
-        if let Some(r) = params.get("rotation_y").and_then(|v| v.try_to::<f64>().ok()) {
+    fn append_generated(
+        &mut self,
+        mut g: BMesh,
+        offset: Vector3,
+        params: &VarDictionary,
+    ) -> PackedInt32Array {
+        if let Some(r) = params
+            .get("rotation_y")
+            .and_then(|v| v.try_to::<f64>().ok())
+        {
             let all = (0..g.positions.len() as u32).collect();
             ops::rotate_vertices_y(&mut g, &all, PVec3::ZERO, (r as f32).to_radians());
         }
-        g.translate(to_p(offset));
-        let mat = params.get("material").and_then(|v| v.try_to::<i64>().ok()).unwrap_or(0).clamp(0, 255) as u16;
-        let col = params.get("color").and_then(|v| v.try_to::<Color>().ok()).map(color_bytes);
-        for f in &mut g.faces {
-            f.material = mat;
+        g.displace(to_p(offset));
+        let mat = params
+            .get("material")
+            .and_then(|v| v.try_to::<i64>().ok())
+            .unwrap_or(0)
+            .clamp(0, 255) as u16;
+        let col = params
+            .get("color")
+            .and_then(|v| v.try_to::<Color>().ok())
+            .map(color_bytes);
+        for f in &mut g.facets {
+            f.stuff = mat;
             if let Some(c) = col {
-                f.color = c;
+                f.tint = c;
             }
         }
         let added = self.edit(|m| {
-            let start = m.faces.len();
-            m.append(&g);
-            start..m.faces.len()
+            let start = m.facets.len();
+            m.append_tail(&g);
+            start..m.facets.len()
         });
         added.map(|f| f as i32).collect()
     }

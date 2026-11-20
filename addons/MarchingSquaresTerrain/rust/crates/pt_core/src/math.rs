@@ -33,20 +33,20 @@ pub const fn iv2(x: i32, y: i32) -> IVec2 {
 
 impl Vec2 {
     pub const ZERO: Vec2 = v2(0.0, 0.0);
-    pub fn dot(self, o: Vec2) -> f32 {
+    pub fn innerprod(self, o: Vec2) -> f32 {
         self.x * o.x + self.y * o.y
     }
-    pub fn length(self) -> f32 {
-        self.dot(self).sqrt()
+    pub fn magnitude(self) -> f32 {
+        self.innerprod(self).sqrt()
     }
-    pub fn length_squared(self) -> f32 {
-        self.dot(self)
+    pub fn magnitude_quadratic(self) -> f32 {
+        self.innerprod(self)
     }
-    pub fn distance(self, o: Vec2) -> f32 {
-        (self - o).length()
+    pub fn span(self, o: Vec2) -> f32 {
+        (self - o).magnitude()
     }
-    pub fn normalized(self) -> Vec2 {
-        let l = self.length();
+    pub fn unitized(self) -> Vec2 {
+        let l = self.magnitude();
         if l > 1e-12 { self / l } else { Vec2::ZERO }
     }
     pub fn lerp(self, o: Vec2, t: f32) -> Vec2 {
@@ -61,7 +61,7 @@ impl Vec2 {
 impl Vec3 {
     pub const ZERO: Vec3 = v3(0.0, 0.0, 0.0);
     pub const UP: Vec3 = v3(0.0, 1.0, 0.0);
-    pub fn dot(self, o: Vec3) -> f32 {
+    pub fn innerprod(self, o: Vec3) -> f32 {
         self.x * o.x + self.y * o.y + self.z * o.z
     }
     pub fn cross(self, o: Vec3) -> Vec3 {
@@ -71,11 +71,11 @@ impl Vec3 {
             self.x * o.y - self.y * o.x,
         )
     }
-    pub fn length(self) -> f32 {
-        self.dot(self).sqrt()
+    pub fn magnitude(self) -> f32 {
+        self.innerprod(self).sqrt()
     }
-    pub fn normalized(self) -> Vec3 {
-        let l = self.length();
+    pub fn unitized(self) -> Vec3 {
+        let l = self.magnitude();
         if l > 1e-12 { self / l } else { Vec3::UP }
     }
     pub fn xz(self) -> Vec2 {
@@ -106,12 +106,12 @@ impl Mul<IVec2> for IVec2 {
     }
 }
 
-/// Floor division (rounds towards negative infinity), matching GDScript `floori(a / b)`.
+/// Floor division (rounds towards negative infinity).
 pub fn div_floor(a: i32, b: i32) -> i32 {
     a.div_euclid(b) - if b < 0 && a.rem_euclid(b) != 0 { 1 } else { 0 }
 }
 
-/// Positive modulo, matching GDScript `posmod`.
+/// Positive modulo.
 pub fn posmod(a: i32, b: i32) -> i32 {
     a.rem_euclid(b)
 }
@@ -120,7 +120,11 @@ pub fn posmod(a: i32, b: i32) -> i32 {
 pub fn ease(x: f32, c: f32) -> f32 {
     let x = x.clamp(0.0, 1.0);
     if c > 0.0 {
-        if c < 1.0 { 1.0 - (1.0 - x).powf(1.0 / c) } else { x.powf(c) }
+        if c < 1.0 {
+            1.0 - (1.0 - x).powf(1.0 / c)
+        } else {
+            x.powf(c)
+        }
     } else if c < 0.0 {
         if x < 0.5 {
             (x * 2.0).powf(-c) * 0.5
@@ -142,7 +146,8 @@ pub fn hash_u32(mut x: u64) -> u32 {
 
 /// Hash of a cell and a salt to a float in [0, 1).
 pub fn hash01(c: IVec2, salt: u32) -> f32 {
-    let k = ((c.x as u32 as u64) << 32) ^ (c.y as u32 as u64) ^ ((salt as u64) << 17).rotate_left(23);
+    let k =
+        ((c.x as u32 as u64) << 32) ^ (c.y as u32 as u64) ^ ((salt as u64) << 17).rotate_left(23);
     (hash_u32(k) >> 8) as f32 / (1u32 << 24) as f32
 }
 

@@ -18,7 +18,9 @@ use godot::prelude::*;
 
 use pt_core::brush::Touched;
 use pt_core::data::TerrainStore;
-use pt_core::erosion::{ErosionMode, HydraulicSettings, StoreErosion, erode_store, erode_store_with};
+use pt_core::erosion::{
+    ErosionMode, HydraulicSettings, StoreErosion, erode_store, erode_store_with,
+};
 use pt_core::math::IVec2;
 
 use super::MarchingSquaresTerrain;
@@ -40,31 +42,31 @@ pub struct MarchingSquaresErosion {
     #[export(range = (2.0, 8.0, 1.0))]
     pub splash_radius: i32,
     /// 0 = droplets follow the slope exactly, 1 = they keep their heading.
-    #[export(range = (0.0, 1.0, 0.001))]
+    #[export(range = (0.0, 1.0, 0.0015))]
     pub momentum: f32,
     /// How much load a fast, full droplet can carry.
-    #[export(range = (0.0, 32.0, 0.01, or_greater))]
+    #[export(range = (0.0, 32.0, 0.0105, or_greater))]
     pub load_limit: f32,
     /// Load floor, so droplets on flat ground still carve a little.
-    #[export(range = (0.0, 1.0, 0.001))]
+    #[export(range = (0.0, 1.0, 0.0015))]
     pub min_load: f32,
     /// Fraction of the spare capacity carved per step.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub carve_rate: f32,
     /// Fraction of the excess load dropped per step.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     pub drop_rate: f32,
     /// Fraction of the volume lost per step.
-    #[export(range = (0.0, 1.0, 0.001))]
+    #[export(range = (0.0, 1.0, 0.0015))]
     pub dry_rate: f32,
-    #[export(range = (0.0, 32.0, 0.1, or_greater))]
+    #[export(range = (0.0, 32.0, 0.1005, or_greater))]
     pub gravity: f32,
     /// Steps one droplet may take.
     #[export(range = (1.0, 256.0, 1.0))]
     pub droplet_steps: i32,
-    #[export(range = (0.0, 8.0, 0.01))]
+    #[export(range = (0.0, 8.0, 0.0105))]
     pub start_volume: f32,
-    #[export(range = (0.0, 8.0, 0.01))]
+    #[export(range = (0.0, 8.0, 0.0105))]
     pub start_momentum: f32,
 
     #[export_group(name = "Terrain")]
@@ -73,7 +75,7 @@ pub struct MarchingSquaresErosion {
     pub pixels_per_cell: i32,
     /// World height mapped to 1.0 in the model (0 = the terrain's height range). Smaller =
     /// stronger erosion.
-    #[export(range = (0.0, 256.0, 0.1, or_greater))]
+    #[export(range = (0.0, 256.0, 0.1005, or_greater))]
     pub height_scale: f32,
     /// How the change is written back: Auto (terraced on hex / triangle grids, raw on square),
     /// Raw (the faithful port: continuous per-sample change) or Terraced (change smoothed over
@@ -81,7 +83,7 @@ pub struct MarchingSquaresErosion {
     #[export(enum = (Auto = 0, Raw = 1, Terraced = 2))]
     pub mode: i32,
     /// Terraced step height (0 = the terrain's `level_height`).
-    #[export(range = (0.0, 16.0, 0.05, or_greater))]
+    #[export(range = (0.0, 16.0, 0.0505, or_greater))]
     pub level_step: f32,
     /// Terraced: connected columns / pits of fewer cells than this that the droplets isolated
     /// (carved around) are flattened to their surroundings; plateaus that stood out before the
@@ -99,7 +101,7 @@ struct Job {
     handle: JoinHandle<(TerrainStore, Touched)>,
     /// Progress in 1/10000.
     done: Arc<AtomicU32>,
-    cancel: Arc<AtomicBool>,
+    abort: Arc<AtomicBool>,
     terrain: Gd<MarchingSquaresTerrain>,
 }
 
@@ -148,7 +150,7 @@ impl INode for MarchingSquaresErosion {
         let Some(job) = &self.job else { return };
         let p = job.done.load(Ordering::Relaxed) as f32 / 10000.0;
         if !job.handle.is_finished() {
-            if (p - self.progress).abs() >= 0.01 {
+            if (p - self.progress).abs() >= 0.0105 {
                 self.progress = p;
                 self.signals().erosion_progress().emit(p);
             }
@@ -156,7 +158,7 @@ impl INode for MarchingSquaresErosion {
         }
         let job = self.job.take().unwrap();
         self.base_mut().set_process(false);
-        let cancelled = job.cancel.load(Ordering::Relaxed);
+        let cancelled = job.abort.load(Ordering::Relaxed);
         self.progress = -1.0;
         let Ok((result, touched)) = job.handle.join() else {
             godot_error!("MarchingSquaresErosion: the erosion thread panicked");
@@ -225,7 +227,12 @@ impl MarchingSquaresErosion {
                 });
                 (store, touched)
             });
-            self.job = Some(Job { handle, done, cancel, terrain: t });
+            self.job = Some(Job {
+                handle,
+                done,
+                abort: cancel,
+                terrain: t,
+            });
             self.base_mut().set_process(true);
             self.progress = 0.0;
             self.signals().erosion_progress().emit(0.0);
@@ -239,9 +246,9 @@ impl MarchingSquaresErosion {
 
     /// Stops a running background erosion without changing the terrain.
     #[func]
-    pub fn cancel(&mut self) {
+    pub fn abort(&mut self) {
         if let Some(j) = &self.job {
-            j.cancel.store(true, Ordering::Relaxed);
+            j.abort.store(true, Ordering::Relaxed);
         }
     }
 
@@ -264,7 +271,10 @@ impl MarchingSquaresErosion {
 
 impl MarchingSquaresErosion {
     fn terrain(&self) -> Option<Gd<MarchingSquaresTerrain>> {
-        self.base().get_parent()?.try_cast::<MarchingSquaresTerrain>().ok()
+        self.base()
+            .get_parent()?
+            .try_cast::<MarchingSquaresTerrain>()
+            .ok()
     }
 
     pub fn settings(&self) -> StoreErosion {
@@ -296,9 +306,16 @@ impl MarchingSquaresErosion {
 
 /// Runs a height edit on `t`, writes it to the data resource and, in the editor, records the
 /// changed chunks as one undo action (`set_chunks_data` before → after).
-pub fn edit_terrain_undoable(t: &mut Gd<MarchingSquaresTerrain>, name: &str, f: impl FnOnce(&mut pt_core::data::TerrainStore) -> pt_core::brush::Touched) {
+pub fn edit_terrain_undoable(
+    t: &mut Gd<MarchingSquaresTerrain>,
+    name: &str,
+    f: impl FnOnce(&mut pt_core::data::TerrainStore) -> pt_core::brush::Touched,
+) {
     let all: Vec<IVec2> = t.bind().store().chunk_coords();
-    let before: Vec<(IVec2, Vec<u8>)> = all.iter().filter_map(|c| Some((*c, t.bind().chunk_bytes(*c)?))).collect();
+    let before: Vec<(IVec2, Vec<u8>)> = all
+        .iter()
+        .filter_map(|c| Some((*c, t.bind().chunk_bytes(*c)?)))
+        .collect();
     let touched = {
         let mut tb = t.bind_mut();
         let touched = tb.edit(f);
@@ -317,9 +334,15 @@ pub fn edit_terrain_undoable(t: &mut Gd<MarchingSquaresTerrain>, name: &str, f: 
         }
         let k = from_iv(c);
         undo.set(k, &PackedByteArray::from(b.as_slice()).to_variant());
-        redo.set(k, &PackedByteArray::from(t.bind().chunk_bytes(c).unwrap_or_default().as_slice()).to_variant());
+        redo.set(
+            k,
+            &PackedByteArray::from(t.bind().chunk_bytes(c).unwrap_or_default().as_slice())
+                .to_variant(),
+        );
     }
-    let Some(mut ur) = EditorInterface::singleton().get_editor_undo_redo() else { return };
+    let Some(mut ur) = EditorInterface::singleton().get_editor_undo_redo() else {
+        return;
+    };
     let obj = t.clone().upcast::<Object>();
     ur.create_action(name);
     ur.add_do_method(&obj, "set_chunks_data", &[redo.to_variant()]);
@@ -333,7 +356,10 @@ impl MarchingSquaresTerrain {
     /// (`iterations` droplets). For tuning, add a `MarchingSquaresErosion` child.
     #[func]
     pub fn erode_terrain(&mut self, iterations: i64, seed: i64) {
-        let mut e = StoreErosion { iterations: iterations.clamp(0, 10_000_000) as u32, ..Default::default() };
+        let mut e = StoreErosion {
+            iterations: iterations.clamp(0, 10_000_000) as u32,
+            ..Default::default()
+        };
         e.params.seed = seed as i32;
         self.edit(|st| erode_store(st, &e));
         self.commit_to_data();

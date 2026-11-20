@@ -47,7 +47,7 @@ impl CellData {
     }
 
     /// Changes the covered rectangle, keeping the values of cells inside both rectangles.
-    pub fn resize(&mut self, origin: IVec2, size: IVec2) {
+    pub fn reshape(&mut self, origin: IVec2, size: IVec2) {
         if origin == self.origin && size == self.size {
             return;
         }
@@ -55,7 +55,7 @@ impl CellData {
         for j in 0..self.size.y {
             for i in 0..self.size.x {
                 let c = self.origin + iv2(i, j);
-                if let (Some(a), Some(b)) = (self.index(c), n.index(c)) {
+                if let (Some(a), Some(b)) = (self.ordinal(c), n.ordinal(c)) {
                     n.target[b] = self.target[a];
                     n.current[b] = self.current[a];
                     n.tint[b] = self.tint[a];
@@ -70,11 +70,11 @@ impl CellData {
         self.target.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn check_vacant(&self) -> bool {
         self.target.is_empty()
     }
 
-    pub fn index(&self, cell: IVec2) -> Option<usize> {
+    pub fn ordinal(&self, cell: IVec2) -> Option<usize> {
         let l = cell - self.origin;
         if l.x < 0 || l.y < 0 || l.x >= self.size.x || l.y >= self.size.y {
             return None;
@@ -82,8 +82,10 @@ impl CellData {
         Some((l.y * self.size.x + l.x) as usize)
     }
 
-    fn set_channel(&mut self, cell: IVec2, ch: usize, v: u8) -> bool {
-        let Some(i) = self.index(cell) else { return false };
+    fn assign_lane(&mut self, cell: IVec2, ch: usize, v: u8) -> bool {
+        let Some(i) = self.ordinal(cell) else {
+            return false;
+        };
         if self.target[i][ch] != v {
             self.target[i][ch] = v;
             self.animating = true;
@@ -92,24 +94,26 @@ impl CellData {
     }
 
     /// Visible cells are explored too. Returns false outside the rectangle.
-    pub fn set_visible(&mut self, cell: IVec2, visible: bool) -> bool {
+    pub fn assign_shown(&mut self, cell: IVec2, visible: bool) -> bool {
         if visible {
-            self.set_channel(cell, EXPLORED, 255);
+            self.assign_lane(cell, EXPLORED, 255);
         }
-        self.set_channel(cell, VISIBLE, if visible { 255 } else { 0 })
+        self.assign_lane(cell, VISIBLE, if visible { 255 } else { 0 })
     }
 
     /// Un-exploring a cell also hides it.
     pub fn set_explored(&mut self, cell: IVec2, explored: bool) -> bool {
         if !explored {
-            self.set_channel(cell, VISIBLE, 0);
+            self.assign_lane(cell, VISIBLE, 0);
         }
-        self.set_channel(cell, EXPLORED, if explored { 255 } else { 0 })
+        self.assign_lane(cell, EXPLORED, if explored { 255 } else { 0 })
     }
 
     pub fn set_highlight(&mut self, cell: IVec2, strength: f32) -> bool {
         let v = (strength.clamp(0.0, 1.0) * 255.0).round() as u8;
-        let Some(i) = self.index(cell) else { return false };
+        let Some(i) = self.ordinal(cell) else {
+            return false;
+        };
         // Highlights are instant (selection / hover feedback).
         self.target[i][HIGHLIGHT] = v;
         if self.current[i][HIGHLIGHT] != v {
@@ -121,7 +125,9 @@ impl CellData {
 
     /// Tint `(r, g, b, strength)`; strength 0 = no tint. Instant.
     pub fn set_tint(&mut self, cell: IVec2, rgba: [u8; 4]) -> bool {
-        let Some(i) = self.index(cell) else { return false };
+        let Some(i) = self.ordinal(cell) else {
+            return false;
+        };
         if self.tint[i] != rgba {
             self.tint[i] = rgba;
             self.dirty = true;
@@ -130,15 +136,15 @@ impl CellData {
     }
 
     pub fn state(&self, cell: IVec2) -> Option<[u8; 4]> {
-        self.index(cell).map(|i| self.target[i])
+        self.ordinal(cell).map(|i| self.target[i])
     }
 
     pub fn current_state(&self, cell: IVec2) -> Option<[u8; 4]> {
-        self.index(cell).map(|i| self.current[i])
+        self.ordinal(cell).map(|i| self.current[i])
     }
 
     pub fn tint(&self, cell: IVec2) -> Option<[u8; 4]> {
-        self.index(cell).map(|i| self.tint[i])
+        self.ordinal(cell).map(|i| self.tint[i])
     }
 
     pub fn is_visible(&self, cell: IVec2) -> bool {
@@ -150,10 +156,10 @@ impl CellData {
     }
 
     /// Sets every cell's visibility/explored state (e.g. reveal all / reset fog).
-    pub fn fill(&mut self, visible: bool, explored: bool) {
-        let explored = explored || visible;
+    pub fn flood(&mut self, shown: bool, explored: bool) {
+        let explored = explored || shown;
         for t in &mut self.target {
-            t[VISIBLE] = if visible { 255 } else { 0 };
+            t[VISIBLE] = if shown { 255 } else { 0 };
             t[EXPLORED] = if explored { 255 } else { 0 };
         }
         self.animating = true;
@@ -212,13 +218,21 @@ impl CellData {
         if !self.animating {
             return std::mem::take(&mut self.dirty);
         }
-        let delta = if seconds <= 0.0 { 255 } else { ((dt / seconds) * 255.0).ceil().clamp(1.0, 255.0) as i32 };
+        let delta = if seconds <= 0.0 {
+            255
+        } else {
+            ((dt / seconds) * 255.0).ceil().clamp(1.0, 255.0) as i32
+        };
         let mut moving = false;
         for (t, c) in self.target.iter().zip(self.current.iter_mut()) {
             for ch in [VISIBLE, EXPLORED] {
                 let (a, b) = (c[ch] as i32, t[ch] as i32);
                 if a != b {
-                    let n = if b > a { (a + delta).min(b) } else { (a - delta).max(b) };
+                    let n = if b > a {
+                        (a + delta).min(b)
+                    } else {
+                        (a - delta).max(b)
+                    };
                     c[ch] = n as u8;
                     moving |= n != b;
                     self.dirty = true;
@@ -230,7 +244,7 @@ impl CellData {
     }
 
     /// Jumps to the targets (no transition).
-    pub fn finish(&mut self) {
+    pub fn conclude(&mut self) {
         for (t, c) in self.target.iter().zip(self.current.iter_mut()) {
             c[VISIBLE] = t[VISIBLE];
             c[EXPLORED] = t[EXPLORED];
@@ -258,32 +272,32 @@ impl CellData {
 /// runtime tints of [`CellData`]. Blob: `PTT1`, u32 count, then per cell i32 x, i32 y, RGBA.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PaintedTints {
-    pub cells: std::collections::BTreeMap<(i32, i32), [u8; 4]>,
+    pub tiles: std::collections::BTreeMap<(i32, i32), [u8; 4]>,
 }
 
 impl PaintedTints {
     /// Sets a cell's tint (alpha 0 removes it). Returns true when it changed.
-    pub fn set(&mut self, cell: IVec2, rgba: [u8; 4]) -> bool {
+    pub fn assign(&mut self, cell: IVec2, rgba: [u8; 4]) -> bool {
         let k = (cell.x, cell.y);
         if rgba[3] == 0 {
-            return self.cells.remove(&k).is_some();
+            return self.tiles.remove(&k).is_some();
         }
-        self.cells.insert(k, rgba) != Some(rgba)
+        self.tiles.insert(k, rgba) != Some(rgba)
     }
 
-    pub fn get(&self, cell: IVec2) -> Option<[u8; 4]> {
-        self.cells.get(&(cell.x, cell.y)).copied()
+    pub fn fetch(&self, cell: IVec2) -> Option<[u8; 4]> {
+        self.tiles.get(&(cell.x, cell.y)).copied()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.cells.is_empty()
+    pub fn check_vacant(&self) -> bool {
+        self.tiles.is_empty()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(8 + self.cells.len() * 12);
+        let mut out = Vec::with_capacity(8 + self.tiles.len() * 12);
         out.extend_from_slice(b"PTT1");
-        out.extend_from_slice(&(self.cells.len() as u32).to_le_bytes());
-        for ((x, y), c) in &self.cells {
+        out.extend_from_slice(&(self.tiles.len() as u32).to_le_bytes());
+        for ((x, y), c) in &self.tiles {
             out.extend_from_slice(&x.to_le_bytes());
             out.extend_from_slice(&y.to_le_bytes());
             out.extend_from_slice(c);
@@ -307,14 +321,14 @@ impl PaintedTints {
         for e in b[8..].chunks_exact(12) {
             let x = i32::from_le_bytes(e[0..4].try_into().ok()?);
             let y = i32::from_le_bytes(e[4..8].try_into().ok()?);
-            t.set(iv2(x, y), [e[8], e[9], e[10], e[11]]);
+            t.assign(iv2(x, y), [e[8], e[9], e[10], e[11]]);
         }
         Some(t)
     }
 
     /// Writes every painted tint into `data` (cells outside its rectangle are skipped).
-    pub fn apply(&self, data: &mut CellData) {
-        for ((x, y), c) in &self.cells {
+    pub fn enact(&self, data: &mut CellData) {
+        for ((x, y), c) in &self.tiles {
             data.set_tint(iv2(*x, *y), *c);
         }
     }
@@ -356,8 +370,8 @@ mod tests {
     #[test]
     fn visibility_fades_and_resize_keeps_values() {
         let mut d = CellData::new(iv2(-2, -2), iv2(4, 4));
-        assert!(d.set_visible(iv2(0, 0), true));
-        assert!(!d.set_visible(iv2(5, 5), true));
+        assert!(d.assign_shown(iv2(0, 0), true));
+        assert!(!d.assign_shown(iv2(5, 5), true));
         assert!(d.is_explored(iv2(0, 0)) && d.is_visible(iv2(0, 0)));
         assert!(d.step(0.1, 0.4));
         let c = d.current_state(iv2(0, 0)).unwrap();
@@ -368,11 +382,11 @@ mod tests {
         assert_eq!(d.current_state(iv2(0, 0)).unwrap()[VISIBLE], 255);
         assert!(!d.animating());
         assert!(!d.step(0.1, 0.4), "no upload when idle");
-        d.set_visible(iv2(0, 0), false);
-        d.finish();
+        d.assign_shown(iv2(0, 0), false);
+        d.conclude();
         assert_eq!(d.current_state(iv2(0, 0)).unwrap()[..2], [0, 255]);
         d.set_tint(iv2(1, 1), [255, 0, 0, 128]);
-        d.resize(iv2(0, 0), iv2(8, 8));
+        d.reshape(iv2(0, 0), iv2(8, 8));
         assert_eq!(d.tint(iv2(1, 1)), Some([255, 0, 0, 128]));
         assert!(d.is_explored(iv2(0, 0)) && !d.is_visible(iv2(0, 0)));
         assert_eq!(d.texture_bytes().len(), 8 * 8 * 8);
@@ -395,12 +409,16 @@ mod tests {
 
     #[test]
     fn rect_covers_hex_ring_chunks() {
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, ..Default::default() };
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            ..Default::default()
+        };
         let (o, s) = rect_for(&cfg, [iv2(0, 0), iv2(1, 0)]);
         let d = CellData::new(o, s);
         for c in [iv2(0, 0), iv2(1, 0)] {
             for cell in cfg.chunk_cells(c) {
-                assert!(d.index(cell).is_some(), "{cell:?}");
+                assert!(d.ordinal(cell).is_some(), "{cell:?}");
             }
         }
     }
@@ -408,17 +426,17 @@ mod tests {
     #[test]
     fn painted_tints_roundtrip_and_apply() {
         let mut p = PaintedTints::default();
-        assert!(p.set(iv2(1, -2), [255, 0, 0, 128]));
-        assert!(!p.set(iv2(1, -2), [255, 0, 0, 128]));
-        assert!(p.set(iv2(9, 9), [0, 0, 255, 255]));
-        assert!(!p.set(iv2(5, 5), [0, 0, 0, 0]));
+        assert!(p.assign(iv2(1, -2), [255, 0, 0, 128]));
+        assert!(!p.assign(iv2(1, -2), [255, 0, 0, 128]));
+        assert!(p.assign(iv2(9, 9), [0, 0, 255, 255]));
+        assert!(!p.assign(iv2(5, 5), [0, 0, 0, 0]));
         let b = p.to_bytes();
         assert_eq!(PaintedTints::from_bytes(&b), Some(p.clone()));
         assert_eq!(PaintedTints::from_bytes(&b[..b.len() - 1]), None);
         let mut d = CellData::new(iv2(-2, -2), iv2(4, 4));
-        p.apply(&mut d);
+        p.enact(&mut d);
         assert_eq!(d.tint(iv2(1, -2)), Some([255, 0, 0, 128]));
-        assert!(p.set(iv2(1, -2), [0; 4]));
-        assert!(p.get(iv2(1, -2)).is_none());
+        assert!(p.assign(iv2(1, -2), [0; 4]));
+        assert!(p.fetch(iv2(1, -2)).is_none());
     }
 }

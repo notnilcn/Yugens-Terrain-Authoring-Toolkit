@@ -6,17 +6,29 @@
 //! label. Saved property names are unchanged, and the tooltip names the full property.
 
 use godot::classes::{EditorInspector, EditorInspectorPlugin, IEditorInspectorPlugin, Object};
-use godot::register::info::{PropertyHint, PropertyUsageFlags};
 use godot::prelude::*;
+use godot::register::info::{PropertyHint, PropertyUsageFlags};
 
 /// (class, property, label).
 const LABELS: &[(&str, &str, &str)] = &[
     ("MarchingSquaresAutoRules", "filler_amount", "Amount"),
     ("MarchingSquaresAutoRules", "lip_threshold", "Lip Cutoff"),
-    ("MarchingSquaresAutoRules", "rock_filler_slot", "Filler Slot"),
-    ("MarchingSquaresAutoRules", "shore_filler_slot", "Filler Slot"),
+    (
+        "MarchingSquaresAutoRules",
+        "rock_filler_slot",
+        "Filler Slot",
+    ),
+    (
+        "MarchingSquaresAutoRules",
+        "shore_filler_slot",
+        "Filler Slot",
+    ),
     ("MarchingSquaresAutoRules", "snow_max_slope", "Max Slope"),
-    ("MarchingSquaresAutoRules", "snow_noise_scale", "Noise Scale"),
+    (
+        "MarchingSquaresAutoRules",
+        "snow_noise_scale",
+        "Noise Scale",
+    ),
     ("MarchingSquaresAutoRules", "snow_slope_fade", "Slope Fade"),
     ("MarchingSquaresErosion", "carve_rate", "Carve"),
     ("MarchingSquaresErosion", "drop_rate", "Drop"),
@@ -31,7 +43,11 @@ const LABELS: &[(&str, &str, &str)] = &[
     ("MarchingSquaresErosion", "start_momentum", "Start Speed"),
     ("MarchingSquaresErosion", "start_volume", "Start Volume"),
     ("MarchingSquaresTerrain", "chunk_handles", "Handles"),
-    ("MarchingSquaresTerrain", "grass_ledge_threshold", "Ledge Cutoff"),
+    (
+        "MarchingSquaresTerrain",
+        "grass_ledge_threshold",
+        "Ledge Cutoff",
+    ),
     ("MarchingSquaresTerrain", "grid_fade_distance", "Fade Range"),
     ("MarchingSquaresTerrain", "highlight_width", "Highlight"),
     ("MarchingSquaresTerrain", "lod_in_editor", "In Editor"),
@@ -39,16 +55,36 @@ const LABELS: &[(&str, &str, &str)] = &[
     ("MarchingSquaresTerrain", "map_window_margin", "Margin"),
     ("MarchingSquaresTerrain", "map_window_radius", "Radius"),
     ("MarchingSquaresTerrain", "map_window_focus", "Focus"),
-    ("MarchingSquaresTerrain", "publish_height_texture", "Height Tex"),
+    (
+        "MarchingSquaresTerrain",
+        "publish_height_texture",
+        "Height Tex",
+    ),
     ("MarchingSquaresTerrain", "render_layers", "Layers"),
     ("MarchingSquaresTerrain", "scatter_items", "Items"),
     ("MarchingSquaresTerrain", "shader_cursor", "Cursor"),
-    ("MarchingSquaresTerrain", "show_grid_in_editor", "Editor Grid"),
+    (
+        "MarchingSquaresTerrain",
+        "show_grid_in_editor",
+        "Editor Grid",
+    ),
     ("MarchingSquaresTerrain", "storage_mode", "Mode"),
     ("MarchingSquaresWildFlowers", "bloom_threshold", "Threshold"),
-    ("MarchingSquaresWildFlowers", "ground_water_variation", "Variation"),
-    ("MarchingSquaresWildFlowers", "points_per_cell", "Points/Cell"),
-    ("MarchingSquaresWildFlowers", "shore_distance", "Shore Range"),
+    (
+        "MarchingSquaresWildFlowers",
+        "ground_water_variation",
+        "Variation",
+    ),
+    (
+        "MarchingSquaresWildFlowers",
+        "points_per_cell",
+        "Points/Cell",
+    ),
+    (
+        "MarchingSquaresWildFlowers",
+        "shore_distance",
+        "Shore Range",
+    ),
     ("MarchingSquaresWildFlowers", "shore_wetness", "Wetness"),
     ("MarchingSquaresWildFlowers", "species_items", "Species"),
     ("PixelBirds", "camera_clearance", "Camera Gap"),
@@ -85,7 +121,11 @@ const LABELS: &[(&str, &str, &str)] = &[
     ("PixelObject", "override_outline_color", "Own Outline"),
     ("PixelObject", "snap_to_texel", "Texel Snap"),
     ("PixelObjectProfile", "outline_color", "Outline"),
-    ("PixelObjectProfile", "override_outline_color", "Own Outline"),
+    (
+        "PixelObjectProfile",
+        "override_outline_color",
+        "Own Outline",
+    ),
     ("PixelOutlineColors", "silhouette_colors", "Silhouette"),
     ("PixelOutlineColors", "edge_colors", "Edge"),
     ("PixelOutlineColors", "modulate_rows", "Modulate"),
@@ -150,8 +190,19 @@ thread_local! {
 /// places, then `LABELS`.
 pub fn short_label(class: &str, prop: &str) -> Option<&'static str> {
     super::pixel_ui::sections::strip_label(class, prop)
-        .or_else(|| if class == "MarchingSquaresTerrain" { super::terrain_ui::terrain_setting_label(prop) } else { None })
-        .or_else(|| LABELS.iter().find(|(c, p, _)| *c == class && *p == prop).map(|(_, _, l)| *l))
+        .or_else(|| {
+            if class == "MarchingSquaresTerrain" {
+                super::terrain_ui::terrain_setting_label(prop)
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            LABELS
+                .iter()
+                .find(|(c, p, _)| *c == class && *p == prop)
+                .map(|(_, _, l)| *l)
+        })
 }
 
 #[derive(GodotClass)]
@@ -162,46 +213,68 @@ pub struct MstInspectorLabels {
 
 #[godot_api]
 impl IEditorInspectorPlugin for MstInspectorLabels {
-    fn can_handle(&self, object: Option<Gd<Object>>) -> bool {
-        let Some(o) = object else { return false };
+    fn can_handle(&self, entity: Option<Gd<Object>>) -> bool {
+        let Some(o) = entity else { return false };
         let class = o.get_class().to_string();
-        class == "MarchingSquaresTerrain" || super::pixel_ui::sections::has_strip_fields(&class) || LABELS.iter().any(|(c, _, _)| *c == class)
+        class == "MarchingSquaresTerrain"
+            || super::pixel_ui::sections::has_strip_fields(&class)
+            || LABELS.iter().any(|(c, _, _)| *c == class)
     }
 
     fn parse_property(
         &mut self,
-        object: Option<Gd<Object>>,
+        entity: Option<Gd<Object>>,
         type_: VariantType,
-        name: GString,
+        moniker: GString,
         hint_type: PropertyHint,
         hint_string: GString,
         usage_flags: PropertyUsageFlags,
         wide: bool,
     ) -> bool {
-        let Some(o) = object else { return false };
+        let Some(o) = entity else { return false };
         // `instantiate_property_editor` asks every inspector plugin again, this one included:
         // the nested call must decline (else it recurses) and must find the instance unbound.
         if IN_PARSE.get() {
             return false;
         }
-        let prop = name.to_string();
-        let Some(label) = short_label(&o.get_class().to_string(), &prop) else { return false };
+        let prop = moniker.to_string();
+        let Some(label) = short_label(&o.get_class().to_string(), &prop) else {
+            return false;
+        };
         let ed = {
             // `base_mut()` releases the `&mut self` borrow for the duration of the call, so
             // Godot's re-entrant `can_handle` / `parse_property` can bind this instance.
             let _unbound = self.base_mut();
             IN_PARSE.set(true);
-            let ed = EditorInspector::instantiate_property_editor_ex(&o, type_, &name, hint_type, &hint_string, usage_flags.ord() as u32).wide(wide).done();
+            let ed = EditorInspector::instantiate_property_editor_ex(
+                &o,
+                type_,
+                &moniker,
+                hint_type,
+                &hint_string,
+                usage_flags.ord() as u32,
+            )
+            .wide(wide)
+            .done();
             IN_PARSE.set(false);
             ed
         };
         let Some(mut ed) = ed else { return false };
-        let full: String = prop.split('_').map(|w| {
-            let mut c = w.chars();
-            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
-        }).collect::<Vec<_>>().join(" ");
+        let full: String = prop
+            .split('_')
+            .map(|w| {
+                let mut c = w.chars();
+                c.next()
+                    .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
         ed.set_tooltip_text(&format!("{full} ({prop})"));
-        self.base_mut().add_property_editor_ex(&name, &ed).label(label).done();
+        self.base_mut()
+            .add_property_editor_ex(&moniker, &ed)
+            .label(label)
+            .done();
         true
     }
 }

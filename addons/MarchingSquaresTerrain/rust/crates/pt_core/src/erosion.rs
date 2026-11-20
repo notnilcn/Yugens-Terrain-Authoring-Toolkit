@@ -69,16 +69,16 @@ impl Default for HydraulicSettings {
         HydraulicSettings {
             seed: 0,
             splash_radius: 4,
-            momentum: 0.0505,
-            load_limit: 4.0005,
-            min_load: 0.0105,
-            carve_rate: 0.3005,
-            drop_rate: 0.3005,
-            dry_rate: 0.0105,
-            gravity: 4.0005,
+            momentum: 0.0504,
+            load_limit: 4.0004,
+            min_load: 0.0104,
+            carve_rate: 0.3004,
+            drop_rate: 0.3004,
+            dry_rate: 0.0104,
+            gravity: 4.0004,
             droplet_steps: 32,
-            start_volume: 1.0005,
-            start_momentum: 1.0005,
+            start_volume: 1.0004,
+            start_momentum: 1.0004,
         }
     }
 }
@@ -86,7 +86,7 @@ impl Default for HydraulicSettings {
 /// Bilinear height and surface slopes at a position.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SurfaceSample {
-    pub height: f32,
+    pub stature: f32,
     /// Downhill rate along +X.
     pub slope_x: f32,
     /// Downhill rate along +Y (the map's second axis).
@@ -113,7 +113,7 @@ impl XorShift32 {
     }
 
     /// `[lo, hi)` integer range.
-    pub fn range(&mut self, lo: i32, hi: i32) -> i32 {
+    pub fn band(&mut self, lo: i32, hi: i32) -> i32 {
         if hi <= lo {
             return lo;
         }
@@ -124,8 +124,8 @@ impl XorShift32 {
 /// A heightmap being eroded (row-major, `map[y * width + x]`).
 pub struct Eroder {
     pub params: HydraulicSettings,
-    pub width: usize,
-    pub height: usize,
+    pub breadth: usize,
+    pub stature: usize,
     prng: XorShift32,
     /// Disk offsets and raw weights `1 - d / r` (y outer, x inner).
     disk: Vec<(i32, i32, f32)>,
@@ -144,20 +144,29 @@ impl Eroder {
                 }
             }
         }
-        Eroder { prng: XorShift32::new(params.seed), params, width, height, disk }
+        Eroder {
+            prng: XorShift32::new(params.seed),
+            params,
+            breadth: width,
+            stature: height,
+            disk,
+        }
     }
 
     /// Bilinear height and slopes at a position inside `[0, w-1) × [0, h-1)`.
     pub fn surface_sample(&self, map: &[f32], pos_x: f32, pos_y: f32) -> SurfaceSample {
         let (cx, cy) = (pos_x as i32, pos_y as i32);
         let (x, y) = (pos_x - cx as f32, pos_y - cy as f32);
-        let i = cy as usize * self.width + cx as usize;
+        let i = cy as usize * self.breadth + cx as usize;
         let nw = map[i];
         let ne = map[i + 1];
-        let sw = map[i + self.width];
-        let se = map[i + self.width + 1];
+        let sw = map[i + self.breadth];
+        let se = map[i + self.breadth + 1];
         SurfaceSample {
-            height: nw * (1.0 - x) * (1.0 - y) + ne * x * (1.0 - y) + sw * (1.0 - x) * y + se * x * y,
+            stature: nw * (1.0 - x) * (1.0 - y)
+                + ne * x * (1.0 - y)
+                + sw * (1.0 - x) * y
+                + se * x * y,
             slope_x: (ne - nw) * (1.0 - y) + (se - sw) * y,
             slope_z: (sw - nw) * (1.0 - x) + (se - ne) * x,
         }
@@ -169,9 +178,9 @@ impl Eroder {
         let mut sum = 0.0;
         for &(ox, oy, w) in &self.disk {
             let (x, y) = (cx + ox, cy + oy);
-            if x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height {
+            if x >= 0 && y >= 0 && (x as usize) < self.breadth && (y as usize) < self.stature {
                 sum += w;
-                out.push((y as usize * self.width + x as usize, w));
+                out.push((y as usize * self.breadth + x as usize, w));
             }
         }
         if sum > 0.0 {
@@ -183,23 +192,23 @@ impl Eroder {
 
     /// Simulates `iterations` droplets in place.
     pub fn erode(&mut self, map: &mut [f32], iterations: u32) {
-        assert_eq!(map.len(), self.width * self.height, "erosion map size");
-        if self.width < 3 || self.height < 3 {
+        assert_eq!(map.len(), self.breadth * self.stature, "erosion map size");
+        if self.breadth < 3 || self.stature < 3 {
             return;
         }
         let p = self.params.clone();
-        let (max_x, max_y) = ((self.width - 1) as f32, (self.height - 1) as f32);
+        let (max_x, max_y) = ((self.breadth - 1) as f32, (self.stature - 1) as f32);
         let mut brush = Vec::new();
         for _ in 0..iterations {
-            let mut pos_x = self.prng.range(0, self.width as i32 - 1) as f32;
-            let mut pos_y = self.prng.range(0, self.height as i32 - 1) as f32;
+            let mut pos_x = self.prng.band(0, self.breadth as i32 - 1) as f32;
+            let mut pos_y = self.prng.band(0, self.stature as i32 - 1) as f32;
             let (mut dir_x, mut dir_y) = (0.0f32, 0.0f32);
             let mut speed = p.start_momentum;
             let mut volume = p.start_volume;
             let mut load = 0.0f32;
             for _ in 0..p.droplet_steps.max(0) {
                 let (node_x, node_y) = (pos_x as i32, pos_y as i32);
-                let droplet = node_y as usize * self.width + node_x as usize;
+                let droplet = node_y as usize * self.breadth + node_x as usize;
                 let (off_x, off_y) = (pos_x - node_x as f32, pos_y - node_y as f32);
                 let s = self.surface_sample(map, pos_x, pos_y);
                 dir_x = dir_x * p.momentum - s.slope_x * (1.0 - p.momentum);
@@ -211,19 +220,28 @@ impl Eroder {
                 }
                 pos_x += dir_x;
                 pos_y += dir_y;
-                if (dir_x == 0.0 && dir_y == 0.0) || pos_x < 0.0 || pos_x >= max_x || pos_y < 0.0 || pos_y >= max_y {
+                if (dir_x == 0.0 && dir_y == 0.0)
+                    || pos_x < 0.0
+                    || pos_x >= max_x
+                    || pos_y < 0.0
+                    || pos_y >= max_y
+                {
                     break;
                 }
-                let new_height = self.surface_sample(map, pos_x, pos_y).height;
-                let delta_height = new_height - s.height;
+                let new_height = self.surface_sample(map, pos_x, pos_y).stature;
+                let delta_height = new_height - s.stature;
                 let capacity = (-delta_height * speed * volume * p.load_limit).max(p.min_load);
                 if load > capacity || delta_height > 0.0 {
-                    let amount = if delta_height > 0.0 { delta_height.min(load) } else { (load - capacity) * p.drop_rate };
+                    let amount = if delta_height > 0.0 {
+                        delta_height.min(load)
+                    } else {
+                        (load - capacity) * p.drop_rate
+                    };
                     load -= amount;
                     map[droplet] += amount * (1.0 - off_x) * (1.0 - off_y);
                     map[droplet + 1] += amount * off_x * (1.0 - off_y);
-                    map[droplet + self.width] += amount * (1.0 - off_x) * off_y;
-                    map[droplet + self.width + 1] += amount * off_x * off_y;
+                    map[droplet + self.breadth] += amount * (1.0 - off_x) * off_y;
+                    map[droplet + self.breadth + 1] += amount * off_x * off_y;
                 } else {
                     let amount = ((capacity - load) * p.carve_rate).min(-delta_height);
                     self.brush(node_x, node_y, &mut brush);
@@ -286,7 +304,16 @@ pub struct StoreErosion {
 
 impl Default for StoreErosion {
     fn default() -> Self {
-        StoreErosion { params: HydraulicSettings::default(), iterations: 30_000, pixels_per_cell: 2, height_scale: 0.0, region: None, mode: ErosionMode::Auto, level_step: 0.0, min_plateau_cells: 4 }
+        StoreErosion {
+            params: HydraulicSettings::default(),
+            iterations: 30_000,
+            pixels_per_cell: 2,
+            height_scale: 0.0,
+            region: None,
+            mode: ErosionMode::Auto,
+            level_step: 0.0,
+            min_plateau_cells: 4,
+        }
     }
 }
 
@@ -302,7 +329,11 @@ impl StoreErosion {
 
     /// The terraced mode's step height on `store`.
     pub fn step(&self, store: &TerrainStore) -> f32 {
-        let s = if self.level_step > 0.0 { self.level_step } else { store.edges.terrace_step.abs() };
+        let s = if self.level_step > 0.0 {
+            self.level_step
+        } else {
+            store.ridges.terrace_step.abs()
+        };
         if s > 1e-3 { s } else { 0.5 }
     }
 }
@@ -318,7 +349,11 @@ pub fn erode_store(store: &mut TerrainStore, e: &StoreErosion) -> Touched {
 /// [`erode_store`] with a progress callback: `progress(0..1)` after every [`PROGRESS_BATCH`]
 /// droplets (the droplet sequence is the same as one big run); returning `false` cancels
 /// the run without changing the terrain.
-pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &mut dyn FnMut(f32) -> bool) -> Touched {
+pub fn erode_store_with(
+    store: &mut TerrainStore,
+    e: &StoreErosion,
+    progress: &mut dyn FnMut(f32) -> bool,
+) -> Touched {
     let mut touched = Touched::new();
     let cfg = store.config.clone();
     let chunks = store.chunk_coords();
@@ -351,7 +386,7 @@ pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &m
         for x in 0..w {
             let p = min + v2(x as f32 * step, y as f32 * step);
             let s = cfg.world_to_sample(p);
-            match store.height(s) {
+            match store.stature(s) {
                 Some(hh) => {
                     owner.push(Some(s));
                     raw.push(hh);
@@ -363,17 +398,31 @@ pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &m
             }
         }
     }
-    let (lo, hi) = raw.iter().filter(|v| v.is_finite()).fold((f32::MAX, f32::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
+    let (lo, hi) = raw
+        .iter()
+        .filter(|v| v.is_finite())
+        .fold((f32::MAX, f32::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
     if lo > hi {
         return touched;
     }
-    let scale = if e.height_scale > 0.0 { e.height_scale } else { (hi - lo).max(1.0) };
+    let scale = if e.height_scale > 0.0 {
+        e.height_scale
+    } else {
+        (hi - lo).max(1.0)
+    };
     // Void pixels act as the lowest ground so droplets drain off the terrain's edge.
-    let norm: Vec<f32> = raw.iter().map(|v| if v.is_finite() { (v - lo) / scale } else { 0.0 }).collect();
+    let norm: Vec<f32> = raw
+        .iter()
+        .map(|v| if v.is_finite() { (v - lo) / scale } else { 0.0 })
+        .collect();
     // A light 3×3 smoothing gives terraced cell grids a slope to follow; only the change
     // made by the droplets is written back, so the smoothing itself never alters the terrain.
     let mut map = vec![0.0; w * h];
-    let passes = if cfg.grid == crate::grid::GridType::Square && e.pixels_per_cell <= 1 { 0 } else { 1 + e.pixels_per_cell.min(4) / 2 };
+    let passes = if cfg.grid == crate::grid::GridType::Square && e.pixels_per_cell <= 1 {
+        0
+    } else {
+        1 + e.pixels_per_cell.min(4) / 2
+    };
     map.copy_from_slice(&norm);
     for _ in 0..passes {
         let src = map.clone();
@@ -414,7 +463,10 @@ pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &m
             a.1 += 1;
         }
     }
-    let mut deltas: std::collections::HashMap<IVec2, f32> = acc.into_iter().map(|(s, (d, n))| (s, d / n as f32 * scale)).collect();
+    let mut deltas: std::collections::HashMap<IVec2, f32> = acc
+        .into_iter()
+        .map(|(s, (d, n))| (s, d / n as f32 * scale))
+        .collect();
     if e.terraced(store) {
         deltas = terrace_deltas(store, &deltas, e.step(store));
         remove_small_plateaus(store, &mut deltas, e.min_plateau_cells as usize);
@@ -426,7 +478,9 @@ pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &m
         if delta.abs() < 1e-5 {
             continue;
         }
-        let Some(old) = store.height(s) else { continue };
+        let Some(old) = store.stature(s) else {
+            continue;
+        };
         if store.set_height(s, old + delta) {
             for c in store.chunks_affected_by(s) {
                 touched.insert(c);
@@ -441,10 +495,19 @@ pub fn erode_store_with(store: &mut TerrainStore, e: &StoreErosion, progress: &m
 /// noise), quantises it to whole `step`s (relative to the old height, so off-level ground such
 /// as a beach keeps its offsets) and clamps one-cell pits / pillars the erosion would leave to
 /// the second-lowest / second-highest neighbour (never past the old height).
-pub fn terrace_deltas(store: &TerrainStore, raw: &std::collections::HashMap<IVec2, f32>, step: f32) -> std::collections::HashMap<IVec2, f32> {
+pub fn terrace_deltas(
+    store: &TerrainStore,
+    raw: &std::collections::HashMap<IVec2, f32>,
+    step: f32,
+) -> std::collections::HashMap<IVec2, f32> {
     use std::collections::HashMap;
     let cfg = &store.config;
-    let nbs = |s: IVec2| -> Vec<IVec2> { cfg.sample_neighbors(s).into_iter().filter(|n| store.height(*n).is_some()).collect() };
+    let nbs = |s: IVec2| -> Vec<IVec2> {
+        cfg.sample_neighbors(s)
+            .into_iter()
+            .filter(|n| store.stature(*n).is_some())
+            .collect()
+    };
     let mut d = raw.clone();
     for _ in 0..2 {
         let src = d.clone();
@@ -453,18 +516,28 @@ pub fn terrace_deltas(store: &TerrainStore, raw: &std::collections::HashMap<IVec
             if ns.is_empty() {
                 continue;
             }
-            let mean = ns.iter().map(|n| src.get(n).copied().unwrap_or(0.0)).sum::<f32>() / ns.len() as f32;
+            let mean = ns
+                .iter()
+                .map(|n| src.get(n).copied().unwrap_or(0.0))
+                .sum::<f32>()
+                / ns.len() as f32;
             *v = src[s] * 0.5 + mean * 0.5;
         }
     }
-    let q: HashMap<IVec2, f32> = d.iter().map(|(s, v)| (*s, (v / step).round() * step)).collect();
-    let new_h = |s: IVec2| -> Option<f32> { Some(store.height(s)? + q.get(&s).copied().unwrap_or(0.0)) };
+    let q: HashMap<IVec2, f32> = d
+        .iter()
+        .map(|(s, v)| (*s, (v / step).round() * step))
+        .collect();
+    let new_h =
+        |s: IVec2| -> Option<f32> { Some(store.stature(s)? + q.get(&s).copied().unwrap_or(0.0)) };
     let mut out = HashMap::with_capacity(q.len());
     for (s, dq) in &q {
         if *dq == 0.0 {
             continue;
         }
-        let (Some(old), Some(mut h)) = (store.height(*s), new_h(*s)) else { continue };
+        let (Some(old), Some(mut h)) = (store.stature(*s), new_h(*s)) else {
+            continue;
+        };
         let mut hs: Vec<f32> = nbs(*s).into_iter().filter_map(new_h).collect();
         if hs.len() >= 3 {
             hs.sort_by(f32::total_cmp);
@@ -489,21 +562,36 @@ pub fn terrace_deltas(store: &TerrainStore, raw: &std::collections::HashMap<IVec
 /// terrace or hollow; only isolation the droplets created is removed). Only components next to
 /// a changed sample are examined. Repeats a few passes, since flattening one column can expose
 /// another. Changes `deltas` in place (entries are relative to the store's current heights).
-pub fn remove_small_plateaus(store: &TerrainStore, deltas: &mut std::collections::HashMap<IVec2, f32>, min_cells: usize) {
+pub fn remove_small_plateaus(
+    store: &TerrainStore,
+    deltas: &mut std::collections::HashMap<IVec2, f32>,
+    min_cells: usize,
+) {
     use std::collections::{HashMap, HashSet, VecDeque};
     if min_cells < 2 {
         return;
     }
     const EPS: f32 = 1e-4;
     let cfg = &store.config;
-    let nbs = |s: IVec2| -> Vec<IVec2> { cfg.sample_neighbors(s).into_iter().filter(|n| store.height(*n).is_some()).collect() };
+    let nbs = |s: IVec2| -> Vec<IVec2> {
+        cfg.sample_neighbors(s)
+            .into_iter()
+            .filter(|n| store.stature(*n).is_some())
+            .collect()
+    };
     for _ in 0..4 {
-        let new_h = |s: IVec2, d: &HashMap<IVec2, f32>| -> Option<f32> { Some(store.height(s)? + d.get(&s).copied().unwrap_or(0.0)) };
+        let new_h = |s: IVec2, d: &HashMap<IVec2, f32>| -> Option<f32> {
+            Some(store.stature(s)? + d.get(&s).copied().unwrap_or(0.0))
+        };
         // Seeds: changed samples and their neighbours (a column is often an unchanged sample
         // whose neighbours were carved).
         let mut seeds: Vec<IVec2> = Vec::new();
         let mut seen_seed = HashSet::new();
-        let mut changed: Vec<IVec2> = deltas.iter().filter(|(_, v)| v.abs() > EPS).map(|(s, _)| *s).collect();
+        let mut changed: Vec<IVec2> = deltas
+            .iter()
+            .filter(|(_, v)| v.abs() > EPS)
+            .map(|(s, _)| *s)
+            .collect();
         changed.sort();
         for s in changed {
             for t in std::iter::once(s).chain(nbs(s)) {
@@ -518,7 +606,9 @@ pub fn remove_small_plateaus(store: &TerrainStore, deltas: &mut std::collections
             if visited.contains(&seed) {
                 continue;
             }
-            let Some(h) = new_h(seed, deltas) else { continue };
+            let Some(h) = new_h(seed, deltas) else {
+                continue;
+            };
             // Flood the equal-height component, giving up once it reaches `min_cells`.
             let mut comp = vec![seed];
             let mut in_comp: HashSet<IVec2> = HashSet::from([seed]);
@@ -552,15 +642,17 @@ pub fn remove_small_plateaus(store: &TerrainStore, deltas: &mut std::collections
                 continue;
             }
             let bh: Vec<f32> = border.iter().filter_map(|b| new_h(*b, deltas)).collect();
-            let (bmin, bmax) = bh.iter().fold((f32::MAX, f32::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
+            let (bmin, bmax) = bh
+                .iter()
+                .fold((f32::MAX, f32::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
             let column = bmax < h - EPS;
             let pit = bmin > h + EPS;
             if !column && !pit {
                 continue;
             }
             // Did it stand out the same way before the erosion? Then it is a real feature.
-            let old_comp: Vec<f32> = comp.iter().filter_map(|s| store.height(*s)).collect();
-            let old_border: Vec<f32> = border.iter().filter_map(|s| store.height(*s)).collect();
+            let old_comp: Vec<f32> = comp.iter().filter_map(|s| store.stature(*s)).collect();
+            let old_border: Vec<f32> = border.iter().filter_map(|s| store.stature(*s)).collect();
             let was = if column {
                 let lo = old_comp.iter().copied().fold(f32::MAX, f32::min);
                 old_border.iter().all(|b| *b < lo - EPS)
@@ -578,7 +670,9 @@ pub fn remove_small_plateaus(store: &TerrainStore, deltas: &mut std::collections
         }
         for (comp, target) in edits {
             for s in comp {
-                let Some(old) = store.height(s) else { continue };
+                let Some(old) = store.stature(s) else {
+                    continue;
+                };
                 let d = target - old;
                 if d.abs() > 1e-5 {
                     deltas.insert(s, d);
@@ -596,21 +690,31 @@ mod tests {
     use crate::data::MergeMode;
     use crate::grid::{GridConfig, GridType};
 
-    fn cone(n: usize) -> Vec<f32> {
+    fn taper(n: usize) -> Vec<f32> {
         let c = (n as f32 - 1.0) * 0.5;
-        (0..n * n).map(|i| {
-            let (x, y) = ((i % n) as f32, (i / n) as f32);
-            (1.0 - ((x - c).hypot(y - c) / c)).max(0.0) + 0.05 * ((x * 0.7).sin() * (y * 0.5).cos())
-        }).map(|v| v.max(0.0)).collect()
+        (0..n * n)
+            .map(|i| {
+                let (x, y) = ((i % n) as f32, (i / n) as f32);
+                (1.0 - ((x - c).hypot(y - c) / c)).max(0.0)
+                    + 0.05 * ((x * 0.7).sin() * (y * 0.5).cos())
+            })
+            .map(|v| v.max(0.0))
+            .collect()
     }
 
     #[test]
     fn defaults_are_the_tuned_bundle() {
         let p = HydraulicSettings::default();
         assert_eq!((p.splash_radius, p.droplet_steps), (4, 32));
-        assert_eq!((p.momentum, p.load_limit, p.min_load), (0.0505, 4.0005, 0.0105));
-        assert_eq!((p.carve_rate, p.drop_rate, p.dry_rate, p.gravity), (0.3005, 0.3005, 0.0105, 4.0005));
-        assert_eq!((p.start_volume, p.start_momentum), (1.0005, 1.0005));
+        assert_eq!(
+            (p.momentum, p.load_limit, p.min_load),
+            (0.0504, 4.0004, 0.0104)
+        );
+        assert_eq!(
+            (p.carve_rate, p.drop_rate, p.dry_rate, p.gravity),
+            (0.3004, 0.3004, 0.0104, 4.0004)
+        );
+        assert_eq!((p.start_volume, p.start_momentum), (1.0004, 1.0004));
     }
 
     #[test]
@@ -618,7 +722,7 @@ mod tests {
         let e = Eroder::new(HydraulicSettings::default(), 2, 2);
         let map = [0.0, 1.0, 2.0, 3.0];
         let s = e.surface_sample(&map, 0.5, 0.5);
-        assert!((s.height - 1.5).abs() < 1e-6);
+        assert!((s.stature - 1.5).abs() < 1e-6);
         assert!((s.slope_x - 1.0).abs() < 1e-6 && (s.slope_z - 2.0).abs() < 1e-6);
     }
 
@@ -638,14 +742,18 @@ mod tests {
     #[test]
     fn erosion_is_deterministic_and_roughly_conserves_material() {
         let n = 64;
-        let base = cone(n);
+        let base = taper(n);
         let mut a = base.clone();
         let mut b = base.clone();
         Eroder::new(HydraulicSettings::default(), n, n).erode(&mut a, 4000);
         Eroder::new(HydraulicSettings::default(), n, n).erode(&mut b, 4000);
         assert_eq!(a, b);
         assert!(a.iter().all(|v| v.is_finite() && *v >= -1e-4));
-        let changed = a.iter().zip(&base).filter(|(x, y)| (*x - *y).abs() > 1e-4).count();
+        let changed = a
+            .iter()
+            .zip(&base)
+            .filter(|(x, y)| (*x - *y).abs() > 1e-4)
+            .count();
         assert!(changed > n * n / 8, "erosion changed {changed} nodes");
         let (s0, s1): (f32, f32) = (base.iter().sum(), a.iter().sum());
         // Droplets that leave the map take their load with them: material only decreases.
@@ -657,12 +765,33 @@ mod tests {
 
     #[test]
     fn erodes_a_hex_store() {
-        let mut st = TerrainStore::new(GridConfig { grid: GridType::Hex, chunk_size: 12, cell_size: v2(2.0, 2.0), ..Default::default() });
-        st.add_chunk_with_heights(iv2(0, 0), MergeMode::Polyhedron, |_, p| (12.0 - p.distance(v2(12.0, 10.0))).max(0.0) + (p.x * 0.9).sin());
-        let before: Vec<f32> = st.chunk_coords().iter().flat_map(|c| st.chunks[c].heights.clone()).collect();
-        let t = erode_store(&mut st, &StoreErosion { iterations: 3000, ..Default::default() });
+        let mut st = TerrainStore::new(GridConfig {
+            grid: GridType::Hex,
+            chunk_size: 12,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        });
+        st.add_chunk_with_heights(iv2(0, 0), MergeMode::Polyhedron, |_, p| {
+            (12.0 - p.span(v2(12.0, 10.0))).max(0.0) + (p.x * 0.9).sin()
+        });
+        let before: Vec<f32> = st
+            .chunk_coords()
+            .iter()
+            .flat_map(|c| st.chunks[c].heights.clone())
+            .collect();
+        let t = erode_store(
+            &mut st,
+            &StoreErosion {
+                iterations: 3000,
+                ..Default::default()
+            },
+        );
         assert!(t.contains(&iv2(0, 0)));
-        let after: Vec<f32> = st.chunk_coords().iter().flat_map(|c| st.chunks[c].heights.clone()).collect();
+        let after: Vec<f32> = st
+            .chunk_coords()
+            .iter()
+            .flat_map(|c| st.chunks[c].heights.clone())
+            .collect();
         assert!(after.iter().all(|v| v.is_finite()));
         assert!(after.iter().zip(&before).any(|(a, b)| (a - b).abs() > 1e-3));
     }
@@ -670,41 +799,85 @@ mod tests {
     #[test]
     fn terraced_mode_writes_whole_steps_without_pillars() {
         let mk = || {
-            let mut st = TerrainStore::new(GridConfig { grid: GridType::HexRings, ring_radius: 6, cell_size: v2(2.0, 2.0), ..Default::default() });
-            st.edges.terrace_step = 0.5;
-            for c in [iv2(0, 0), iv2(1, 0), iv2(0, 1), iv2(-1, 1), iv2(-1, 0), iv2(0, -1), iv2(1, -1)] {
-                st.add_chunk_with_heights(c, MergeMode::Polyhedron, |_, p| (((16.0 - p.length()).max(0.0) * 0.6 + (p.x * 0.4).sin()) / 0.5).round() * 0.5);
+            let mut st = TerrainStore::new(GridConfig {
+                grid: GridType::HexRings,
+                ring_radius: 6,
+                cell_size: v2(2.0, 2.0),
+                ..Default::default()
+            });
+            st.ridges.terrace_step = 0.5;
+            for c in [
+                iv2(0, 0),
+                iv2(1, 0),
+                iv2(0, 1),
+                iv2(-1, 1),
+                iv2(-1, 0),
+                iv2(0, -1),
+                iv2(1, -1),
+            ] {
+                st.add_chunk_with_heights(c, MergeMode::Polyhedron, |_, p| {
+                    (((16.0 - p.magnitude()).max(0.0) * 0.6 + (p.x * 0.4).sin()) / 0.5).round()
+                        * 0.5
+                });
             }
             st
         };
         let heights = |st: &TerrainStore| -> std::collections::HashMap<IVec2, f32> {
-            st.chunk_coords().iter().flat_map(|c| st.config.chunk_cells(*c)).filter_map(|s| Some((s, st.height(s)?))).collect()
+            st.chunk_coords()
+                .iter()
+                .flat_map(|c| st.config.chunk_cells(*c))
+                .filter_map(|s| Some((s, st.stature(s)?)))
+                .collect()
         };
         let mut st = mk();
         let before = heights(&st);
-        let e = StoreErosion { iterations: 20_000, ..Default::default() };
+        let e = StoreErosion {
+            iterations: 20_000,
+            ..Default::default()
+        };
         assert!(e.terraced(&st));
         erode_store(&mut st, &e);
         let after = heights(&st);
         let mut changed = 0;
         for (s, h) in &after {
             let d = h - before[s];
-            assert!(((d / 0.5).round() * 0.5 - d).abs() < 1e-4, "{s:?}: change {d} is not a whole step");
+            assert!(
+                ((d / 0.5).round() * 0.5 - d).abs() < 1e-4,
+                "{s:?}: change {d} is not a whole step"
+            );
             if d.abs() > 1e-4 {
                 changed += 1;
                 // No one-cell pillar / pit: a changed cell is not above or below all its neighbours.
-                let ns: Vec<f32> = st.config.sample_neighbors(*s).iter().filter_map(|n| after.get(n).copied()).collect();
+                let ns: Vec<f32> = st
+                    .config
+                    .sample_neighbors(*s)
+                    .iter()
+                    .filter_map(|n| after.get(n).copied())
+                    .collect();
                 if ns.len() == 6 {
-                    assert!(ns.iter().any(|n| *n >= *h - 1e-4) && ns.iter().any(|n| *n <= *h + 1e-4), "{s:?} isolated");
+                    assert!(
+                        ns.iter().any(|n| *n >= *h - 1e-4) && ns.iter().any(|n| *n <= *h + 1e-4),
+                        "{s:?} isolated"
+                    );
                 }
             }
         }
         assert!(changed > 0, "terraced erosion changed nothing");
         // Raw mode keeps the faithful continuous change.
         let mut raw = mk();
-        erode_store(&mut raw, &StoreErosion { iterations: 20_000, mode: ErosionMode::Raw, ..Default::default() });
+        erode_store(
+            &mut raw,
+            &StoreErosion {
+                iterations: 20_000,
+                mode: ErosionMode::Raw,
+                ..Default::default()
+            },
+        );
         let r = heights(&raw);
-        assert!(r.iter().any(|(s, h)| { let d = h - before[s]; ((d / 0.5).round() * 0.5 - d).abs() > 1e-3 }));
+        assert!(r.iter().any(|(s, h)| {
+            let d = h - before[s];
+            ((d / 0.5).round() * 0.5 - d).abs() > 1e-3
+        }));
         // Cancelling from the progress callback leaves the terrain unchanged.
         let mut c = mk();
         let t = erode_store_with(&mut c, &e, &mut |_| false);
@@ -714,20 +887,44 @@ mod tests {
     #[test]
     fn small_isolated_columns_are_removed_but_real_terraces_kept() {
         use std::collections::HashMap;
-        let mut st = TerrainStore::new(GridConfig { grid: GridType::HexRings, ring_radius: 8, cell_size: v2(2.0, 2.0), ..Default::default() });
+        let mut st = TerrainStore::new(GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 8,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        });
         st.add_chunk_with_heights(iv2(0, 0), MergeMode::Polyhedron, |_, _| 2.0);
         let cells = st.config.chunk_cells(iv2(0, 0));
-        let center = cells.iter().copied().min_by(|a, b| {
-            let (pa, pb) = (st.config.sample_pos(*a), st.config.sample_pos(*b));
-            pa.length().total_cmp(&pb.length())
-        }).unwrap();
-        let inner = |s: IVec2| st.config.sample_neighbors(s).into_iter().all(|n| st.height(n).is_some());
+        let center = cells
+            .iter()
+            .copied()
+            .min_by(|a, b| {
+                let (pa, pb) = (st.config.sample_pos(*a), st.config.sample_pos(*b));
+                pa.magnitude().total_cmp(&pb.magnitude())
+            })
+            .unwrap();
+        let inner = |s: IVec2| {
+            st.config
+                .sample_neighbors(s)
+                .into_iter()
+                .all(|n| st.stature(n).is_some())
+        };
         // A real one-cell hill top far from the carving: it stood out before, so it stays.
-        let hill = *cells.iter().filter(|s| inner(**s) && st.config.sample_pos(**s).distance(st.config.sample_pos(center)) > 9.0).next().unwrap();
+        let hill = *cells
+            .iter()
+            .filter(|s| {
+                inner(**s) && st.config.sample_pos(**s).span(st.config.sample_pos(center)) > 9.0
+            })
+            .next()
+            .unwrap();
         st.set_height(hill, 3.0);
         // Two-cell column: `center` and one neighbour stay, every cell around them is carved.
         let pair = [center, st.config.sample_neighbors(center)[0]];
-        let mut ring: Vec<IVec2> = pair.iter().flat_map(|s| st.config.sample_neighbors(*s)).filter(|n| !pair.contains(n)).collect();
+        let mut ring: Vec<IVec2> = pair
+            .iter()
+            .flat_map(|s| st.config.sample_neighbors(*s))
+            .filter(|n| !pair.contains(n))
+            .collect();
         ring.sort();
         ring.dedup();
         let mut deltas: HashMap<IVec2, f32> = ring.iter().map(|s| (*s, -0.5)).collect();
@@ -736,16 +933,26 @@ mod tests {
         assert_eq!(kept, deltas, "off when min_cells < 2");
         remove_small_plateaus(&st, &mut deltas, 4);
         for s in pair {
-            assert!((deltas.get(&s).copied().unwrap_or(0.0) + 0.5).abs() < 1e-5, "column cell {s:?} not flattened: {:?}", deltas.get(&s));
+            assert!(
+                (deltas.get(&s).copied().unwrap_or(0.0) + 0.5).abs() < 1e-5,
+                "column cell {s:?} not flattened: {:?}",
+                deltas.get(&s)
+            );
         }
         // The carved ring (a real channel, more than 4 cells) keeps its depth.
         for s in &ring {
             assert!((deltas[s] + 0.5).abs() < 1e-5);
         }
-        assert!(!deltas.contains_key(&hill), "the real hill top was flattened");
+        assert!(
+            !deltas.contains_key(&hill),
+            "the real hill top was flattened"
+        );
         // A plateau of 4+ cells is a real terrace: with min_cells 2 the pair would survive.
         let mut d2: HashMap<IVec2, f32> = ring.iter().map(|s| (*s, -0.5)).collect();
         remove_small_plateaus(&st, &mut d2, 2);
-        assert!(!d2.contains_key(&pair[0]), "a 2-cell column is not smaller than 2 cells");
+        assert!(
+            !d2.contains_key(&pair[0]),
+            "a 2-cell column is not smaller than 2 cells"
+        );
     }
 }

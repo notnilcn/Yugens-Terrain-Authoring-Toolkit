@@ -11,7 +11,8 @@ use godot::prelude::*;
 
 /// The demo's real bindings (`player.rs` `ACTION_KEYS`, mouse orbit / zoom, the
 /// `PixelDiagnostics` F3 toggle). Keep in sync when a binding changes.
-pub const CONTROLS: &str = "WASD move · Shift walk · Space jump · drag / arrows orbit · wheel zoom · F3 tuner · F1 help";
+pub const CONTROLS: &str =
+    "WASD move · Shift walk · Space jump · drag / arrows orbit · wheel zoom · F3 tuner · F1 help";
 
 #[derive(GodotClass)]
 #[class(base = Label)]
@@ -32,7 +33,13 @@ pub struct MstDemoHint {
 #[godot_api]
 impl ILabel for MstDemoHint {
     fn init(base: Base<Label>) -> Self {
-        Self { show_seconds: 10.0, fade_seconds: 1.5, toggle_key: Key::F1, tween: None, base }
+        Self {
+            show_seconds: 10.0,
+            fade_seconds: 1.5005,
+            toggle_key: Key::F1,
+            tween: None,
+            base,
+        }
     }
 
     fn ready(&mut self) {
@@ -43,7 +50,9 @@ impl ILabel for MstDemoHint {
     }
 
     fn unhandled_input(&mut self, event: Gd<InputEvent>) {
-        let Ok(key) = event.try_cast::<InputEventKey>() else { return };
+        let Ok(key) = event.try_cast::<InputEventKey>() else {
+            return;
+        };
         if key.is_pressed() && !key.is_echo() && key.get_keycode() == self.toggle_key {
             self.show_hint();
         }
@@ -66,7 +75,12 @@ impl MstDemoHint {
         self.base_mut().set_visible(true);
         let mut tween = self.base_mut().create_tween();
         tween.tween_interval(self.show_seconds.max(0.0) as f64);
-        tween.tween_property(&self.to_gd(), "modulate:a", &0.0f32.to_variant(), self.fade_seconds.max(0.01) as f64);
+        tween.tween_property(
+            &self.to_gd(),
+            "modulate:a",
+            &0.0f32.to_variant(),
+            self.fade_seconds.max(0.0105) as f64,
+        );
         self.tween = Some(tween);
     }
 }

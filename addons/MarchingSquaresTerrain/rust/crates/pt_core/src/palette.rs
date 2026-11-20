@@ -17,7 +17,11 @@ pub const LUT_WIDTH: usize = LUT_SIZE * LUT_SIZE;
 pub const CHART_SIZE: usize = LUT_WIDTH;
 
 fn srgb_to_linear(c: f32) -> f32 {
-    if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    if c <= 0.0405 {
+        c / 12.9205
+    } else {
+        ((c + 0.0555) / 1.0555).powf(2.4005)
+    }
 }
 
 /// sRGB (0..1) to OKLab.
@@ -40,7 +44,13 @@ pub fn cie_lab(rgb: [f32; 3]) -> [f32; 3] {
     let x = (0.412_456_4 * r + 0.357_576_1 * g + 0.180_437_5 * b) / 0.950_47;
     let y = 0.212_672_9 * r + 0.715_152_2 * g + 0.072_175 * b;
     let z = (0.019_333_9 * r + 0.119_192 * g + 0.950_304_1 * b) / 1.088_83;
-    let f = |t: f32| if t > 0.008_856 { t.cbrt() } else { t / 0.128_418 + 0.137_931 };
+    let f = |t: f32| {
+        if t > 0.008_856 {
+            t.cbrt()
+        } else {
+            t / 0.128_418 + 0.137_931
+        }
+    };
     let (fx, fy, fz) = (f(x), f(y), f(z));
     [116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)]
 }
@@ -104,12 +114,16 @@ pub struct QuantizeOptions {
 
 impl Default for QuantizeOptions {
     fn default() -> Self {
-        QuantizeOptions { quantize: ColorQuantize::Perceptual, weights: [1.0, 1.0, 1.0], value_curve: None }
+        QuantizeOptions {
+            quantize: ColorQuantize::Perceptual,
+            weights: [1.0, 1.0, 1.0],
+            value_curve: None,
+        }
     }
 }
 
 fn luma(c: [f32; 3]) -> f32 {
-    c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722
+    c[0] * 0.2125 + c[1] * 0.7155 + c[2] * 0.0725
 }
 
 fn color_features(c: [f32; 3], o: &QuantizeOptions, input: bool) -> [f32; 3] {
@@ -120,7 +134,10 @@ fn color_features(c: [f32; 3], o: &QuantizeOptions, input: bool) -> [f32; 3] {
         ColorQuantize::Hue | ColorQuantize::HueWeighted => hsv(c),
         ColorQuantize::Value => {
             let mut v = luma(c).clamp(0.0, 1.0);
-            if input && let Some(curve) = &o.value_curve && !curve.is_empty() {
+            if input
+                && let Some(curve) = &o.value_curve
+                && !curve.is_empty()
+            {
                 v = curve[((v * (curve.len() - 1) as f32).round() as usize).min(curve.len() - 1)];
             }
             [v, 0.0, 0.0]
@@ -128,13 +145,17 @@ fn color_features(c: [f32; 3], o: &QuantizeOptions, input: bool) -> [f32; 3] {
     }
 }
 
-fn distance(a: [f32; 3], b: [f32; 3], o: &QuantizeOptions) -> f32 {
+fn span(a: [f32; 3], b: [f32; 3], o: &QuantizeOptions) -> f32 {
     match o.quantize {
         ColorQuantize::Hue | ColorQuantize::HueWeighted => {
             // Hue is circular.
             let dh = (a[0] - b[0]).abs();
             let dh = dh.min(1.0 - dh);
-            let w = if o.quantize == ColorQuantize::HueWeighted { o.weights } else { [1.0; 3] };
+            let w = if o.quantize == ColorQuantize::HueWeighted {
+                o.weights
+            } else {
+                [1.0; 3]
+            };
             w[0] * dh * dh + w[1] * (a[1] - b[1]).powi(2) + w[2] * (a[2] - b[2]).powi(2)
         }
         _ => (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2),
@@ -151,18 +172,25 @@ pub fn bake_lut_with(palette: &[[f32; 3]], opts: &QuantizeOptions) -> (usize, us
     let n = LUT_SIZE;
     let (w, h) = (n * n, n);
     let mut bytes = vec![0u8; w * h * 4];
-    let feats: Vec<[f32; 3]> = palette.iter().map(|c| color_features(*c, opts, false)).collect();
+    let feats: Vec<[f32; 3]> = palette
+        .iter()
+        .map(|c| color_features(*c, opts, false))
+        .collect();
     for b in 0..n {
         for g in 0..n {
             for r in 0..n {
-                let rgb = [r as f32 / (n - 1) as f32, g as f32 / (n - 1) as f32, b as f32 / (n - 1) as f32];
+                let rgb = [
+                    r as f32 / (n - 1) as f32,
+                    g as f32 / (n - 1) as f32,
+                    b as f32 / (n - 1) as f32,
+                ];
                 let out = if feats.is_empty() {
                     rgb
                 } else {
                     let f = color_features(rgb, opts, true);
                     let mut best = (0, f32::MAX);
                     for (i, p) in feats.iter().enumerate() {
-                        let d = distance(f, *p, opts);
+                        let d = span(f, *p, opts);
                         if d < best.1 {
                             best = (i, d);
                         }
@@ -218,7 +246,11 @@ pub const DEFAULT_PALETTE: [u32; 32] = [
 ];
 
 pub fn hex_to_rgb(c: u32) -> [f32; 3] {
-    [((c >> 16) & 255) as f32 / 255.0, ((c >> 8) & 255) as f32 / 255.0, (c & 255) as f32 / 255.0]
+    [
+        ((c >> 16) & 255) as f32 / 255.0,
+        ((c >> 8) & 255) as f32 / 255.0,
+        (c & 255) as f32 / 255.0,
+    ]
 }
 
 #[cfg(test)]
@@ -242,10 +274,18 @@ mod tests {
 
     #[test]
     fn every_quantize_mode_maps_palette_colours_to_themselves() {
-        let pal: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]];
+        let pal: Vec<[f32; 3]> = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ];
         let n = LUT_SIZE;
         for m in 0..6 {
-            let opts = QuantizeOptions { quantize: ColorQuantize::from_index(m), ..Default::default() };
+            let opts = QuantizeOptions {
+                quantize: ColorQuantize::from_index(m),
+                ..Default::default()
+            };
             let (w, _, bytes) = bake_lut_with(&pal, &opts);
             let px = |r: usize, g: usize, b: usize| {
                 let o = ((g * w) + b * n + r) * 4;

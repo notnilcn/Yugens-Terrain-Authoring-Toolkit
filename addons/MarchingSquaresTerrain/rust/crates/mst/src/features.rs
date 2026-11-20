@@ -14,8 +14,8 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use godot::classes::{Engine, ProjectSettings, SceneTree};
 use godot::classes::scene_tree::GroupCallFlags;
+use godot::classes::{Engine, ProjectSettings, SceneTree};
 use godot::prelude::*;
 
 use crate::util::is_editor;
@@ -47,46 +47,142 @@ pub enum Feature {
 pub struct Info {
     pub feature: Feature,
     /// Setting key under `marching_squares_terrain/features/` (also the script name).
-    pub key: &'static str,
+    pub token: &'static str,
     pub label: &'static str,
     pub default: bool,
     /// What the feature draws and what switching it off saves.
     pub hint: &'static str,
 }
 
-const fn info(feature: Feature, key: &'static str, label: &'static str, default: bool, hint: &'static str) -> Info {
-    Info { feature, key, label, default, hint }
+const fn facts(
+    feature: Feature,
+    key: &'static str,
+    label: &'static str,
+    default: bool,
+    hint: &'static str,
+) -> Info {
+    Info {
+        feature,
+        token: key,
+        label,
+        default,
+        hint,
+    }
 }
 
 /// Every feature, in menu order. The index is the feature's bit in the enabled mask.
 pub const ALL: &[Info] = &[
-    info(Feature::Clouds, "clouds", "Clouds", false, "PixelSky cloud shadows and cloud deck (cloud noise in every ground, prop and water shader)."),
-    info(Feature::GodRays, "god_rays", "God Rays", false, "PixelRenderer light-sheet god rays (a ray march per low-res pixel)."),
-    info(Feature::Outlines, "outlines", "Outlines", true, "PixelRenderer silhouettes and crease highlights."),
-    info(Feature::OutlineIds, "outline_ids", "Outline Ids", true, "PixelRenderer id pass: outline ids above 7, hover / selection highlights, per-object palette and dither switches (one extra low-res scene pass)."),
-    info(Feature::Water, "water", "Water", false, "PixelWater surfaces, waterfalls and caustics on the ground."),
-    info(Feature::Weather, "weather", "Weather", false, "PixelWeather rain, snow, lightning, wetness and wind."),
-    info(Feature::Birds, "birds", "Birds", false, "PixelBirds flocks (boids simulation)."),
-    info(Feature::Fireflies, "fireflies", "Fireflies", false, "PixelFireflies glow swarms."),
-    info(Feature::Smoke, "smoke", "Smoke", false, "PixelSmoke plumes (simulated puffs)."),
-    info(Feature::Fire, "fire", "Fire", false, "PixelFireSystem spreading grass fire (simulation, flames, glow)."),
-    info(Feature::Particles, "particles", "Particle Fields", false, "PixelParticleField flipbook layers (dust, pollen, falling leaves)."),
-    info(Feature::LightVolumes, "light_volumes", "Light Volumes", false, "PixelLightVolume dithered light pools and source orbs."),
-    info(Feature::SunShafts, "sun_shafts", "Sun Shafts", false, "PixelSunShafts shadow-cut light sheets (a few large transparent quads lit through the sun's shadow map)."),
-    info(Feature::Grass, "grass", "Grass", true, "MarchingSquaresTerrain grass blades."),
+    facts(
+        Feature::Clouds,
+        "clouds",
+        "Clouds",
+        false,
+        "PixelSky cloud shadows and cloud deck (cloud noise in every ground, prop and water shader).",
+    ),
+    facts(
+        Feature::GodRays,
+        "god_rays",
+        "God Rays",
+        false,
+        "PixelRenderer light-sheet god rays (a ray march per low-res pixel).",
+    ),
+    facts(
+        Feature::Outlines,
+        "outlines",
+        "Outlines",
+        true,
+        "PixelRenderer silhouettes and crease highlights.",
+    ),
+    facts(
+        Feature::OutlineIds,
+        "outline_ids",
+        "Outline Ids",
+        true,
+        "PixelRenderer id pass: outline ids above 7, hover / selection highlights, per-object palette and dither switches (one extra low-res scene pass).",
+    ),
+    facts(
+        Feature::Water,
+        "water",
+        "Water",
+        false,
+        "PixelWater surfaces, waterfalls and caustics on the ground.",
+    ),
+    facts(
+        Feature::Weather,
+        "weather",
+        "Weather",
+        false,
+        "PixelWeather rain, snow, lightning, wetness and wind.",
+    ),
+    facts(
+        Feature::Birds,
+        "birds",
+        "Birds",
+        false,
+        "PixelBirds flocks (boids simulation).",
+    ),
+    facts(
+        Feature::Fireflies,
+        "fireflies",
+        "Fireflies",
+        false,
+        "PixelFireflies glow swarms.",
+    ),
+    facts(
+        Feature::Smoke,
+        "smoke",
+        "Smoke",
+        false,
+        "PixelSmoke plumes (simulated puffs).",
+    ),
+    facts(
+        Feature::Fire,
+        "fire",
+        "Fire",
+        false,
+        "PixelFireSystem spreading grass fire (simulation, flames, glow).",
+    ),
+    facts(
+        Feature::Particles,
+        "particles",
+        "Particle Fields",
+        false,
+        "PixelParticleField flipbook layers (dust, pollen, falling leaves).",
+    ),
+    facts(
+        Feature::LightVolumes,
+        "light_volumes",
+        "Light Volumes",
+        false,
+        "PixelLightVolume dithered light pools and source orbs.",
+    ),
+    facts(
+        Feature::SunShafts,
+        "sun_shafts",
+        "Sun Shafts",
+        false,
+        "PixelSunShafts shadow-cut light sheets (a few large transparent quads lit through the sun's shadow map).",
+    ),
+    facts(
+        Feature::Grass,
+        "grass",
+        "Grass",
+        true,
+        "MarchingSquaresTerrain grass blades.",
+    ),
 ];
 
-fn index(f: Feature) -> usize {
+fn ordinal(f: Feature) -> usize {
     ALL.iter().position(|i| i.feature == f).unwrap_or(0)
 }
 
 pub fn info_of(f: Feature) -> &'static Info {
-    &ALL[index(f)]
+    &ALL[ordinal(f)]
 }
 
 /// The feature that gates nodes of `class` (the Pixel World menu turns it on when such a node
 /// is added).
-pub fn for_class(class: &str) -> Option<Feature> {
+pub fn for_category(class: &str) -> Option<Feature> {
     Some(match class {
         "PixelSky" => Feature::Clouds,
         "PixelWater" => Feature::Water,
@@ -103,11 +199,11 @@ pub fn for_class(class: &str) -> Option<Feature> {
 }
 
 pub fn by_key(key: &str) -> Option<&'static Info> {
-    ALL.iter().find(|i| i.key == key)
+    ALL.iter().find(|i| i.token == key)
 }
 
 fn setting(i: &Info) -> String {
-    format!("{PREFIX}{}", i.key)
+    format!("{PREFIX}{}", i.token)
 }
 
 static MASK: AtomicU32 = AtomicU32::new(0);
@@ -117,7 +213,11 @@ fn read_mask() -> u32 {
     let ps = ProjectSettings::singleton();
     ALL.iter().enumerate().fold(0, |m, (b, i)| {
         let key = setting(i);
-        let on = if ps.has_setting(&key) { ps.get_setting(&key).try_to::<bool>().unwrap_or(i.default) } else { i.default };
+        let on = if ps.has_setting(&key) {
+            ps.get_setting(&key).try_to::<bool>().unwrap_or(i.default)
+        } else {
+            i.default
+        };
         if on { m | (1 << b) } else { m }
     })
 }
@@ -130,8 +230,8 @@ fn mask() -> u32 {
 }
 
 /// Whether `f` is on for this project.
-pub fn enabled(f: Feature) -> bool {
-    mask() & (1 << index(f)) != 0
+pub fn active(f: Feature) -> bool {
+    mask() & (1 << ordinal(f)) != 0
 }
 
 /// Registers the settings (with their defaults, so Project Settings lists them and only
@@ -156,18 +256,18 @@ pub fn register_settings() {
 
 /// Turns `f` on or off and tells the gated nodes. In the editor the change is saved to
 /// project.godot; at runtime it lasts for the session (a game's options menu can call it).
-pub fn set_enabled(f: Feature, on: bool) {
+pub fn assign_active(f: Feature, on: bool) {
     let i = info_of(f);
     let mut ps = ProjectSettings::singleton();
     ps.set_setting(&setting(i), &on.to_variant());
     if is_editor() {
         ps.save();
     }
-    reload();
+    reingest();
 }
 
 /// Re-reads the settings (after Project Settings was edited) and notifies on a change.
-pub fn reload() {
+pub fn reingest() {
     let old = MASK.load(Ordering::Relaxed);
     let new = read_mask();
     MASK.store(new, Ordering::Relaxed);
@@ -179,13 +279,18 @@ pub fn reload() {
 
 /// Calls [`CALLBACK`] on every gated node (deferred: the caller may be a bound node).
 pub fn notify() {
-    let Some(tree) = Engine::singleton().get_main_loop().and_then(|m| m.try_cast::<SceneTree>().ok()) else { return };
+    let Some(tree) = Engine::singleton()
+        .get_main_loop()
+        .and_then(|m| m.try_cast::<SceneTree>().ok())
+    else {
+        return;
+    };
     let mut tree = tree;
     tree.call_group_flags(GroupCallFlags::DEFERRED, GROUP, CALLBACK, &[]);
 }
 
 /// Adds a gated node to [`GROUP`]; call from `ready`.
-pub fn watch(node: &Gd<impl Inherits<Node>>) {
+pub fn observe(node: &Gd<impl Inherits<Node>>) {
     let mut n = node.clone().upcast::<Node>();
     if !n.is_in_group(GROUP) {
         n.add_to_group(GROUP);
@@ -194,7 +299,7 @@ pub fn watch(node: &Gd<impl Inherits<Node>>) {
 
 /// Configuration warning for a node whose feature is off (empty when it is on).
 pub fn warning(f: Feature) -> Option<String> {
-    if enabled(f) {
+    if active(f) {
         return None;
     }
     let i = info_of(f);
@@ -217,28 +322,32 @@ impl PixelFeatures {
     /// Whether the feature `key` (see `get_feature_keys`) is on.
     #[func]
     fn is_enabled(key: GString) -> bool {
-        by_key(&key.to_string()).is_some_and(|i| enabled(i.feature))
+        by_key(&key.to_string()).is_some_and(|i| active(i.feature))
     }
 
     /// Turns the feature `key` on or off. In a running game this lasts for the session.
     #[func]
-    fn set_enabled(key: GString, on: bool) {
+    fn assign_active(key: GString, on: bool) {
         match by_key(&key.to_string()) {
-            Some(i) => set_enabled(i.feature, on),
-            None => godot_error!("PixelFeatures: unknown feature \"{key}\" (see get_feature_keys())"),
+            Some(i) => assign_active(i.feature, on),
+            None => {
+                godot_error!("PixelFeatures: unknown feature \"{key}\" (see get_feature_keys())")
+            }
         }
     }
 
     /// Keys of every feature, in menu order.
     #[func]
     fn get_feature_keys() -> PackedStringArray {
-        ALL.iter().map(|i| GString::from(i.key)).collect()
+        ALL.iter().map(|i| GString::from(i.token)).collect()
     }
 
     /// Display name of the feature `key`.
     #[func]
     fn get_feature_label(key: GString) -> GString {
-        by_key(&key.to_string()).map(|i| GString::from(i.label)).unwrap_or_default()
+        by_key(&key.to_string())
+            .map(|i| GString::from(i.label))
+            .unwrap_or_default()
     }
 
     /// Seconds on the shared effect clock (`pt_time` in the shaders; wraps every hour).
@@ -262,14 +371,32 @@ mod tests {
     fn feature_table_is_consistent() {
         assert!(ALL.len() <= 32, "the enabled mask is a u32");
         for (i, a) in ALL.iter().enumerate() {
-            assert_eq!(index(a.feature), i, "{} listed twice", a.key);
-            assert!(ALL.iter().filter(|b| b.key == a.key).count() == 1, "duplicate key {}", a.key);
-            assert!(a.key.chars().all(|c| c.is_ascii_lowercase() || c == '_'), "key {} is not snake_case", a.key);
+            assert_eq!(ordinal(a.feature), i, "{} listed twice", a.token);
+            assert!(
+                ALL.iter().filter(|b| b.token == a.token).count() == 1,
+                "duplicate key {}",
+                a.token
+            );
+            assert!(
+                a.token.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                "key {} is not snake_case",
+                a.token
+            );
         }
-        for class in ["PixelSky", "PixelWater", "PixelWeather", "PixelBirds", "PixelFireflies", "PixelSmoke", "PixelFireSystem", "PixelParticleField", "PixelLightVolume"] {
-            let f = for_class(class).expect(class);
+        for class in [
+            "PixelSky",
+            "PixelWater",
+            "PixelWeather",
+            "PixelBirds",
+            "PixelFireflies",
+            "PixelSmoke",
+            "PixelFireSystem",
+            "PixelParticleField",
+            "PixelLightVolume",
+        ] {
+            let f = for_category(class).expect(class);
             assert!(!info_of(f).default, "{class}: expensive effects are opt-in");
         }
-        assert!(for_class("PixelRenderer").is_none());
+        assert!(for_category("PixelRenderer").is_none());
     }
 }

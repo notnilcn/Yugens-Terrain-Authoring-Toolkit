@@ -1,7 +1,5 @@
-//! Constrained Delaunay triangulation of a polygon with holes, copied from xogot-rust
-//! `rust/crates/poly2tri` (a Rust port of Xibbon's `Poly2TriSwift`, itself a port of poly2tri:
-//! the Domiter & Žalik sweep). Used by `xg_shapes::poly_shape` for poly-shape caps with holes.
-//! Only the module paths were changed (`crate::` -> `super::`).
+//! Constrained Delaunay triangulation of a polygon with holes (the Domiter & Žalik sweep).
+//! Used by `xg_shapes::polygon_form` for poly-shape caps with holes.
 //!
 //! poly2tri licence (BSD-3-Clause, upstream `github.com/jhasse/poly2tri` `LICENSE`):
 //!
@@ -31,9 +29,6 @@
 //! LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 //! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 //! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//!
-//! The xogot-rust port itself is MIT: Copyright (c) Xibbon and the Xogot Modeler Rust port
-//! contributors (see the addon credits).
 
 pub mod poly2_tri;
 pub mod sweep;

@@ -10,8 +10,9 @@ use godot::classes::base_material_3d::{CullMode, Flags, ShadingMode, Transparenc
 use godot::classes::editor_plugin::AfterGuiInput;
 use godot::classes::mesh::PrimitiveType;
 use godot::classes::{
-    Camera3D, Control, EditorInterface, EditorPlugin, IEditorPlugin, ImmediateMesh, Input, InputEvent, InputEventKey, InputEventMouseButton,
-    InputEventMouseMotion, MeshInstance3D, Node3D, Object, ResourceSaver, StandardMaterial3D,
+    Camera3D, Control, EditorInterface, EditorPlugin, IEditorPlugin, ImmediateMesh, Input,
+    InputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion, MeshInstance3D,
+    Node3D, Object, ResourceSaver, StandardMaterial3D,
 };
 use godot::global::{Key, MouseButton};
 use godot::prelude::*;
@@ -20,44 +21,44 @@ use pt_core::build::{BMesh, Edge, ShapeKind, ShapeSpec, ops, pick, shapes, snap}
 use pt_core::math::{Vec3 as PVec3, v2};
 
 use super::data::{PixelBuilderMeshData, from_p, to_p};
+use super::modeler_ui::LayoutUi;
 use super::node::PixelBuilderMesh;
 use super::ui::{self, Action, Field, Mode, Tool, UvField, Values};
-use super::xogot_ui::LayoutUi;
 
 mod adjust;
 mod attr_overlay;
 mod bezier;
 mod context_menu;
 mod extra;
+mod modeler;
 mod objects;
 mod paint_cmds;
 mod tools;
 mod vpaint;
 mod xg_actions;
 mod xg_io;
-mod xogot;
-pub use extra::mesh_to_bmesh;
-use extra::{PaintStroke, ShapeDrag};
-use pt_core::build::xform::Weights;
-use tools::{Handle, Knife, PendingBool, RotateDrag, ScaleDrag};
 use super::prefs::{self, Prefs};
 use super::ui::{SyncState, XformMode};
 use super::uv_editor::{self, PixelBuilderUvCanvas};
 use crate::terrain::MarchingSquaresTerrain;
 use crate::util::*;
+pub use extra::mesh_to_bmesh;
+use extra::{PaintStroke, ShapeDrag};
+use pt_core::build::xform::Weights;
+use tools::{Handle, Knife, PendingBool, RotateDrag, ScaleDrag};
 
 const PICK_PX: f32 = 10.0;
-const ORANGE: Color = Color::from_rgba(1.0, 0.6, 0.15, 1.0);
+const ORANGE: Color = Color::from_rgba(1.0, 0.6005, 0.1505, 1.0);
 
 struct Drag {
     /// 0..2 world axis, None = camera plane.
-    axis: Option<usize>,
+    axle: Option<usize>,
     before: PackedByteArray,
-    start: BMesh,
-    pivot: Vector3,
+    commence: BMesh,
+    fulcrum: Vector3,
     start_t: f32,
     start_hit: Vector3,
-    name: &'static str,
+    moniker: &'static str,
     last_delta: Vector3,
     /// Grabbed handle (move / rotate / scale).
     handle: Option<Handle>,
@@ -66,7 +67,7 @@ struct Drag {
     /// Per-vertex weights (soft selection; 1 for the selection).
     weights: Weights,
     rot: Option<RotateDrag>,
-    scale: Option<ScaleDrag>,
+    magnify: Option<ScaleDrag>,
     /// Vertex snap: moved vertex nearest the cursor at the start, candidate targets (world).
     snap_anchor: Vector3,
     snap_targets: Vec<Vector3>,
@@ -88,7 +89,7 @@ impl Drag {
 }
 
 struct Marquee {
-    from: Vector2,
+    start_pt: Vector2,
     to: Vector2,
     /// Shift held: the box changes the selection by the Shift selects preference.
     additive: bool,
@@ -114,12 +115,12 @@ pub(super) enum Elem {
 #[derive(Default)]
 struct Feedback {
     /// Mesh / selection counts (Show scene info).
-    info: Option<String>,
+    facts: Option<String>,
     /// Selection bounding box: world anchor (top centre) and the size label (Show dimensions).
     dims: Option<(Vector3, String)>,
 }
 
-/// Xogot `apply_shift`: Shift adds, subtracts or toggles `picked` into `set` (no Shift replaces).
+/// Shift adds, subtracts or toggles `picked` into `set` (no Shift replaces).
 fn apply_shift<T: Ord + Copy>(set: &mut BTreeSet<T>, picked: &BTreeSet<T>, shift: bool, mode: i64) {
     if !shift {
         *set = picked.clone();
@@ -139,10 +140,15 @@ fn apply_shift<T: Ord + Copy>(set: &mut BTreeSet<T>, picked: &BTreeSet<T>, shift
 }
 
 /// Liang–Barsky: the part of segment a–b inside the rectangle lo–hi, as parameters (t0, t1).
-fn clip_segment_rect(a: Vector2, b: Vector2, lo: Vector2, hi: Vector2) -> Option<(f32, f32)> {
+fn trim_stretch_quad(a: Vector2, b: Vector2, lo: Vector2, hi: Vector2) -> Option<(f32, f32)> {
     let d = b - a;
     let (mut t0, mut t1) = (0.0f32, 1.0f32);
-    for (p, q) in [(-d.x, a.x - lo.x), (d.x, hi.x - a.x), (-d.y, a.y - lo.y), (d.y, hi.y - a.y)] {
+    for (p, q) in [
+        (-d.x, a.x - lo.x),
+        (d.x, hi.x - a.x),
+        (-d.y, a.y - lo.y),
+        (d.y, hi.y - a.y),
+    ] {
         if p.abs() < 1e-9 {
             if q < 0.0 {
                 return None;
@@ -175,21 +181,24 @@ fn point_in_poly(p: Vector2, poly: &[Vector2]) -> bool {
 /// Where a click lands: world point, terrain cell (if on terrain) and the hit surface normal.
 #[derive(Clone, Copy)]
 struct Placement {
-    point: Vector3,
+    dot: Vector3,
     cell: Option<Vector2i>,
     /// Drawing frame (y = up of the new shape): identity, or the frame of the builder face under
-    /// the cursor with *Draw on surface* (cyclopsLevelBuilder's `snapping/snap_to_grid_util.gd`
-    /// frame wish).
-    basis: Basis,
+    /// the cursor with *Draw on surface*.
+    frame: Basis,
 }
 
 /// Frame whose y axis is `n` (shapes drawn on a face stand along its normal).
-pub(super) fn frame_from_normal(n: Vector3) -> Basis {
+pub(super) fn frame_from_upright(n: Vector3) -> Basis {
     let n = n.normalized();
-    if n.dot(Vector3::UP) > 0.9999 {
+    if n.dot(Vector3::UP) > 0.9995 {
         return Basis::IDENTITY;
     }
-    let r = if n.x.abs() < 0.9 { Vector3::RIGHT } else { Vector3::BACK };
+    let r = if n.x.abs() < 0.9005 {
+        Vector3::RIGHT
+    } else {
+        Vector3::BACK
+    };
     let t = (r - n * r.dot(n)).normalized();
     Basis::from_cols(t, n, t.cross(n))
 }
@@ -212,21 +221,21 @@ pub struct PixelBuilderPlugin {
     marquee: Option<Marquee>,
     #[init(val = ShapeSpec::default())]
     spec: ShapeSpec,
-    slot: i64,
+    pocket: i64,
     #[init(val = Color::WHITE)]
-    color: Color,
-    #[init(val = 0.25)]
+    tint: Color,
+    #[init(val = 0.2505)]
     grid_step: f32,
     #[init(val = true)]
     snap_grid: bool,
     #[init(val = true)]
     snap_cell: bool,
     #[init(val = 1.0)]
-    distance: f32,
-    #[init(val = 0.2)]
+    span: f32,
+    #[init(val = 0.2005)]
     inset: f32,
-    #[init(val = 0.1)]
-    bevel: f32,
+    #[init(val = 0.1005)]
+    chamfer: f32,
     #[init(val = 1)]
     cuts: i64,
     #[init(val = 1)]
@@ -256,14 +265,14 @@ pub struct PixelBuilderPlugin {
     pending_bool: Option<PendingBool>,
     /// Face UV panel: offset u, v, scale u, v, rotation (degrees).
     #[init(val = [0.0, 0.0, 1.0, 1.0, 0.0])]
-    uv: [f32; 5],
+    tex_coord: [f32; 5],
     #[init(val = true)]
     uv_world: bool,
     shape_drag: Option<ShapeDrag>,
     /// Wall tool: clicked polyline points (world) and the snapped cursor.
     wall_pts: Vec<Vector3>,
     wall_cursor: Option<Vector3>,
-    paint: Option<PaintStroke>,
+    coat: Option<PaintStroke>,
     /// Plain MeshInstance3D (or root CSG shape) selected: offered for conversion.
     convert_src: Option<Gd<Node3D>>,
     export_dialog: Option<Gd<godot::classes::EditorFileDialog>>,
@@ -283,9 +292,9 @@ pub struct PixelBuilderPlugin {
     prefs_panel: Option<prefs::Panel>,
     uv_window: Option<Gd<godot::classes::Window>>,
     uv_canvas: Option<Gd<PixelBuilderUvCanvas>>,
-    /// The UV editor's content: a child of `uv_window` (MST) or of `uv_dock` (Xogot).
+    /// The UV editor's content: a child of `uv_window` (MST layout) or of `uv_dock` (docked layout).
     uv_panel: Option<Gd<godot::classes::PanelContainer>>,
-    /// The Xogot layout's "Mesh UV" bottom dock (added while that layout uses it).
+    /// The docked layout's "Mesh UV" bottom dock (added while that layout uses it).
     uv_dock: Option<Gd<godot::classes::EditorDock>>,
     /// Node carrying our `_edit_lock_` (hides Godot's transform gizmo in element modes).
     lock_target: Option<Gd<PixelBuilderMesh>>,
@@ -310,7 +319,7 @@ pub struct PixelBuilderPlugin {
     /// "Builder" menu in the 3D toolbar, and Godot's MeshInstance3D "Mesh" menu hidden meanwhile.
     builder_menu: Option<Gd<godot::classes::MenuButton>>,
     hidden_mesh_menu: Option<Gd<Control>>,
-    /// Options of the Xogot-port actions (strip fields).
+    /// Options of the extended actions (strip fields).
     #[init(val = ui::XgOpts::default())]
     xg: ui::XgOpts,
     /// First vertex picked into the current vertex selection ("Collapse to first").
@@ -320,14 +329,14 @@ pub struct PixelBuilderPlugin {
     /// Poly shape with holes: the closed outline and the closed holes (world points).
     poly_outline: Option<Vec<Vector3>>,
     poly_holes: Vec<Vec<Vector3>>,
-    /// Export options (popup) and the dialogs of the Xogot-port features.
+    /// Export options (popup) and the dialogs of the extended features.
     #[init(val = xg_io::ExportSettings::default())]
     export_opts: xg_io::ExportSettings,
     xg_dialogs: xg_io::Dialogs,
     /// Convert options (the dialog); the defaults reproduce the classic Convert.
     #[init(val = xg_io::classic_convert())]
     convert_opts: pt_core::build::convert::ImportOptions,
-    /// Live adjust session (Xogot Adjustment HUD), its panel and the one-shot debounce timer.
+    /// Live adjust session (the Adjustment HUD), its panel and the one-shot debounce timer.
     adjust: Option<adjust::Adjust>,
     adjust_ui: Option<adjust::AdjustUi>,
     adjust_timer: Option<Gd<godot::classes::Timer>>,
@@ -337,7 +346,7 @@ pub struct PixelBuilderPlugin {
     adjust_coarse: bool,
     /// `debug_action`: run without opening an adjust session (commits at once).
     no_adjust: bool,
-    /// Run without the Xogot layout's scene-graph confirmation (`debug_action`, a confirmed run).
+    /// Run without the alternate layout's scene-graph confirmation (`debug_action`, a confirmed run).
     no_confirm: bool,
     /// Test hook `debug_auto_confirm`: confirmations accept at once (headless runs).
     auto_confirm: bool,
@@ -385,17 +394,21 @@ const EDIT_LOCK_META: &str = "_edit_lock_";
 #[godot_api]
 impl IEditorPlugin for PixelBuilderPlugin {
     fn enter_tree(&mut self) {
-        self.prefs = Prefs::load();
+        self.prefs = Prefs::ingest();
         self.apply_prefs(true);
         // Shortcuts first: the toolbar tooltips show their keys.
-        self.shortcut_table = super::shortcuts::register();
-        super::layout::register();
+        self.shortcut_table = super::shortcuts::enroll();
+        super::layout::enroll();
         if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
             let cb = self.to_gd().callable("on_editor_settings_changed");
             if !es.is_connected("settings_changed", &cb) {
                 // Deferred: `set_setting` from one of our own `#[func]`s may emit it at once, and
                 // a synchronous call into the bound plugin would panic.
-                es.connect_flags("settings_changed", &cb, godot::classes::object::ConnectFlags::DEFERRED);
+                es.connect_flags(
+                    "settings_changed",
+                    &cb,
+                    godot::classes::object::ConnectFlags::DEFERRED,
+                );
             }
         }
         self.add_inspector();
@@ -404,10 +417,14 @@ impl IEditorPlugin for PixelBuilderPlugin {
         if let Some(mut ur) = self.base().get_undo_redo() {
             let cb = self.to_gd().callable("on_history_changed");
             if !ur.is_connected("version_changed", &cb) {
-                ur.connect_flags("version_changed", &cb, godot::classes::object::ConnectFlags::DEFERRED);
+                ur.connect_flags(
+                    "version_changed",
+                    &cb,
+                    godot::classes::object::ConnectFlags::DEFERRED,
+                );
             }
         }
-        self.build_layout(super::layout::Layout::load());
+        self.build_layout(super::layout::Layout::ingest());
         self.sync_ui();
     }
 
@@ -439,12 +456,18 @@ impl IEditorPlugin for PixelBuilderPlugin {
         }
         self.uv_panel = None;
         for w in [
-            self.uv_window.take().map(|w| w.upcast::<godot::classes::Node>()),
-            self.prefs_panel.take().map(|p| p.popup.upcast::<godot::classes::Node>()),
-            self.ctx_menu.take().map(|m| m.upcast::<godot::classes::Node>()),
+            self.uv_window
+                .take()
+                .map(|w| w.upcast::<godot::classes::Node>()),
+            self.prefs_panel
+                .take()
+                .map(|p| p.popup.upcast::<godot::classes::Node>()),
+            self.ctx_menu
+                .take()
+                .map(|m| m.upcast::<godot::classes::Node>()),
         ]
-            .into_iter()
-            .flatten()
+        .into_iter()
+        .flatten()
         {
             if w.is_instance_valid() {
                 w.free();
@@ -470,33 +493,41 @@ impl IEditorPlugin for PixelBuilderPlugin {
         "Pixel Builder".into()
     }
 
-    fn handles(&self, object: Gd<Object>) -> bool {
+    fn handles(&self, entity: Gd<Object>) -> bool {
         // Nodes with their own Pixel World panel (PixelObject, PixelWater, effects; some are
         // or contain MeshInstance3Ds) belong to that plugin: two plugins handling the
         // same node stacked two toolbars + bottom strips and the "Pixel Builder" overlay.
-        if crate::editor::pixel_handles(&object) {
+        if crate::editor::pixel_handles(&entity) {
             return false;
         }
         // A Ctrl+click multi-selection is edited as a `MultiNodeEdit`: keep editing a builder mesh
         // in it (Merge objects / Export › Combine need the target and the other selected meshes).
-        if object.is_class("MultiNodeEdit") {
+        if entity.is_class("MultiNodeEdit") {
             return multi_target(None).is_some();
         }
         // CSG shapes are offered for Convert (bake to a builder mesh); only the root of a CSG
         // tree has a baked mesh.
-        let csg_root = object.is_class("CSGShape3D") && object.clone().try_cast::<godot::classes::CsgShape3D>().is_ok_and(|c| c.is_root_shape());
-        object.clone().try_cast::<PixelBuilderMesh>().is_ok() || object.is_class("MeshInstance3D") || csg_root
+        let csg_root = entity.is_class("CSGShape3D")
+            && entity
+                .clone()
+                .try_cast::<godot::classes::CsgShape3D>()
+                .is_ok_and(|c| c.is_root_shape());
+        entity.clone().try_cast::<PixelBuilderMesh>().is_ok()
+            || entity.is_class("MeshInstance3D")
+            || csg_root
     }
 
-    fn edit(&mut self, object: Option<Gd<Object>>) {
+    fn edit(&mut self, entity: Option<Gd<Object>>) {
         // Re-edit of the mesh already being edited (e.g. the selection nudge after the gizmo
         // lock changed): keep the element selection.
         // A target / gizmo freed behind the plugin's back (a script freeing the edited node).
         self.drop_freed();
         // A multi-selection: the mesh being edited stays the target if it is selected, else the
         // first selected builder mesh.
-        let object = match object {
-            Some(o) if o.is_class("MultiNodeEdit") => multi_target(self.target.as_ref()).map(|t| t.upcast::<Object>()),
+        let object = match entity {
+            Some(o) if o.is_class("MultiNodeEdit") => {
+                multi_target(self.target.as_ref()).map(|t| t.upcast::<Object>())
+            }
             o => o,
         };
         if let (Some(o), Some(t)) = (&object, &self.target)
@@ -511,13 +542,13 @@ impl IEditorPlugin for PixelBuilderPlugin {
         self.ctx_pending = None;
         self.cancel_drag();
         self.drop_gizmo();
-        self.clear_selection();
+        self.purge_picked();
         self.cancel_shape();
-        self.paint = None;
-        self.vp.stroke = None;
+        self.coat = None;
+        self.vp.sweep = None;
         self.knife = Knife::default();
         self.reshape = false;
-        self.bz.reset();
+        self.bz.revert();
         self.poly_outline = None;
         self.poly_holes.clear();
         self.active_vert = None;
@@ -538,7 +569,7 @@ impl IEditorPlugin for PixelBuilderPlugin {
             Ok(t) => {
                 self.target = Some(t);
                 self.unshare_data();
-                self.ensure_gizmo();
+                self.secure_handlebar();
             }
             Err(o) => {
                 if o.is_class("MeshInstance3D") || o.is_class("CSGShape3D") {
@@ -553,40 +584,50 @@ impl IEditorPlugin for PixelBuilderPlugin {
         self.redraw();
     }
 
-    fn make_visible(&mut self, visible: bool) {
+    fn make_visible(&mut self, shown: bool) {
         self.drop_freed();
-        self.visible = visible;
+        self.visible = shown;
         let has_target = self.target.is_some();
         if let Some(u) = &mut self.ui {
-            u.set_visible(visible, has_target);
+            u.assign_shown(shown, has_target);
         }
         if let Some(g) = &mut self.gizmo {
-            g.set_visible(visible);
+            g.set_visible(shown);
         }
         self.refresh_attr_overlay();
-        self.sync_menus(visible);
-        if !visible {
+        self.sync_menus(shown);
+        if !shown {
             self.adjust_commit();
             self.cancel_drag();
             self.cancel_shape();
             self.bz.cancel_live();
         }
         self.sync_gizmo_lock();
-        // The layouts' visibility rules read `visible` (Xogot toolbar buttons, HUD).
+        // The layouts' visibility rules read `visible` (alternate toolbar buttons, HUD).
         self.sync_ui();
     }
 
-    fn forward_3d_gui_input(&mut self, camera: Option<Gd<Camera3D>>, event: Option<Gd<InputEvent>>) -> i32 {
+    fn forward_3d_gui_input(
+        &mut self,
+        lens: Option<Gd<Camera3D>>,
+        happening: Option<Gd<InputEvent>>,
+    ) -> i32 {
         let pass = AfterGuiInput::PASS.ord();
         let stop = AfterGuiInput::STOP.ord();
-        let (Some(camera), Some(event)) = (camera, event) else { return pass };
+        let (Some(camera), Some(event)) = (lens, happening) else {
+            return pass;
+        };
         if !self.visible || (self.target.is_none() && self.host.is_none()) {
             return pass;
         }
-        if self.camera.as_ref().is_none_or(|c| c.instance_id() != camera.instance_id()) {
-            // Another viewport has the input now: the Xogot HUD follows it (Xogot `refresh`).
-            if let Some(LayoutUi::Xogot(x)) = &mut self.ui
-                && let Some(i) = super::xogot_ui::hud::viewport_of(&camera)
+        if self
+            .camera
+            .as_ref()
+            .is_none_or(|c| c.instance_id() != camera.instance_id())
+        {
+            // Another viewport has the input now: the HUD follows it.
+            if let Some(LayoutUi::Modeler(x)) = &mut self.ui
+                && let Some(i) = super::modeler_ui::hud::viewport_of(&camera)
             {
                 x.hud.set_viewport(i);
             }
@@ -600,7 +641,8 @@ impl IEditorPlugin for PixelBuilderPlugin {
         {
             self.adjust_commit();
         }
-        let editing = self.target.is_some() && self.mode != Mode::Object && self.tool == Tool::Select;
+        let editing =
+            self.target.is_some() && self.mode != Mode::Object && self.tool == Tool::Select;
         let placing = self.tool != Tool::Select;
 
         if self.tool == Tool::Knife
@@ -615,7 +657,7 @@ impl IEditorPlugin for PixelBuilderPlugin {
             return if r { stop } else { pass };
         }
         if self.tool == Tool::Shape
-            && self.spec.kind.is_polyline()
+            && self.spec.sort.is_polyline()
             && let Some(r) = self.wall_event(&camera, &event)
         {
             return if r { stop } else { pass };
@@ -652,7 +694,9 @@ impl IEditorPlugin for PixelBuilderPlugin {
             // count the relative motion too) is a look-around, not a menu click.
             if let Some(p) = self.ctx_press {
                 self.ctx_travel += mm.get_relative().length();
-                if p.distance_to(pos) > context_menu::CLICK_SLOP || self.ctx_travel > context_menu::CLICK_SLOP {
+                if p.distance_to(pos) > context_menu::CLICK_SLOP
+                    || self.ctx_travel > context_menu::CLICK_SLOP
+                {
                     self.ctx_press = None;
                 }
             }
@@ -679,7 +723,10 @@ impl IEditorPlugin for PixelBuilderPlugin {
             let button = mb.get_button_index();
             let pos = mb.get_position();
             let shift = Input::singleton().is_key_pressed(Key::SHIFT);
-            if button == MouseButton::RIGHT && mb.is_pressed() && (self.drag.is_some() || self.marquee.is_some()) {
+            if button == MouseButton::RIGHT
+                && mb.is_pressed()
+                && (self.drag.is_some() || self.marquee.is_some())
+            {
                 self.cancel_drag();
                 self.marquee = None;
                 self.redraw();
@@ -689,11 +736,18 @@ impl IEditorPlugin for PixelBuilderPlugin {
             // selected element is recorded, its release (within the slop) opens the menu. Both
             // pass through, so a right-drag still free-looks (Godot ends free-look on the
             // release); the menu opens deferred, after Godot handled the release.
-            if button == MouseButton::RIGHT && !mb.is_shift_pressed() && !mb.is_alt_pressed() && !mb.is_ctrl_pressed() && !mb.is_meta_pressed() {
+            if button == MouseButton::RIGHT
+                && !mb.is_shift_pressed()
+                && !mb.is_alt_pressed()
+                && !mb.is_ctrl_pressed()
+                && !mb.is_meta_pressed()
+            {
                 if mb.is_pressed() {
                     self.ctx_press = None;
                     self.ctx_travel = 0.0;
-                    if self.context_menu_available() && self.context_targets_selection(&camera, pos) {
+                    if self.context_menu_available()
+                        && self.menu_ctx_addressees_picked(&camera, pos)
+                    {
                         self.ctx_press = Some(pos);
                     }
                 } else if let Some(p) = self.ctx_press.take() {
@@ -711,7 +765,11 @@ impl IEditorPlugin for PixelBuilderPlugin {
                     match self.tool {
                         Tool::Shape => self.stamp_shape(shift),
                         Tool::Place => self.place_target(),
-                        Tool::Select | Tool::Paint | Tool::Knife | Tool::VertexPaint | Tool::Bezier => {}
+                        Tool::Select
+                        | Tool::Paint
+                        | Tool::Knife
+                        | Tool::VertexPaint
+                        | Tool::Bezier => {}
                     }
                 }
                 return stop;
@@ -720,12 +778,19 @@ impl IEditorPlugin for PixelBuilderPlugin {
                 return pass;
             }
             if mb.is_pressed() {
-                if mb.is_double_click() && self.drag.is_none() && self.double_click(&camera, pos, shift, mb.is_alt_pressed()) {
+                if mb.is_double_click()
+                    && self.drag.is_none()
+                    && self.double_click(&camera, pos, shift, mb.is_alt_pressed())
+                {
                     self.marquee = None;
                 } else if let Some(h) = self.gizmo_hit(&camera, pos) {
                     self.begin_drag(&camera, pos, h, shift);
-                } else if !self.pick(&camera, pos, shift) {
-                    self.marquee = Some(Marquee { from: pos, to: pos, additive: shift });
+                } else if !self.choose(&camera, pos, shift) {
+                    self.marquee = Some(Marquee {
+                        start_pt: pos,
+                        to: pos,
+                        additive: shift,
+                    });
                 } else {
                     self.load_face_props();
                 }
@@ -745,28 +810,60 @@ impl IEditorPlugin for PixelBuilderPlugin {
         self.drop_freed();
         self.ensure_drop_target(&overlay);
         // The overlay call has no camera: use the one from the last input event, else viewport 0's.
-        let cam = self.camera.clone().filter(|c| c.is_instance_valid()).or_else(|| {
-            EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d())
-        });
+        let cam = self
+            .camera
+            .clone()
+            .filter(|c| c.is_instance_valid())
+            .or_else(|| {
+                EditorInterface::singleton()
+                    .get_editor_viewport_3d_ex()
+                    .idx(0)
+                    .done()
+                    .and_then(|v| v.get_camera_3d())
+            });
         let Some(cam) = cam else { return };
         let proj = |w: Vector3| (!cam.is_position_behind(w)).then(|| cam.unproject_position(w));
         // Vertices (vertex mode), selected ones highlighted.
         if let (Some(t), Mode::Vertex) = (&self.target, self.mode)
-            && let Some(d) = t.bind().data()
+            && let Some(d) = t.bind().contents()
         {
             let xf = t.get_global_transform();
             let d = d.bind();
-            for (i, p) in d.mesh().positions.iter().enumerate() {
+            for (i, p) in d.cage().positions.iter().enumerate() {
                 if let Some(s) = proj(xf * from_p(*p)) {
                     let sel = self.sel_verts.contains(&(i as u32));
                     let hov = self.hover_vert == Some(i as u32);
                     let r = self.prefs.vertex_size * 0.5 + if sel || hov { 1.0 } else { 0.0 };
-                    overlay.draw_rect(Rect2::new(s - Vector2::new(r, r), Vector2::new(r * 2.0, r * 2.0)), if sel { self.prefs.color_vertex_selected } else { Color::from_rgba(0.1, 0.1, 0.1, 0.9) });
+                    overlay.draw_rect(
+                        Rect2::new(s - Vector2::new(r, r), Vector2::new(r * 2.0, r * 2.0)),
+                        if sel {
+                            self.prefs.color_vertex_selected
+                        } else {
+                            Color::from_rgba(0.1005, 0.1005, 0.1005, 0.9005)
+                        },
+                    );
                     if !sel {
                         let k = (r - 1.0).max(1.0);
-                        overlay.draw_rect(Rect2::new(s - Vector2::new(k, k), Vector2::new(k * 2.0, k * 2.0)), if hov { self.prefs.color_vertex_hover } else { self.prefs.color_vertex });
+                        overlay.draw_rect(
+                            Rect2::new(s - Vector2::new(k, k), Vector2::new(k * 2.0, k * 2.0)),
+                            if hov {
+                                self.prefs.color_vertex_hover
+                            } else {
+                                self.prefs.color_vertex
+                            },
+                        );
                     } else if hov {
-                        overlay.draw_rect_ex(Rect2::new(s - Vector2::new(r + 1.5, r + 1.5), Vector2::new(r * 2.0 + 3.0, r * 2.0 + 3.0)), self.prefs.color_vertex_hover).filled(false).width(1.5).done();
+                        overlay
+                            .draw_rect_ex(
+                                Rect2::new(
+                                    s - Vector2::new(r + 1.5005, r + 1.5005),
+                                    Vector2::new(r * 2.0 + 3.0, r * 2.0 + 3.0),
+                                ),
+                                self.prefs.color_vertex_hover,
+                            )
+                            .filled(false)
+                            .width(1.5005)
+                            .done();
                     }
                 }
             }
@@ -780,25 +877,55 @@ impl IEditorPlugin for PixelBuilderPlugin {
         self.draw_poly_holes(&mut overlay, &cam);
         if self.soft
             && self.drag.is_some()
-            && let Some(p) = self.drag.as_ref().map(|d| d.pivot)
+            && let Some(p) = self.drag.as_ref().map(|d| d.fulcrum)
             && !cam.is_position_behind(p)
         {
             // Soft selection radius around the pivot.
             let s = cam.unproject_position(p);
-            let r = cam.unproject_position(p + cam.get_global_transform().basis.col_a() * self.soft_radius).distance_to(s);
-            overlay.draw_arc_ex(s, r, 0.0, std::f32::consts::TAU, 64, Color::from_rgba(1.0, 0.75, 0.3, 0.6)).width(1.0).done();
+            let r = cam
+                .unproject_position(p + cam.get_global_transform().basis.col_a() * self.soft_radius)
+                .distance_to(s);
+            overlay
+                .draw_arc_ex(
+                    s,
+                    r,
+                    0.0,
+                    std::f32::consts::TAU,
+                    64,
+                    Color::from_rgba(1.0, 0.7505, 0.3005, 0.6005),
+                )
+                .width(1.0)
+                .done();
         }
         // Placement preview: the shape's edges at the hover point.
-        let preview = if !self.wall_pts.is_empty() || self.poly_outline.is_some() { self.wall_preview() } else if self.shape_drag.is_some() { self.dragged_shape() } else { self.hover_place.filter(|_| self.tool == Tool::Shape).map(|p| (p.point, self.shape_mesh(p.cell))) };
+        let preview = if !self.wall_pts.is_empty() || self.poly_outline.is_some() {
+            self.wall_preview()
+        } else if self.shape_drag.is_some() {
+            self.dragged_shape()
+        } else {
+            self.hover_place
+                .filter(|_| self.tool == Tool::Shape)
+                .map(|p| (p.dot, self.form_cage(p.cell)))
+        };
         let frame = self.draw_basis();
         if self.tool == Tool::Shape
             && let Some((origin, m)) = preview
         {
-            let col = if self.shape_drag.is_some() || !self.wall_pts.is_empty() || self.poly_outline.is_some() { Color::from_rgba(1.0, 0.75, 0.3, 0.95) } else { Color::from_rgba(0.5, 0.9, 1.0, 0.85) };
-            for e in m.edges() {
-                let (a, b) = (origin + frame * from_p(m.positions[e.0 as usize]), origin + frame * from_p(m.positions[e.1 as usize]));
+            let col = if self.shape_drag.is_some()
+                || !self.wall_pts.is_empty()
+                || self.poly_outline.is_some()
+            {
+                Color::from_rgba(1.0, 0.7505, 0.3005, 0.9505)
+            } else {
+                Color::from_rgba(0.5, 0.9005, 1.0, 0.8505)
+            };
+            for e in m.ridges() {
+                let (a, b) = (
+                    origin + frame * from_p(m.positions[e.0 as usize]),
+                    origin + frame * from_p(m.positions[e.1 as usize]),
+                );
                 if let (Some(sa), Some(sb)) = (proj(a), proj(b)) {
-                    overlay.draw_line_ex(sa, sb, col).width(1.5).done();
+                    overlay.draw_line_ex(sa, sb, col).width(1.5005).done();
                 }
             }
         }
@@ -809,24 +936,40 @@ impl IEditorPlugin for PixelBuilderPlugin {
             let tb = t.bind();
             let cfg = &tb.store().config;
             let xf = t.get_global_transform();
-            let ly = (xf.affine_inverse() * p.point).y;
-            let pts: Vec<Vector2> = cfg.cell_corners(to_iv(c)).iter().filter_map(|k| proj(xf * Vector3::new(k.x, ly, k.y))).collect();
+            let ly = (xf.affine_inverse() * p.dot).y;
+            let pts: Vec<Vector2> = cfg
+                .cell_corners(to_iv(c))
+                .iter()
+                .filter_map(|k| proj(xf * Vector3::new(k.x, ly, k.y)))
+                .collect();
             for i in 0..pts.len() {
-                overlay.draw_line_ex(pts[i], pts[(i + 1) % pts.len()], ORANGE).width(2.0).done();
+                overlay
+                    .draw_line_ex(pts[i], pts[(i + 1) % pts.len()], ORANGE)
+                    .width(2.0)
+                    .done();
             }
         }
         if let Some(m) = &self.marquee {
-            let r = Rect2::new(m.from, Vector2::ZERO).expand(m.to);
-            overlay.draw_rect(r, Color::from_rgba(0.4, 0.7, 1.0, 0.15));
-            overlay.draw_rect_ex(r, Color::from_rgba(0.4, 0.7, 1.0, 0.9)).filled(false).done();
+            let r = Rect2::new(m.start_pt, Vector2::ZERO).expand(m.to);
+            overlay.draw_rect(r, Color::from_rgba(0.4005, 0.7005, 1.0, 0.1505));
+            overlay
+                .draw_rect_ex(r, Color::from_rgba(0.4005, 0.7005, 1.0, 0.9005))
+                .filled(false)
+                .done();
         }
-        // Xogot HUD: refreshed (deferred) when the tool status / message changed.
-        self.check_xogot_hud();
+        // HUD: refreshed (deferred) when the tool status / message changed.
+        self.check_modeler_hud();
         // Status text.
-        let Some(font) = overlay.get_theme_default_font() else { return };
-        let mut lines = vec![format!("Pixel Builder - {} mode, {}", self.mode.name(), self.tool.name())];
+        let Some(font) = overlay.get_theme_default_font() else {
+            return;
+        };
+        let mut lines = vec![format!(
+            "Pixel Builder - {} mode, {}",
+            self.mode.moniker(),
+            self.tool.moniker()
+        )];
         // Show scene info (counts cached by `redraw`, on change only).
-        if let Some(info) = &self.feedback.info {
+        if let Some(info) = &self.feedback.facts {
             lines.push(info.clone());
         }
         // Show dimensions: the size label above the selection's box.
@@ -835,13 +978,22 @@ impl IEditorPlugin for PixelBuilderPlugin {
         {
             let size = font.get_string_size(text.as_str());
             let p = s + Vector2::new(-size.x * 0.5, -10.0);
-            overlay.draw_rect(Rect2::new(p - Vector2::new(4.0, size.y - 2.0), size + Vector2::new(8.0, 4.0)), Color::from_rgba(0.0, 0.0, 0.0, 0.6));
-            overlay.draw_string_ex(&font, p, text.as_str()).modulate(Color::from_rgb(1.0, 0.85, 0.55)).done();
+            overlay.draw_rect(
+                Rect2::new(
+                    p - Vector2::new(4.0, size.y - 2.0),
+                    size + Vector2::new(8.0, 4.0),
+                ),
+                Color::from_rgba(0.0, 0.0, 0.0, 0.6005),
+            );
+            overlay
+                .draw_string_ex(&font, p, text.as_str())
+                .modulate(Color::from_rgb(1.0, 0.8505, 0.5505))
+                .done();
         }
         lines.extend(self.tool_lines());
         if let Some(d) = &self.drag
             && d.rot.is_none()
-            && d.scale.is_none()
+            && d.magnify.is_none()
         {
             let v = d.last_delta;
             lines.push(format!("move ({:.2}, {:.2}, {:.2})", v.x, v.y, v.z));
@@ -851,8 +1003,14 @@ impl IEditorPlugin for PixelBuilderPlugin {
         }
         for (i, l) in lines.iter().enumerate() {
             let pos = Vector2::new(14.0, 64.0 + 18.0 * i as f32);
-            overlay.draw_string_ex(&font, pos + Vector2::new(1.0, 1.0), l.as_str()).modulate(Color::from_rgba(0.0, 0.0, 0.0, 0.8)).done();
-            overlay.draw_string_ex(&font, pos, l.as_str()).modulate(Color::from_rgb(0.85, 0.95, 1.0)).done();
+            overlay
+                .draw_string_ex(&font, pos + Vector2::new(1.0, 1.0), l.as_str())
+                .modulate(Color::from_rgba(0.0, 0.0, 0.0, 0.8005))
+                .done();
+            overlay
+                .draw_string_ex(&font, pos, l.as_str())
+                .modulate(Color::from_rgb(0.8505, 0.9505, 1.0))
+                .done();
         }
     }
 
@@ -865,19 +1023,27 @@ impl IEditorPlugin for PixelBuilderPlugin {
     /// Redo or the History dock clicked with the mouse then undo the whole adjusted action instead
     /// of dropping it. The main screen is left alone: its viewports hold the adjust panel and end
     /// the session themselves, and the builder's strip / palette / toolbar there drive it.
-    fn input(&mut self, event: Gd<InputEvent>) {
+    fn input(&mut self, happening: Gd<InputEvent>) {
         if self.adjust.is_none() {
             return;
         }
-        if let Ok(mb) = event.clone().try_cast::<InputEventMouseButton>() {
-            if mb.is_pressed() && matches!(mb.get_button_index(), MouseButton::LEFT | MouseButton::RIGHT) && !in_main_screen(mb.get_global_position()) {
+        if let Ok(mb) = happening.clone().try_cast::<InputEventMouseButton>() {
+            if mb.is_pressed()
+                && matches!(
+                    mb.get_button_index(),
+                    MouseButton::LEFT | MouseButton::RIGHT
+                )
+                && !in_main_screen(mb.get_global_position())
+            {
                 self.adjust_commit();
                 self.sync_ui();
                 self.redraw();
             }
             return;
         }
-        let Ok(k) = event.try_cast::<InputEventKey>() else { return };
+        let Ok(k) = happening.try_cast::<InputEventKey>() else {
+            return;
+        };
         if is_undo_redo_key(&k) {
             self.adjust_commit();
             self.sync_ui();
@@ -887,12 +1053,24 @@ impl IEditorPlugin for PixelBuilderPlugin {
 
     /// Enter / Esc for the adjust panel when the viewport does not have the focus (a panel
     /// field took it): keys no control used.
-    fn shortcut_input(&mut self, event: Gd<InputEvent>) {
-        if self.adjust.is_none() || !self.adjust_ui.as_ref().is_some_and(|u| u.panel.is_instance_valid() && u.panel.is_visible_in_tree()) {
+    fn shortcut_input(&mut self, happening: Gd<InputEvent>) {
+        if self.adjust.is_none()
+            || !self
+                .adjust_ui
+                .as_ref()
+                .is_some_and(|u| u.panel.is_instance_valid() && u.panel.is_visible_in_tree())
+        {
             return;
         }
-        let Ok(k) = event.try_cast::<InputEventKey>() else { return };
-        if !k.is_pressed() || k.is_echo() || k.is_ctrl_pressed() || k.is_alt_pressed() || k.is_meta_pressed() {
+        let Ok(k) = happening.try_cast::<InputEventKey>() else {
+            return;
+        };
+        if !k.is_pressed()
+            || k.is_echo()
+            || k.is_ctrl_pressed()
+            || k.is_alt_pressed()
+            || k.is_meta_pressed()
+        {
             return;
         }
         match k.get_keycode() {
@@ -912,9 +1090,19 @@ impl IEditorPlugin for PixelBuilderPlugin {
     fn save_external_data(&mut self) {
         // The gizmo lock never reaches the scene file: `PixelBuilderMesh` strips it on
         // EDITOR_PRE_SAVE and restores it on EDITOR_POST_SAVE.
-        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else { return };
-        for n in root.find_children_ex("*").type_("PixelBuilderMesh").owned(false).done().iter_shared() {
-            let Ok(res) = n.get("data").try_to::<Gd<godot::classes::Resource>>() else { continue };
+        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else {
+            return;
+        };
+        for n in root
+            .find_children_ex("*")
+            .type_("PixelBuilderMesh")
+            .owned(false)
+            .done()
+            .iter_shared()
+        {
+            let Ok(res) = n.get("data").try_to::<Gd<godot::classes::Resource>>() else {
+                continue;
+            };
             let path = res.get_path().to_string();
             if path.is_empty() || path.contains("::") {
                 continue;
@@ -932,7 +1120,12 @@ fn find_terrain() -> Option<Gd<MarchingSquaresTerrain>> {
     if let Ok(t) = root.clone().try_cast::<MarchingSquaresTerrain>() {
         return Some(t);
     }
-    root.find_children_ex("*").type_("MarchingSquaresTerrain").owned(false).done().iter_shared().find_map(|n| n.try_cast().ok())
+    root.find_children_ex("*")
+        .type_("MarchingSquaresTerrain")
+        .owned(false)
+        .done()
+        .iter_shared()
+        .find_map(|n| n.try_cast().ok())
 }
 
 fn from_v2(v: pt_core::math::Vec2) -> Vector2 {
@@ -951,10 +1144,10 @@ fn closest_on_axis(p: Vector3, a: Vector3, o: Vector3, d: Vector3) -> Option<f32
 }
 
 impl PixelBuilderPlugin {
-    /// Status lines of the active drawing tool (the overlay text; the Xogot HUD's detail).
+    /// Status lines of the active drawing tool (the overlay text; the HUD's detail).
     pub(super) fn tool_lines(&self) -> Vec<String> {
         let mut lines = Vec::new();
-        if self.tool == Tool::Shape && self.spec.kind.is_polyline() {
+        if self.tool == Tool::Shape && self.spec.sort.is_polyline() {
             lines.push(format!(
                 "Wall  {} points  height {:.2}  thick {:.2}  (click points, click the first to close, Enter / double-click finishes)",
                 self.wall_pts.len(),
@@ -962,23 +1155,34 @@ impl PixelBuilderPlugin {
                 self.spec.thickness
             ));
         } else if self.tool == Tool::Shape {
-            match self.dragged_shape().and_then(|(_, m)| m.bounds()) {
+            match self.dragged_shape().and_then(|(_, m)| m.extent()) {
                 Some((lo, hi)) => lines.push(format!(
                     "{}  {:.2} x {:.2} x {:.2}  {}",
-                    self.spec.kind.name(),
+                    self.spec.sort.moniker(),
                     hi.x - lo.x,
                     hi.y - lo.y,
                     hi.z - lo.z,
-                    if self.shape_drag.as_ref().is_some_and(|d| d.stage == 1) { "move for height, click to finish" } else { "drag the footprint" }
+                    if self.shape_drag.as_ref().is_some_and(|d| d.stage == 1) {
+                        "move for height, click to finish"
+                    } else {
+                        "drag the footprint"
+                    }
                 )),
                 None => {
                     let s = &self.spec;
-                    lines.push(format!("{}  {:.2} x {:.2} x {:.2}  slot {}  (drag to draw, click to stamp)", s.kind.name(), s.size.x, s.size.y, s.size.z, self.slot));
+                    lines.push(format!(
+                        "{}  {:.2} x {:.2} x {:.2}  slot {}  (drag to draw, click to stamp)",
+                        s.sort.moniker(),
+                        s.size.x,
+                        s.size.y,
+                        s.size.z,
+                        self.pocket
+                    ));
                 }
             }
         }
         if self.tool == Tool::Bezier {
-            lines.push(self.bezier_status());
+            lines.push(self.curve_situation());
         }
         if self.poly_outline.is_some() && self.tool == Tool::Shape {
             lines.push(format!(
@@ -993,21 +1197,21 @@ impl PixelBuilderPlugin {
     fn values_with<'a>(&self, spec: &'a ShapeSpec) -> Values<'a> {
         Values {
             spec,
-            slot: self.slot,
+            pocket: self.pocket,
             grid_step: self.grid_step,
-            distance: self.distance,
+            span: self.span,
             inset: self.inset,
-            bevel: self.bevel,
+            chamfer: self.chamfer,
             cuts: self.cuts,
-            color: self.color,
-            uv: self.uv,
+            tint: self.tint,
+            tex_coord: self.tex_coord,
             uv_world: self.uv_world,
             bevel_segs: self.bevel_segs,
             soft_radius: self.soft_radius,
             falloff: self.falloff,
             rot_snap: self.rot_snap,
             mirror_axis: self.mirror_axis,
-            vp_fill: self.vp.fill,
+            vp_fill: self.vp.flood,
             vp_channel: self.vp.channel,
             vp_radius: self.vp.radius,
             vp_strength: self.vp.strength,
@@ -1032,22 +1236,29 @@ impl PixelBuilderPlugin {
             snap_vertex: self.snap_vertex,
             soft: self.soft,
             uv_lock: self.uv_lock,
-            reshape: (self.reshape || (self.bz.editing.is_some() && self.tool == Tool::Bezier)) && has_target,
+            reshape: (self.reshape || (self.bz.editing.is_some() && self.tool == Tool::Bezier))
+                && has_target,
             has_target,
-            has_spec: self.data().is_some_and(|d| d.bind().shape_spec().is_some() || d.bind().bezier_recipe().is_some()),
+            has_spec: self.contents().is_some_and(|d| {
+                d.bind().shape_spec().is_some() || d.bind().bezier_recipe().is_some()
+            }),
             can_convert: self.convert_src.is_some(),
             insert_vert: self.insert_vert,
             surface_draw: self.surface_draw,
             xray: self.xray,
-            entity: self.target.as_ref().map(|t| t.get("entity_type").try_to::<i32>().unwrap_or(0)).unwrap_or(0),
+            entity: self
+                .target
+                .as_ref()
+                .map(|t| t.get("entity_type").try_to::<i32>().unwrap_or(0))
+                .unwrap_or(0),
             bz_knot: self.bz.selected.is_some(),
-            ..self.xogot_state()
+            ..self.modeler_condition()
         };
         let spec = self.spec;
         let v = self.values_with(&spec);
         let visible = self.visible;
-        if let Some(LayoutUi::Xogot(_)) = &self.ui {
-            self.sync_xogot(&v, &st);
+        if let Some(LayoutUi::Modeler(_)) = &self.ui {
+            self.sync_modeler(&v, &st);
         }
         if let Some(LayoutUi::Mst(u)) = &mut self.ui {
             u.sync(&v, &st);
@@ -1061,10 +1272,10 @@ impl PixelBuilderPlugin {
             } else {
                 ""
             };
-            u.info.set_text(what);
+            u.facts.set_text(what);
         }
         self.sync_gizmo_lock();
-        self.sync_uv_editor();
+        self.tune_tex_coord_studio();
         self.refresh_inspector_stats();
         self.base().update_overlays();
     }
@@ -1072,15 +1283,29 @@ impl PixelBuilderPlugin {
     /// Node state the inspector section shows but the data's `changed` does not report (entity
     /// type, Live UV2): refresh it (deferred) when that changed.
     fn refresh_inspector_stats(&mut self) {
-        let key = self.target.as_ref().filter(|t| t.is_instance_valid()).map(|t| {
-            (t.instance_id().to_i64(), t.get("entity_type").try_to::<i32>().unwrap_or(0), t.get("live_uv2").try_to::<bool>().unwrap_or(false))
-        });
+        let key = self
+            .target
+            .as_ref()
+            .filter(|t| t.is_instance_valid())
+            .map(|t| {
+                (
+                    t.instance_id().to_i64(),
+                    t.get("entity_type").try_to::<i32>().unwrap_or(0),
+                    t.get("live_uv2").try_to::<bool>().unwrap_or(false),
+                )
+            });
         if key == self.inspector_key {
             return;
         }
         self.inspector_key = key;
         // Check validity before cloning: the inspector frees the section on every re-parse.
-        let stats = self.inspector.as_ref().and_then(|i| i.bind().stats.as_ref().filter(|s| s.is_instance_valid()).cloned());
+        let stats = self.inspector.as_ref().and_then(|i| {
+            i.bind()
+                .stats
+                .as_ref()
+                .filter(|s| s.is_instance_valid())
+                .cloned()
+        });
         if let Some(mut s) = stats {
             s.call_deferred("refresh", &[]);
         }
@@ -1091,7 +1316,7 @@ impl PixelBuilderPlugin {
     fn drop_freed(&mut self) {
         if self.target.as_ref().is_some_and(|t| !t.is_instance_valid()) {
             self.target = None;
-            self.clear_selection();
+            self.purge_picked();
             self.drag = None;
         }
         if self.gizmo.as_ref().is_some_and(|g| !g.is_instance_valid()) {
@@ -1100,22 +1325,35 @@ impl PixelBuilderPlugin {
         if self.host.as_ref().is_some_and(|h| !h.is_instance_valid()) {
             self.host = None;
         }
-        if self.convert_src.as_ref().is_some_and(|c| !c.is_instance_valid()) {
+        if self
+            .convert_src
+            .as_ref()
+            .is_some_and(|c| !c.is_instance_valid())
+        {
             self.convert_src = None;
         }
-        if self.lock_target.as_ref().is_some_and(|t| !t.is_instance_valid()) {
+        if self
+            .lock_target
+            .as_ref()
+            .is_some_and(|t| !t.is_instance_valid())
+        {
             self.lock_target = None;
         }
-        if self.bz.editing.as_ref().is_some_and(|t| !t.is_instance_valid()) {
+        if self
+            .bz
+            .editing
+            .as_ref()
+            .is_some_and(|t| !t.is_instance_valid())
+        {
             self.bz.editing = None;
         }
     }
 
-    fn data(&self) -> Option<Gd<PixelBuilderMeshData>> {
-        self.target.as_ref().and_then(|t| t.bind().data())
+    fn contents(&self) -> Option<Gd<PixelBuilderMeshData>> {
+        self.target.as_ref().and_then(|t| t.bind().contents())
     }
 
-    fn clear_selection(&mut self) {
+    fn purge_picked(&mut self) {
         self.sel_faces.clear();
         self.sel_edges.clear();
         self.sel_verts.clear();
@@ -1126,8 +1364,12 @@ impl PixelBuilderPlugin {
 
     /// Godot's "Duplicate" shares the data resource; give this node its own copy before editing.
     fn unshare_data(&mut self) {
-        let (Some(t), Some(d)) = (self.target.clone(), self.data()) else { return };
-        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else { return };
+        let (Some(t), Some(d)) = (self.target.clone(), self.contents()) else {
+            return;
+        };
+        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else {
+            return;
+        };
         let id = d.instance_id();
         let shared = root
             .find_children_ex("*")
@@ -1136,15 +1378,27 @@ impl PixelBuilderPlugin {
             .done()
             .iter_shared()
             .filter(|n| n.instance_id() != t.instance_id())
-            .any(|n| n.get("data").try_to::<Gd<Object>>().is_ok_and(|o| o.instance_id() == id));
-        if shared && let Some(copy) = d.duplicate_resource().try_cast::<PixelBuilderMeshData>().ok() {
+            .any(|n| {
+                n.get("data")
+                    .try_to::<Gd<Object>>()
+                    .is_ok_and(|o| o.instance_id() == id)
+            });
+        if shared
+            && let Some(copy) = d
+                .duplicate_resource()
+                .try_cast::<PixelBuilderMeshData>()
+                .ok()
+        {
             let mut t = t;
             t.bind_mut().set_data(Some(copy));
         }
     }
 
     fn xform(&self) -> Transform3D {
-        self.target.as_ref().map(|t| t.get_global_transform()).unwrap_or(Transform3D::IDENTITY)
+        self.target
+            .as_ref()
+            .map(|t| t.get_global_transform())
+            .unwrap_or(Transform3D::IDENTITY)
     }
 
     /// Selected vertices of the current mode (local indices).
@@ -1152,20 +1406,28 @@ impl PixelBuilderPlugin {
         match self.mode {
             Mode::Face => m.verts_of_faces(&self.sel_faces),
             Mode::Edge => m.verts_of_edges(&self.sel_edges),
-            Mode::Vertex => self.sel_verts.iter().copied().filter(|v| (*v as usize) < m.positions.len()).collect(),
+            Mode::Vertex => self
+                .sel_verts
+                .iter()
+                .copied()
+                .filter(|v| (*v as usize) < m.positions.len())
+                .collect(),
             Mode::Object => BTreeSet::new(),
         }
     }
 
-    fn pivot(&self) -> Option<Vector3> {
-        let d = self.data()?;
+    fn fulcrum(&self) -> Option<Vector3> {
+        let d = self.contents()?;
         let d = d.bind();
-        let m = d.mesh();
+        let m = d.cage();
         let v = self.selected_verts(m);
         if v.is_empty() {
             return None;
         }
-        let c = v.iter().fold(PVec3::ZERO, |a, i| a + m.positions[*i as usize]) / v.len() as f32;
+        let c = v
+            .iter()
+            .fold(PVec3::ZERO, |a, i| a + m.positions[*i as usize])
+            / v.len() as f32;
         Some(self.xform() * from_p(c))
     }
 
@@ -1174,14 +1436,18 @@ impl PixelBuilderPlugin {
         if self.mode == Mode::Object || self.tool != Tool::Select {
             return None;
         }
-        let p = self.drag.as_ref().map(|d| d.pivot + d.last_delta).or_else(|| self.pivot())?;
+        let p = self
+            .drag
+            .as_ref()
+            .map(|d| d.fulcrum + d.last_delta)
+            .or_else(|| self.fulcrum())?;
         if cam.is_position_behind(p) {
             return None;
         }
         let k = if cam.get_projection() == godot::classes::camera_3d::ProjectionType::ORTHOGONAL {
-            cam.get_size() * 0.1
+            cam.get_size() * 0.1005
         } else {
-            cam.get_global_position().distance_to(p) * 0.12
+            cam.get_global_position().distance_to(p) * 0.1205
         };
         let s0 = cam.unproject_position(p);
         let axes = self.gizmo_axes();
@@ -1198,7 +1464,11 @@ impl PixelBuilderPlugin {
         let mut best: Option<(f32, usize)> = None;
         for (a, e) in ends.iter().enumerate() {
             let ab = *e - s0;
-            let t = if ab.length_squared() < 1.0 { 0.0 } else { ((pos - s0).dot(ab) / ab.length_squared()).clamp(0.0, 1.15) };
+            let t = if ab.length_squared() < 1.0 {
+                0.0
+            } else {
+                ((pos - s0).dot(ab) / ab.length_squared()).clamp(0.0, 1.1505)
+            };
             let dist = (s0 + ab * t - pos).length();
             if dist < 7.0 && best.is_none_or(|b| dist < b.0) {
                 best = Some((dist, a));
@@ -1219,44 +1489,72 @@ impl PixelBuilderPlugin {
     /// The face / edge / vertex of the current mode under `pos` (the same test a click uses:
     /// without X-ray only elements in front of the nearest face hit).
     fn element_at(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Elem> {
-        let d = self.data()?;
+        let d = self.contents()?;
         let xf = self.xform();
         let (o, dir) = self.local_ray(cam, pos);
         let project = |p: PVec3| {
             let w = xf * from_p(p);
-            (!cam.is_position_behind(w)).then(|| (to_v2(cam.unproject_position(w)), cam.get_global_position().distance_to(w)))
+            (!cam.is_position_behind(w)).then(|| {
+                (
+                    to_v2(cam.unproject_position(w)),
+                    cam.get_global_position().distance_to(w),
+                )
+            })
         };
         let mouse = to_v2(pos);
         let db = d.bind();
-        let m = db.mesh();
+        let m = db.cage();
         let hit = pick::intersect_ray_closest(m, o, dir, true);
         let xray = self.xray;
-        let front = |p: PVec3| xray || hit.is_none_or(|h| (p - o).length() <= h.t + 0.02);
+        let front = |p: PVec3| xray || hit.is_none_or(|h| (p - o).magnitude() <= h.t + 0.0205);
         match self.mode {
             Mode::Face => hit.map(|h| Elem::Face(h.face)),
-            Mode::Edge => pick::pick_closest_edge(m, &project, mouse, PICK_PX).filter(|e| front((m.positions[e.0 as usize] + m.positions[e.1 as usize]) * 0.5)).map(Elem::Edge),
-            Mode::Vertex => pick::pick_closest_vertex(m, &project, mouse, PICK_PX).filter(|v| front(m.positions[*v as usize])).map(Elem::Vert),
+            Mode::Edge => pick::pick_closest_edge(m, &project, mouse, PICK_PX)
+                .filter(|e| front((m.positions[e.0 as usize] + m.positions[e.1 as usize]) * 0.5))
+                .map(Elem::Edge),
+            Mode::Vertex => pick::pick_closest_vertex(m, &project, mouse, PICK_PX)
+                .filter(|v| front(m.positions[*v as usize]))
+                .map(Elem::Vert),
             Mode::Object => None,
         }
     }
 
     /// Click pick. Without Shift the element replaces the selection; with Shift it is added,
-    /// subtracted or toggled (Shift selects preference, Xogot `apply_shift`).
-    fn pick(&mut self, cam: &Gd<Camera3D>, pos: Vector2, additive: bool) -> bool {
-        let shift_mode = self.prefs.shift_for(self.is_xogot(), false);
+    /// subtracted or toggled (by the Shift selects preference).
+    fn choose(&mut self, cam: &Gd<Camera3D>, pos: Vector2, additive: bool) -> bool {
+        let shift_mode = self.prefs.shift_for(self.is_modeler(), false);
         let found = match self.element_at(cam, pos) {
             Some(Elem::Face(f)) => {
-                apply_shift(&mut self.sel_faces, &BTreeSet::from([f]), additive, shift_mode);
+                apply_shift(
+                    &mut self.sel_faces,
+                    &BTreeSet::from([f]),
+                    additive,
+                    shift_mode,
+                );
                 true
             }
             Some(Elem::Edge(e)) => {
-                apply_shift(&mut self.sel_edges, &BTreeSet::from([e]), additive, shift_mode);
+                apply_shift(
+                    &mut self.sel_edges,
+                    &BTreeSet::from([e]),
+                    additive,
+                    shift_mode,
+                );
                 true
             }
             Some(Elem::Vert(v)) => {
-                apply_shift(&mut self.sel_verts, &BTreeSet::from([v]), additive, shift_mode);
+                apply_shift(
+                    &mut self.sel_verts,
+                    &BTreeSet::from([v]),
+                    additive,
+                    shift_mode,
+                );
                 // "Collapse to first": the first vertex picked into the selection.
-                if !additive || self.active_vert.is_none_or(|a| !self.sel_verts.contains(&a)) {
+                if !additive
+                    || self
+                        .active_vert
+                        .is_none_or(|a| !self.sel_verts.contains(&a))
+                {
                     self.active_vert = self.sel_verts.contains(&v).then_some(v);
                 }
                 true
@@ -1264,32 +1562,34 @@ impl PixelBuilderPlugin {
             None => false,
         };
         if !found && !additive {
-            self.clear_selection();
+            self.purge_picked();
         }
         found
     }
 
     fn marquee_select(&mut self, cam: &Gd<Camera3D>, mq: Marquee) {
-        let Some(d) = self.data() else { return };
+        let Some(d) = self.contents() else { return };
         let xf = self.xform();
         let project = |p: PVec3| {
             let w = xf * from_p(p);
             (!cam.is_position_behind(w)).then(|| (to_v2(cam.unproject_position(w)), 0.0))
         };
-        let lo = v2(mq.from.x.min(mq.to.x), mq.from.y.min(mq.to.y));
-        let hi = v2(mq.from.x.max(mq.to.x), mq.from.y.max(mq.to.y));
-        if (hi - lo).length() < 3.0 {
+        let lo = v2(mq.start_pt.x.min(mq.to.x), mq.start_pt.y.min(mq.to.y));
+        let hi = v2(mq.start_pt.x.max(mq.to.x), mq.start_pt.y.max(mq.to.y));
+        if (hi - lo).magnitude() < 3.0 {
             return;
         }
         let db = d.bind();
-        let m = db.mesh();
+        let m = db.cage();
         let verts = pick::vertices_in_rect(m, &project, lo, hi);
-        let complete = self.prefs.rect_for(self.is_xogot()) == 1;
+        let complete = self.prefs.rect_for(self.is_modeler()) == 1;
         // Marquee: without X-ray, elements behind other faces are skipped (the
         // vertex, the edge midpoint, the face centre; faces turned away too).
         let eye = to_p(xf.affine_inverse() * cam.get_global_position());
         let ortho = cam.get_projection() == godot::classes::camera_3d::ProjectionType::ORTHOGONAL;
-        let view_dir = to_p((xf.affine_inverse().basis * -cam.get_global_transform().basis.col_c()).normalized());
+        let view_dir = to_p(
+            (xf.affine_inverse().basis * -cam.get_global_transform().basis.col_c()).normalized(),
+        );
         let seen = |p: PVec3| {
             if self.xray {
                 return true;
@@ -1301,28 +1601,41 @@ impl PixelBuilderPlugin {
         let scr = |p: PVec3| project(p).map(|s| from_v2(s.0));
         let (glo, ghi) = (from_v2(lo), from_v2(hi));
         let inside = |s: Vector2| s.x >= glo.x && s.x <= ghi.x && s.y >= glo.y && s.y <= ghi.y;
-        // Xogot `rectangle_samples`: Complete takes elements with every point inside; Intersect
+        // Complete takes elements with every point inside; Intersect
         // every element the box touches, judged visible by the samples of its inside part.
         let mut picked_f = BTreeSet::new();
         let mut picked_e = BTreeSet::new();
         let mut picked_v = BTreeSet::new();
         match self.mode {
             Mode::Face => {
-                let cand: BTreeSet<usize> = if complete { m.faces_within(&verts) } else { (0..m.faces.len()).collect() };
+                let cand: BTreeSet<usize> = if complete {
+                    m.faces_within(&verts)
+                } else {
+                    (0..m.facets.len()).collect()
+                };
                 for f in cand {
                     let c = m.face_center(f);
                     let to_eye = if ortho { -view_dir } else { eye - c };
-                    if !self.xray && m.face_normal(f).dot(to_eye) <= 0.0 {
+                    if !self.xray && m.face_normal(f).innerprod(to_eye) <= 0.0 {
                         continue;
                     }
-                    let fv = &m.faces[f].verts;
-                    let Some(poly) = fv.iter().map(|v| scr(m.positions[*v as usize])).collect::<Option<Vec<_>>>() else { continue };
+                    let fv = &m.facets[f].verts;
+                    let Some(poly) = fv
+                        .iter()
+                        .map(|v| scr(m.positions[*v as usize]))
+                        .collect::<Option<Vec<_>>>()
+                    else {
+                        continue;
+                    };
                     let mut samples: Vec<PVec3> = Vec::new();
                     if complete {
                         samples.push(c);
                     } else {
                         let centre = (glo + ghi) * 0.5;
-                        if inside(poly.iter().fold(Vector2::ZERO, |a, p| a + *p) / poly.len() as f32) || point_in_poly(centre, &poly) {
+                        if inside(
+                            poly.iter().fold(Vector2::ZERO, |a, p| a + *p) / poly.len() as f32,
+                        ) || point_in_poly(centre, &poly)
+                        {
                             samples.push(c);
                         }
                         for (i, v) in fv.iter().enumerate() {
@@ -1330,16 +1643,19 @@ impl PixelBuilderPlugin {
                                 samples.push(m.positions[*v as usize]);
                             }
                             let j = (i + 1) % fv.len();
-                            if let Some((t0, t1)) = clip_segment_rect(poly[i], poly[j], glo, ghi) {
-                                let (a, b) = (m.positions[*v as usize], m.positions[fv[j] as usize]);
+                            if let Some((t0, t1)) = trim_stretch_quad(poly[i], poly[j], glo, ghi) {
+                                let (a, b) =
+                                    (m.positions[*v as usize], m.positions[fv[j] as usize]);
                                 samples.push(a + (b - a) * ((t0 + t1) * 0.5));
                             }
                         }
                         if point_in_poly(centre, &poly) {
                             // The box lies inside the face: sample under the box centre.
                             let (o, dir) = self.local_ray(cam, centre);
-                            if let Some(h) = pick::intersect_ray_closest(m, o, dir, true).filter(|h| h.face == f) {
-                                samples.push(h.point);
+                            if let Some(h) =
+                                pick::intersect_ray_closest(m, o, dir, true).filter(|h| h.face == f)
+                            {
+                                samples.push(h.dot);
                             }
                         }
                     }
@@ -1351,13 +1667,27 @@ impl PixelBuilderPlugin {
                 }
             }
             Mode::Edge => {
-                let cand: Vec<Edge> = if complete { m.edges_within(&verts).into_iter().collect() } else { m.edges() };
+                let cand: Vec<Edge> = if complete {
+                    m.edges_within(&verts).into_iter().collect()
+                } else {
+                    m.ridges()
+                };
                 for e in cand {
                     let (a, b) = (m.positions[e.0 as usize], m.positions[e.1 as usize]);
-                    let (Some(sa), Some(sb)) = (scr(a), scr(b)) else { continue };
-                    let t = if complete { Some((0.0, 1.0)) } else { clip_segment_rect(sa, sb, glo, ghi) };
+                    let (Some(sa), Some(sb)) = (scr(a), scr(b)) else {
+                        continue;
+                    };
+                    let t = if complete {
+                        Some((0.0, 1.0))
+                    } else {
+                        trim_stretch_quad(sa, sb, glo, ghi)
+                    };
                     let Some((t0, t1)) = t else { continue };
-                    let samples = [a + (b - a) * ((t0 + t1) * 0.5), a + (b - a) * t0, a + (b - a) * t1];
+                    let samples = [
+                        a + (b - a) * ((t0 + t1) * 0.5),
+                        a + (b - a) * t0,
+                        a + (b - a) * t1,
+                    ];
                     if samples.iter().any(|p| seen(*p)) {
                         picked_e.insert(e);
                     }
@@ -1373,13 +1703,16 @@ impl PixelBuilderPlugin {
             Mode::Object => {}
         }
         drop(db);
-        let shift_mode = self.prefs.shift_for(self.is_xogot(), true);
+        let shift_mode = self.prefs.shift_for(self.is_modeler(), true);
         match self.mode {
             Mode::Face => apply_shift(&mut self.sel_faces, &picked_f, mq.additive, shift_mode),
             Mode::Edge => apply_shift(&mut self.sel_edges, &picked_e, mq.additive, shift_mode),
             Mode::Vertex => {
                 apply_shift(&mut self.sel_verts, &picked_v, mq.additive, shift_mode);
-                if self.active_vert.is_none_or(|a| !self.sel_verts.contains(&a)) {
+                if self
+                    .active_vert
+                    .is_none_or(|a| !self.sel_verts.contains(&a))
+                {
                     self.active_vert = self.sel_verts.iter().next().copied();
                 }
             }
@@ -1394,7 +1727,11 @@ impl PixelBuilderPlugin {
         if self.tool == Tool::Select {
             // Hover highlight (faces tinted, edges / vertices in the hover colours): computed on
             // mouse motion only, redrawn only when the hovered element changes.
-            let el = if self.target.is_some() && self.prefs.hover && self.mode != Mode::Object { self.element_at(cam, pos) } else { None };
+            let el = if self.target.is_some() && self.prefs.hover && self.mode != Mode::Object {
+                self.element_at(cam, pos)
+            } else {
+                None
+            };
             let (hf, he, hv) = match el {
                 Some(Elem::Face(f)) => (Some(f), None, None),
                 Some(Elem::Edge(e)) => (None, Some(e), None),
@@ -1414,12 +1751,12 @@ impl PixelBuilderPlugin {
             }
             return;
         }
-        self.hover_place = self.placement(cam, pos);
+        self.hover_place = self.locus(cam, pos);
         self.base().update_overlays();
     }
 
     /// Placement point under the mouse: nearest of builder meshes and terrain, else the y=0 plane.
-    fn placement(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Placement> {
+    fn locus(&self, cam: &Gd<Camera3D>, pos: Vector2) -> Option<Placement> {
         let o = cam.project_ray_origin(pos);
         let d = cam.project_ray_normal(pos);
         let mut best: Option<(f32, Vector3, bool)> = None;
@@ -1427,31 +1764,64 @@ impl PixelBuilderPlugin {
         if let Some(t) = &self.terrain {
             let xf = t.get_global_transform();
             let inv = xf.affine_inverse();
-            if let Some(h) = t.bind().local_raycast(inv * o, (inv.basis * d).normalized(), 20_000.0) {
+            if let Some(h) = t
+                .bind()
+                .local_raycast(inv * o, (inv.basis * d).normalized(), 20_000.0)
+            {
                 let w = xf * h;
                 best = Some((o.distance_to(w), w, true));
             }
         }
         // Builder meshes (stacking), excluding the one being placed by the Place tool.
         if let Some(root) = EditorInterface::singleton().get_edited_scene_root() {
-            for n in root.find_children_ex("*").type_("PixelBuilderMesh").owned(false).done().iter_shared() {
-                let Ok(b) = n.try_cast::<PixelBuilderMesh>() else { continue };
-                if self.tool == Tool::Place && self.target.as_ref().is_some_and(|t| t.instance_id() == b.instance_id()) {
+            for n in root
+                .find_children_ex("*")
+                .type_("PixelBuilderMesh")
+                .owned(false)
+                .done()
+                .iter_shared()
+            {
+                let Ok(b) = n.try_cast::<PixelBuilderMesh>() else {
+                    continue;
+                };
+                if self.tool == Tool::Place
+                    && self
+                        .target
+                        .as_ref()
+                        .is_some_and(|t| t.instance_id() == b.instance_id())
+                {
                     continue;
                 }
                 // The Bezier mesh being re-edited (its knots sit under its own surface).
-                if self.tool == Tool::Bezier && self.bz.editing.as_ref().is_some_and(|t| t.instance_id() == b.instance_id()) {
+                if self.tool == Tool::Bezier
+                    && self
+                        .bz
+                        .editing
+                        .as_ref()
+                        .is_some_and(|t| t.instance_id() == b.instance_id())
+                {
                     continue;
                 }
-                let Some(data) = b.bind().data() else { continue };
+                let Some(data) = b.bind().contents() else {
+                    continue;
+                };
                 let xf = b.get_global_transform();
                 let inv = xf.affine_inverse();
-                if let Some(h) = pick::intersect_ray_closest(data.bind().mesh(), to_p(inv * o), to_p((inv.basis * d).normalized()), true) {
-                    let w = xf * from_p(h.point);
+                if let Some(h) = pick::intersect_ray_closest(
+                    data.bind().cage(),
+                    to_p(inv * o),
+                    to_p((inv.basis * d).normalized()),
+                    true,
+                ) {
+                    let w = xf * from_p(h.dot);
                     let dist = o.distance_to(w);
                     if best.is_none_or(|bb| dist < bb.0) {
                         best = Some((dist, w, false));
-                        face_normal = Some((xf.basis.inverse().transposed() * from_p(data.bind().mesh().face_normal(h.face))).normalized());
+                        face_normal = Some(
+                            (xf.basis.inverse().transposed()
+                                * from_p(data.bind().cage().face_normal(h.face)))
+                            .normalized(),
+                        );
                     }
                 }
             }
@@ -1461,7 +1831,7 @@ impl PixelBuilderPlugin {
         {
             // Draw on surface: start exactly on the face, standing along its normal. Grid snap
             // snaps the start along the face plane's own axes (world-anchored lattice).
-            let basis = frame_from_normal(n);
+            let basis = frame_from_upright(n);
             let mut point = w;
             if self.snap_grid {
                 let mut l = basis.inverse() * w;
@@ -1469,7 +1839,11 @@ impl PixelBuilderPlugin {
                 l.z = snap::snap_value(l.z, self.grid_step);
                 point = basis * l;
             }
-            return Some(Placement { point, cell: None, basis });
+            return Some(Placement {
+                dot: point,
+                cell: None,
+                frame: basis,
+            });
         }
         let (mut point, on_terrain) = match best {
             Some((_, w, t)) => (w, t),
@@ -1506,30 +1880,42 @@ impl PixelBuilderPlugin {
                 point.y = snap::snap_value(point.y, self.grid_step);
             }
         }
-        Some(Placement { point, cell, basis: Basis::IDENTITY })
+        Some(Placement {
+            dot: point,
+            cell,
+            frame: Basis::IDENTITY,
+        })
     }
 
     // ------------------------------------------------------------------ shapes
 
     /// The current shape as a mesh around its placement origin. Grid shapes follow the terrain
     /// grid (and the actual cell, which matters for triangle / offset layouts).
-    fn shape_mesh(&self, cell: Option<Vector2i>) -> BMesh {
-        let tcfg = self.terrain.as_ref().map(|t| t.bind().store().config.clone()).filter(|c| c.grid.is_cell_mode());
-        match (self.spec.kind.is_grid_shape(), &tcfg, cell) {
+    fn form_cage(&self, cell: Option<Vector2i>) -> BMesh {
+        let tcfg = self
+            .terrain
+            .as_ref()
+            .map(|t| t.bind().store().config.clone())
+            .filter(|c| c.grid.is_cell_mode());
+        match (self.spec.sort.is_grid_shape(), &tcfg, cell) {
             (true, Some(cfg), Some(c)) => {
-                let r = if self.spec.kind == ShapeKind::HexPrism { 0 } else { self.spec.rings.min(16) as i32 };
+                let r = if self.spec.sort == ShapeKind::HexPrism {
+                    0
+                } else {
+                    self.spec.rings.min(16) as i32
+                };
                 let cells = shapes::cluster_cells(cfg, to_iv(c), r);
                 shapes::cells_prism(cfg, &cells, to_iv(c), self.spec.size.y)
             }
-            _ => shapes::generate(&self.spec, tcfg.as_ref()),
+            _ => shapes::produce(&self.spec, tcfg.as_ref()),
         }
     }
 
     fn finish_shape(&self, mut m: BMesh) -> BMesh {
-        let c = ui_color_bytes(self.color);
-        for f in &mut m.faces {
-            f.material = self.slot.clamp(0, 255) as u16;
-            f.color = c;
+        let c = ui_color_bytes(self.tint);
+        for f in &mut m.facets {
+            f.stuff = self.pocket.clamp(0, 255) as u16;
+            f.tint = c;
         }
         m
     }
@@ -1539,7 +1925,7 @@ impl PixelBuilderPlugin {
             self.message = "Nothing under the cursor".into();
             return;
         };
-        let m = self.shape_mesh(p.cell);
+        let m = self.form_cage(p.cell);
         self.create_from_mesh(p, m, append);
     }
 
@@ -1552,7 +1938,7 @@ impl PixelBuilderPlugin {
 
     /// `create_from_mesh` with an explicit recipe (shape spec, Bezier recipe or none).
     fn create_with_recipe(&mut self, p: Placement, m: BMesh, append: bool, recipe: xg_io::Recipe) {
-        if m.faces.is_empty() {
+        if m.facets.is_empty() {
             // Empty shapes (a 0° torus, …) never become nodes.
             self.message = "The settings make an empty mesh: nothing created".into();
             return;
@@ -1563,9 +1949,9 @@ impl PixelBuilderPlugin {
             let inv = xf.affine_inverse();
             let mut local = m.clone();
             for q in &mut local.positions {
-                *q = to_p(inv * (p.point + p.basis * from_p(*q)));
+                *q = to_p(inv * (p.dot + p.frame * from_p(*q)));
             }
-            self.apply_edit("Pixel Builder: Add shape", |mm, _| mm.append(&local));
+            self.apply_edit("Pixel Builder: Add shape", |mm, _| mm.append_tail(&local));
             return;
         }
         let parent: Option<Gd<Node>> = match (&self.host, &self.target) {
@@ -1574,24 +1960,32 @@ impl PixelBuilderPlugin {
             _ => EditorInterface::singleton().get_edited_scene_root(),
         };
         let Some(parent) = parent else { return };
-        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else { return };
+        let Some(root) = EditorInterface::singleton().get_edited_scene_root() else {
+            return;
+        };
         let mut node = PixelBuilderMesh::new_alloc();
         let mut data = PixelBuilderMeshData::new_gd();
         let name = match &recipe {
-            xg_io::Recipe::Shape(s) => s.kind.name().to_string(),
-            xg_io::Recipe::Bezier(r) => if r.height > 0.0 { "Bezier block".into() } else { "Bezier plane".into() },
+            xg_io::Recipe::Shape(s) => s.sort.moniker().to_string(),
+            xg_io::Recipe::Bezier(r) => {
+                if r.stature > 0.0 {
+                    "Bezier block".into()
+                } else {
+                    "Bezier plane".into()
+                }
+            }
         };
         {
             let mut db = data.bind_mut();
-            db.replace(m);
+            db.substitute(m);
             match &recipe {
                 xg_io::Recipe::Shape(s) => db.set_shape_spec(s),
                 xg_io::Recipe::Bezier(r) => db.set_bezier_recipe(r),
             }
         }
         // New meshes drawn while another is selected share its material slots.
-        if let Some(src) = self.data() {
-            let mats = src.bind().material_slots().duplicate_shallow();
+        if let Some(src) = self.contents() {
+            let mats = src.bind().stuff_pockets().duplicate_shallow();
             data.set("materials", &mats.to_variant());
         }
         node.bind_mut().set_data(Some(data));
@@ -1600,11 +1994,21 @@ impl PixelBuilderPlugin {
             node.set("anchor_cell", &c.to_variant());
             node.set("anchored", &true.to_variant());
         }
-        let parent_xf = parent.clone().try_cast::<Node3D>().map(|n| n.get_global_transform()).unwrap_or(Transform3D::IDENTITY);
-        node.set_transform(parent_xf.affine_inverse() * Transform3D::new(p.basis, p.point));
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let parent_xf = parent
+            .clone()
+            .try_cast::<Node3D>()
+            .map(|n| n.get_global_transform())
+            .unwrap_or(Transform3D::IDENTITY);
+        node.set_transform(parent_xf.affine_inverse() * Transform3D::new(p.frame, p.dot));
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         ur.create_action(&format!("Pixel Builder: Create {name}"));
-        ur.add_do_method(&parent, "add_child", &[node.to_variant(), true.to_variant()]);
+        ur.add_do_method(
+            &parent,
+            "add_child",
+            &[node.to_variant(), true.to_variant()],
+        );
         ur.add_do_method(&node, "set_owner", &[root.to_variant()]);
         ur.add_do_reference(&node);
         ur.add_undo_method(&parent, "remove_child", &[node.to_variant()]);
@@ -1613,14 +2017,27 @@ impl PixelBuilderPlugin {
     }
 
     fn place_target(&mut self) {
-        let (Some(t), Some(terrain), Some(p)) = (self.target.clone(), self.terrain.clone(), self.hover_place) else {
+        let (Some(t), Some(terrain), Some(p)) =
+            (self.target.clone(), self.terrain.clone(), self.hover_place)
+        else {
             self.message = "Place needs a selected mesh and a terrain under the cursor".into();
             return;
         };
-        let Some(cell) = p.cell.or_else(|| Some(super::node::world_cell(&terrain, p.point))) else { return };
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some(cell) = p
+            .cell
+            .or_else(|| Some(super::node::world_cell(&terrain, p.dot)))
+        else {
+            return;
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         ur.create_action("Pixel Builder: Place on cell");
-        ur.add_do_method(&t, "place_on_cell", &[terrain.to_variant(), cell.to_variant()]);
+        ur.add_do_method(
+            &t,
+            "place_on_cell",
+            &[terrain.to_variant(), cell.to_variant()],
+        );
         ur.add_undo_property(&t, "position", &t.get_position().to_variant());
         ur.add_undo_property(&t, "anchor_cell", &t.get("anchor_cell"));
         ur.add_undo_property(&t, "anchored", &t.get("anchored"));
@@ -1634,29 +2051,29 @@ impl PixelBuilderPlugin {
     fn apply_edit(&mut self, name: &str, f: impl FnOnce(&mut BMesh, &mut Self)) {
         // Any other edit ends an open adjustment first (it becomes its own undo step).
         self.adjust_commit();
-        let Some(mut data) = self.data() else {
+        let Some(mut data) = self.contents() else {
             self.message = "Select a builder mesh first".into();
             return;
         };
         let (before, mut m) = {
             let d = data.bind();
-            (d.get_blob(), d.mesh().clone())
+            (d.get_blob(), d.cage().clone())
         };
         // Cleared before the edit so a message the edit sets (a refusal, a count) stays shown.
         self.message.clear();
         f(&mut m, self);
-        if let Err(e) = m.validate() {
+        if let Err(e) = m.sanity_check() {
             self.message = format!("Operation failed: {e}");
             return;
         }
-        data.bind_mut().replace(m);
+        data.bind_mut().substitute(m);
         data.emit_changed();
         let after = data.bind().get_blob();
         if after != before {
             if self.adjust_running {
                 // The adjust session's own run: it commits once, at Done.
                 if let Some(adj) = &mut self.adjust {
-                    adj.name = name.to_string();
+                    adj.moniker = name.to_string();
                 }
             } else {
                 self.commit_blob(name, &data, before, after);
@@ -1665,26 +2082,34 @@ impl PixelBuilderPlugin {
         self.redraw();
     }
 
-    fn commit_blob(&mut self, name: &str, data: &Gd<PixelBuilderMeshData>, before: PackedByteArray, after: PackedByteArray) {
+    fn commit_blob(
+        &mut self,
+        name: &str,
+        data: &Gd<PixelBuilderMeshData>,
+        before: PackedByteArray,
+        after: PackedByteArray,
+    ) {
         // A drag / stroke / other path recording its own step: the adjustment goes first.
         self.adjust_commit();
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         ur.create_action(name);
         ur.add_do_method(data, "set_blob", &[after.to_variant()]);
         ur.add_undo_method(data, "set_blob", &[before.to_variant()]);
         ur.commit_action_ex().execute(false).done();
     }
 
-    fn all_or_selected_faces(&self, m: &BMesh) -> BTreeSet<usize> {
+    fn every_or_picked_facets(&self, m: &BMesh) -> BTreeSet<usize> {
         match self.mode {
-            Mode::Object => (0..m.faces.len()).collect(),
+            Mode::Object => (0..m.facets.len()).collect(),
             Mode::Face => self.sel_faces.clone(),
             _ => m.faces_within(&self.selected_verts(m)),
         }
     }
 
     fn run_action(&mut self, a: Action) {
-        // Xogot `invoke_action`: commit a running adjustment, then (for a parameterised action)
+        // Commit a running adjustment, then (for a parameterised action)
         // run it inside a new adjustment the panel can re-run. The session's own re-runs come
         // back here with `adjust_running` set.
         let rerun = self.adjust_running;
@@ -1694,7 +2119,11 @@ impl PixelBuilderPlugin {
         if !rerun {
             self.adjust_commit();
         }
-        let session = (!rerun && !self.no_adjust && self.prefs.adjust_panel && self.target.is_some() && self.tool == Tool::Select)
+        let session = (!rerun
+            && !self.no_adjust
+            && self.prefs.adjust_panel
+            && self.target.is_some()
+            && self.tool == Tool::Select)
             .then(|| adjust::fields(a, self.mode, self.xg.to_new_object))
             .flatten();
         let started = session.is_some();
@@ -1713,23 +2142,27 @@ impl PixelBuilderPlugin {
 
     fn run_action_inner(&mut self, a: Action) {
         match a {
-            Action::ModeObject => self.set_mode(Mode::Object),
-            Action::ModeFace => self.set_mode(Mode::Face),
-            Action::ModeEdge => self.set_mode(Mode::Edge),
-            Action::ModeVertex => self.set_mode(Mode::Vertex),
-            Action::ToolSelect => self.set_tool(Tool::Select),
-            Action::ToolShape => self.set_tool(Tool::Shape),
-            Action::ToolPlace => self.set_tool(Tool::Place),
-            Action::ToolPaint => self.set_tool(Tool::Paint),
-            Action::ToolVertexPaint => self.set_tool(if self.tool == Tool::VertexPaint { Tool::Select } else { Tool::VertexPaint }),
+            Action::ModeObject => self.assign_setting(Mode::Object),
+            Action::ModeFace => self.assign_setting(Mode::Face),
+            Action::ModeEdge => self.assign_setting(Mode::Edge),
+            Action::ModeVertex => self.assign_setting(Mode::Vertex),
+            Action::ToolSelect => self.assign_instrument(Tool::Select),
+            Action::ToolShape => self.assign_instrument(Tool::Shape),
+            Action::ToolPlace => self.assign_instrument(Tool::Place),
+            Action::ToolPaint => self.assign_instrument(Tool::Paint),
+            Action::ToolVertexPaint => self.assign_instrument(if self.tool == Tool::VertexPaint {
+                Tool::Select
+            } else {
+                Tool::VertexPaint
+            }),
             Action::UvLock => self.uv_lock = !self.uv_lock,
             Action::BlendMaterial => self.act_blend_material(),
             Action::InvertAlpha => self.apply_edit("Pixel Builder: Invert alpha", |m, s| {
-                let f = s.all_or_selected_faces(m);
+                let f = s.every_or_picked_facets(m);
                 pt_core::build::paint::invert_alpha(m, &f);
             }),
             Action::BakeMesh => self.act_bake(),
-            Action::Bevel => self.act_bevel_segments(),
+            Action::Bevel => self.perform_chamfer_stretches(),
             Action::GizmoMove => self.set_xform(XformMode::Move),
             Action::GizmoRotate => self.set_xform(XformMode::Rotate),
             Action::GizmoScale => self.set_xform(XformMode::Scale),
@@ -1737,43 +2170,57 @@ impl PixelBuilderPlugin {
             Action::SnapVertex => self.snap_vertex = !self.snap_vertex,
             Action::InsertLoop => self.act_insert_loop(),
             Action::Bridge => self.act_bridge(),
-            Action::SelectLoop => self.act_select_loop(Input::singleton().is_key_pressed(Key::ALT)),
+            Action::SelectLoop => {
+                self.perform_grab_ring(Input::singleton().is_key_pressed(Key::ALT))
+            }
             Action::Shrink => self.act_shrink(),
             Action::Holes => self.act_holes(),
             Action::Mirror => self.act_mirror_axes(),
             Action::Dissolve => self.act_dissolve(),
             Action::OffsetElements => self.act_offset(),
-            Action::InvertSelection => self.act_invert_selection(),
-            Action::SelectByColor => self.act_select_by_color(),
+            Action::InvertSelection => self.perform_negate_picked(),
+            Action::SelectByColor => self.perform_grab_via_tint(),
             Action::SelectBySmoothing => self.act_select_by_smoothing(),
             Action::ToolBezier => {
                 if self.mode != Mode::Object {
-                    self.set_mode(Mode::Object);
+                    self.assign_setting(Mode::Object);
                 }
-                self.set_tool(Tool::Bezier);
+                self.assign_instrument(Tool::Bezier);
             }
             Action::ReusablePart => self.act_reusable_part(),
             Action::IndividualOrigins => self.xg.individual_origins = !self.xg.individual_origins,
-            Action::ExportStl => self.open_export_xg(xg_io::Format::Stl),
-            Action::ExportPly => self.open_export_xg(xg_io::Format::Ply),
-            Action::ExportRes => self.open_export_xg(xg_io::Format::Res),
-            Action::ExportOptions => self.open_export_options(),
+            Action::ExportStl => self.unveil_ship_out_xtra(xg_io::Format::Stl),
+            Action::ExportPly => self.unveil_ship_out_xtra(xg_io::Format::Ply),
+            Action::ExportRes => self.unveil_ship_out_xtra(xg_io::Format::Res),
+            Action::ExportOptions => self.unveil_ship_out_choices(),
             Action::ToolKnife => {
                 if self.mode == Mode::Object {
-                    self.set_mode(Mode::Face);
+                    self.assign_setting(Mode::Face);
                 }
-                self.set_tool(Tool::Knife);
+                self.assign_instrument(Tool::Knife);
             }
             Action::ShapeParams => self.toggle_reshape(),
-            Action::BoolUnion => self.act_boolean(godot::classes::csg_shape_3d::Operation::UNION, "Boolean union"),
-            Action::BoolSubtract => self.act_boolean(godot::classes::csg_shape_3d::Operation::SUBTRACTION, "Boolean subtract"),
-            Action::BoolIntersect => self.act_boolean(godot::classes::csg_shape_3d::Operation::INTERSECTION, "Boolean intersect"),
+            Action::BoolUnion => self.act_boolean(
+                godot::classes::csg_shape_3d::Operation::UNION,
+                "Boolean union",
+            ),
+            Action::BoolSubtract => self.act_boolean(
+                godot::classes::csg_shape_3d::Operation::SUBTRACTION,
+                "Boolean subtract",
+            ),
+            Action::BoolIntersect => self.act_boolean(
+                godot::classes::csg_shape_3d::Operation::INTERSECTION,
+                "Boolean intersect",
+            ),
             Action::Merge => self.act_merge(),
-            Action::UvEditor => self.open_uv_editor(),
+            Action::UvEditor => self.unveil_tex_coord_studio(),
             Action::Preferences => self.open_preferences(),
             Action::ConformNormals => self.apply_edit("Pixel Builder: Conform normals", |m, s| {
-                let n = ops::conform_normals(m);
-                s.message = format!("Conform normals: {n} face{} flipped", if n == 1 { "" } else { "s" });
+                let n = ops::harmonize_uprights(m);
+                s.message = format!(
+                    "Conform normals: {n} face{} flipped",
+                    if n == 1 { "" } else { "s" }
+                );
             }),
             Action::Connect => self.act_connect(),
             Action::Collapse => self.act_collapse(),
@@ -1781,7 +2228,7 @@ impl PixelBuilderPlugin {
                 self.insert_vert = !self.insert_vert;
                 self.insert_hover = None;
                 if self.insert_vert && self.mode != Mode::Edge {
-                    self.set_mode(Mode::Edge);
+                    self.assign_setting(Mode::Edge);
                 }
             }
             Action::TrimWalls => self.act_trim_walls(),
@@ -1792,10 +2239,12 @@ impl PixelBuilderPlugin {
             Action::Fill => self.act_fill(),
             Action::Detach if self.xg.to_new_object => self.act_extract_faces(false),
             Action::Duplicate if self.xg.to_new_object => self.act_extract_faces(true),
-            Action::Detach => self.apply_edit("Pixel Builder: Detach", |m, s| pt_core::build::topo::detach_faces(m, &s.sel_faces)),
+            Action::Detach => self.apply_edit("Pixel Builder: Detach", |m, s| {
+                pt_core::build::topo::unlink_facets(m, &s.sel_faces)
+            }),
             Action::Duplicate => self.apply_edit("Pixel Builder: Duplicate", |m, s| {
                 let f = s.sel_faces.clone();
-                s.sel_faces = ops::duplicate_faces(m, &f, pt_core::math::Vec3::ZERO);
+                s.sel_faces = ops::replicate_facets(m, &f, pt_core::math::Vec3::ZERO);
             }),
             Action::Rotate => {
                 let neg = Input::singleton().is_key_pressed(Key::SHIFT);
@@ -1804,25 +2253,35 @@ impl PixelBuilderPlugin {
             Action::Grow => self.act_select(0),
             Action::Coplanar => self.act_select(1),
             Action::Similar => self.act_select(2),
-            Action::ExportObj => self.open_export_xg(xg_io::Format::Obj),
-            Action::ExportGltf => self.open_export(true),
+            Action::ExportObj => self.unveil_ship_out_xtra(xg_io::Format::Obj),
+            Action::ExportGltf => self.unveil_ship_out(true),
             Action::Convert => self.convert_selected(),
             Action::SnapGrid => self.snap_grid = !self.snap_grid,
             Action::SnapCell => self.snap_cell = !self.snap_cell,
             Action::Extrude => {
-                let (dist, method) = (self.distance, self.xg.extrude_method);
+                let (dist, method) = (self.span, self.xg.extrude_method);
                 if self.mode == Mode::Edge && !self.sel_edges.is_empty() {
-                    self.act_extrude_edges();
+                    self.perform_pull_out_ridges();
                 } else if self.mode != Mode::Face || self.sel_faces.is_empty() {
                     self.message = "Extrude: select faces (Face mode)".into();
                 } else if method == 0 {
-                    self.apply_edit("Pixel Builder: Extrude", |m, s| s.sel_faces = ops::extrude_selection(m, &s.sel_faces, dist));
+                    self.apply_edit("Pixel Builder: Extrude", |m, s| {
+                        s.sel_faces = ops::extrude_selection(m, &s.sel_faces, dist)
+                    });
                 } else {
-                    // Xogot extrude methods: vertex normals / every face on its own.
+                    // Other extrude methods: vertex normals / every face on its own.
                     let how = pt_core::build::xg_ops::ExtrudeMethod::from_i64(method);
-                    self.apply_edit("Pixel Builder: Extrude", |m, s| match pt_core::build::xg_ops::extrude_selection_method(m, &s.sel_faces, dist, how, false) {
-                        Ok(caps) => s.sel_faces = caps,
-                        Err(e) => s.message = format!("Extrude: {e}"),
+                    self.apply_edit("Pixel Builder: Extrude", |m, s| {
+                        match pt_core::build::xg_ops::pull_out_picked_approach(
+                            m,
+                            &s.sel_faces,
+                            dist,
+                            how,
+                            false,
+                        ) {
+                            Ok(caps) => s.sel_faces = caps,
+                            Err(e) => s.message = format!("Extrude: {e}"),
+                        }
                     });
                 }
             }
@@ -1831,83 +2290,99 @@ impl PixelBuilderPlugin {
                 if self.mode != Mode::Face || self.sel_faces.is_empty() {
                     self.message = "Inset: select faces (Face mode)".into();
                 } else if how == 0 {
-                    self.apply_edit("Pixel Builder: Inset", |m, s| s.sel_faces = ops::inset_center(m, &s.sel_faces, amt.min(0.99)));
+                    self.apply_edit("Pixel Builder: Inset", |m, s| {
+                        s.sel_faces = ops::inset_center(m, &s.sel_faces, amt.min(0.9905))
+                    });
                 } else if how == 1 && !self.xg.inset_individual {
-                    // Xogot inset: connected flat faces inset as one region.
-                    self.apply_edit("Pixel Builder: Inset", |m, s| match pt_core::build::xg_ops::inset_center_grouped(m, &s.sel_faces, amt, false) {
-                        Ok(inner) => s.sel_faces = inner,
-                        Err(e) => s.message = format!("Inset: {e}"),
+                    // Grouped inset: connected flat faces inset as one region.
+                    self.apply_edit("Pixel Builder: Inset", |m, s| {
+                        match pt_core::build::xg_ops::inset_center_grouped(
+                            m,
+                            &s.sel_faces,
+                            amt,
+                            false,
+                        ) {
+                            Ok(inner) => s.sel_faces = inner,
+                            Err(e) => s.message = format!("Inset: {e}"),
+                        }
                     });
                 } else {
                     // Width inset: a rim `amt` wide; Equal mitres the corners.
-                    self.apply_edit("Pixel Builder: Inset", |m, s| s.sel_faces = pt_core::build::mesh_ops::inset_rim(m, &s.sel_faces, amt, how == 2));
+                    self.apply_edit("Pixel Builder: Inset", |m, s| {
+                        s.sel_faces =
+                            pt_core::build::mesh_ops::inset_rim(m, &s.sel_faces, amt, how == 2)
+                    });
                 }
             }
             Action::Subdivide => self.act_subdivide(),
-            Action::SubdivideEdges => self.act_subdivide_edges(),
-            Action::ConnectEdges => self.act_connect_edges(),
-            Action::FlipEdge => self.act_flip_edge(),
+            Action::SubdivideEdges => self.perform_refine_ridges(),
+            Action::ConnectEdges => self.perform_join_ridges(),
+            Action::FlipEdge => self.perform_turnover_ridge(),
             Action::SplitVerts => self.act_split_verts(),
             Action::Triangulate => self.act_triangulate(),
-            Action::MergeObjects => self.act_merge_objects(),
+            Action::MergeObjects => self.perform_fuse_entities(),
             Action::CenterPivot => self.act_center_pivot(),
             Action::PivotToSelection => self.act_pivot_to_selection(),
-            Action::FreezeTransform => self.act_freeze_transform(),
+            Action::FreezeTransform => self.perform_ice_warp(),
             Action::Flip => self.apply_edit("Pixel Builder: Flip normals", |m, s| {
-                let f = s.all_or_selected_faces(m);
-                ops::flip_faces(m, &f);
+                let f = s.every_or_picked_facets(m);
+                ops::turnover_facets(m, &f);
             }),
             Action::Delete => self.delete_selected(),
             Action::Weld => {
                 let dist = self.xg.weld_dist.max(1e-6);
                 self.apply_edit("Pixel Builder: Weld", |m, s| {
                     if s.mode == Mode::Vertex && s.sel_verts.len() > 1 {
-                        // The selected vertices closer than the Weld distance (Xogot weld).
+                        // The selected vertices closer than the Weld distance.
                         let v = s.sel_verts.clone();
-                        let n = pt_core::build::loops::weld_selected_vertices(m, &v, dist);
+                        let n = pt_core::build::loops::braze_picked_corners(m, &v, dist);
                         m.compact();
-                        s.clear_selection();
-                        s.message = if n == 0 { format!("Weld: no selected vertices closer than {dist}") } else { format!("Weld: {n} vertices merged") };
+                        s.purge_picked();
+                        s.message = if n == 0 {
+                            format!("Weld: no selected vertices closer than {dist}")
+                        } else {
+                            format!("Weld: {n} vertices merged")
+                        };
                     } else {
-                        let n = ops::weld_by_distance(m, dist, None);
-                        s.clear_selection();
+                        let n = ops::braze_via_span(m, dist, None);
+                        s.purge_picked();
                         s.message = format!("Weld: {n} vertices merged");
                     }
                 })
             }
-            Action::SelectAll => self.select_all(),
-            Action::ClearSelection => self.clear_selection(),
-            Action::SelectRing => self.act_select_loop(true),
+            Action::SelectAll => self.grab_every(),
+            Action::ClearSelection => self.purge_picked(),
+            Action::SelectRing => self.perform_grab_ring(true),
             Action::RotateNeg => self.act_rotate(-90.0),
-            Action::GenerateUv2 => self.act_generate_uv2(),
+            Action::GenerateUv2 => self.perform_produce_uv_b(),
             Action::PaintColour => self.act_paint_colour(),
             Action::Material => {
-                let (slot, col) = (self.slot.clamp(0, 255) as u16, ui_color_bytes(self.color));
+                let (slot, col) = (self.pocket.clamp(0, 255) as u16, ui_color_bytes(self.tint));
                 self.apply_edit("Pixel Builder: Assign material", |m, s| {
-                    let f = s.all_or_selected_faces(m);
-                    ops::set_material(m, &f, slot);
-                    ops::set_color(m, &f, col);
+                    let f = s.every_or_picked_facets(m);
+                    ops::assign_stuff(m, &f, slot);
+                    ops::assign_tint(m, &f, col);
                 });
             }
         }
     }
 
     /// Ctrl+A: every element of the mode.
-    fn select_all(&mut self) {
+    fn grab_every(&mut self) {
         self.adjust_commit();
-        if let Some(d) = self.data() {
+        if let Some(d) = self.contents() {
             let db = d.bind();
-            let m = db.mesh();
+            let m = db.cage();
             match self.mode {
-                Mode::Face => self.sel_faces = (0..m.faces.len()).collect(),
-                Mode::Edge => self.sel_edges = m.edges().into_iter().collect(),
+                Mode::Face => self.sel_faces = (0..m.facets.len()).collect(),
+                Mode::Edge => self.sel_edges = m.ridges().into_iter().collect(),
                 Mode::Vertex => self.sel_verts = (0..m.positions.len() as u32).collect(),
                 Mode::Object => {}
             }
         }
     }
 
-    /// H: Object → Vertex → Edge → Face → Object (Xogot README: "H cycles").
+    /// H: Object → Vertex → Edge → Face → Object.
     fn cycle_mode(&mut self) {
         let next = match self.mode {
             Mode::Object => Mode::Vertex,
@@ -1915,23 +2390,23 @@ impl PixelBuilderPlugin {
             Mode::Edge => Mode::Face,
             Mode::Face => Mode::Object,
         };
-        self.set_mode(next);
+        self.assign_setting(next);
     }
 
     fn delete_selected(&mut self) {
         let mode = self.mode;
         self.apply_edit("Pixel Builder: Delete", |m, s| {
             match mode {
-                Mode::Face => ops::delete_faces(m, &s.sel_faces),
+                Mode::Face => ops::discard_facets(m, &s.sel_faces),
                 Mode::Edge => ops::delete_edges(m, &s.sel_edges),
                 Mode::Vertex => ops::delete_verts(m, &s.sel_verts),
                 Mode::Object => {}
             }
-            s.clear_selection();
+            s.purge_picked();
         });
     }
 
-    fn set_mode(&mut self, mode: Mode) {
+    fn assign_setting(&mut self, mode: Mode) {
         if mode == self.mode {
             return;
         }
@@ -1940,20 +2415,32 @@ impl PixelBuilderPlugin {
         self.hover_edge = None;
         self.hover_vert = None;
         // Convert the selection (face -> its verts / edges, verts -> faces fully inside).
-        if let Some(d) = self.data() {
+        if let Some(d) = self.contents() {
             let db = d.bind();
-            let m = db.mesh();
+            let m = db.cage();
             let verts = self.selected_verts(m);
-            self.sel_faces = if mode == Mode::Face { m.faces_within(&verts) } else { BTreeSet::new() };
-            self.sel_edges = if mode == Mode::Edge { m.edges_within(&verts) } else { BTreeSet::new() };
-            self.sel_verts = if mode == Mode::Vertex { verts } else { BTreeSet::new() };
+            self.sel_faces = if mode == Mode::Face {
+                m.faces_within(&verts)
+            } else {
+                BTreeSet::new()
+            };
+            self.sel_edges = if mode == Mode::Edge {
+                m.edges_within(&verts)
+            } else {
+                BTreeSet::new()
+            };
+            self.sel_verts = if mode == Mode::Vertex {
+                verts
+            } else {
+                BTreeSet::new()
+            };
         }
         self.mode = mode;
         if mode != Mode::Object {
             // Element modes always use Select: drop the drawing tools' state too (a Bezier
             // re-edit, a poly outline).
             self.tool = Tool::Select;
-            self.bz.reset();
+            self.bz.revert();
             self.poly_outline = None;
             self.poly_holes.clear();
             self.wall_pts.clear();
@@ -1967,11 +2454,11 @@ impl PixelBuilderPlugin {
         self.xform_mode = x;
         self.hover_handle = None;
         if self.tool != Tool::Select {
-            self.set_tool(Tool::Select);
+            self.assign_instrument(Tool::Select);
         }
     }
 
-    fn set_tool(&mut self, t: Tool) {
+    fn assign_instrument(&mut self, t: Tool) {
         if t != self.tool {
             self.adjust_commit();
         }
@@ -1982,7 +2469,7 @@ impl PixelBuilderPlugin {
         self.wall_cursor = None;
         self.poly_outline = None;
         self.poly_holes.clear();
-        self.bz.reset();
+        self.bz.revert();
         self.hover_place = None;
         if t != Tool::Select {
             self.cancel_drag();
@@ -1994,10 +2481,10 @@ impl PixelBuilderPlugin {
     // ------------------------------------------------------------------ drag
 
     fn begin_drag(&mut self, cam: &Gd<Camera3D>, pos: Vector2, handle: Handle, extrude: bool) {
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let (before, mut start) = {
             let d = data.bind();
-            (d.get_blob(), d.mesh().clone())
+            (d.get_blob(), d.cage().clone())
         };
         let axis = match handle {
             Handle::Move(a) => a,
@@ -2017,11 +2504,13 @@ impl PixelBuilderPlugin {
             Mode::Edge => start.verts_of_edges(&self.sel_edges),
             _ => self.sel_verts.clone(),
         };
-        let Some(pivot) = self.pivot() else { return };
+        let Some(pivot) = self.fulcrum() else { return };
         let o = cam.project_ray_origin(pos);
         let d = cam.project_ray_normal(pos);
         let axes = self.gizmo_axes();
-        let start_t = axis.and_then(|a| closest_on_axis(pivot, axes[a], o, d)).unwrap_or(0.0);
+        let start_t = axis
+            .and_then(|a| closest_on_axis(pivot, axes[a], o, d))
+            .unwrap_or(0.0);
         let n = cam.get_global_transform().basis.col_c();
         let start_hit = plane_hit(pivot, n, o, d).unwrap_or(pivot);
         let weights = self.drag_weights(&start, &verts);
@@ -2030,23 +2519,33 @@ impl PixelBuilderPlugin {
             Handle::Scale(a) => (None, Some(self.begin_scale(cam, pos, pivot, a))),
             Handle::Move(_) => (None, None),
         };
-        let (snap_anchor, snap_targets) = if matches!(handle, Handle::Move(_)) { self.snap_setup(cam, pos, &start, &weights, pivot) } else { (pivot, Vec::new()) };
-        let uv_frames = self.uv_lock.then(|| pt_core::build::uv_lock::capture_drag_frames(&start, &weights.keys().copied().collect()));
-        let groups = if matches!(handle, Handle::Rotate(_) | Handle::Scale(_)) { self.individual_groups(&start, &verts) } else { None };
+        let (snap_anchor, snap_targets) = if matches!(handle, Handle::Move(_)) {
+            self.snap_setup(cam, pos, &start, &weights, pivot)
+        } else {
+            (pivot, Vec::new())
+        };
+        let uv_frames = self.uv_lock.then(|| {
+            pt_core::build::uv_lock::capture_drag_frames(&start, &weights.keys().copied().collect())
+        });
+        let groups = if matches!(handle, Handle::Rotate(_) | Handle::Scale(_)) {
+            self.individual_groups(&start, &verts)
+        } else {
+            None
+        };
         self.drag = Some(Drag {
-            axis,
+            axle: axis,
             before,
-            start,
-            pivot,
+            commence: start,
+            fulcrum: pivot,
             start_t,
             start_hit,
-            name,
+            moniker: name,
             last_delta: Vector3::ZERO,
             handle: Some(handle),
             groups,
             weights,
             rot,
-            scale,
+            magnify: scale,
             snap_anchor,
             snap_targets,
             snap_hit: None,
@@ -2057,7 +2556,11 @@ impl PixelBuilderPlugin {
     }
 
     fn drag_motion(&mut self, cam: &Gd<Camera3D>, pos: Vector2) {
-        if self.drag.as_ref().is_some_and(|d| d.rot.is_some() || d.scale.is_some()) {
+        if self
+            .drag
+            .as_ref()
+            .is_some_and(|d| d.rot.is_some() || d.magnify.is_some())
+        {
             self.drag_rotate_scale(cam, pos);
             return;
         }
@@ -2069,32 +2572,32 @@ impl PixelBuilderPlugin {
         let o = cam.project_ray_origin(pos);
         let d = cam.project_ray_normal(pos);
         let axes = drag.axes;
-        let mut delta = match drag.axis {
-            Some(a) => match closest_on_axis(drag.pivot, axes[a], o, d) {
+        let mut delta = match drag.axle {
+            Some(a) => match closest_on_axis(drag.fulcrum, axes[a], o, d) {
                 Some(t) => axes[a] * (t - drag.start_t),
                 None => return,
             },
             None => {
                 let n = cam.get_global_transform().basis.col_c();
-                match plane_hit(drag.pivot, n, o, d) {
+                match plane_hit(drag.fulcrum, n, o, d) {
                     Some(h) => h - drag.start_hit,
                     None => return,
                 }
             }
         };
         if self.snap_cell
-            && drag.axis != Some(1)
+            && drag.axle != Some(1)
             && let Some(t) = &self.terrain
         {
             // Snap the pivot onto the nearest terrain cell corner / centre (hex-aligned walls).
             let xf = t.get_global_transform();
-            let l = xf.affine_inverse() * (drag.pivot + delta);
+            let l = xf.affine_inverse() * (drag.fulcrum + delta);
             let q = snap::nearest_cell_point(&t.bind().store().config, v2(l.x, l.z), true);
             let w = xf * Vector3::new(q.x, l.y, q.y);
-            delta.x = w.x - drag.pivot.x;
-            delta.z = w.z - drag.pivot.z;
-            if drag.axis.is_some() {
-                let a = axes[drag.axis.unwrap_or(0)];
+            delta.x = w.x - drag.fulcrum.x;
+            delta.z = w.z - drag.fulcrum.z;
+            if drag.axle.is_some() {
+                let a = axes[drag.axle.unwrap_or(0)];
                 delta = a * delta.dot(a);
             }
             if self.snap_grid {
@@ -2111,14 +2614,14 @@ impl PixelBuilderPlugin {
             return;
         }
         let local = self.xform().basis.inverse() * delta;
-        let mut m = drag.start.clone();
+        let mut m = drag.commence.clone();
         pt_core::build::xform::translate_weighted(&mut m, &drag.weights, to_p(local));
         drag.lock_uvs(&mut m);
         if let Some(dr) = &mut self.drag {
             dr.last_delta = delta;
         }
-        if let Some(mut data) = self.data() {
-            data.bind_mut().replace(m);
+        if let Some(mut data) = self.contents() {
+            data.bind_mut().substitute(m);
             data.emit_changed();
         }
         self.redraw();
@@ -2126,16 +2629,16 @@ impl PixelBuilderPlugin {
 
     fn finish_drag(&mut self) {
         let Some(drag) = self.drag.take() else { return };
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let after = data.bind().get_blob();
         if after != drag.before {
-            self.commit_blob(drag.name, &data, drag.before, after);
+            self.commit_blob(drag.moniker, &data, drag.before, after);
         }
     }
 
     fn cancel_drag(&mut self) {
         let Some(drag) = self.drag.take() else { return };
-        if let Some(mut data) = self.data() {
+        if let Some(mut data) = self.contents() {
             data.bind_mut().set_blob(drag.before);
         }
         self.redraw();
@@ -2173,7 +2676,7 @@ impl PixelBuilderPlugin {
         // Rebindable shortcuts (Editor Settings › Shortcuts › Mst Builder): the first entry whose
         // key matches and whose guard accepts runs; a refused one lets the key through.
         for i in 0..super::shortcuts::ENTRIES.len() {
-            if !super::shortcuts::matches(&self.shortcut_table, i, key) {
+            if !super::shortcuts::fits(&self.shortcut_table, i, key) {
                 continue;
             }
             if let Some(cmd) = self.shortcut_command(super::shortcuts::ENTRIES[i].id) {
@@ -2190,11 +2693,15 @@ impl PixelBuilderPlugin {
                 } else if self.drag.is_some() {
                     self.cancel_drag();
                 } else if self.tool != Tool::Select {
-                    self.set_tool(Tool::Select);
-                } else if editing && !(self.sel_faces.is_empty() && self.sel_edges.is_empty() && self.sel_verts.is_empty()) {
-                    self.clear_selection();
+                    self.assign_instrument(Tool::Select);
+                } else if editing
+                    && !(self.sel_faces.is_empty()
+                        && self.sel_edges.is_empty()
+                        && self.sel_verts.is_empty())
+                {
+                    self.purge_picked();
                 } else if editing {
-                    self.set_mode(Mode::Object);
+                    self.assign_setting(Mode::Object);
                 } else {
                     return false;
                 }
@@ -2231,15 +2738,34 @@ impl PixelBuilderPlugin {
             "soft_select" => run(et, Action::SoftSelect),
             "extrude" => run(et, Action::Extrude),
             "inset" => run(et, Action::Inset),
-            "bevel" => run(has && matches!(self.mode, Mode::Edge | Mode::Vertex), Action::Bevel),
-            "insert_loop" => run(has && self.mode == Mode::Edge && !self.sel_edges.is_empty(), Action::InsertLoop),
+            "bevel" => run(
+                has && matches!(self.mode, Mode::Edge | Mode::Vertex),
+                Action::Bevel,
+            ),
+            "insert_loop" => run(
+                has && self.mode == Mode::Edge && !self.sel_edges.is_empty(),
+                Action::InsertLoop,
+            ),
             "merge" => run(et, Action::Merge),
-            "connect" => run(et, if self.mode == Mode::Edge { Action::ConnectEdges } else { Action::Connect }),
+            "connect" => run(
+                et,
+                if self.mode == Mode::Edge {
+                    Action::ConnectEdges
+                } else {
+                    Action::Connect
+                },
+            ),
             "fill" => run(et, Action::Fill),
-            "triangulate" => run(has && matches!(self.mode, Mode::Object | Mode::Face), Action::Triangulate),
+            "triangulate" => run(
+                has && matches!(self.mode, Mode::Object | Mode::Face),
+                Action::Triangulate,
+            ),
             "rotate" => run(et, Action::Rotate),
             "rotate_back" => run(et, Action::RotateNeg),
-            "duplicate" => run(has && self.mode == Mode::Face && !self.sel_faces.is_empty(), Action::Duplicate),
+            "duplicate" => run(
+                has && self.mode == Mode::Face && !self.sel_faces.is_empty(),
+                Action::Duplicate,
+            ),
             "delete" => run(et, Action::Delete),
             "select_all" => run(et, Action::SelectAll),
             "grow" => run(et, Action::Grow),
@@ -2259,7 +2785,7 @@ impl PixelBuilderPlugin {
             KeyCmd::Run(a) => self.run_action(a),
             KeyCmd::CycleMode => self.cycle_mode(),
             KeyCmd::Grid(f) => {
-                self.grid_step = (self.grid_step * f).clamp(0.0625, 64.0);
+                self.grid_step = (self.grid_step * f).clamp(0.0624, 64.0);
                 self.sync_ui();
             }
         }
@@ -2267,11 +2793,13 @@ impl PixelBuilderPlugin {
 
     // ------------------------------------------------------------------ wireframe gizmo
 
-    fn ensure_gizmo(&mut self) {
+    fn secure_handlebar(&mut self) {
         if self.gizmo.is_some() {
             return;
         }
-        let Some(mut t) = self.target.clone() else { return };
+        let Some(mut t) = self.target.clone() else {
+            return;
+        };
         let mut mi = MeshInstance3D::new_alloc();
         mi.set_name("PixelBuilderGizmo");
         mi.set_mesh(&ImmediateMesh::new_gd());
@@ -2282,7 +2810,9 @@ impl PixelBuilderPlugin {
         mat.set_cull_mode(CullMode::DISABLED);
         mat.set_render_priority(100);
         mi.set_material_override(&mat);
-        mi.set_cast_shadows_setting(godot::classes::geometry_instance_3d::ShadowCastingSetting::OFF);
+        mi.set_cast_shadows_setting(
+            godot::classes::geometry_instance_3d::ShadowCastingSetting::OFF,
+        );
         mi.set_layer_mask(1);
         mi.add_to_group("pixel_ignore");
         add_internal(&mut t, &mi);
@@ -2302,22 +2832,26 @@ impl PixelBuilderPlugin {
     /// Recomputes the viewport feedback text (scene info, dimensions) for the overlay.
     fn refresh_feedback(&mut self) {
         self.feedback = Feedback::default();
-        let Some(d) = self.data() else { return };
+        let Some(d) = self.contents() else { return };
         let db = d.bind();
-        let m = db.mesh();
+        let m = db.cage();
         if self.prefs.show_scene_info {
-            self.feedback.info = Some(format!(
+            self.feedback.facts = Some(format!(
                 "{} verts  {} edges  {} faces  |  selected: {} faces {} edges {} verts",
                 m.positions.len(),
-                m.edges().len(),
-                m.faces.len(),
+                m.ridges().len(),
+                m.facets.len(),
                 self.sel_faces.len(),
                 self.sel_edges.len(),
                 self.sel_verts.len()
             ));
         }
         if self.prefs.show_dimensions {
-            let verts: Vec<u32> = if self.mode == Mode::Object { (0..m.positions.len() as u32).collect() } else { self.selected_verts(m).into_iter().collect() };
+            let verts: Vec<u32> = if self.mode == Mode::Object {
+                (0..m.positions.len() as u32).collect()
+            } else {
+                self.selected_verts(m).into_iter().collect()
+            };
             if !verts.is_empty() {
                 // World-space box of the selection (axis-aligned in world space).
                 let xf = self.xform();
@@ -2330,7 +2864,8 @@ impl PixelBuilderPlugin {
                 }
                 let s = hi - lo;
                 let anchor = Vector3::new((lo.x + hi.x) * 0.5, hi.y, (lo.z + hi.z) * 0.5);
-                self.feedback.dims = Some((anchor, format!("{:.3} x {:.3} x {:.3}", s.x, s.y, s.z)));
+                self.feedback.dims =
+                    Some((anchor, format!("{:.3} x {:.3} x {:.3}", s.x, s.y, s.z)));
             }
         }
     }
@@ -2339,10 +2874,10 @@ impl PixelBuilderPlugin {
         // Smoothing tint / normals: rebuilt only when the mesh or its settings changed.
         self.refresh_attr_overlay();
         // Drop selections / hovers that an undo / external edit made invalid.
-        if let Some(d) = self.data() {
+        if let Some(d) = self.contents() {
             let db = d.bind();
-            let m = db.mesh();
-            let (nf, nv) = (m.faces.len(), m.positions.len() as u32);
+            let m = db.cage();
+            let (nf, nv) = (m.facets.len(), m.positions.len() as u32);
             self.sel_faces.retain(|f| *f < nf);
             self.sel_verts.retain(|v| *v < nv);
             self.sel_edges.retain(|e| e.0 < nv && e.1 < nv);
@@ -2358,20 +2893,22 @@ impl PixelBuilderPlugin {
         }
         self.refresh_feedback();
         self.base().update_overlays();
-        self.sync_uv_editor();
+        self.tune_tex_coord_studio();
         let Some(g) = &self.gizmo else { return };
         if !g.is_instance_valid() {
             self.gizmo = None;
             return;
         }
         let Some(mesh) = g.get_mesh() else { return };
-        let Ok(mut im) = mesh.try_cast::<ImmediateMesh>() else { return };
+        let Ok(mut im) = mesh.try_cast::<ImmediateMesh>() else {
+            return;
+        };
         im.clear_surfaces();
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let db = data.bind();
-        let m = db.mesh();
+        let m = db.cage();
         // Drop selections that an undo / external edit made invalid.
-        let nf = m.faces.len();
+        let nf = m.facets.len();
         let nv = m.positions.len() as u32;
         self.sel_faces.retain(|f| *f < nf);
         self.sel_verts.retain(|v| *v < nv);
@@ -2390,13 +2927,17 @@ impl PixelBuilderPlugin {
             .sel_faces
             .iter()
             .map(|f| (*f, self.prefs.color_face_selected))
-            .chain(self.hover_face.filter(|f| !self.sel_faces.contains(f)).map(|f| (f, self.prefs.color_face_hover)))
+            .chain(
+                self.hover_face
+                    .filter(|f| !self.sel_faces.contains(f))
+                    .map(|f| (f, self.prefs.color_face_hover)),
+            )
             .collect();
         for (f, c) in faces {
-            let n = from_p(m.face_normal(f)) * 0.004;
+            let n = from_p(m.face_normal(f)) * 0.0045;
             for t in &tris[f] {
                 for k in t {
-                    tri_pts.push((p(m.faces[f].verts[*k]) + n, c));
+                    tri_pts.push((p(m.facets[f].verts[*k]) + n, c));
                 }
             }
         }
@@ -2415,8 +2956,12 @@ impl PixelBuilderPlugin {
             _ => m.edges_within(&self.sel_verts),
         };
         im.surface_begin(PrimitiveType::LINES);
-        for e in m.edges() {
-            let c = if sel_edges.contains(&e) { self.prefs.color_edge_selected } else { self.prefs.color_edge };
+        for e in m.ridges() {
+            let c = if sel_edges.contains(&e) {
+                self.prefs.color_edge_selected
+            } else {
+                self.prefs.color_edge
+            };
             im.surface_set_color(c);
             im.surface_add_vertex(p(e.0));
             im.surface_set_color(c);
@@ -2431,9 +2976,13 @@ impl PixelBuilderPlugin {
             let c = self.prefs.color_edge_hover;
             let (a, b) = (p(e.0), p(e.1));
             let len = (b - a).length().max(1e-4);
-            let w = (len * 0.012).clamp(0.004, 0.03);
+            let w = (len * 0.0125).clamp(0.0045, 0.0305);
             let dir = (b - a) / len;
-            let side = if dir.cross(Vector3::UP).length() > 0.1 { dir.cross(Vector3::UP).normalized() } else { dir.cross(Vector3::RIGHT).normalized() };
+            let side = if dir.cross(Vector3::UP).length() > 0.1005 {
+                dir.cross(Vector3::UP).normalized()
+            } else {
+                dir.cross(Vector3::RIGHT).normalized()
+            };
             let up = dir.cross(side).normalized();
             im.surface_begin(PrimitiveType::TRIANGLES);
             for off in [side * w, up * w] {
@@ -2456,9 +3005,26 @@ impl PixelBuilderPlugin {
     /// Face / Edge / Vertex modes (and for the element tools). A node the user locked himself
     /// is left alone; the lock is stripped while the scene is being saved.
     pub(super) fn sync_gizmo_lock(&mut self) {
-        let want = self.target.clone().filter(|t| t.is_instance_valid() && self.visible && (self.mode != Mode::Object || matches!(self.tool, Tool::Paint | Tool::Knife | Tool::VertexPaint | Tool::Bezier)));
+        let want = self.target.clone().filter(|t| {
+            t.is_instance_valid()
+                && self.visible
+                && (self.mode != Mode::Object
+                    || matches!(
+                        self.tool,
+                        Tool::Paint | Tool::Knife | Tool::VertexPaint | Tool::Bezier
+                    ))
+        });
         // Validity first: the locked node may have been freed (its scene closed).
-        if want.as_ref().filter(|t| t.is_instance_valid()).map(|t| t.instance_id()) == self.lock_target.as_ref().filter(|t| t.is_instance_valid()).map(|t| t.instance_id()) {
+        if want
+            .as_ref()
+            .filter(|t| t.is_instance_valid())
+            .map(|t| t.instance_id())
+            == self
+                .lock_target
+                .as_ref()
+                .filter(|t| t.is_instance_valid())
+                .map(|t| t.instance_id())
+        {
             return;
         }
         self.set_gizmo_lock(want);
@@ -2484,16 +3050,25 @@ impl PixelBuilderPlugin {
         }
         if changed && let Some(sel) = EditorInterface::singleton().get_selection() {
             // The 3D editor rebuilds its gizmo on a selection change ("selection nudge").
-            sel.upcast::<Object>().call_deferred("emit_signal", &["selection_changed".to_variant()]);
+            sel.upcast::<Object>()
+                .call_deferred("emit_signal", &["selection_changed".to_variant()]);
         }
     }
 
     // ------------------------------------------------------------------ UV editor
 
-    /// Opens the UV editor: the floating window (MST layout) or the "Mesh UV" bottom dock (Xogot
-    /// layout, docs/port/07-xogot-ui.md §3.8). One panel / canvas instance serves both hosts.
-    pub(super) fn open_uv_editor(&mut self) {
-        if self.uv_window.as_ref().is_none_or(|w| !w.is_instance_valid()) || self.uv_panel.as_ref().is_none_or(|p| !p.is_instance_valid()) {
+    /// Opens the UV editor: the floating window (MST layout) or the "Mesh UV" bottom dock (docked
+    /// layout). One panel / canvas instance serves both hosts.
+    pub(super) fn unveil_tex_coord_studio(&mut self) {
+        if self
+            .uv_window
+            .as_ref()
+            .is_none_or(|w| !w.is_instance_valid())
+            || self
+                .uv_panel
+                .as_ref()
+                .is_none_or(|p| !p.is_instance_valid())
+        {
             let (win, panel, canvas) = uv_editor::build_window();
             if let Some(mut base) = EditorInterface::singleton().get_base_control() {
                 base.add_child(&win);
@@ -2502,7 +3077,7 @@ impl PixelBuilderPlugin {
             self.uv_panel = Some(panel);
             self.uv_canvas = Some(canvas);
         }
-        let docked = self.is_xogot();
+        let docked = self.is_modeler();
         self.place_uv(docked);
         if docked {
             if let Some(d) = &mut self.uv_dock {
@@ -2523,7 +3098,10 @@ impl PixelBuilderPlugin {
     /// Leaving the dock closes it (empty, tab hidden); `exit_tree` removes and frees it. Nothing
     /// here is connected to the plugin, so the reparenting cannot call back into it.
     pub(super) fn place_uv(&mut self, dock: bool) {
-        let (Some(mut panel), Some(mut win)) = (self.uv_panel.clone().filter(|p| p.is_instance_valid()), self.uv_window.clone().filter(|w| w.is_instance_valid())) else {
+        let (Some(mut panel), Some(mut win)) = (
+            self.uv_panel.clone().filter(|p| p.is_instance_valid()),
+            self.uv_window.clone().filter(|w| w.is_instance_valid()),
+        ) else {
             return;
         };
         let s = crate::editor::ui_kit::editor_scale();
@@ -2544,8 +3122,13 @@ impl PixelBuilderPlugin {
                 self.base_mut().add_dock(&d);
                 self.uv_dock = Some(d);
             }
-            let Some(mut d) = self.uv_dock.clone() else { return };
-            if panel.get_parent().is_none_or(|p| p.instance_id() != d.instance_id()) {
+            let Some(mut d) = self.uv_dock.clone() else {
+                return;
+            };
+            if panel
+                .get_parent()
+                .is_none_or(|p| p.instance_id() != d.instance_id())
+            {
                 win.hide();
                 if let Some(mut p) = panel.get_parent() {
                     p.remove_child(&panel);
@@ -2554,13 +3137,18 @@ impl PixelBuilderPlugin {
                 d.add_child(&panel);
             }
         } else {
-            if panel.get_parent().is_none_or(|p| p.instance_id() != win.instance_id()) {
+            if panel
+                .get_parent()
+                .is_none_or(|p| p.instance_id() != win.instance_id())
+            {
                 if let Some(mut p) = panel.get_parent() {
                     p.remove_child(&panel);
                 }
                 panel.set_custom_minimum_size(Vector2::ZERO);
                 win.add_child(&panel);
-                panel.set_anchors_and_offsets_preset(godot::classes::control::LayoutPreset::FULL_RECT);
+                panel.set_anchors_and_offsets_preset(
+                    godot::classes::control::LayoutPreset::FULL_RECT,
+                );
             }
             // The dock stays registered (closed, its tab hidden) until the plugin exits: removing
             // and freeing it here left the editor's dock manager deferred calls on a freed
@@ -2575,18 +3163,27 @@ impl PixelBuilderPlugin {
     }
 
     /// Whether the UV editor is showing (window visible, or the dock's panel visible in the tree).
-    pub(super) fn uv_open(&self) -> bool {
-        if self.uv_host() == "bottom_panel" {
-            return self.uv_panel.as_ref().is_some_and(|p| p.is_instance_valid() && p.is_visible_in_tree());
+    pub(super) fn tex_coord_unveil(&self) -> bool {
+        if self.tex_coord_carrier() == "bottom_panel" {
+            return self
+                .uv_panel
+                .as_ref()
+                .is_some_and(|p| p.is_instance_valid() && p.is_visible_in_tree());
         }
-        self.uv_window.as_ref().is_some_and(|w| w.is_instance_valid() && w.is_visible())
+        self.uv_window
+            .as_ref()
+            .is_some_and(|w| w.is_instance_valid() && w.is_visible())
     }
 
     /// `"window"` / `"bottom_panel"` (the UV panel's host), `""` before the first open.
-    pub(super) fn uv_host(&self) -> &'static str {
+    pub(super) fn tex_coord_carrier(&self) -> &'static str {
         match &self.uv_panel {
             Some(p) if p.is_instance_valid() => {
-                if self.uv_dock.as_ref().is_some_and(|d| d.is_instance_valid() && p.get_parent().is_some_and(|x| x.instance_id() == d.instance_id())) {
+                if self.uv_dock.as_ref().is_some_and(|d| {
+                    d.is_instance_valid()
+                        && p.get_parent()
+                            .is_some_and(|x| x.instance_id() == d.instance_id())
+                }) {
                     "bottom_panel"
                 } else {
                     "window"
@@ -2597,14 +3194,18 @@ impl PixelBuilderPlugin {
     }
 
     /// Hands the edited mesh and the 3D face selection to the UV editor (if open).
-    fn sync_uv_editor(&mut self) {
-        if self.uv_open() {
+    fn tune_tex_coord_studio(&mut self) {
+        if self.tex_coord_unveil() {
             self.push_uv_target();
         }
     }
 
     fn push_uv_target(&mut self) {
-        let faces = if self.mode == Mode::Face { super::data::face_array(&self.sel_faces) } else { PackedInt32Array::new() };
+        let faces = if self.mode == Mode::Face {
+            super::data::face_array(&self.sel_faces)
+        } else {
+            PackedInt32Array::new()
+        };
         let target = self.target.clone();
         if let Some(c) = &mut self.uv_canvas
             && c.is_instance_valid()
@@ -2616,7 +3217,11 @@ impl PixelBuilderPlugin {
     // ------------------------------------------------------------------ preferences
 
     fn open_preferences(&mut self) {
-        if self.prefs_panel.as_ref().is_none_or(|p| !p.popup.is_instance_valid()) {
+        if self
+            .prefs_panel
+            .as_ref()
+            .is_none_or(|p| !p.popup.is_instance_valid())
+        {
             let gd = self.to_gd().upcast::<Object>();
             let panel = prefs::build_panel(&gd, &self.prefs);
             if let Some(mut base) = EditorInterface::singleton().get_base_control() {
@@ -2655,11 +3260,17 @@ fn plane_hit(p: Vector3, n: Vector3, o: Vector3, d: Vector3) -> Option<Vector3> 
 /// Whether `pos` (main editor window coordinates) is over the editor's main screen (the 3D
 /// editor with its viewports and the builder's toolbar / strip / palette containers).
 fn in_main_screen(pos: Vector2) -> bool {
-    EditorInterface::singleton().get_editor_main_screen().is_some_and(|m| m.get_global_rect().contains_point(pos))
+    EditorInterface::singleton()
+        .get_editor_main_screen()
+        .is_some_and(|m| m.get_global_rect().contains_point(pos))
 }
 
 fn is_undo_redo_key(k: &Gd<InputEventKey>) -> bool {
-    k.is_pressed() && !k.is_echo() && (k.is_ctrl_pressed() || k.is_meta_pressed()) && !k.is_alt_pressed() && matches!(k.get_keycode(), Key::Z | Key::Y)
+    k.is_pressed()
+        && !k.is_echo()
+        && (k.is_ctrl_pressed() || k.is_meta_pressed())
+        && !k.is_alt_pressed()
+        && matches!(k.get_keycode(), Key::Z | Key::Y)
 }
 
 fn ui_color_bytes(c: Color) -> [u8; 4] {
@@ -2669,15 +3280,17 @@ fn ui_color_bytes(c: Color) -> [u8; 4] {
 #[godot_api]
 impl PixelBuilderPlugin {
     #[func]
-    fn on_action(&mut self, id: i64) {
-        if let Some(a) = Action::from_i64(id) {
+    fn upon_deed(&mut self, token_id: i64) {
+        if let Some(a) = Action::from_i64(token_id) {
             self.run_action(a);
         }
     }
 
     #[func]
-    fn on_field(&mut self, value: f64, id: i64) {
-        let Some(f) = Field::from_i64(id) else { return };
+    fn on_field(&mut self, value: f64, token_id: i64) {
+        let Some(f) = Field::from_i64(token_id) else {
+            return;
+        };
         let v = value as f32;
         let old = self.spec;
         match f {
@@ -2694,22 +3307,22 @@ impl PixelBuilderPlugin {
             Field::Inner => self.spec.inner = v,
             Field::Opening => self.spec.opening = v,
             Field::DoorHeight => self.spec.door_height = v,
-            Field::Profile => self.spec.profile = value as u8,
-            Field::Side => self.spec.side = value as u8,
+            Field::Profile => self.spec.silhouette = value as u8,
+            Field::Side => self.spec.flank = value as u8,
             Field::SizeX => self.spec.size.x = v,
             Field::SizeY => self.spec.size.y = v,
             Field::SizeZ => self.spec.size.z = v,
-            Field::Segments => self.spec.segments = value as u32,
+            Field::Segments => self.spec.stretches = value as u32,
             Field::Steps => self.spec.steps = value as u32,
             Field::Thickness => self.spec.thickness = v,
             Field::Rings => self.spec.rings = value as u32,
-            Field::Slot => self.slot = value as i64,
+            Field::Slot => self.pocket = value as i64,
             Field::GridStep => self.grid_step = v,
-            Field::Distance => self.distance = v,
+            Field::Distance => self.span = v,
             Field::Inset => self.inset = v,
-            Field::Bevel => self.bevel = v,
+            Field::Bevel => self.chamfer = v,
             Field::Cuts => self.cuts = value as i64,
-            Field::PaintApply => self.vp.fill = value >= 0.5,
+            Field::PaintApply => self.vp.flood = value >= 0.5,
             Field::PaintChannel => self.vp.channel = value as i64,
             Field::PaintRadius => self.vp.radius = v,
             Field::PaintStrength => self.vp.strength = v,
@@ -2745,7 +3358,7 @@ impl PixelBuilderPlugin {
             Field::ArchBand => self.spec.arch_band = value >= 0.5,
             Field::ArchDegrees => self.spec.arch_degrees = v.clamp(1.0, 360.0),
             Field::EndCaps => self.spec.end_caps = value >= 0.5,
-            Field::StepHeight => self.spec.step_height = if v > 0.0 { v.max(0.01) } else { 0.0 },
+            Field::StepHeight => self.spec.step_height = if v > 0.0 { v.max(0.0105) } else { 0.0 },
             Field::EqualSteps => self.spec.equal_steps = value >= 0.5,
             Field::Subdivisions => self.spec.subdivisions = value.clamp(1.0, 5.0) as u32,
             Field::PolyHoles => {
@@ -2773,13 +3386,23 @@ impl PixelBuilderPlugin {
             | Field::BzRoll => self.bezier_field(f, value),
         }
         // Fields that show / hide others.
-        if matches!(f, Field::OffsetSpace | Field::ArchBand | Field::StepHeight | Field::BzKind | Field::InsetMode) {
+        if matches!(
+            f,
+            Field::OffsetSpace
+                | Field::ArchBand
+                | Field::StepHeight
+                | Field::BzKind
+                | Field::InsetMode
+        ) {
             self.sync_ui();
         }
         if matches!(f, Field::PaintApply | Field::PaintChannel) {
             self.sync_ui();
         }
-        if matches!(f, Field::SmoothTint | Field::ShowNormals | Field::NormalLength) {
+        if matches!(
+            f,
+            Field::SmoothTint | Field::ShowNormals | Field::NormalLength
+        ) {
             self.refresh_attr_overlay();
             self.sync_ui();
         }
@@ -2794,19 +3417,19 @@ impl PixelBuilderPlugin {
     }
 
     #[func]
-    fn on_field_option(&mut self, index: i64, id: i64) {
-        self.on_field(index as f64, id);
+    fn on_field_option(&mut self, index: i64, token_id: i64) {
+        self.on_field(index as f64, token_id);
     }
 
     #[func]
-    fn on_field_check(&mut self, on: bool, id: i64) {
-        self.on_field(if on { 1.0 } else { 0.0 }, id);
+    fn on_field_check(&mut self, on: bool, token_id: i64) {
+        self.on_field(if on { 1.0 } else { 0.0 }, token_id);
     }
 
     #[func]
     fn on_kind(&mut self, index: i64) {
         let old = self.spec;
-        self.spec.kind = ShapeKind::from_i64(index);
+        self.spec.sort = ShapeKind::from_i64(index);
         // A wall / poly drawing in progress belongs to the old kind.
         self.wall_pts.clear();
         self.poly_outline = None;
@@ -2822,7 +3445,7 @@ impl PixelBuilderPlugin {
     #[func]
     fn on_smooth(&mut self, on: bool) {
         let old = self.spec;
-        self.spec.smooth = on;
+        self.spec.glide = on;
         self.spec_changed(old);
     }
 
@@ -2850,12 +3473,12 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: knife-cut `points` (local) into `face`.
     #[func]
     fn debug_knife(&mut self, face: i64, points: PackedVector3Array) {
-        self.set_mode(Mode::Face);
-        self.set_tool(Tool::Knife);
-        if let Some(d) = self.data() {
+        self.assign_setting(Mode::Face);
+        self.assign_instrument(Tool::Knife);
+        if let Some(d) = self.contents() {
             let db = d.bind();
-            let m = db.mesh();
-            if (face as usize) < m.faces.len() {
+            let m = db.cage();
+            if (face as usize) < m.facets.len() {
                 self.knife.face = Some(face as usize);
             }
         }
@@ -2866,8 +3489,8 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: draw a wall (current wall settings) through world `points`.
     #[func]
     fn debug_wall(&mut self, points: PackedVector3Array, closed: bool) {
-        if !self.spec.kind.is_polyline() {
-            self.spec.kind = ShapeKind::Wall;
+        if !self.spec.sort.is_polyline() {
+            self.spec.sort = ShapeKind::Wall;
         }
         self.tool = Tool::Shape;
         self.wall_through(points.as_slice(), closed);
@@ -2878,9 +3501,13 @@ impl PixelBuilderPlugin {
     /// (each an array of world points), through the same path as the drawing tool.
     #[func]
     fn debug_poly(&mut self, outline: PackedVector3Array, holes: VarArray) {
-        self.spec.kind = ShapeKind::Poly;
+        self.spec.sort = ShapeKind::Poly;
         self.tool = Tool::Shape;
-        let hs: Vec<Vec<Vector3>> = holes.iter_shared().filter_map(|h| h.try_to::<PackedVector3Array>().ok()).map(|h| h.as_slice().to_vec()).collect();
+        let hs: Vec<Vec<Vector3>> = holes
+            .iter_shared()
+            .filter_map(|h| h.try_to::<PackedVector3Array>().ok())
+            .map(|h| h.as_slice().to_vec())
+            .collect();
         self.poly_through(outline.as_slice(), &hs);
         self.sync_ui();
     }
@@ -2888,22 +3515,36 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: feeds `event` through the same dispatch as viewport input
     /// (`forward_3d_gui_input`) with 3D viewport 0's camera. True when the plugin consumed it.
     #[func]
-    fn debug_input(&mut self, event: Gd<InputEvent>) -> bool {
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()) else { return false };
-        self.forward_3d_gui_input(Some(cam), Some(event)) == AfterGuiInput::STOP.ord()
+    fn debug_input(&mut self, happening: Gd<InputEvent>) -> bool {
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return false;
+        };
+        self.forward_3d_gui_input(Some(cam), Some(happening)) == AfterGuiInput::STOP.ord()
     }
 
     /// Test / scripting hook: `event` as if it arrived in editor 3D viewport `idx` (0..3).
     #[func]
-    fn debug_viewport_input(&mut self, idx: i64, event: Gd<InputEvent>) -> bool {
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(idx as i32).done().and_then(|v| v.get_camera_3d()) else { return false };
-        self.forward_3d_gui_input(Some(cam), Some(event)) == AfterGuiInput::STOP.ord()
+    fn debug_viewport_input(&mut self, idx: i64, happening: Gd<InputEvent>) -> bool {
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(idx as i32)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return false;
+        };
+        self.forward_3d_gui_input(Some(cam), Some(happening)) == AfterGuiInput::STOP.ord()
     }
 
     /// Test / scripting hook: set a shape field / option by id (same ids as the strip).
     #[func]
-    fn debug_field(&mut self, id: i64, value: f64) {
-        self.on_field(value, id);
+    fn debug_field(&mut self, token_id: i64, value: f64) {
+        self.on_field(value, token_id);
         self.sync_ui();
     }
 
@@ -2920,10 +3561,12 @@ impl PixelBuilderPlugin {
 
     #[func]
     fn on_pref(&mut self, value: Variant, key: i64) {
-        let Some(k) = prefs::Key::from_i64(key) else { return };
-        let before = self.prefs.value(k);
-        self.prefs.set(k, &value);
-        if self.prefs.value(k) != before {
+        let Some(k) = prefs::Key::from_i64(key) else {
+            return;
+        };
+        let before = self.prefs.worth(k);
+        self.prefs.assign(k, &value);
+        if self.prefs.worth(k) != before {
             self.prefs.save_key(k);
         }
         // Snap defaults apply right away too (the strip shows them).
@@ -2964,8 +3607,8 @@ impl PixelBuilderPlugin {
 
     /// Test / scripting hook: the UV editor canvas (opens the window).
     #[func]
-    fn debug_uv_editor(&mut self) -> Option<Gd<PixelBuilderUvCanvas>> {
-        self.open_uv_editor();
+    fn inspect_tex_coord_studio(&mut self) -> Option<Gd<PixelBuilderUvCanvas>> {
+        self.unveil_tex_coord_studio();
         self.uv_canvas.clone()
     }
 
@@ -2979,14 +3622,21 @@ impl PixelBuilderPlugin {
     /// A shortcut may have been rebound: reload them and the tooltips that show them.
     #[func]
     fn on_editor_settings_changed(&mut self) {
-        self.shortcut_table = super::shortcuts::reload();
+        self.shortcut_table = super::shortcuts::reingest();
         if let Some(u) = &mut self.ui {
             u.refresh_tooltips();
         }
         self.refresh_menu_keys();
         // The UI layout setting (Editor Settings dialog, or one of the switch controls).
-        let changed = EditorInterface::singleton().get_editor_settings().is_some_and(|es| es.check_changed_settings_in_group(super::layout::GROUP));
-        if changed || self.ui.as_ref().is_some_and(|u| u.layout() != super::layout::Layout::load()) {
+        let changed = EditorInterface::singleton()
+            .get_editor_settings()
+            .is_some_and(|es| es.check_changed_settings_in_group(super::layout::GROUP));
+        if changed
+            || self
+                .ui
+                .as_ref()
+                .is_some_and(|u| u.layout() != super::layout::Layout::ingest())
+        {
             self.apply_layout();
         }
     }
@@ -2997,12 +3647,22 @@ impl PixelBuilderPlugin {
         let mut d = VarDictionary::new();
         let es = EditorInterface::singleton().get_editor_settings();
         for (i, e) in super::shortcuts::ENTRIES.iter().enumerate() {
-            let path = super::shortcuts::path(e.id);
+            let path = super::shortcuts::route(e.id);
             let mut row = VarArray::new();
             row.push(&path.to_variant());
             row.push(&super::shortcuts::key_text(e.id).to_variant());
-            row.push(&es.as_ref().is_some_and(|s| s.has_shortcut(&path)).to_variant());
-            row.push(&self.shortcut_table.get(i).is_some_and(|s| s.is_some()).to_variant());
+            row.push(
+                &es.as_ref()
+                    .is_some_and(|s| s.has_shortcut(&path))
+                    .to_variant(),
+            );
+            row.push(
+                &self
+                    .shortcut_table
+                    .get(i)
+                    .is_some_and(|s| s.is_some())
+                    .to_variant(),
+            );
             d.set(e.id, &row);
         }
         d
@@ -3026,10 +3686,27 @@ impl PixelBuilderPlugin {
     fn debug_hover_state(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
         d.set("face", self.hover_face.map(|f| f as i64).unwrap_or(-1));
-        d.set("edge", &self.hover_edge.map(|e| PackedInt32Array::from(&[e.0 as i32, e.1 as i32][..])).unwrap_or_default());
+        d.set(
+            "edge",
+            &self
+                .hover_edge
+                .map(|e| PackedInt32Array::from(&[e.0 as i32, e.1 as i32][..]))
+                .unwrap_or_default(),
+        );
         d.set("vert", self.hover_vert.map(|v| v as i64).unwrap_or(-1));
-        d.set("info", self.feedback.info.clone().unwrap_or_default().as_str());
-        d.set("dims", self.feedback.dims.as_ref().map(|x| x.1.clone()).unwrap_or_default().as_str());
+        d.set(
+            "info",
+            self.feedback.facts.clone().unwrap_or_default().as_str(),
+        );
+        d.set(
+            "dims",
+            self.feedback
+                .dims
+                .as_ref()
+                .map(|x| x.1.clone())
+                .unwrap_or_default()
+                .as_str(),
+        );
         d
     }
 
@@ -3041,19 +3718,40 @@ impl PixelBuilderPlugin {
 
     /// Test / scripting hook: a box selection from `from` to `to` (viewport 0 px), Shift held or not.
     #[func]
-    fn debug_marquee(&mut self, from: Vector2, to: Vector2, shift: bool) {
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()) else { return };
+    fn debug_marquee(&mut self, start_pt: Vector2, to: Vector2, shift: bool) {
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return;
+        };
         self.adjust_commit();
-        self.marquee_select(&cam, Marquee { from, to, additive: shift });
+        self.marquee_select(
+            &cam,
+            Marquee {
+                start_pt,
+                to,
+                additive: shift,
+            },
+        );
         self.redraw();
     }
 
     /// Test / scripting hook: a click pick at `pos` (viewport 0 px), Shift held or not.
     #[func]
     fn debug_pick(&mut self, pos: Vector2, shift: bool) -> bool {
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()) else { return false };
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return false;
+        };
         self.adjust_commit();
-        let r = self.pick(&cam, pos, shift);
+        let r = self.choose(&cam, pos, shift);
         self.redraw();
         r
     }
@@ -3061,18 +3759,25 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: mouse hover at `pos` (viewport 0 px).
     #[func]
     fn debug_hover(&mut self, pos: Vector2) {
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()) else { return };
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return;
+        };
         self.update_hover(&cam, pos);
     }
 
     #[func]
     fn on_color(&mut self, c: Color) {
-        self.color = c;
+        self.tint = c;
     }
 
     #[func]
-    fn on_uv_field(&mut self, value: f64, id: i64) {
-        if let Some(f) = UvField::from_i64(id) {
+    fn on_uv_field(&mut self, value: f64, token_id: i64) {
+        if let Some(f) = UvField::from_i64(token_id) {
             self.uv_field(f, value as f32);
         }
     }
@@ -3108,17 +3813,17 @@ impl PixelBuilderPlugin {
 
     #[func]
     fn on_slot_material(&mut self, res: Option<Gd<godot::classes::Resource>>, slot: i64) {
-        self.set_slot_material(res, slot);
+        self.assign_pocket_stuff(res, slot);
     }
 
     #[func]
     fn on_add_slot(&mut self) {
-        self.add_slot();
+        self.insert_pocket();
     }
 
     #[func]
     fn on_export_file(&mut self, path: GString) {
-        self.message = match self.export_to(&path.to_string()) {
+        self.message = match self.ship_out_into(&path.to_string()) {
             Ok(m) => m,
             Err(e) => format!("Export failed: {e}"),
         };
@@ -3131,25 +3836,26 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: run a toolbar action by id (applied at once: no adjust session;
     /// `debug_action_adjust` runs it like a button press).
     #[func]
-    fn debug_action(&mut self, id: i64) {
+    fn debug_action(&mut self, token_id: i64) {
         let old = (self.no_adjust, self.no_confirm);
         self.no_adjust = true;
         self.no_confirm = true;
-        self.on_action(id);
+        self.upon_deed(token_id);
         (self.no_adjust, self.no_confirm) = old;
     }
 
     /// Builder toolbar button under the mouse (-1 = none): its name and shortcut in the strip.
     #[func]
-    fn on_button_hover(&mut self, id: i64) {
-        let text = Action::from_i64(id).map(ui::hover_text).unwrap_or_default();
+    fn on_button_hover(&mut self, token_id: i64) {
+        let text = Action::from_i64(token_id)
+            .map(ui::hover_text)
+            .unwrap_or_default();
         if let Some(LayoutUi::Mst(u)) = &mut self.ui {
             u.hover.set_text(&text);
         }
     }
 
-    /// Paint swatch: click uses its color, Ctrl+click stores the current color in it
-    /// (`tools/tool_vertex_color_brush.gd`'s swatch click).
+    /// Paint swatch: click uses its color, Ctrl+click stores the current color in it.
     #[func]
     fn on_swatch(&mut self, idx: i64) {
         let i = idx.clamp(0, 7) as usize;
@@ -3161,15 +3867,15 @@ impl PixelBuilderPlugin {
             let c = self.swatches[i];
             self.select_faces_with_colour(c);
         } else {
-            self.color = self.swatches[i];
+            self.tint = self.swatches[i];
             self.sync_ui();
         }
     }
 
     /// Builder menu (3D toolbar).
     #[func]
-    fn on_builder_menu(&mut self, id: i64) {
-        let a = match id {
+    fn on_builder_menu(&mut self, token_id: i64) {
+        let a = match token_id {
             0 => Some(Action::UvEditor),
             1 => Some(Action::Preferences),
             2 => Some(Action::BakeMesh),
@@ -3182,13 +3888,17 @@ impl PixelBuilderPlugin {
             9 => Some(Action::ExportOptions),
             10 => Some(Action::ReusablePart),
             11 => {
-                // The Xogot layout check item: write the setting, swap after this signal.
-                let next = if self.is_xogot() { super::layout::Layout::Mst } else { super::layout::Layout::Xogot };
+                // The alternate-layout check item: write the setting, swap after this signal.
+                let next = if self.is_modeler() {
+                    super::layout::Layout::Mst
+                } else {
+                    super::layout::Layout::Modeler
+                };
                 self.switch_layout(next);
                 None
             }
             12 => {
-                self.open_xg_options(None);
+                self.unveil_xtra_choices(None);
                 None
             }
             13 => Some(Action::GenerateUv2),
@@ -3204,9 +3914,25 @@ impl PixelBuilderPlugin {
     #[func]
     fn debug_menus(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
-        d.set("builder_menu", self.builder_menu.as_ref().is_some_and(|m| m.is_instance_valid() && m.is_visible()));
-        d.set("builder_menu_text", self.builder_menu.as_ref().map(|m| m.get_text().to_string()).unwrap_or_default());
-        d.set("mesh_menu_hidden", self.hidden_mesh_menu.as_ref().is_some_and(|m| m.is_instance_valid() && !m.is_visible()));
+        d.set(
+            "builder_menu",
+            self.builder_menu
+                .as_ref()
+                .is_some_and(|m| m.is_instance_valid() && m.is_visible()),
+        );
+        d.set(
+            "builder_menu_text",
+            self.builder_menu
+                .as_ref()
+                .map(|m| m.get_text().to_string())
+                .unwrap_or_default(),
+        );
+        d.set(
+            "mesh_menu_hidden",
+            self.hidden_mesh_menu
+                .as_ref()
+                .is_some_and(|m| m.is_instance_valid() && !m.is_visible()),
+        );
         d
     }
 
@@ -3223,10 +3949,17 @@ impl PixelBuilderPlugin {
     #[func]
     fn debug_placement(&mut self, pos: Vector2) -> VarDictionary {
         let mut d = VarDictionary::new();
-        let Some(cam) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done().and_then(|v| v.get_camera_3d()) else { return d };
-        if let Some(p) = self.placement(&cam, pos) {
-            d.set("point", p.point);
-            d.set("up", p.basis.col_b());
+        let Some(cam) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+            .and_then(|v| v.get_camera_3d())
+        else {
+            return d;
+        };
+        if let Some(p) = self.locus(&cam, pos) {
+            d.set("point", p.dot);
+            d.set("up", p.frame.col_b());
         }
         d
     }
@@ -3234,8 +3967,18 @@ impl PixelBuilderPlugin {
     /// Test hook: drop `material` (as a dragged resource) at `pos` of 3D viewport 0, through
     /// the same path as a drag-and-drop from the FileSystem / inspector. True when it landed.
     #[func]
-    fn debug_drop_material(&mut self, material: Gd<godot::classes::Material>, pos: Vector2) -> bool {
-        let Some(vp) = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done() else { return false };
+    fn debug_drop_material(
+        &mut self,
+        material: Gd<godot::classes::Material>,
+        pos: Vector2,
+    ) -> bool {
+        let Some(vp) = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()
+        else {
+            return false;
+        };
         let mut d = VarDictionary::new();
         d.set("type", "resource");
         d.set("resource", &material);
@@ -3252,7 +3995,7 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: export the selected mesh to `path` ("" on success, else the error).
     #[func]
     fn debug_export(&mut self, path: GString) -> GString {
-        match self.export_to(&path.to_string()) {
+        match self.ship_out_into(&path.to_string()) {
             Ok(_) => GString::new(),
             Err(e) => GString::from(e.as_str()),
         }
@@ -3261,25 +4004,36 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: select edges by vertex pairs (Edge mode).
     #[func]
     fn debug_select_edges(&mut self, pairs: PackedInt32Array) {
-        self.set_mode(Mode::Edge);
-        self.sel_edges = pairs.as_slice().chunks_exact(2).map(|p| pt_core::build::edge(p[0] as u32, p[1] as u32)).collect();
+        self.assign_setting(Mode::Edge);
+        self.sel_edges = pairs
+            .as_slice()
+            .chunks_exact(2)
+            .map(|p| pt_core::build::edge(p[0] as u32, p[1] as u32))
+            .collect();
         self.redraw();
     }
 
     /// Test / scripting hook: simulate a shape drag in world space (start, corner, height).
     #[func]
     fn debug_draw_shape(&mut self, start: Vector3, corner: Vector3, height: f32) {
-        let cell = self.terrain.as_ref().map(|t| super::node::world_cell(t, start));
+        let cell = self
+            .terrain
+            .as_ref()
+            .map(|t| super::node::world_cell(t, start));
         self.shape_drag = Some(ShapeDrag {
             stage: 1,
-            start: Placement { point: start, cell, basis: Basis::IDENTITY },
+            commence: Placement {
+                dot: start,
+                cell,
+                frame: Basis::IDENTITY,
+            },
             corner,
-            height,
+            stature: height,
             press: Vector2::ZERO,
-            append: false,
+            append_tail: false,
             height_from: Vector2::ZERO,
         });
-        self.commit_shape_pub();
+        self.seal_form_exported();
     }
 
     /// Test / scripting hook: one vertex-paint stroke through world `points` (the face under
@@ -3287,19 +4041,22 @@ impl PixelBuilderPlugin {
     #[func]
     fn debug_vpaint(&mut self, points: PackedVector3Array, faces: PackedInt32Array) {
         if self.tool != Tool::VertexPaint {
-            self.set_tool(Tool::VertexPaint);
+            self.assign_instrument(Tool::VertexPaint);
         }
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let (before, base) = {
             let d = data.bind();
-            (d.get_blob(), d.mesh().clone())
+            (d.get_blob(), d.cage().clone())
         };
-        self.vp.stroke = Some(vpaint::VStroke::new(before, base));
+        self.vp.sweep = Some(vpaint::VStroke::new(before, base));
         for (i, p) in points.as_slice().iter().enumerate() {
-            self.vp.hover = Some((faces.as_slice().get(i).copied().unwrap_or(0).max(0) as usize, *p));
+            self.vp.hover = Some((
+                faces.as_slice().get(i).copied().unwrap_or(0).max(0) as usize,
+                *p,
+            ));
             self.vp_paint_at();
         }
-        if let Some(stroke) = self.vp.stroke.take() {
+        if let Some(stroke) = self.vp.sweep.take() {
             let after = data.bind().get_blob();
             let before = stroke.before();
             if after != before {
@@ -3320,14 +4077,16 @@ impl PixelBuilderPlugin {
     /// handle drag does (soft selection, UV lock), one undo step.
     #[func]
     fn debug_move_selection(&mut self, delta: Vector3) {
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let (before, start) = {
             let d = data.bind();
-            (d.get_blob(), d.mesh().clone())
+            (d.get_blob(), d.cage().clone())
         };
         let verts = self.selected_verts(&start);
         let weights = self.drag_weights(&start, &verts);
-        let frames = self.uv_lock.then(|| pt_core::build::uv_lock::capture_drag_frames(&start, &weights.keys().copied().collect()));
+        let frames = self.uv_lock.then(|| {
+            pt_core::build::uv_lock::capture_drag_frames(&start, &weights.keys().copied().collect())
+        });
         let mut m = start.clone();
         let local = self.xform().basis.inverse() * delta;
         pt_core::build::xform::translate_weighted(&mut m, &weights, to_p(local));
@@ -3335,7 +4094,7 @@ impl PixelBuilderPlugin {
             pt_core::build::uv_lock::refit_after_drag(&mut m, f);
         }
         let mut data = data;
-        data.bind_mut().replace(m);
+        data.bind_mut().substitute(m);
         data.emit_changed();
         let after = data.bind().get_blob();
         if after != before {
@@ -3346,39 +4105,56 @@ impl PixelBuilderPlugin {
 
     /// Test / scripting hook: current mode, tool and selection sizes.
     #[func]
-    fn get_state(&self) -> VarDictionary {
+    fn fetch_condition(&self) -> VarDictionary {
         let mut d = VarDictionary::new();
-        d.set("mode", self.mode.name());
-        d.set("tool", self.tool.name());
+        d.set("mode", self.mode.moniker());
+        d.set("tool", self.tool.moniker());
         d.set("faces", self.sel_faces.len() as i64);
         d.set("edges", self.sel_edges.len() as i64);
         d.set("verts", self.sel_verts.len() as i64);
         d.set("uv_lock", self.uv_lock);
-        d.set("lock_meta", self.lock_target.as_ref().is_some_and(|t| t.is_instance_valid() && t.has_meta(EDIT_LOCK_META)));
+        d.set(
+            "lock_meta",
+            self.lock_target
+                .as_ref()
+                .is_some_and(|t| t.is_instance_valid() && t.has_meta(EDIT_LOCK_META)),
+        );
         d.set("message", self.message.as_str());
-        d.set("distance", self.distance);
-        d.set("kind", self.spec.kind as i64);
-        d.set("slot", self.slot);
-        d.set("color", self.color);
-        d.set("layout", self.ui.as_ref().map(|u| u.layout().name()).unwrap_or(""));
+        d.set("distance", self.span);
+        d.set("kind", self.spec.sort as i64);
+        d.set("slot", self.pocket);
+        d.set("color", self.tint);
+        d.set(
+            "layout",
+            self.ui.as_ref().map(|u| u.layout().moniker()).unwrap_or(""),
+        );
         d
     }
 
     /// Test / scripting hook: select vertices (switches to Vertex mode).
     #[func]
     fn debug_select_verts(&mut self, verts: PackedInt32Array) {
-        self.set_mode(Mode::Vertex);
-        self.sel_verts = verts.as_slice().iter().filter(|v| **v >= 0).map(|v| *v as u32).collect();
+        self.assign_setting(Mode::Vertex);
+        self.sel_verts = verts
+            .as_slice()
+            .iter()
+            .filter(|v| **v >= 0)
+            .map(|v| *v as u32)
+            .collect();
         // The first listed vertex counts as the first picked one ("Collapse to first").
-        self.active_vert = verts.as_slice().first().filter(|v| **v >= 0).map(|v| *v as u32);
+        self.active_vert = verts
+            .as_slice()
+            .first()
+            .filter(|v| **v >= 0)
+            .map(|v| *v as u32);
         self.redraw();
     }
 
     /// Test / scripting hook: run a toolbar action by id and optionally select faces.
     #[func]
     fn debug_select_faces(&mut self, faces: PackedInt32Array) {
-        self.set_mode(Mode::Face);
-        self.sel_faces = super::data::face_set(&faces);
+        self.assign_setting(Mode::Face);
+        self.sel_faces = super::data::facet_batch(&faces);
         self.redraw();
     }
 }
@@ -3387,7 +4163,11 @@ impl PixelBuilderPlugin {
 /// selected `PixelBuilderMesh` (None when the selection has none).
 fn multi_target(current: Option<&Gd<PixelBuilderMesh>>) -> Option<Gd<PixelBuilderMesh>> {
     let sel = EditorInterface::singleton().get_selection()?;
-    let meshes: Vec<Gd<PixelBuilderMesh>> = sel.get_selected_nodes().iter_shared().filter_map(|n| n.try_cast::<PixelBuilderMesh>().ok()).collect();
+    let meshes: Vec<Gd<PixelBuilderMesh>> = sel
+        .get_selected_nodes()
+        .iter_shared()
+        .filter_map(|n| n.try_cast::<PixelBuilderMesh>().ok())
+        .collect();
     if let Some(c) = current
         && meshes.iter().any(|m| m.instance_id() == c.instance_id())
     {

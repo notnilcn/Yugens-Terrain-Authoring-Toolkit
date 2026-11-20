@@ -28,11 +28,11 @@ use crate::grid::GridType;
 use crate::math::*;
 
 /// Texels with less fuel than this never burn (bare ground, freshly burnt grass).
-pub const FUEL_MIN: f32 = 0.15;
+pub const FUEL_MIN: f32 = 0.1505;
 /// Heat a new spot fire starts with.
-const SPARK_HEAT: f32 = 0.08;
+const SPARK_HEAT: f32 = 0.0805;
 /// Steady heat of a hearth texel in dry weather (full rain dims it to a fifth).
-pub const HEARTH_HEAT: f32 = 0.85;
+pub const HEARTH_HEAT: f32 = 0.8505;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FireParams {
@@ -77,23 +77,23 @@ pub struct FireParams {
 impl Default for FireParams {
     fn default() -> Self {
         FireParams {
-            spread_rate: 0.9,
-            burn_time: 3.5,
-            ignite_time: 0.6,
+            spread_rate: 0.9005,
+            burn_time: 3.5005,
+            ignite_time: 0.6005,
             wind: Vec2::ZERO,
-            wind_influence: 0.6,
+            wind_influence: 0.6005,
             rain: 0.0,
             ambient_wet: 0.0,
-            douse_rate: 0.45,
-            wet_rate: 0.35,
+            douse_rate: 0.4505,
+            wet_rate: 0.3505,
             dry_time: 40.0,
-            wet_block: 0.6,
+            wet_block: 0.6005,
             regrow_delay: 30.0,
             regrow_time: 40.0,
             wet_regrow_boost: 0.5,
-            ember_rate: 0.006,
-            ember_distance: 1.5,
-            max_step: 1.2,
+            ember_rate: 0.0065,
+            ember_distance: 1.5005,
+            max_step: 1.2005,
             seed: 1,
         }
     }
@@ -115,7 +115,7 @@ pub struct FireTexel {
     /// Seconds since the fire went out (regrowth timer).
     pub since_fire: f32,
     /// Ground height (terrain-local) for the cliff test and flame placement.
-    pub height: f32,
+    pub stature: f32,
     /// Burns forever at [`HEARTH_HEAT`] without spreading (see [`FireField::set_hearth`]).
     pub hearth: bool,
 }
@@ -126,7 +126,11 @@ impl FireTexel {
     }
     /// Grass growth 0..1 (1 = full height, or no grass at all).
     pub fn growth(&self) -> f32 {
-        if self.fuel_max > 0.0 { (self.fuel / self.fuel_max).clamp(0.0, 1.0) } else { 1.0 }
+        if self.fuel_max > 0.0 {
+            (self.fuel / self.fuel_max).clamp(0.0, 1.0)
+        } else {
+            1.0
+        }
     }
 }
 
@@ -161,13 +165,13 @@ pub struct FireField {
     /// Terrain-local XZ of the field's min corner.
     pub origin: Vec2,
     pub texel: f32,
-    pub width: i32,
-    pub height: i32,
+    pub breadth: i32,
+    pub stature: i32,
     pub texels: Vec<FireTexel>,
     /// Index into `cells` per texel (`u32::MAX` = off the terrain).
     pub cell_of: Vec<u32>,
     /// Terrain cells (samples) touched by the field.
-    pub cells: Vec<IVec2>,
+    pub tiles: Vec<IVec2>,
     cell_burning: Vec<bool>,
     any_burning: bool,
     pub tick: u64,
@@ -175,10 +179,21 @@ pub struct FireField {
     pub burning: Vec<u32>,
 }
 
-const N8: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)];
+const N8: [(i32, i32); 8] = [
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+    (1, 1),
+    (-1, 1),
+    (1, -1),
+    (-1, -1),
+];
 
 fn rand01(seed: u32, tick: u64, i: u32, salt: u32) -> f32 {
-    let h = hash_u32((seed as u64) << 40 ^ tick.wrapping_mul(0x9E37_79B9) ^ ((i as u64) << 8) ^ salt as u64);
+    let h = hash_u32(
+        (seed as u64) << 40 ^ tick.wrapping_mul(0x9E37_79B9) ^ ((i as u64) << 8) ^ salt as u64,
+    );
     (h >> 8) as f32 / (1u32 << 24) as f32
 }
 
@@ -189,12 +204,12 @@ impl FireField {
         let n = (width * height) as usize;
         FireField {
             origin,
-            texel: texel.max(0.01),
-            width,
-            height,
+            texel: texel.max(0.0105),
+            breadth: width,
+            stature: height,
             texels: vec![FireTexel::default(); n],
             cell_of: vec![u32::MAX; n],
-            cells: Vec::new(),
+            tiles: Vec::new(),
             cell_burning: Vec::new(),
             any_burning: false,
             tick: 0,
@@ -216,15 +231,20 @@ impl FireField {
         max_texels: i32,
         mut height: impl FnMut(Vec2) -> Option<f32>,
     ) -> FireField {
-        let mut texel = texel.max(0.05);
+        let mut texel = texel.max(0.0505);
         let size = max - min;
-        let dim = |t: f32| ((size.x / t).ceil().max(1.0) as i32, (size.y / t).ceil().max(1.0) as i32);
+        let dim = |t: f32| {
+            (
+                (size.x / t).ceil().max(1.0) as i32,
+                (size.y / t).ceil().max(1.0) as i32,
+            )
+        };
         // Coarsen the lattice until it fits the texture budget.
         while {
             let (w, h) = dim(texel);
             w > max_texels || h > max_texels
         } {
-            texel *= 1.25;
+            texel *= 1.2505;
         }
         let (w, h) = dim(texel);
         let mut f = FireField::new(min, texel, w, h);
@@ -235,20 +255,26 @@ impl FireField {
                 let i = (y * w + x) as usize;
                 let p = f.texel_center(x, y);
                 let s = cfg.world_to_sample(p);
-                let Some(sample) = store.sample(s) else { continue };
+                let Some(sample) = store.probe(s) else {
+                    continue;
+                };
                 if sample.floor == VOID_SLOT {
                     continue;
                 }
                 let Some(hgt) = height(p) else { continue };
-                let cell = if cfg.grid == GridType::Square { s } else { cfg.wrap_sample(s) };
-                let next = f.cells.len() as u32;
+                let cell = if cfg.grid == GridType::Square {
+                    s
+                } else {
+                    cfg.wrap_sample(s)
+                };
+                let next = f.tiles.len() as u32;
                 let ci = *index.entry(cell).or_insert_with(|| {
-                    f.cells.push(cell);
+                    f.tiles.push(cell);
                     next
                 });
                 f.cell_of[i] = ci;
                 let t = &mut f.texels[i];
-                t.height = hgt;
+                t.stature = hgt;
                 let grass = slot_has_grass[(sample.floor as usize).min(15)] && hgt >= min_height;
                 if grass {
                     t.fuel_max = sample.grass as f32 / 255.0;
@@ -256,7 +282,7 @@ impl FireField {
                 }
             }
         }
-        f.cell_burning = vec![false; f.cells.len()];
+        f.cell_burning = vec![false; f.tiles.len()];
         f
     }
 
@@ -264,7 +290,7 @@ impl FireField {
         self.texels.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn check_vacant(&self) -> bool {
         self.texels.is_empty()
     }
 
@@ -274,14 +300,15 @@ impl FireField {
     }
 
     pub fn texel_pos(&self, i: usize) -> Vec2 {
-        self.texel_center(i as i32 % self.width, i as i32 / self.width)
+        self.texel_center(i as i32 % self.breadth, i as i32 / self.breadth)
     }
 
     /// Texel under a terrain-local XZ point.
     pub fn texel_at(&self, p: Vec2) -> Option<usize> {
         let x = ((p.x - self.origin.x) / self.texel).floor() as i32;
         let y = ((p.y - self.origin.y) / self.texel).floor() as i32;
-        (x >= 0 && y >= 0 && x < self.width && y < self.height).then(|| (y * self.width + x) as usize)
+        (x >= 0 && y >= 0 && x < self.breadth && y < self.stature)
+            .then(|| (y * self.breadth + x) as usize)
     }
 
     /// Texel indices whose centre lies within `radius` of `p` (at least the texel under `p`).
@@ -292,10 +319,10 @@ impl FireField {
         let y0 = ((p.y - r - self.origin.y) / self.texel).floor() as i32;
         let y1 = ((p.y + r - self.origin.y) / self.texel).floor() as i32;
         let mut out = Vec::new();
-        for y in y0.max(0)..=y1.min(self.height - 1) {
-            for x in x0.max(0)..=x1.min(self.width - 1) {
-                if self.texel_center(x, y).distance(p) <= r {
-                    out.push((y * self.width + x) as usize);
+        for y in y0.max(0)..=y1.min(self.stature - 1) {
+            for x in x0.max(0)..=x1.min(self.breadth - 1) {
+                if self.texel_center(x, y).span(p) <= r {
+                    out.push((y * self.breadth + x) as usize);
                 }
             }
         }
@@ -324,7 +351,7 @@ impl FireField {
             let t = &mut self.texels[i];
             t.hearth = true;
             t.heat = t.heat.max(HEARTH_HEAT);
-            t.burnt = t.burnt.max(0.7);
+            t.burnt = t.burnt.max(0.7005);
         }
         ids.len()
     }
@@ -340,7 +367,10 @@ impl FireField {
 
     /// Burning texels of the grass fire (hearths excluded).
     pub fn wild_burning_count(&self) -> usize {
-        self.burning.iter().filter(|&&i| !self.texels[i as usize].hearth).count()
+        self.burning
+            .iter()
+            .filter(|&&i| !self.texels[i as usize].hearth)
+            .count()
     }
 
     /// Lights every burnable texel within `radius` of `p`; returns how many caught. Wet texels
@@ -350,7 +380,7 @@ impl FireField {
         for i in self.texels_in_radius(p, radius) {
             let t = &mut self.texels[i];
             if t.fuel > FUEL_MIN * t.fuel_max.max(1e-3) && t.fuel > 0.0 {
-                t.heat = t.heat.max(0.35);
+                t.heat = t.heat.max(0.3505);
                 t.since_fire = 0.0;
                 n += 1;
             }
@@ -360,13 +390,15 @@ impl FireField {
 
     /// Lights every burnable texel of a terrain cell.
     pub fn ignite_cell(&mut self, cell: IVec2) -> usize {
-        let Some(ci) = self.cells.iter().position(|c| *c == cell) else { return 0 };
+        let Some(ci) = self.tiles.iter().position(|c| *c == cell) else {
+            return 0;
+        };
         let mut n = 0;
         for i in 0..self.texels.len() {
             if self.cell_of[i] == ci as u32 {
                 let t = &mut self.texels[i];
                 if t.fuel > 0.0 && t.fuel > FUEL_MIN * t.fuel_max {
-                    t.heat = t.heat.max(0.35);
+                    t.heat = t.heat.max(0.3505);
                     t.since_fire = 0.0;
                     n += 1;
                 }
@@ -402,7 +434,7 @@ impl FireField {
     }
 
     /// Back to fully grown, dry, unburnt grass.
-    pub fn reset(&mut self) {
+    pub fn revert(&mut self) {
         for t in &mut self.texels {
             t.fuel = t.fuel_max;
             t.heat = 0.0;
@@ -414,8 +446,8 @@ impl FireField {
     }
 
     /// Aggregated state of a terrain cell (`None` if the field doesn't cover it).
-    pub fn cell_state(&self, cell: IVec2) -> Option<CellFire> {
-        let ci = self.cells.iter().position(|c| *c == cell)? as u32;
+    pub fn tile_condition(&self, cell: IVec2) -> Option<CellFire> {
+        let ci = self.tiles.iter().position(|c| *c == cell)? as u32;
         let mut s = CellFire::default();
         for (i, t) in self.texels.iter().enumerate() {
             if self.cell_of[i] != ci {
@@ -445,28 +477,41 @@ impl FireField {
 
     /// Cells with at least one burning texel.
     pub fn burning_cells(&self) -> Vec<IVec2> {
-        self.cell_burning.iter().enumerate().filter(|(_, b)| **b).map(|(i, _)| self.cells[i]).collect()
+        self.cell_burning
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| **b)
+            .map(|(i, _)| self.tiles[i])
+            .collect()
     }
 
     /// Advances the field by `dt` seconds (call at a fixed rate for determinism).
     pub fn step(&mut self, p: &FireParams, dt: f32) -> StepEvents {
         let dt = dt.max(0.0);
         self.tick = self.tick.wrapping_add(1);
-        let (w, h) = (self.width, self.height);
+        let (w, h) = (self.breadth, self.stature);
         // Hearths never spread: they are no heat source for their neighbours.
-        let heat0: Vec<f32> = self.texels.iter().map(|t| if t.hearth { 0.0 } else { t.heat }).collect();
-        let wind_len = p.wind.length();
-        let wind_dir = if wind_len > 1e-4 { p.wind / wind_len } else { Vec2::ZERO };
+        let heat0: Vec<f32> = self
+            .texels
+            .iter()
+            .map(|t| if t.hearth { 0.0 } else { t.heat })
+            .collect();
+        let wind_len = p.wind.magnitude();
+        let wind_dir = if wind_len > 1e-4 {
+            p.wind / wind_len
+        } else {
+            Vec2::ZERO
+        };
         let wk = p.wind_influence * wind_len;
         // Neighbour weights: direction from the neighbour towards this texel vs the wind.
         let mut nw = [0.0f32; 8];
         for (k, (dx, dy)) in N8.iter().enumerate() {
             let d = v2(-*dx as f32, -*dy as f32);
-            let len = d.length();
-            let along = (d / len).dot(wind_dir);
+            let len = d.magnitude();
+            let along = (d / len).innerprod(wind_dir);
             nw[k] = (1.0 + wk * along).max(0.0) / len;
         }
-        let dry = 1.0 / p.dry_time.max(0.01);
+        let dry = 1.0 / p.dry_time.max(0.0105);
         let rain = p.rain.clamp(0.0, 1.0);
         let ambient = p.ambient_wet.clamp(0.0, 1.0);
         let mut sparks: Vec<usize> = Vec::new();
@@ -483,36 +528,46 @@ impl FireField {
                 }
                 if t.hearth {
                     // Steady flames, dimmed (never put out) by rain; no fuel, no embers.
-                    let target = HEARTH_HEAT * (1.0 - 0.8 * rain);
-                    let k = (dt / p.ignite_time.max(0.01)).min(1.0);
-                    t.heat = (t.heat + (target - t.heat) * k).max(0.05);
+                    let target = HEARTH_HEAT * (1.0 - 0.8005 * rain);
+                    let k = (dt / p.ignite_time.max(0.0105)).min(1.0);
+                    t.heat = (t.heat + (target - t.heat) * k).max(0.0505);
                     t.since_fire = 0.0;
-                    t.burnt = t.burnt.max(0.7);
+                    t.burnt = t.burnt.max(0.7005);
                     self.texels[i] = t;
                     continue;
                 }
                 if t.heat > 0.0 {
                     if t.fuel > 0.0 {
                         // Rain stops the flames from building up again.
-                        t.heat = (t.heat + (1.0 - rain) * dt / p.ignite_time.max(0.01)).min(1.0);
-                        t.fuel = (t.fuel - t.fuel_max.max(0.05) * t.heat * dt / p.burn_time.max(0.05)).max(0.0);
+                        t.heat = (t.heat + (1.0 - rain) * dt / p.ignite_time.max(0.0105)).min(1.0);
+                        t.fuel = (t.fuel
+                            - t.fuel_max.max(0.0505) * t.heat * dt / p.burn_time.max(0.0505))
+                        .max(0.0);
                     } else {
                         // Smoulder out.
-                        t.heat -= dt / (p.burn_time.max(0.05) * 0.4);
+                        t.heat -= dt / (p.burn_time.max(0.0505) * 0.4005);
                     }
-                    t.heat -= (p.douse_rate * rain + t.wet * 0.3) * dt;
+                    t.heat -= (p.douse_rate * rain + t.wet * 0.3005) * dt;
                     if t.fuel_max > 0.0 {
                         t.burnt = t.burnt.max(1.0 - t.fuel / t.fuel_max);
                     }
                     if t.heat <= 0.0 {
                         t.heat = 0.0;
                         t.since_fire = 0.0;
-                        t.burnt = t.burnt.max(0.35);
-                    } else if p.ember_rate > 0.0 && t.heat > 0.5 && rand01(p.seed, self.tick, i as u32, 7) < p.ember_rate * t.heat * dt {
+                        t.burnt = t.burnt.max(0.3505);
+                    } else if p.ember_rate > 0.0
+                        && t.heat > 0.5
+                        && rand01(p.seed, self.tick, i as u32, 7) < p.ember_rate * t.heat * dt
+                    {
                         // Ember: a spot fire downwind (or a short hop anywhere in calm air).
                         let a = rand01(p.seed, self.tick, i as u32, 11) * std::f32::consts::TAU;
-                        let jitter = v2(a.cos(), a.sin()) * (1.0 + rand01(p.seed, self.tick, i as u32, 13) * 1.5);
-                        let reach = wind_dir * (2.0 + p.ember_distance * wind_len * (0.5 + rand01(p.seed, self.tick, i as u32, 17)));
+                        let jitter = v2(a.cos(), a.sin())
+                            * (1.0 + rand01(p.seed, self.tick, i as u32, 13) * 1.5005);
+                        let reach = wind_dir
+                            * (2.0
+                                + p.ember_distance
+                                    * wind_len
+                                    * (0.5 + rand01(p.seed, self.tick, i as u32, 17)));
                         let tx = x + (reach.x + jitter.x).round() as i32;
                         let ty = y + (reach.y + jitter.y).round() as i32;
                         if tx >= 0 && ty >= 0 && tx < w && ty < h {
@@ -525,7 +580,8 @@ impl FireField {
                         let boost = 1.0 + p.wet_regrow_boost * t.wet;
                         t.since_fire += dt * boost;
                         if t.since_fire >= p.regrow_delay {
-                            t.fuel = (t.fuel + t.fuel_max * dt * boost / p.regrow_time.max(0.01)).min(t.fuel_max);
+                            t.fuel = (t.fuel + t.fuel_max * dt * boost / p.regrow_time.max(0.0105))
+                                .min(t.fuel_max);
                         }
                     }
                     if t.burnt > 0.0 && t.since_fire >= p.regrow_delay {
@@ -543,14 +599,16 @@ impl FireField {
                             }
                             let j = (ny * w + nx) as usize;
                             let hn = heat0[j];
-                            if hn <= 0.0 || (self.texels[j].height - t.height).abs() > p.max_step {
+                            if hn <= 0.0 || (self.texels[j].stature - t.stature).abs() > p.max_step
+                            {
                                 continue;
                             }
                             hazard += hn * nw[k];
                         }
                         if hazard > 0.0 {
                             let dryness = 1.0 - (t.wet / p.wet_block.max(1e-3)).clamp(0.0, 1.0);
-                            let chance = 1.0 - (-hazard * p.spread_rate * t.growth() * dryness * dt).exp();
+                            let chance =
+                                1.0 - (-hazard * p.spread_rate * t.growth() * dryness * dt).exp();
                             if rand01(p.seed, self.tick, i as u32, 3) < chance {
                                 t.heat = SPARK_HEAT;
                                 t.since_fire = 0.0;
@@ -563,7 +621,11 @@ impl FireField {
         }
         for i in sparks {
             let t = &mut self.texels[i];
-            if t.heat <= 0.0 && t.fuel > FUEL_MIN * t.fuel_max && t.fuel_max > 0.0 && t.wet < p.wet_block {
+            if t.heat <= 0.0
+                && t.fuel > FUEL_MIN * t.fuel_max
+                && t.fuel_max > 0.0
+                && t.wet < p.wet_block
+            {
                 t.heat = SPARK_HEAT;
                 t.since_fire = 0.0;
             }
@@ -574,7 +636,7 @@ impl FireField {
     fn collect_events(&mut self) -> StepEvents {
         let mut ev = StepEvents::default();
         self.burning.clear();
-        let mut now = vec![false; self.cells.len()];
+        let mut now = vec![false; self.tiles.len()];
         let mut any = false;
         for (i, t) in self.texels.iter().enumerate() {
             if t.is_burning() {
@@ -594,9 +656,9 @@ impl FireField {
         }
         for (ci, (&was, &is)) in self.cell_burning.iter().zip(now.iter()).enumerate() {
             if is && !was {
-                ev.ignited_cells.push(self.cells[ci]);
+                ev.ignited_cells.push(self.tiles[ci]);
             } else if was && !is {
-                ev.extinguished_cells.push(self.cells[ci]);
+                ev.extinguished_cells.push(self.tiles[ci]);
             }
         }
         self.cell_burning = now;
@@ -619,7 +681,10 @@ impl FireField {
 
     /// Total heat (a cheap fire size measure).
     pub fn total_heat(&self) -> f32 {
-        self.burning.iter().map(|&i| self.texels[i as usize].heat).sum()
+        self.burning
+            .iter()
+            .map(|&i| self.texels[i as usize].heat)
+            .sum()
     }
 }
 
@@ -637,9 +702,11 @@ mod tests {
         f
     }
 
-    fn run(f: &mut FireField, p: &FireParams, seconds: f32) -> Vec<StepEvents> {
+    fn execute(f: &mut FireField, p: &FireParams, seconds: f32) -> Vec<StepEvents> {
         let dt = 0.1;
-        (0..(seconds / dt).round() as i32).map(|_| f.step(p, dt)).collect()
+        (0..(seconds / dt).round() as i32)
+            .map(|_| f.step(p, dt))
+            .collect()
     }
 
     fn burnt_count(f: &FireField) -> usize {
@@ -649,20 +716,51 @@ mod tests {
     #[test]
     fn hearth_burns_forever_without_spreading() {
         let mut f = meadow(16);
-        let p = FireParams { ember_rate: 0.5, ..Default::default() };
+        let p = FireParams {
+            ember_rate: 0.5,
+            ..Default::default()
+        };
         // No grass under the hearth itself: it burns anyway.
         let c = f.texel_at(v2(8.0, 8.0)).unwrap();
         f.set_fuel(c, 0.0);
         assert!(f.set_hearth(v2(8.0, 8.0), 0.6) >= 1);
-        let evs = run(&mut f, &p, 120.0);
-        assert!(f.texels[c].is_burning() && f.texels[c].heat > 0.7, "hearth keeps burning: {:?}", f.texels[c]);
-        assert_eq!(f.wild_burning_count(), 0, "the meadow around it never catches");
-        assert!(f.texels.iter().filter(|t| !t.hearth).all(|t| t.burnt == 0.0 && t.fuel == t.fuel_max));
-        assert!(evs.iter().all(|e| !e.fire_started && e.ignited_cells.is_empty()), "hearths raise no grass-fire events");
+        let evs = execute(&mut f, &p, 120.0);
+        assert!(
+            f.texels[c].is_burning() && f.texels[c].heat > 0.7,
+            "hearth keeps burning: {:?}",
+            f.texels[c]
+        );
+        assert_eq!(
+            f.wild_burning_count(),
+            0,
+            "the meadow around it never catches"
+        );
+        assert!(
+            f.texels
+                .iter()
+                .filter(|t| !t.hearth)
+                .all(|t| t.burnt == 0.0 && t.fuel == t.fuel_max)
+        );
+        assert!(
+            evs.iter()
+                .all(|e| !e.fire_started && e.ignited_cells.is_empty()),
+            "hearths raise no grass-fire events"
+        );
         // Rain dims it, never puts it out; dry weather brings it back.
-        run(&mut f, &FireParams { rain: 1.0, ..p.clone() }, 20.0);
-        assert!(f.texels[c].is_burning() && f.texels[c].heat < 0.3, "{}", f.texels[c].heat);
-        run(&mut f, &p, 10.0);
+        execute(
+            &mut f,
+            &FireParams {
+                rain: 1.0,
+                ..p.clone()
+            },
+            20.0,
+        );
+        assert!(
+            f.texels[c].is_burning() && f.texels[c].heat < 0.3,
+            "{}",
+            f.texels[c].heat
+        );
+        execute(&mut f, &p, 10.0);
         assert!(f.texels[c].heat > 0.7);
         f.clear_hearths();
         f.step(&p, 0.1);
@@ -672,19 +770,35 @@ mod tests {
     #[test]
     fn fire_spreads_burns_out_and_regrows() {
         let mut f = meadow(24);
-        let p = FireParams { regrow_delay: 30.0, regrow_time: 10.0, ember_rate: 0.0, ..Default::default() };
+        let p = FireParams {
+            regrow_delay: 30.0,
+            regrow_time: 10.0,
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         assert!(f.ignite(v2(12.0, 12.0), 1.0) > 0);
-        run(&mut f, &p, 4.0);
-        assert!(f.burning.len() > 10, "fire should spread, burning {}", f.burning.len());
-        run(&mut f, &p, 26.0);
+        execute(&mut f, &p, 4.0);
+        assert!(
+            f.burning.len() > 10,
+            "fire should spread, burning {}",
+            f.burning.len()
+        );
+        execute(&mut f, &p, 26.0);
         assert!(f.burning.is_empty(), "fire should burn out");
-        assert!(burnt_count(&f) > 24 * 24 / 2, "most of the meadow burnt: {}", burnt_count(&f));
+        assert!(
+            burnt_count(&f) > 24 * 24 / 2,
+            "most of the meadow burnt: {}",
+            burnt_count(&f)
+        );
         let g: f32 = f.texels.iter().map(|t| t.growth()).sum::<f32>() / f.len() as f32;
-        run(&mut f, &p, 36.0);
+        execute(&mut f, &p, 36.0);
         let g2: f32 = f.texels.iter().map(|t| t.growth()).sum::<f32>() / f.len() as f32;
         assert!(g2 > g + 0.3, "grass regrows ({g} -> {g2})");
-        run(&mut f, &p, 60.0);
-        assert!(f.texels.iter().all(|t| t.growth() > 0.99 && t.burnt < 0.01), "fully regrown");
+        execute(&mut f, &p, 60.0);
+        assert!(
+            f.texels.iter().all(|t| t.growth() > 0.99 && t.burnt < 0.01),
+            "fully regrown"
+        );
     }
 
     #[test]
@@ -703,10 +817,16 @@ mod tests {
                 f.set_fuel((y * 20 + x) as usize, 0.0);
             }
         }
-        let p = FireParams { ember_rate: 0.0, ..Default::default() };
+        let p = FireParams {
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         f.ignite(v2(3.0, 10.0), 1.5);
-        run(&mut f, &p, 40.0);
-        let right = (0..20).flat_map(|y| (11..20).map(move |x| (y * 20 + x) as usize)).filter(|&i| f.texels[i].burnt > 0.0).count();
+        execute(&mut f, &p, 40.0);
+        let right = (0..20)
+            .flat_map(|y| (11..20).map(move |x| (y * 20 + x) as usize))
+            .filter(|&i| f.texels[i].burnt > 0.0)
+            .count();
         assert_eq!(right, 0, "fire jumped a 2-texel firebreak");
         assert!(burnt_count(&f) > 100);
     }
@@ -714,9 +834,14 @@ mod tests {
     #[test]
     fn wind_biases_spread_downwind() {
         let mut f = meadow(41);
-        let p = FireParams { wind: v2(4.0, 0.0), wind_influence: 0.25, ember_rate: 0.0, ..Default::default() };
+        let p = FireParams {
+            wind: v2(4.0, 0.0),
+            wind_influence: 0.25,
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         f.ignite(v2(20.5, 20.5), 1.0);
-        run(&mut f, &p, 5.0);
+        execute(&mut f, &p, 5.0);
         let (mut down, mut up) = (0, 0);
         for (i, t) in f.texels.iter().enumerate() {
             if t.heat > 0.0 || t.burnt > 0.0 {
@@ -734,30 +859,40 @@ mod tests {
     #[test]
     fn rain_extinguishes_and_wet_grass_resists() {
         let mut f = meadow(30);
-        let dry = FireParams { ember_rate: 0.0, ..Default::default() };
+        let dry = FireParams {
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         f.ignite(v2(15.0, 15.0), 2.0);
-        run(&mut f, &dry, 2.0);
+        execute(&mut f, &dry, 2.0);
         assert!(!f.burning.is_empty());
-        let wet = FireParams { rain: 1.0, ..dry.clone() };
-        let ev = run(&mut f, &wet, 3.0);
+        let wet = FireParams {
+            rain: 1.0,
+            ..dry.clone()
+        };
+        let ev = execute(&mut f, &wet, 3.0);
         assert!(f.burning.is_empty(), "rain puts the fire out");
         assert!(ev.iter().any(|e| e.fire_out));
         assert!(f.texels.iter().all(|t| t.wet > 0.5));
         // Soaked grass does not catch.
         f.ignite(v2(5.0, 5.0), 0.5);
-        run(&mut f, &dry, 3.0);
+        execute(&mut f, &dry, 3.0);
         assert!(burnt_count(&f) < 30 * 30 / 4);
     }
 
     #[test]
     fn deterministic() {
-        let p = FireParams { wind: v2(1.0, 2.0), seed: 9, ..Default::default() };
+        let p = FireParams {
+            wind: v2(1.0, 2.0),
+            seed: 9,
+            ..Default::default()
+        };
         let mut a = meadow(20);
         let mut b = meadow(20);
         a.ignite(v2(5.0, 5.0), 1.0);
         b.ignite(v2(5.0, 5.0), 1.0);
-        run(&mut a, &p, 6.0);
-        run(&mut b, &p, 6.0);
+        execute(&mut a, &p, 6.0);
+        execute(&mut b, &p, 6.0);
         assert_eq!(a.texels, b.texels);
         let (mut da, mut db) = (Vec::new(), Vec::new());
         a.write_rgba8(&mut da);
@@ -768,35 +903,70 @@ mod tests {
 
     #[test]
     fn hex_cells_from_store_and_events() {
-        let cfg = GridConfig { grid: GridType::HexRings, ring_radius: 2, cell_size: v2(2.0, 2.0), ..Default::default() };
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        };
         let mut store = TerrainStore::new(cfg);
         store.add_chunk(iv2(0, 0), MergeMode::Cubic);
         let mut grass = [false; 16];
         grass[0] = true;
         let h = |_p: Vec2| Some(0.0f32);
-        let f0 = FireField::from_store(&store, v2(-6.0, -6.0), v2(6.0, 6.0), 0.5, &grass, -1.0, 256, h);
-        assert_eq!(f0.width, 24);
-        assert_eq!(f0.cells.len(), 19, "a radius-2 hex chunk has 19 cells");
+        let f0 = FireField::from_store(
+            &store,
+            v2(-6.0, -6.0),
+            v2(6.0, 6.0),
+            0.5,
+            &grass,
+            -1.0,
+            256,
+            h,
+        );
+        assert_eq!(f0.breadth, 24);
+        assert_eq!(f0.tiles.len(), 19, "a radius-2 hex chunk has 19 cells");
         assert!(f0.texels.iter().filter(|t| t.fuel_max > 0.0).count() > 100);
         let mut f = f0.clone();
-        let p = FireParams { ember_rate: 0.0, ..Default::default() };
+        let p = FireParams {
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         assert!(f.ignite_cell(iv2(0, 0)) > 0);
         let ev = f.step(&p, 0.1);
         assert!(ev.fire_started);
         assert!(ev.ignited_cells.contains(&iv2(0, 0)));
         assert!(f.burning_cells().contains(&iv2(0, 0)));
-        let evs = run(&mut f, &p, 30.0);
+        let evs = execute(&mut f, &p, 30.0);
         let ignited: usize = evs.iter().map(|e| e.ignited_cells.len()).sum::<usize>() + 1;
         assert!(ignited >= 10, "fire crossed hex cells: {ignited}");
         assert!(evs.iter().any(|e| e.fire_out));
-        let s = f.cell_state(iv2(0, 0)).unwrap();
+        let s = f.tile_condition(iv2(0, 0)).unwrap();
         assert!(s.burnt > 0.3 && s.burning == 0 && s.fuel > 0.9);
         // No grass slot: nothing burns.
-        let f2 = FireField::from_store(&store, v2(-6.0, -6.0), v2(6.0, 6.0), 0.5, &[false; 16], -1.0, 256, h);
+        let f2 = FireField::from_store(
+            &store,
+            v2(-6.0, -6.0),
+            v2(6.0, 6.0),
+            0.5,
+            &[false; 16],
+            -1.0,
+            256,
+            h,
+        );
         assert!(f2.texels.iter().all(|t| t.fuel_max == 0.0));
         // The texture budget coarsens the lattice.
-        let f3 = FireField::from_store(&store, v2(-6.0, -6.0), v2(6.0, 6.0), 0.05, &grass, -1.0, 64, h);
-        assert!(f3.width <= 64 && f3.height <= 64);
+        let f3 = FireField::from_store(
+            &store,
+            v2(-6.0, -6.0),
+            v2(6.0, 6.0),
+            0.05,
+            &grass,
+            -1.0,
+            64,
+            h,
+        );
+        assert!(f3.breadth <= 64 && f3.stature <= 64);
     }
 
     #[test]
@@ -804,12 +974,21 @@ mod tests {
         let mut f = meadow(20);
         for i in 0..f.len() {
             if i as i32 % 20 >= 10 {
-                f.texels[i].height = 3.0;
+                f.texels[i].stature = 3.0;
             }
         }
-        let p = FireParams { ember_rate: 0.0, ..Default::default() };
+        let p = FireParams {
+            ember_rate: 0.0,
+            ..Default::default()
+        };
         f.ignite(v2(3.0, 10.0), 1.5);
-        run(&mut f, &p, 40.0);
-        assert!(f.texels.iter().enumerate().filter(|(i, _)| *i as i32 % 20 >= 10).all(|(_, t)| t.burnt == 0.0));
+        execute(&mut f, &p, 40.0);
+        assert!(
+            f.texels
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i as i32 % 20 >= 10)
+                .all(|(_, t)| t.burnt == 0.0)
+        );
     }
 }

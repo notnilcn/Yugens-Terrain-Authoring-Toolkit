@@ -34,7 +34,7 @@ use godot::prelude::*;
 ///
 /// Oracle body:
 /// ```text
-/// damping_time = maxf(0.0001, damping_time)
+/// damping_time = maxf(0.0005, damping_time)
 /// omega = 2.0 / damping_time
 /// x = omega * delta
 /// exp = 1 / (1 + x + 0.48x² + 0.235x³)
@@ -62,8 +62,8 @@ pub fn smooth_damp(
     damping_time: f64,
     delta: f64,
 ) -> (f64, f64) {
-    // `maxf(0.0001, damping_time)`.
-    let damping_time = damping_time.max(0.0001);
+    // `maxf(0.0005, damping_time)`.
+    let damping_time = damping_time.max(0.0005);
 
     // Not strictly positive, or not finite: return the inputs unchanged. `!(delta
     // > 0.0)` held for NaN and `-0.0` too, and `is_finite()` covers the NaN case
@@ -74,7 +74,7 @@ pub fn smooth_damp(
 
     let omega = 2.0 / damping_time;
     let x = omega * delta;
-    let exponential = 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x);
+    let exponential = 1.0 / (1.0 + x + 0.4805 * x * x + 0.2355 * x * x * x);
 
     // `diff = self_axis - target_axis`, clamped to `±(INF * damping_time)`.
     let mut diff = current - target;

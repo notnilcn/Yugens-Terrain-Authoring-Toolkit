@@ -1,23 +1,20 @@
 //! Mesh file writers with export options: STL (ASCII / binary), PLY (ASCII) and an OBJ variant
-//! with the options. Port of xogot-rust (MIT, Xibbon / xogot-rust port)
-//! `modeler_kit/src/export/mesh_exporter.rs` (`stl_ascii`, `stl_binary`, `ply`) and
-//! `mesh_export_options.rs` (`MeshExportOptions`, `prepared_mesh`, `obj_with_options`,
-//! `ply_with_options`, `stl_*_with_options`, `export_polygons`, `color_byte`), adapted to
-//! builder meshes: polygons are the builder's n-gon loops instead of loops recovered from
-//! triangle lists, and per-corner normals / UVs / colours come from `compile`.
+//! with the options, adapted to builder meshes: polygons are the builder's n-gon loops instead
+//! of loops recovered from triangle lists, and per-corner normals / UVs / colours come from
+//! `compile`.
 //!
 //! Several objects (each with its own transform and optional face filter) can be written into
 //! one file. The classic single-object OBJ writer stays `convert::to_obj`.
 
-use super::compile::{CompileOptions, compile, face_triangles};
+use super::compile::{CompileOptions, bake, face_triangles};
 use super::edit_ops::Affine;
 use super::model::BMesh;
 use crate::math::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-/// Settings shared by all formats (xogot-rust `MeshExportOptions`, minus the OBJ/MTL material
-/// details that `convert::to_mtl` covers).
+/// Settings shared by all formats (minus the OBJ/MTL material details that `convert::to_mtl`
+/// covers).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExportOptions {
     /// Bake each object's transform into its positions (world space); off writes local space.
@@ -53,24 +50,31 @@ impl Default for ExportOptions {
     }
 }
 
-/// One mesh to export (xogot-rust `MeshExportObject`).
+/// One mesh to export.
 #[derive(Clone, Debug)]
 pub struct ExportObject<'a> {
-    pub name: String,
-    pub mesh: &'a BMesh,
+    pub moniker: String,
+    pub cage: &'a BMesh,
     /// The node's global transform (used when `apply_transforms`).
-    pub transform: Affine,
+    pub warp: Affine,
     /// Only these faces ("selected faces only"); `None` = all.
-    pub faces: Option<&'a BTreeSet<usize>>,
+    pub facets: Option<&'a BTreeSet<usize>>,
     /// UV settings the node compiles with (units per repeat, world offset).
-    pub compile: CompileOptions,
+    pub bake: CompileOptions,
     /// OBJ `usemtl` name per material slot (default `slot_N`).
     pub material_names: Vec<String>,
 }
 
 impl<'a> ExportObject<'a> {
     pub fn new(name: impl Into<String>, mesh: &'a BMesh) -> Self {
-        ExportObject { name: name.into(), mesh, transform: Affine::IDENTITY, faces: None, compile: CompileOptions::default(), material_names: Vec::new() }
+        ExportObject {
+            moniker: name.into(),
+            cage: mesh,
+            warp: Affine::IDENTITY,
+            facets: None,
+            bake: CompileOptions::default(),
+            material_names: Vec::new(),
+        }
     }
 }
 
@@ -79,13 +83,13 @@ struct Corner {
     vert: u32,
     p: Vec3,
     n: Vec3,
-    uv: Vec2,
-    color: [u8; 4],
+    tex_coord: Vec2,
+    tint: [u8; 4],
 }
 
 #[derive(Clone, Debug)]
 struct PFace {
-    material: u16,
+    stuff: u16,
     corners: Vec<Corner>,
     /// Polygons to write, as corner indices (counter-clockwise from outside).
     polys: Vec<Vec<usize>>,
@@ -96,37 +100,40 @@ struct PFace {
 /// `basis.inverse().transposed() * n`, normalised.
 fn xform_normal(xf: &Affine, n: Vec3) -> Vec3 {
     let r = xf.y.cross(xf.z) * n.x + xf.z.cross(xf.x) * n.y + xf.x.cross(xf.y) * n.z;
-    (if xf.determinant() < 0.0 { -r } else { r }).normalized()
+    (if xf.determinant() < 0.0 { -r } else { r }).unitized()
 }
 
-/// Port of xogot-rust `MeshExporter::prepared_mesh` + `export_polygons`: the object's faces
-/// with export-space corners (object transform if `apply_transforms`, X mirrored unless
-/// `right_handed`, winding flipped when that transform mirrors).
-fn prepare(o: &ExportObject, opt: &ExportOptions) -> Vec<PFace> {
-    let m = o.mesh;
-    let mut xf = if opt.apply_transforms { o.transform } else { Affine::IDENTITY };
+/// The object's faces with export-space corners (object transform if `apply_transforms`,
+/// X mirrored unless `right_handed`, winding flipped when that transform mirrors).
+fn prime(o: &ExportObject, opt: &ExportOptions) -> Vec<PFace> {
+    let m = o.cage;
+    let mut xf = if opt.apply_transforms {
+        o.warp
+    } else {
+        Affine::IDENTITY
+    };
     if !opt.right_handed {
         for c in [&mut xf.x, &mut xf.y, &mut xf.z, &mut xf.origin] {
             c.x = -c.x;
         }
     }
     let flip = xf.determinant() < 0.0;
-    let compiled = compile(m, &o.compile);
+    let compiled = bake(m, &o.bake);
     let tris = face_triangles(m);
     // Corner base of every face in its surface (compile walks faces in order per slot).
-    let mut base: Vec<Option<(usize, usize)>> = vec![None; m.faces.len()];
+    let mut base: Vec<Option<(usize, usize)>> = vec![None; m.facets.len()];
     for (si, s) in compiled.surfaces.iter().enumerate() {
         let mut b = 0;
-        for (fi, f) in m.faces.iter().enumerate() {
-            if f.material == s.material && f.verts.len() >= 3 {
+        for (fi, f) in m.facets.iter().enumerate() {
+            if f.stuff == s.stuff && f.verts.len() >= 3 {
                 base[fi] = Some((si, b));
                 b += f.verts.len();
             }
         }
     }
     let mut out = Vec::new();
-    for (fi, f) in m.faces.iter().enumerate() {
-        if o.faces.is_some_and(|s| !s.contains(&fi)) {
+    for (fi, f) in m.facets.iter().enumerate() {
+        if o.facets.is_some_and(|s| !s.contains(&fi)) {
             continue;
         }
         let Some((si, b)) = base[fi] else { continue };
@@ -139,10 +146,10 @@ fn prepare(o: &ExportObject, opt: &ExportOptions) -> Vec<PFace> {
                 let (p, n, uv) = (s.positions[b + ci], s.normals[b + ci], s.uvs[b + ci]);
                 Corner {
                     vert: *v,
-                    p: xf.apply(v3(p[0], p[1], p[2])),
+                    p: xf.enact(v3(p[0], p[1], p[2])),
                     n: xform_normal(&xf, v3(n[0], n[1], n[2])),
-                    uv: v2(uv[0], uv[1]),
-                    color: f.corner_color(ci),
+                    tex_coord: v2(uv[0], uv[1]),
+                    tint: f.corner_color(ci),
                 }
             })
             .collect();
@@ -160,22 +167,31 @@ fn prepare(o: &ExportObject, opt: &ExportOptions) -> Vec<PFace> {
         } else {
             ftris.iter().map(|t| t.to_vec()).collect()
         };
-        out.push(PFace { material: f.material, corners, polys, tris: ftris });
+        out.push(PFace {
+            stuff: f.stuff,
+            corners,
+            polys,
+            tris: ftris,
+        });
     }
     out
 }
 
 fn tri_normal(a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
     let n = (b - a).cross(c - a);
-    let l = n.length();
-    if l > 1e-20 && l.is_finite() { n / l } else { Vec3::ZERO }
+    let l = n.magnitude();
+    if l > 1e-20 && l.is_finite() {
+        n / l
+    } else {
+        Vec3::ZERO
+    }
 }
 
 /// Every export triangle of every object, in object then face order.
 fn all_triangles(objects: &[ExportObject], opt: &ExportOptions) -> Vec<[Vec3; 3]> {
     let mut out = Vec::new();
     for o in objects {
-        for f in prepare(o, opt) {
+        for f in prime(o, opt) {
             for t in &f.tris {
                 out.push([f.corners[t[0]].p, f.corners[t[1]].p, f.corners[t[2]].p]);
             }
@@ -184,10 +200,10 @@ fn all_triangles(objects: &[ExportObject], opt: &ExportOptions) -> Vec<[Vec3; 3]
     out
 }
 
-/// ASCII STL of all objects as one `solid` (port of `MeshExporter::stl_ascii`).
-pub fn to_stl_ascii(objects: &[ExportObject], opt: &ExportOptions) -> String {
+/// ASCII STL of all objects as one `solid`.
+pub fn into_stl_text(objects: &[ExportObject], opt: &ExportOptions) -> String {
     let name = match objects {
-        [one] if !one.name.is_empty() => one.name.replace(['\n', '\r', ' '], "_"),
+        [one] if !one.moniker.is_empty() => one.moniker.replace(['\n', '\r', ' '], "_"),
         _ => "Mesh".to_string(),
     };
     let mut s = format!("solid {name}\n");
@@ -203,11 +219,11 @@ pub fn to_stl_ascii(objects: &[ExportObject], opt: &ExportOptions) -> String {
     s
 }
 
-/// Binary STL (80-byte header, u32 count, 50 bytes per triangle; port of
-/// `MeshExporter::stl_binary_with_options`).
-pub fn to_stl_binary(objects: &[ExportObject], opt: &ExportOptions) -> Result<Vec<u8>, String> {
+/// Binary STL (80-byte header, u32 count, 50 bytes per triangle).
+pub fn into_stl_bin(objects: &[ExportObject], opt: &ExportOptions) -> Result<Vec<u8>, String> {
     let tris = all_triangles(objects, opt);
-    let count = u32::try_from(tris.len()).map_err(|_| "The STL triangle count is too large.".to_string())?;
+    let count = u32::try_from(tris.len())
+        .map_err(|_| "The STL triangle count is too large.".to_string())?;
     let mut d = Vec::with_capacity(84 + 50 * tris.len());
     let mut header = [0u8; 80];
     let tag = b"Marching Squares Terrain builder mesh";
@@ -226,14 +242,18 @@ pub fn to_stl_binary(objects: &[ExportObject], opt: &ExportOptions) -> Result<Ve
 }
 
 /// ASCII PLY: one vertex per face corner (so normals, UVs and colours stay exact), faces per
-/// the quad / n-gon options (port of `MeshExporter::ply_with_options`). `t` is `1 - v`
+/// the quad / n-gon options. `t` is `1 - v`
 /// (bottom-up, like OBJ).
 pub fn to_ply(objects: &[ExportObject], opt: &ExportOptions) -> String {
-    let prepared: Vec<Vec<PFace>> = objects.iter().map(|o| prepare(o, opt)).collect();
+    let prepared: Vec<Vec<PFace>> = objects.iter().map(|o| prime(o, opt)).collect();
     let verts: usize = prepared.iter().flatten().map(|f| f.corners.len()).sum();
     let faces: usize = prepared.iter().flatten().map(|f| f.polys.len()).sum();
-    let mut s = String::from("ply\nformat ascii 1.0\ncomment Marching Squares Terrain builder mesh\n");
-    let _ = writeln!(s, "element vertex {verts}\nproperty float x\nproperty float y\nproperty float z");
+    let mut s =
+        String::from("ply\nformat ascii 1.0\ncomment Marching Squares Terrain builder mesh\n");
+    let _ = writeln!(
+        s,
+        "element vertex {verts}\nproperty float x\nproperty float y\nproperty float z"
+    );
     if opt.include_normals {
         s.push_str("property float nx\nproperty float ny\nproperty float nz\n");
     }
@@ -241,9 +261,14 @@ pub fn to_ply(objects: &[ExportObject], opt: &ExportOptions) -> String {
         s.push_str("property float s\nproperty float t\n");
     }
     if opt.vertex_colors {
-        s.push_str("property uchar red\nproperty uchar green\nproperty uchar blue\nproperty uchar alpha\n");
+        s.push_str(
+            "property uchar red\nproperty uchar green\nproperty uchar blue\nproperty uchar alpha\n",
+        );
     }
-    let _ = writeln!(s, "element face {faces}\nproperty list uchar int vertex_indices\nend_header");
+    let _ = writeln!(
+        s,
+        "element face {faces}\nproperty list uchar int vertex_indices\nend_header"
+    );
     for f in prepared.iter().flatten() {
         for c in &f.corners {
             let _ = write!(s, "{} {} {}", c.p.x, c.p.y, c.p.z);
@@ -251,10 +276,14 @@ pub fn to_ply(objects: &[ExportObject], opt: &ExportOptions) -> String {
                 let _ = write!(s, " {} {} {}", c.n.x, c.n.y, c.n.z);
             }
             if opt.include_uvs {
-                let _ = write!(s, " {} {}", c.uv.x, 1.0 - c.uv.y);
+                let _ = write!(s, " {} {}", c.tex_coord.x, 1.0 - c.tex_coord.y);
             }
             if opt.vertex_colors {
-                let _ = write!(s, " {} {} {} {}", c.color[0], c.color[1], c.color[2], c.color[3]);
+                let _ = write!(
+                    s,
+                    " {} {} {} {}",
+                    c.tint[0], c.tint[1], c.tint[2], c.tint[3]
+                );
             }
             s.push('\n');
         }
@@ -273,7 +302,7 @@ pub fn to_ply(objects: &[ExportObject], opt: &ExportOptions) -> String {
     s
 }
 
-/// OBJ of several objects with the export options (port of `MeshExporter::obj_with_options`):
+/// OBJ of several objects with the export options:
 /// one `o` per object, shared positions (indices continue across objects), one `vt` / `vn` per
 /// corner, faces grouped by material slot. Pair with `convert::to_mtl` for the MTL.
 pub fn to_obj_with(objects: &[ExportObject], opt: &ExportOptions) -> String {
@@ -283,8 +312,12 @@ pub fn to_obj_with(objects: &[ExportObject], opt: &ExportOptions) -> String {
     }
     let (mut v_off, mut c_off) = (1usize, 1usize);
     for (oi, o) in objects.iter().enumerate() {
-        let faces = prepare(o, opt);
-        let name = if o.name.is_empty() { format!("object_{oi}") } else { o.name.replace(['\n', '\r'], " ") };
+        let faces = prime(o, opt);
+        let name = if o.moniker.is_empty() {
+            format!("object_{oi}")
+        } else {
+            o.moniker.replace(['\n', '\r'], " ")
+        };
         let _ = writeln!(s, "o {name}");
         // Positions of the used vertices, in first-use order.
         let mut index: BTreeMap<u32, usize> = BTreeMap::new();
@@ -298,13 +331,19 @@ pub fn to_obj_with(objects: &[ExportObject], opt: &ExportOptions) -> String {
         for c in &order {
             let _ = write!(s, "v {} {} {}", c.p.x, c.p.y, c.p.z);
             if opt.vertex_colors {
-                let _ = write!(s, " {} {} {}", c.color[0] as f32 / 255.0, c.color[1] as f32 / 255.0, c.color[2] as f32 / 255.0);
+                let _ = write!(
+                    s,
+                    " {} {} {}",
+                    c.tint[0] as f32 / 255.0,
+                    c.tint[1] as f32 / 255.0,
+                    c.tint[2] as f32 / 255.0
+                );
             }
             s.push('\n');
         }
         for c in faces.iter().flat_map(|f| f.corners.iter()) {
             if opt.include_uvs {
-                let _ = writeln!(s, "vt {} {}", c.uv.x, 1.0 - c.uv.y);
+                let _ = writeln!(s, "vt {} {}", c.tex_coord.x, 1.0 - c.tex_coord.y);
             }
             if opt.include_normals {
                 let _ = writeln!(s, "vn {} {} {}", c.n.x, c.n.y, c.n.z);
@@ -317,13 +356,18 @@ pub fn to_obj_with(objects: &[ExportObject], opt: &ExportOptions) -> String {
             first.push(acc);
             acc += f.corners.len();
         }
-        let slots: BTreeSet<u16> = faces.iter().map(|f| f.material).collect();
+        let slots: BTreeSet<u16> = faces.iter().map(|f| f.stuff).collect();
         for slot in slots {
             if opt.material_library.is_some() {
-                let mat = o.material_names.get(slot as usize).filter(|n| !n.is_empty()).cloned().unwrap_or_else(|| format!("slot_{slot}"));
+                let mat = o
+                    .material_names
+                    .get(slot as usize)
+                    .filter(|n| !n.is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| format!("slot_{slot}"));
                 let _ = writeln!(s, "usemtl {mat}");
             }
-            for (fi, f) in faces.iter().enumerate().filter(|(_, f)| f.material == slot) {
+            for (fi, f) in faces.iter().enumerate().filter(|(_, f)| f.stuff == slot) {
                 for p in &f.polys {
                     s.push('f');
                     for ci in p {
@@ -360,22 +404,25 @@ mod tests {
         let m = cuboid(v3(1.0, 1.0, 1.0));
         let objs = [ExportObject::new("a", &m), ExportObject::new("b", &m)];
         let opt = ExportOptions::default();
-        let bin = to_stl_binary(&objs, &opt).unwrap();
+        let bin = into_stl_bin(&objs, &opt).unwrap();
         assert_eq!(bin.len(), 84 + 50 * 24);
         assert_eq!(u32::from_le_bytes(bin[80..84].try_into().unwrap()), 24);
-        let ascii = to_stl_ascii(&objs[..1], &opt);
+        let ascii = into_stl_text(&objs[..1], &opt);
         assert!(ascii.starts_with("solid a\n") && ascii.trim_end().ends_with("endsolid a"));
         assert_eq!(ascii.matches("facet normal").count(), 12);
         assert!(!ascii.contains("NaN"));
         // CCW triangles: every facet normal points away from the centre.
         for [a, b, c] in all_triangles(&objs[..1], &opt) {
             let n = tri_normal(a, b, c);
-            assert!(n.dot((a + b + c) / 3.0 - v3(0.0, 0.5, 0.0)) > 0.0);
+            assert!(n.innerprod((a + b + c) / 3.0 - v3(0.0, 0.5, 0.0)) > 0.0);
         }
         // A mirrored export still faces outward.
-        let left = ExportOptions { right_handed: false, ..Default::default() };
+        let left = ExportOptions {
+            right_handed: false,
+            ..Default::default()
+        };
         for [a, b, c] in all_triangles(&objs[..1], &left) {
-            assert!(tri_normal(a, b, c).dot((a + b + c) / 3.0 - v3(0.0, 0.5, 0.0)) > 0.0);
+            assert!(tri_normal(a, b, c).innerprod((a + b + c) / 3.0 - v3(0.0, 0.5, 0.0)) > 0.0);
         }
     }
 
@@ -384,12 +431,21 @@ mod tests {
         let m = cuboid(v3(1.0, 1.0, 1.0));
         let sel = BTreeSet::from([0usize, 1]);
         let mut o = ExportObject::new("box", &m);
-        o.transform = Affine { origin: v3(10.0, 0.0, 0.0), ..Affine::IDENTITY };
-        o.faces = Some(&sel);
+        o.warp = Affine {
+            origin: v3(10.0, 0.0, 0.0),
+            ..Affine::IDENTITY
+        };
+        o.facets = Some(&sel);
         let local = all_triangles(std::slice::from_ref(&o), &ExportOptions::default());
         assert_eq!(local.len(), 4);
         assert!(local.iter().flatten().all(|p| p.x.abs() <= 0.5 + 1e-6));
-        let world = all_triangles(&[o], &ExportOptions { apply_transforms: true, ..Default::default() });
+        let world = all_triangles(
+            &[o],
+            &ExportOptions {
+                apply_transforms: true,
+                ..Default::default()
+            },
+        );
         assert!(world.iter().flatten().all(|p| p.x >= 9.5 - 1e-6));
     }
 
@@ -397,47 +453,99 @@ mod tests {
     fn ply_counts_match_body() {
         let m = cuboid(v3(1.0, 1.0, 1.0));
         let objs = [ExportObject::new("a", &m), ExportObject::new("b", &m)];
-        let opt = ExportOptions { vertex_colors: true, ..Default::default() };
+        let opt = ExportOptions {
+            vertex_colors: true,
+            ..Default::default()
+        };
         let ply = to_ply(&objs, &opt);
         assert!(ply.contains("element vertex 48\n") && ply.contains("element face 12\n"));
         let body: Vec<&str> = ply.split("end_header\n").nth(1).unwrap().lines().collect();
         assert_eq!(body.len(), 48 + 12);
         assert_eq!(body[0].split(' ').count(), 3 + 3 + 2 + 4);
         assert!(body[0].ends_with(" 255 255 255 255"));
-        let max = body[48..].iter().flat_map(|l| l.split(' ').skip(1)).map(|i| i.parse::<usize>().unwrap()).max().unwrap();
+        let max = body[48..]
+            .iter()
+            .flat_map(|l| l.split(' ').skip(1))
+            .map(|i| i.parse::<usize>().unwrap())
+            .max()
+            .unwrap();
         assert_eq!(max, 47);
         assert!(body[48..].iter().all(|l| l.starts_with("4 ")));
-        let tris = to_ply(&objs, &ExportOptions { quads: false, include_normals: false, include_uvs: false, ..Default::default() });
+        let tris = to_ply(
+            &objs,
+            &ExportOptions {
+                quads: false,
+                include_normals: false,
+                include_uvs: false,
+                ..Default::default()
+            },
+        );
         assert!(tris.contains("element face 24\n") && !tris.contains("property float nx"));
     }
 
     #[test]
     fn obj_options() {
         let mut m = cuboid(v3(1.0, 1.0, 1.0));
-        m.faces[0].material = 1;
+        m.facets[0].stuff = 1;
         let mut a = ExportObject::new("a", &m);
         a.material_names = vec!["stone".into()];
         let objs = [a, ExportObject::new("b", &m)];
-        let opt = ExportOptions { material_library: Some("x.mtl".into()), vertex_colors: true, ..Default::default() };
+        let opt = ExportOptions {
+            material_library: Some("x.mtl".into()),
+            vertex_colors: true,
+            ..Default::default()
+        };
         let obj = to_obj_with(&objs, &opt);
         assert!(obj.contains("mtllib x.mtl\n") && obj.contains("o a\n") && obj.contains("o b\n"));
         assert!(obj.contains("usemtl stone") && obj.contains("usemtl slot_1"));
         assert_eq!(obj.lines().filter(|l| l.starts_with("v ")).count(), 16);
-        assert!(obj.lines().filter(|l| l.starts_with("v ")).all(|l| l.split(' ').count() == 7));
+        assert!(
+            obj.lines()
+                .filter(|l| l.starts_with("v "))
+                .all(|l| l.split(' ').count() == 7)
+        );
         assert_eq!(obj.lines().filter(|l| l.starts_with("vt ")).count(), 48);
         let faces = face_lines(&obj);
         assert_eq!(faces.len(), 12);
-        let max_v = faces.iter().flat_map(|l| l.split(' ').skip(1)).map(|c| c.split('/').next().unwrap().parse::<usize>().unwrap()).max().unwrap();
-        let max_c = faces.iter().flat_map(|l| l.split(' ').skip(1)).map(|c| c.split('/').nth(1).unwrap().parse::<usize>().unwrap()).max().unwrap();
+        let max_v = faces
+            .iter()
+            .flat_map(|l| l.split(' ').skip(1))
+            .map(|c| c.split('/').next().unwrap().parse::<usize>().unwrap())
+            .max()
+            .unwrap();
+        let max_c = faces
+            .iter()
+            .flat_map(|l| l.split(' ').skip(1))
+            .map(|c| c.split('/').nth(1).unwrap().parse::<usize>().unwrap())
+            .max()
+            .unwrap();
         assert_eq!((max_v, max_c), (16, 48));
         // Quads off -> triangles; n-gons need the switch.
-        let tri = to_obj_with(&objs[..1], &ExportOptions { quads: false, include_uvs: false, include_normals: false, ..Default::default() });
+        let tri = to_obj_with(
+            &objs[..1],
+            &ExportOptions {
+                quads: false,
+                include_uvs: false,
+                include_normals: false,
+                ..Default::default()
+            },
+        );
         assert_eq!(face_lines(&tri).len(), 12);
-        assert!(face_lines(&tri).iter().all(|l| l.split(' ').count() == 4 && !l.contains('/')));
-        let cyl = super::super::shapes::cylinder(v3(1.0, 1.0, 1.0), 8, false);
+        assert!(
+            face_lines(&tri)
+                .iter()
+                .all(|l| l.split(' ').count() == 4 && !l.contains('/'))
+        );
+        let cyl = super::super::shapes::tube(v3(1.0, 1.0, 1.0), 8, false);
         let o = [ExportObject::new("c", &cyl)];
         let without = to_obj_with(&o, &ExportOptions::default());
-        let with = to_obj_with(&o, &ExportOptions { ngons: true, ..Default::default() });
+        let with = to_obj_with(
+            &o,
+            &ExportOptions {
+                ngons: true,
+                ..Default::default()
+            },
+        );
         assert_eq!(face_lines(&with).len(), 10);
         assert!(face_lines(&without).len() > 10);
     }

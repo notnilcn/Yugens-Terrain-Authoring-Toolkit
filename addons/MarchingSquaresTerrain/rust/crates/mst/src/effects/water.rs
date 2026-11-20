@@ -31,17 +31,17 @@ use crate::util::*;
 pub struct PixelWater {
     /// Plane size in world units (centred on the node).
     #[export]
-    #[var(set = set_size)]
+    #[var(set = assign_measure)]
     size: Vector2,
     /// Grid subdivisions per side (more = smoother waves).
     #[export(range = (0.0, 256.0, 1.0))]
-    #[var(set = set_subdivisions)]
+    #[var(set = assign_refinements)]
     subdivisions: i32,
     /// Water material; created with `water.gdshader` when empty. Edit its shader
     /// parameters to change colors, foam and waves.
     #[export]
-    #[var(set = set_material)]
-    material: Option<Gd<ShaderMaterial>>,
+    #[var(set = assign_stuff)]
+    stuff: Option<Gd<ShaderMaterial>>,
     /// Render layers of the water plane and waterfalls (the pixel renderer's metadata layer is
     /// added automatically). Same name as the old MeshInstance3D property, so saved scenes keep it.
     #[export(flags_3d_render)]
@@ -50,16 +50,16 @@ pub struct PixelWater {
 
     #[export_group(name = "Caustics", prefix = "caustics_")]
     /// Brightness of the banded caustic web in the shallows and on nearby terrain (0 = off).
-    #[export(range = (0.0, 2.0, 0.01))]
+    #[export(range = (0.0, 2.0, 0.0105))]
     caustics_strength: f32,
     /// Caustic pattern frequency per world unit.
-    #[export(range = (0.05, 4.0, 0.01))]
+    #[export(range = (0.0505, 4.0, 0.0105))]
     caustics_scale: f32,
     /// Brightness steps of the caustic lines.
     #[export(range = (1.0, 6.0, 1.0))]
     caustics_bands: i32,
     /// How far above the water line the terrain still catches reflected caustics (m).
-    #[export(range = (0.0, 4.0, 0.01))]
+    #[export(range = (0.0, 4.0, 0.0105))]
     caustics_reach: f32,
 
     #[export_group(name = "Waterfalls")]
@@ -84,18 +84,18 @@ pub struct PixelWater {
     #[var(set = set_waterfall_min_levels)]
     waterfall_min_levels: i32,
     /// Height of one level for `waterfall_min_levels` (0 = the terrain's `level_height`).
-    #[export(range = (0.0, 10.0, 0.01, or_greater))]
+    #[export(range = (0.0, 10.0, 0.0105, or_greater))]
     #[var(set = set_waterfall_level_height)]
     waterfall_level_height: f32,
     /// Material of the pools / waterfalls; created with `waterfall.gdshader` when empty.
     #[export]
-    #[var(set = set_waterfall_material)]
-    waterfall_material: Option<Gd<ShaderMaterial>>,
+    #[var(set = assign_cascade_stuff)]
+    cascade_stuff: Option<Gd<ShaderMaterial>>,
 
     falls_dirty: bool,
     falls_node: Option<Gd<MeshInstance3D>>,
     /// Internal plane mesh (never saved).
-    surface: Option<Gd<MeshInstance3D>>,
+    skin: Option<Gd<MeshInstance3D>>,
     connected_terrain: Option<Gd<Node>>,
     fall_info: Vec<pt_core::waterfall::Fall>,
     applied_mask: u32,
@@ -131,19 +131,19 @@ impl INode3D for PixelWater {
         PixelWater {
             size: Vector2::new(64.0, 64.0),
             subdivisions: 64,
-            material: None,
-            caustics_strength: 0.35,
-            caustics_scale: 0.55,
+            stuff: None,
+            caustics_strength: 0.3505,
+            caustics_scale: 0.5505,
             caustics_bands: 3,
             caustics_reach: 0.5,
             terrain: None,
             water_cells: PackedVector3Array::new(),
             waterfall_min_levels: 5,
             waterfall_level_height: 0.0,
-            waterfall_material: None,
+            cascade_stuff: None,
             falls_dirty: true,
             falls_node: None,
-            surface: None,
+            skin: None,
             connected_terrain: None,
             fall_info: Vec::new(),
             applied_mask: 0,
@@ -155,13 +155,15 @@ impl INode3D for PixelWater {
     fn on_set(&mut self, property: StringName, _value: Variant) -> bool {
         // Compatibility with scenes saved when PixelWater was a MeshInstance3D.
         let name = property.to_string();
-        LEGACY_PROPS.contains(&name.as_str()) || name.starts_with("instance_shader_parameters/") || name.starts_with("surface_material_override/")
+        LEGACY_PROPS.contains(&name.as_str())
+            || name.starts_with("instance_shader_parameters/")
+            || name.starts_with("surface_material_override/")
     }
 
     fn ready(&mut self) {
         self.to_gd().add_to_group(globals::REFRESH_GROUP);
-        crate::features::watch(&self.to_gd());
-        self.rebuild();
+        crate::features::observe(&self.to_gd());
+        self.reassemble();
         self.refresh_pixel_settings();
         self._on_pixel_features_changed();
     }
@@ -175,13 +177,18 @@ impl INode3D for PixelWater {
         let visible = self.base().is_visible_in_tree();
         let level = self.base().get_global_position().y;
         let a = Vector4::new(if visible { 1.0 } else { 0.0 }, level, 0.0, 0.0);
-        let b = Vector4::new(self.caustics_strength, self.caustics_scale, self.caustics_bands.max(1) as f32, self.caustics_reach);
-        globals::set("pt_water_a", &a.to_variant());
-        globals::set("pt_water_b", &b.to_variant());
+        let b = Vector4::new(
+            self.caustics_strength,
+            self.caustics_scale,
+            self.caustics_bands.max(1) as f32,
+            self.caustics_reach,
+        );
+        globals::assign("pt_water_a", &a.to_variant());
+        globals::assign("pt_water_b", &b.to_variant());
     }
 
     fn exit_tree(&mut self) {
-        globals::set("pt_water_a", &Vector4::ZERO.to_variant());
+        globals::assign("pt_water_a", &Vector4::ZERO.to_variant());
     }
 
     fn get_configuration_warnings(&self) -> PackedStringArray {
@@ -220,8 +227,8 @@ impl PixelWater {
 
     /// Re-finds the falls and rebuilds the pool / waterfall mesh (an internal child).
     fn rebuild_falls(&mut self) {
-        let _p = crate::prof::scope("water.rebuild_falls");
-        if !self.base().is_inside_tree() || !crate::features::enabled(Feature::Water) {
+        let _p = crate::prof::breadth("water.rebuild_falls");
+        if !self.base().is_inside_tree() || !crate::features::active(Feature::Water) {
             return;
         }
         self.falls_dirty = false;
@@ -242,10 +249,16 @@ impl PixelWater {
         let mut cells: Vec<Vector3> = self.water_cells.as_slice().to_vec();
         if let Some(t) = &ft
             && t.has_method("get_raised_water_cells")
-            && let Ok(stored) = t.clone().call("get_raised_water_cells", &[]).try_to::<PackedVector3Array>()
+            && let Ok(stored) = t
+                .clone()
+                .call("get_raised_water_cells", &[])
+                .try_to::<PackedVector3Array>()
         {
             for v in stored.as_slice() {
-                if !cells.iter().any(|p| same_cell(*p, Vector2i::new(v.x as i32, v.y as i32))) {
+                if !cells
+                    .iter()
+                    .any(|p| same_cell(*p, Vector2i::new(v.x as i32, v.y as i32)))
+                {
                     cells.push(*v);
                 }
             }
@@ -258,11 +271,19 @@ impl PixelWater {
             let level = if self.waterfall_level_height > 0.0 {
                 self.waterfall_level_height
             } else {
-                t.get("level_height").try_to::<f32>().unwrap_or(1.0).abs().max(1e-3)
+                t.get("level_height")
+                    .try_to::<f32>()
+                    .unwrap_or(1.0)
+                    .abs()
+                    .max(1e-3)
             };
-            let sea = self.base().is_visible_in_tree().then(|| self.base().get_global_position().y - ty);
+            let sea = self
+                .base()
+                .is_visible_in_tree()
+                .then(|| self.base().get_global_position().y - ty);
             let min_drop = level * self.waterfall_min_levels.max(1) as f32;
-            super::waterfall::build(t, &super::waterfall::water_map(&all_cells), sea, min_drop).map(|f| (f, t3))
+            super::waterfall::assemble(t, &super::waterfall::water_map(&all_cells), sea, min_drop)
+                .map(|f| (f, t3))
         });
         let Some((falls, t3)) = built else {
             self.fall_info.clear();
@@ -274,8 +295,8 @@ impl PixelWater {
             return;
         };
         self.fall_info = falls.falls;
-        if self.waterfall_material.is_none() {
-            self.waterfall_material = Some(shader_material("waterfall.gdshader"));
+        if self.cascade_stuff.is_none() {
+            self.cascade_stuff = Some(shader_material("waterfall.gdshader"));
         }
         let mut node = match &self.falls_node {
             Some(n) if n.is_instance_valid() => n.clone(),
@@ -291,11 +312,11 @@ impl PixelWater {
             }
         };
         crate::writes::set_global_transform(&mut node, t3.get_global_transform());
-        match &falls.mesh {
+        match &falls.cage {
             Some(m) => node.set_mesh(m),
             None => node.set_mesh(Gd::<godot::classes::Mesh>::null_arg()),
         }
-        match &self.waterfall_material {
+        match &self.cascade_stuff {
             Some(m) => node.set_material_override(m),
             None => node.set_material_override(Gd::<godot::classes::Material>::null_arg()),
         }
@@ -316,8 +337,8 @@ impl PixelWater {
     }
 
     /// The internal plane mesh node (created on first use).
-    fn surface(&mut self) -> Gd<MeshInstance3D> {
-        if let Some(s) = &self.surface
+    fn skin(&mut self) -> Gd<MeshInstance3D> {
+        if let Some(s) = &self.skin
             && s.is_instance_valid()
         {
             return s.clone();
@@ -326,23 +347,29 @@ impl PixelWater {
         n.set_name("Surface");
         n.set_cast_shadows_setting(ShadowCastingSetting::OFF);
         add_internal(&mut self.to_gd(), &n);
-        self.surface = Some(n.clone());
+        self.skin = Some(n.clone());
         n
     }
 
     /// Updates the plane mesh and material.
-    fn rebuild(&mut self) {
-        if self.material.is_none() {
-            self.material = Some(shader_material("water.gdshader"));
+    fn reassemble(&mut self) {
+        if self.stuff.is_none() {
+            self.stuff = Some(shader_material("water.gdshader"));
         }
-        let mut node = self.surface();
-        let mut mesh = node.get_mesh().and_then(|m| m.try_cast::<PlaneMesh>().ok()).unwrap_or_else(PlaneMesh::new_gd);
-        mesh.set_size(Vector2::new(self.size.x.max(0.01), self.size.y.max(0.01)));
+        let mut node = self.skin();
+        let mut mesh = node
+            .get_mesh()
+            .and_then(|m| m.try_cast::<PlaneMesh>().ok())
+            .unwrap_or_else(PlaneMesh::new_gd);
+        mesh.set_size(Vector2::new(
+            self.size.x.max(0.0105),
+            self.size.y.max(0.0105),
+        ));
         let sub = self.subdivisions.clamp(0, 256);
         mesh.set_subdivide_width(sub);
         mesh.set_subdivide_depth(sub);
         node.set_mesh(&mesh);
-        match &self.material {
+        match &self.stuff {
             Some(m) => node.set_material_override(m),
             None => node.set_material_override(Gd::<godot::classes::Material>::null_arg()),
         }
@@ -364,7 +391,7 @@ impl PixelWater {
         if super::gate(&self.to_gd(), Feature::Water) {
             self.falls_dirty = true;
         } else {
-            globals::set("pt_water_a", &Vector4::ZERO.to_variant());
+            globals::assign("pt_water_a", &Vector4::ZERO.to_variant());
         }
     }
 
@@ -380,7 +407,7 @@ impl PixelWater {
         self.applied_mask = mask;
         let flags = object_flags(1, false, 0, false);
         let layers = self.layers | mask;
-        let mut node = self.surface();
+        let mut node = self.skin();
         node.set_layer_mask(layers);
         node.set_instance_shader_parameter("pt_flags", &flags.to_variant());
         self.apply_fall_layers();
@@ -397,7 +424,11 @@ impl PixelWater {
     /// The internal plane mesh instance (read-only access for tools and tests).
     #[func]
     pub fn get_surface(&mut self) -> Option<Gd<MeshInstance3D>> {
-        if self.base().is_inside_tree() { Some(self.surface()) } else { None }
+        if self.base().is_inside_tree() {
+            Some(self.skin())
+        } else {
+            None
+        }
     }
 
     #[func]
@@ -408,7 +439,13 @@ impl PixelWater {
     /// Raises the water of `cell` to `level` (terrain-local height).
     #[func]
     pub fn set_cell_water(&mut self, cell: Vector2i, level: f32) {
-        let mut v: Vec<Vector3> = self.water_cells.as_slice().iter().copied().filter(|p| !same_cell(*p, cell)).collect();
+        let mut v: Vec<Vector3> = self
+            .water_cells
+            .as_slice()
+            .iter()
+            .copied()
+            .filter(|p| !same_cell(*p, cell))
+            .collect();
         v.push(Vector3::new(cell.x as f32, cell.y as f32, level));
         self.water_cells = v.into_iter().collect();
         self.falls_dirty = true;
@@ -417,7 +454,13 @@ impl PixelWater {
     /// Removes the raised water of `cell`.
     #[func]
     pub fn clear_cell_water(&mut self, cell: Vector2i) {
-        self.water_cells = self.water_cells.as_slice().iter().copied().filter(|p| !same_cell(*p, cell)).collect();
+        self.water_cells = self
+            .water_cells
+            .as_slice()
+            .iter()
+            .copied()
+            .filter(|p| !same_cell(*p, cell))
+            .collect();
         self.falls_dirty = true;
     }
 
@@ -471,32 +514,32 @@ impl PixelWater {
     }
 
     #[func]
-    fn set_waterfall_material(&mut self, v: Option<Gd<ShaderMaterial>>) {
-        self.waterfall_material = v;
+    fn assign_cascade_stuff(&mut self, v: Option<Gd<ShaderMaterial>>) {
+        self.cascade_stuff = v;
         self.falls_dirty = true;
     }
 
     #[func]
-    fn set_size(&mut self, v: Vector2) {
+    fn assign_measure(&mut self, v: Vector2) {
         self.size = v;
         if self.base().is_inside_tree() {
-            self.rebuild();
+            self.reassemble();
         }
     }
 
     #[func]
-    fn set_subdivisions(&mut self, v: i32) {
+    fn assign_refinements(&mut self, v: i32) {
         self.subdivisions = v.clamp(0, 256);
         if self.base().is_inside_tree() {
-            self.rebuild();
+            self.reassemble();
         }
     }
 
     #[func]
-    fn set_material(&mut self, v: Option<Gd<ShaderMaterial>>) {
-        self.material = v;
+    fn assign_stuff(&mut self, v: Option<Gd<ShaderMaterial>>) {
+        self.stuff = v;
         if self.base().is_inside_tree() {
-            self.rebuild();
+            self.reassemble();
         }
     }
 }

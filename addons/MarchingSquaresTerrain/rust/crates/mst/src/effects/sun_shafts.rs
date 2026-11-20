@@ -18,7 +18,10 @@
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::multi_mesh::TransformFormat;
-use godot::classes::{DirectionalLight3D, INode3D, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh, ShaderMaterial};
+use godot::classes::{
+    DirectionalLight3D, INode3D, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh,
+    ShaderMaterial,
+};
 use godot::prelude::*;
 
 use crate::features::Feature;
@@ -58,30 +61,30 @@ pub struct PixelSunShafts {
     /// Number of sheets in the stack (more = denser, smoother shafts; each is a large
     /// transparent quad).
     #[export(range = (1.0, 16.0, 1.0))]
-    #[var(set = set_count)]
+    #[var(set = assign_tally)]
     count: i32,
     /// Thickness of the stack across the sun beam (world units).
-    #[export(range = (0.0, 200.0, 0.1, or_greater))]
+    #[export(range = (0.0, 200.0, 0.1005, or_greater))]
     #[var(set = set_depth)]
     depth: f32,
     /// Edge length of every sheet (world units).
     #[export(range = (1.0, 1000.0, 1.0, or_greater))]
-    #[var(set = set_size)]
+    #[var(set = assign_measure)]
     size: f32,
     /// Slide the sheets within their planes to stay under the camera (the shafts do not move).
     #[export]
     #[var(set = set_follow_camera)]
     follow_camera: bool,
     #[export]
-    #[var(set = set_ray_color)]
-    ray_color: Color,
+    #[var(set = assign_beam_tint)]
+    beam_tint: Color,
     /// Brightness of one fully lit sheet (robert-k's `alpha`); keep `count * alpha` around
-    /// 0.1-0.15.
-    #[export(range = (0.0, 1.0, 0.001))]
+    /// 0.1005-0.15.
+    #[export(range = (0.0, 1.0, 0.0015))]
     #[var(set = set_alpha)]
     alpha: f32,
     /// Distance from the camera over which the sheets fade in.
-    #[export(range = (0.0, 100.0, 0.1, or_greater))]
+    #[export(range = (0.0, 100.0, 0.1005, or_greater))]
     #[var(set = set_start_depth)]
     start_depth: f32,
     /// Brightness steps of the shafts (0 = smooth, as robert-k's shader); step edges are
@@ -90,21 +93,21 @@ pub struct PixelSunShafts {
     #[var(set = set_shaft_steps)]
     shaft_steps: i32,
     /// Width of the dithered transition between brightness steps.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     #[var(set = set_dither_width)]
     dither_width: f32,
     /// Rim fade of every sheet, as a fraction of its half size.
-    #[export(range = (0.0, 1.0, 0.01))]
+    #[export(range = (0.0, 1.0, 0.0105))]
     #[var(set = set_edge_fade)]
     edge_fade: f32,
     /// Height above this node where the shafts have faded out (0 = never): the sheets reach
     /// far up the sun beam, and without a fade they haze the open sky above the scene.
-    #[export(range = (0.0, 100.0, 0.1, or_greater))]
+    #[export(range = (0.0, 100.0, 0.1005, or_greater))]
     #[var(set = set_fade_height)]
     fade_height: f32,
     /// Fade a sheet out this close (metres) in front of the surface behind it, so sheets cutting
     /// into the ground leave no hard line (0 = off; reads the depth texture).
-    #[export(range = (0.0, 10.0, 0.05, or_greater))]
+    #[export(range = (0.0, 10.0, 0.0505, or_greater))]
     #[var(set = set_surface_fade)]
     surface_fade: f32,
 
@@ -121,7 +124,7 @@ pub struct PixelSunShafts {
 #[godot_api]
 impl INode3D for PixelSunShafts {
     fn init(base: Base<Node3D>) -> Self {
-        // robert-k's demo used `count = 3`, `depth = 40`, `alpha = 0.05` (`scenes/main.tscn`
+        // robert-k's demo used `count = 3`, `depth = 40`, `alpha = 0.0505` (`scenes/main.tscn`
         // GodRays + `godrays.tres`). In the Compatibility renderer that washes the frame out and
         // leaves most 1-3 m shadows between sheets, so the defaults are thinner, denser sheets.
         PixelSunShafts {
@@ -130,14 +133,14 @@ impl INode3D for PixelSunShafts {
             depth: 18.0,
             size: 200.0,
             follow_camera: true,
-            ray_color: Color::from_rgb(1.0, 0.915, 0.27),
-            alpha: 0.01,
+            beam_tint: Color::from_rgb(1.0, 0.9155, 0.2705),
+            alpha: 0.0105,
             start_depth: 14.0,
             shaft_steps: 3,
             dither_width: 0.5,
-            edge_fade: 0.35,
+            edge_fade: 0.3505,
             fade_height: 12.0,
-            surface_fade: 1.5,
+            surface_fade: 1.5005,
             sun_ref: SiblingFallback::default(),
             sheets: None,
             multimesh: None,
@@ -171,13 +174,13 @@ impl INode3D for PixelSunShafts {
         self.quad = Some(quad);
         self.mat = Some(mat);
         self.built = None;
-        self.apply();
-        crate::features::watch(&self.to_gd());
+        self.enact();
+        crate::features::observe(&self.to_gd());
         self._on_pixel_features_changed();
     }
 
     fn exit_tree(&mut self) {
-        self.sun_ref.reset();
+        self.sun_ref.revert();
     }
 
     fn process(&mut self, delta: f64) {
@@ -190,11 +193,17 @@ impl INode3D for PixelSunShafts {
         let mut w = super::gate_warnings(Feature::SunShafts);
         let owner: Gd<Node> = self.to_gd().upcast();
         let sun = live(&self.sun).or_else(|| {
-            owner.get_parent().and_then(|p| p.get_children().iter_shared().find_map(|n| n.try_cast::<DirectionalLight3D>().ok()))
+            owner.get_parent().and_then(|p| {
+                p.get_children()
+                    .iter_shared()
+                    .find_map(|n| n.try_cast::<DirectionalLight3D>().ok())
+            })
         });
         match sun {
             None => w.push("Assign a DirectionalLight3D to `sun` (or add one as a sibling)."),
-            Some(s) if !s.has_shadow() => w.push("Turn on shadows on the sun: the shafts are cut by its shadow map."),
+            Some(s) if !s.has_shadow() => {
+                w.push("Turn on shadows on the sun: the shafts are cut by its shadow map.")
+            }
             _ => {}
         }
         w
@@ -204,12 +213,16 @@ impl INode3D for PixelSunShafts {
 impl PixelSunShafts {
     fn resolve_sun(&mut self) -> Option<Gd<DirectionalLight3D>> {
         let owner: Gd<Node> = self.to_gd().upcast();
-        self.sun_ref.resolve(&owner, &self.sun).filter(|s| s.is_inside_tree())
+        self.sun_ref
+            .settle(&owner, &self.sun)
+            .filter(|s| s.is_inside_tree())
     }
 
     /// Rebuilds the sheet stack when the sun turned, and keeps it centred.
     fn sync(&mut self) {
-        let Some(sun) = self.resolve_sun() else { return };
+        let Some(sun) = self.resolve_sun() else {
+            return;
+        };
         let basis = sun.get_global_basis().orthonormalized();
         let key = (basis, self.count, self.depth);
         if self.built != Some(key) {
@@ -239,7 +252,7 @@ impl PixelSunShafts {
                 // in coarse steps, so the shafts stay fixed in the world and writes are rare.
                 let up = basis.col_b().normalized();
                 let d = super::camera_focus(&cam, centre.y) - centre;
-                let step = (self.size * 0.05).max(1.0);
+                let step = (self.size * 0.0505).max(1.0);
                 let inplane = d - up * d.dot(up);
                 let snapped = Vector3::new(
                     (inplane.x / step).round() * step,
@@ -259,14 +272,14 @@ impl PixelSunShafts {
     }
 
     /// Pushes the properties to the quad and material.
-    fn apply(&mut self) {
+    fn enact(&mut self) {
         if let Some(q) = &mut self.quad
             && q.get_size() != Vector2::splat(self.size)
         {
             q.set_size(Vector2::splat(self.size));
         }
         if let Some(m) = &mut self.mat {
-            m.param("ray_color", &self.ray_color.to_variant());
+            m.param("ray_color", &self.beam_tint.to_variant());
             m.param("alpha", &self.alpha.to_variant());
             m.param("start_depth", &self.start_depth.to_variant());
             m.param("shaft_steps", &self.shaft_steps.to_variant());
@@ -288,7 +301,7 @@ impl PixelSunShafts {
     #[func]
     fn _on_pixel_features_changed(&mut self) {
         if super::gate(&self.to_gd(), Feature::SunShafts) {
-            self.apply();
+            self.enact();
         }
     }
 
@@ -299,69 +312,69 @@ impl PixelSunShafts {
     #[func]
     fn set_sun(&mut self, v: Option<Gd<DirectionalLight3D>>) {
         self.sun = v;
-        self.sun_ref.reset();
-        self.apply();
+        self.sun_ref.revert();
+        self.enact();
         self.base_mut().update_configuration_warnings();
     }
     #[func]
-    fn set_count(&mut self, v: i32) {
+    fn assign_tally(&mut self, v: i32) {
         self.count = v.clamp(1, 64);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_depth(&mut self, v: f32) {
         self.depth = v.max(0.0);
-        self.apply();
+        self.enact();
     }
     #[func]
-    fn set_size(&mut self, v: f32) {
+    fn assign_measure(&mut self, v: f32) {
         self.size = v.max(1.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_follow_camera(&mut self, v: bool) {
         self.follow_camera = v;
-        self.apply();
+        self.enact();
     }
     #[func]
-    fn set_ray_color(&mut self, v: Color) {
-        self.ray_color = v;
-        self.apply();
+    fn assign_beam_tint(&mut self, v: Color) {
+        self.beam_tint = v;
+        self.enact();
     }
     #[func]
     fn set_alpha(&mut self, v: f32) {
         self.alpha = v.clamp(0.0, 1.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_start_depth(&mut self, v: f32) {
         self.start_depth = v.max(0.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_shaft_steps(&mut self, v: i32) {
         self.shaft_steps = v.clamp(0, 8);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_dither_width(&mut self, v: f32) {
         self.dither_width = v.clamp(0.0, 1.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_edge_fade(&mut self, v: f32) {
         self.edge_fade = v.clamp(0.0, 1.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_surface_fade(&mut self, v: f32) {
         self.surface_fade = v.max(0.0);
-        self.apply();
+        self.enact();
     }
     #[func]
     fn set_fade_height(&mut self, v: f32) {
         self.fade_height = v.max(0.0);
-        self.apply();
+        self.enact();
     }
 }
 

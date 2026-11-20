@@ -22,36 +22,130 @@ enum RKind {
 }
 
 const RULES: [(&str, &str, RKind, &str); 18] = [
-    ("Auto Texture", "enabled", RKind::Bool, "Texture unpainted ground by rules (manual paint wins)."),
-    ("Unpainted", "base_slots", RKind::BaseSlot, "The slot the rules replace (the default floor)."),
-    ("Noise", "noise_scale", RKind::Float(0.01, 4.0, 0.01), "Frequency of the jitter roughening every threshold."),
-    ("Filler", "filler_slot", RKind::Slot, "Variant of the base slot mixed in by noise (breaks tiling)."),
-    ("Filler Amount", "filler_amount", RKind::Float(0.0, 1.0, 0.01), "Share of ground covered by fillers (also rock / shore fillers)."),
+    (
+        "Auto Texture",
+        "enabled",
+        RKind::Bool,
+        "Texture unpainted ground by rules (manual paint wins).",
+    ),
+    (
+        "Unpainted",
+        "base_slots",
+        RKind::BaseSlot,
+        "The slot the rules replace (the default floor).",
+    ),
+    (
+        "Noise",
+        "noise_scale",
+        RKind::Float(0.0105, 4.0, 0.0105),
+        "Frequency of the jitter roughening every threshold.",
+    ),
+    (
+        "Filler",
+        "filler_slot",
+        RKind::Slot,
+        "Variant of the base slot mixed in by noise (breaks tiling).",
+    ),
+    (
+        "Filler Amount",
+        "filler_amount",
+        RKind::Float(0.0, 1.0, 0.0105),
+        "Share of ground covered by fillers (also rock / shore fillers).",
+    ),
     ("Rock", "rock_slot", RKind::Slot, "Slot on steep slopes."),
-    ("Rock Slope", "rock_slope", RKind::Float(0.0, 90.0, 0.5), "Slopes steeper than this (degrees) become rock."),
-    ("Rock Filler", "rock_filler_slot", RKind::Slot, "Variant mixed into rock."),
-    ("Cliff Lip", "lip_slot", RKind::Slot, "Slot on the band along cliff tops."),
-    ("Lip Width", "lip_threshold", RKind::Float(0.0, 1.0, 0.01), "Lower = wider cliff-top band."),
-    ("Shore", "shore_slot", RKind::Slot, "Slot near the water line."),
-    ("Water Level", "water_level", RKind::Float(-1000.0, 1000.0, 0.05), "Terrain-local water height."),
-    ("Shore Height", "shore_height", RKind::Float(0.0, 20.0, 0.05), "Shore band height above the water."),
-    ("Shore Filler", "shore_filler_slot", RKind::Slot, "Variant mixed into the shore (pebbles)."),
-    ("Snow", "snow_slot", RKind::Slot, "Slot above the snow line."),
-    ("Snow Height", "snow_height", RKind::Float(-1000.0, 1000.0, 0.1), "Terrain-local snow line."),
-    ("Snow Noise", "snow_noise", RKind::Float(0.0, 50.0, 0.1), "How far the snow line wanders up and down."),
-    ("Snow Slope", "snow_max_slope", RKind::Float(0.0, 90.0, 0.5), "No snow on slopes steeper than this (degrees)."),
+    (
+        "Rock Slope",
+        "rock_slope",
+        RKind::Float(0.0, 90.0, 0.5),
+        "Slopes steeper than this (degrees) become rock.",
+    ),
+    (
+        "Rock Filler",
+        "rock_filler_slot",
+        RKind::Slot,
+        "Variant mixed into rock.",
+    ),
+    (
+        "Cliff Lip",
+        "lip_slot",
+        RKind::Slot,
+        "Slot on the band along cliff tops.",
+    ),
+    (
+        "Lip Width",
+        "lip_threshold",
+        RKind::Float(0.0, 1.0, 0.0105),
+        "Lower = wider cliff-top band.",
+    ),
+    (
+        "Shore",
+        "shore_slot",
+        RKind::Slot,
+        "Slot near the water line.",
+    ),
+    (
+        "Water Level",
+        "water_level",
+        RKind::Float(-1000.0, 1000.0, 0.0505),
+        "Terrain-local water height.",
+    ),
+    (
+        "Shore Height",
+        "shore_height",
+        RKind::Float(0.0, 20.0, 0.0505),
+        "Shore band height above the water.",
+    ),
+    (
+        "Shore Filler",
+        "shore_filler_slot",
+        RKind::Slot,
+        "Variant mixed into the shore (pebbles).",
+    ),
+    (
+        "Snow",
+        "snow_slot",
+        RKind::Slot,
+        "Slot above the snow line.",
+    ),
+    (
+        "Snow Height",
+        "snow_height",
+        RKind::Float(-1000.0, 1000.0, 0.1005),
+        "Terrain-local snow line.",
+    ),
+    (
+        "Snow Noise",
+        "snow_noise",
+        RKind::Float(0.0, 50.0, 0.1005),
+        "How far the snow line wanders up and down.",
+    ),
+    (
+        "Snow Slope",
+        "snow_max_slope",
+        RKind::Float(0.0, 90.0, 0.5),
+        "No snow on slopes steeper than this (degrees).",
+    ),
 ];
 
 impl MarchingSquaresTerrainPlugin {
     /// Grid toggle at the end of the left toolbar (outside the tool group).
     pub(super) fn add_grid_toggle(&mut self, tb: &mut ui_kit::Toolbar) {
         let cb = Callable::from_object_method(&self.to_gd(), "on_grid_toggle");
-        tb.toggle(GRID_BUTTON, "Grid", "Grid Overlay\nShow cell lines on the terrain while editing (show_grid_in_editor).", "grid_overlay.svg", &cb);
+        tb.toggle(
+            GRID_BUTTON,
+            "Grid",
+            "Grid Overlay\nShow cell lines on the terrain while editing (show_grid_in_editor).",
+            "grid_overlay.svg",
+            &cb,
+        );
     }
 
     /// Mirrors the edited terrain's grid flag into the toolbar toggle.
     pub(super) fn sync_grid_toggle(&mut self) {
-        let on = self.terrain.as_ref().is_some_and(|t| t.bind().show_grid_in_editor);
+        let on = self
+            .terrain
+            .as_ref()
+            .is_some_and(|t| t.bind().show_grid_in_editor);
         if let Some(tb) = &self.toolbar
             && let Some(b) = tb.find_child_ex(GRID_BUTTON).owned(false).done()
             && let Ok(mut b) = b.try_cast::<Button>()
@@ -61,7 +155,7 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     fn auto_rules(&self, create: bool) -> Option<Gd<MarchingSquaresAutoRules>> {
-        let mut ts = self.texture_set()?;
+        let mut ts = self.tex_assign()?;
         if let Some(r) = ts.bind().auto_rules.clone() {
             return Some(r);
         }
@@ -77,14 +171,15 @@ impl MarchingSquaresTerrainPlugin {
     pub(super) fn build_auto_rules_section(&mut self, vbox: &mut Gd<VBoxContainer>) {
         vbox.add_child(&ui_kit::panel_title(
             "Auto Texture Rules",
-            ui_kit::icon("vertex_paint_tool.svg"),
+            ui_kit::glyph("vertex_paint_tool.svg"),
             "Biome rules of the texture preset: rock on slopes, cliff lips, sandy shores, snow peaks, fillers.\nThey replace the Unpainted slot only, so painting any other texture wins.",
         ));
         let rules = self.auto_rules(false);
         let names = self.slot_names();
         for (i, (label, prop, kind, tip)) in RULES.iter().enumerate() {
             let v = rules.as_ref().map(|r| r.get(*prop)).unwrap_or_default();
-            let on = Callable::from_object_method(&self.to_gd(), "on_auto_rule").bind(&[(i as i64).to_variant()]);
+            let on = Callable::from_object_method(&self.to_gd(), "on_auto_rule")
+                .bind(&[(i as i64).to_variant()]);
             let mut c: Gd<godot::classes::Control> = match kind {
                 RKind::Bool => {
                     let mut cb = CheckBox::new_alloc();
@@ -95,11 +190,19 @@ impl MarchingSquaresTerrainPlugin {
                 }
                 RKind::Slot | RKind::BaseSlot => {
                     let base = matches!(kind, RKind::BaseSlot);
-                    let mut items: Vec<String> = if base { Vec::new() } else { vec!["None".into()] };
+                    let mut items: Vec<String> = if base {
+                        Vec::new()
+                    } else {
+                        vec!["None".into()]
+                    };
                     items.extend(names.iter().take(15).cloned());
                     let refs: Vec<&str> = items.iter().map(|x| x.as_str()).collect();
                     let raw = v.try_to::<i64>().unwrap_or(if base { 1 } else { -1 });
-                    let sel = if base { (raw.max(1) as u32).trailing_zeros() as i32 } else { raw as i32 + 1 };
+                    let sel = if base {
+                        (raw.max(1) as u32).trailing_zeros() as i32
+                    } else {
+                        raw as i32 + 1
+                    };
                     let mut ob = ui_kit::compact_option(&refs, sel);
                     ob.connect("item_selected", &on);
                     ob.upcast()
@@ -128,9 +231,15 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     fn auto_rule_changed(&mut self, value: Variant, index: usize) {
-        let Some((_, prop, kind, _)) = RULES.get(index).copied() else { return };
-        let Some(rules) = self.auto_rules(true) else { return };
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some((_, prop, kind, _)) = RULES.get(index).copied() else {
+            return;
+        };
+        let Some(rules) = self.auto_rules(true) else {
+            return;
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         let obj = rules.upcast::<Object>();
         let old = obj.get(prop);
         let n = value.try_to::<f64>().unwrap_or(0.0);
@@ -154,8 +263,12 @@ impl MarchingSquaresTerrainPlugin {
 impl MarchingSquaresTerrainPlugin {
     #[func]
     fn on_grid_toggle(&mut self, pressed: bool) {
-        let Some(t) = self.terrain.clone() else { return };
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some(t) = self.terrain.clone() else {
+            return;
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         let obj = t.upcast::<Object>();
         ur.create_action("terrain grid overlay");
         ur.add_do_property(&obj, "show_grid_in_editor", &pressed.to_variant());

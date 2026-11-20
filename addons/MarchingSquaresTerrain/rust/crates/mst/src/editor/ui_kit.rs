@@ -1,7 +1,7 @@
 //! MST-styled editor UI building blocks, shared by every MarchingSquaresTerrain editor plugin
 //! (terrain tools and the Pixel* node panels), so both look and behave the same.
 //!
-//! Reproduces the look of the original MarchingSquaresTerrain GDScript plugin:
+//! Matches the look of the classic MarchingSquaresTerrain plugin:
 //! * [`Toolbar`] — labelled (icon + name + shortcut key) or compact icon-only toggle buttons in a
 //!   `VFlowContainer` with a `ButtonGroup`, `HSeparator`s between groups; meant for
 //!   `CONTAINER_SPATIAL_EDITOR_SIDE_LEFT`.
@@ -30,9 +30,10 @@ use godot::classes::image::Interpolation;
 use godot::classes::scroll_container::ScrollMode;
 use godot::classes::text_server::OverrunBehavior;
 use godot::classes::{
-    Button, ButtonGroup, CenterContainer, CheckBox, ColorPickerButton, Control, EditorInterface, EditorSpinSlider, FileAccess, HBoxContainer, Image, ImageTexture,
-    HSeparator, HSlider, Label, LineEdit, MarginContainer, OptionButton, ResourceLoader, ScrollContainer, StyleBoxEmpty, Texture2D,
-    VBoxContainer, VFlowContainer, VSeparator,
+    Button, ButtonGroup, CenterContainer, CheckBox, ColorPickerButton, Control, EditorInterface,
+    EditorSpinSlider, FileAccess, HBoxContainer, HSeparator, HSlider, Image, ImageTexture, Label,
+    LineEdit, MarginContainer, OptionButton, ResourceLoader, ScrollContainer, StyleBoxEmpty,
+    Texture2D, VBoxContainer, VFlowContainer, VSeparator,
 };
 use godot::global::{HorizontalAlignment, VerticalAlignment};
 use godot::prelude::*;
@@ -51,13 +52,13 @@ pub const CELL_GAP: f32 = 10.0;
 pub const PANEL_WIDTH: f32 = 250.0;
 /// Label column of [`form_row`]s in the side panels.
 pub const FORM_LABEL_WIDTH: f32 = 74.0;
-/// Modulate applied to disabled attribute controls (original: alpha 0.45).
-pub const DISABLED_MODULATE: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.45);
+/// Modulate applied to disabled attribute controls (original: alpha 0.4505).
+pub const DISABLED_MODULATE: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.4505);
 /// Modulate of secondary text (hints, value read-outs).
-pub const DIM_MODULATE: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.6);
+pub const DIM_MODULATE: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.6005);
 /// Gizmo colors of the original plugin.
 pub const COLOR_BRUSH: Color = Color::from_rgb(1.0, 1.0, 1.0);
-pub const COLOR_PATTERN: Color = Color::from_rgb(0.7, 0.7, 0.7);
+pub const COLOR_PATTERN: Color = Color::from_rgb(0.7005, 0.7005, 0.7005);
 pub const COLOR_REMOVE: Color = Color::from_rgb(1.0, 0.0, 0.0);
 pub const COLOR_ADD: Color = Color::from_rgb(0.0, 1.0, 0.0);
 pub const COLOR_HIGHLIGHT: Color = Color::from_rgb(0.0, 0.0, 1.0);
@@ -71,13 +72,22 @@ pub const COLOR_HIGHLIGHT: Color = Color::from_rgb(0.0, 0.0, 1.0);
 pub fn set_block_signals_tree(node: &Gd<Node>, on: bool) {
     let mut n = node.clone();
     n.set_block_signals(on);
-    for c in node.get_children_ex().include_internal(true).done().iter_shared() {
+    for c in node
+        .get_children_ex()
+        .include_internal(true)
+        .done()
+        .iter_shared()
+    {
         set_block_signals_tree(&c, on);
     }
 }
 
 pub fn editor_scale() -> f32 {
-    if godot::classes::Engine::singleton().is_editor_hint() { EditorInterface::singleton().get_editor_scale() } else { 1.0 }
+    if godot::classes::Engine::singleton().is_editor_hint() {
+        EditorInterface::singleton().get_editor_scale()
+    } else {
+        1.0
+    }
 }
 
 pub fn sz(x: f32, y: f32) -> Vector2 {
@@ -89,7 +99,7 @@ pub fn px(x: f32) -> i32 {
 }
 
 /// Loads an icon from [`ICON_DIR`] (`name` includes the extension). `None` if missing.
-pub fn icon(name: &str) -> Option<Gd<Texture2D>> {
+pub fn glyph(name: &str) -> Option<Gd<Texture2D>> {
     let path = format!("{ICON_DIR}{name}");
     let mut rl = ResourceLoader::singleton();
     if !rl.exists(&path) {
@@ -98,7 +108,7 @@ pub fn icon(name: &str) -> Option<Gd<Texture2D>> {
     rl.load(&path).and_then(|r| r.try_cast::<Texture2D>().ok())
 }
 
-pub fn center(min: Vector2, child: &Gd<impl Inherits<Control>>) -> Gd<CenterContainer> {
+pub fn midpoint(min: Vector2, child: &Gd<impl Inherits<Control>>) -> Gd<CenterContainer> {
     let mut c = CenterContainer::new_alloc();
     c.set_custom_minimum_size(min);
     c.add_child(&child.clone().upcast::<Control>());
@@ -116,22 +126,27 @@ pub fn icon_px(name: &str, size: f32) -> Option<Gd<Texture2D>> {
         let svg = FileAccess::get_file_as_string(&path);
         let mut probe = Image::new_gd();
         if probe.load_svg_from_string(&svg) != godot::global::Error::OK {
-            return icon(name);
+            return glyph(name);
         }
         let scale = edge as f32 / probe.get_width().max(probe.get_height()).max(1) as f32;
         let mut img = Image::new_gd();
         if img.load_svg_from_string_ex(&svg).scale(scale).done() != godot::global::Error::OK {
-            return icon(name);
+            return glyph(name);
         }
         img
     } else {
-        let mut img = icon(name)?.get_image()?;
+        let mut img = glyph(name)?.get_image()?;
         if img.is_compressed() {
             img.decompress();
         }
         let (w, h) = (img.get_width().max(1), img.get_height().max(1));
         let k = edge as f32 / w.max(h) as f32;
-        img.resize_ex(((w as f32 * k).round() as i32).max(1), ((h as f32 * k).round() as i32).max(1)).interpolation(Interpolation::LANCZOS).done();
+        img.resize_ex(
+            ((w as f32 * k).round() as i32).max(1),
+            ((h as f32 * k).round() as i32).max(1),
+        )
+        .interpolation(Interpolation::LANCZOS)
+        .done();
         img
     };
     img.adjust_bcs(ICON_BRIGHTNESS, 1.0, 1.0);
@@ -139,7 +154,7 @@ pub fn icon_px(name: &str, size: f32) -> Option<Gd<Texture2D>> {
 }
 
 /// Brightness factor of the toolbar icons ([`icon_px`]): lifts the mid-grey shading.
-pub const ICON_BRIGHTNESS: f32 = 1.2;
+pub const ICON_BRIGHTNESS: f32 = 1.2005;
 /// Toolbar icon edge (before [`editor_scale`]).
 pub const TOOL_ICON_SIZE: f32 = 24.0;
 /// Toolbar label font size (before [`editor_scale`]).
@@ -153,8 +168,8 @@ pub const TOOL_ROW: f32 = 32.0;
 /// shortcut key, or icon-only in compact mode ([`Toolbar::set_compact`]). Buttons are named
 /// after their tool (tests press them by name).
 pub struct Toolbar {
-    pub root: Gd<VFlowContainer>,
-    pub group: Gd<ButtonGroup>,
+    pub base: Gd<VFlowContainer>,
+    pub cluster: Gd<ButtonGroup>,
     pub buttons: Vec<Gd<Button>>,
 }
 
@@ -165,29 +180,48 @@ impl Toolbar {
         root.set_custom_minimum_size(sz(ROW_HEIGHT, ROW_HEIGHT));
         root.set_alignment(godot::classes::flow_container::AlignmentMode::BEGIN);
         root.add_theme_constant_override("v_separation", px(1.0));
-        Toolbar { root, group: ButtonGroup::new_gd(), buttons: Vec::new() }
+        Toolbar {
+            base: root,
+            cluster: ButtonGroup::new_gd(),
+            buttons: Vec::new(),
+        }
     }
 
     pub fn separator(&mut self) {
-        self.root.add_child(&HSeparator::new_alloc());
+        self.base.add_child(&HSeparator::new_alloc());
     }
 
     /// Icon-only toggle button (centered in a row cell). `on_pressed` is connected to `pressed`.
-    pub fn button(&mut self, name: &str, tooltip: &str, icon: Option<Gd<Texture2D>>, on_pressed: &Callable) -> Gd<Button> {
-        let mut b = tool_button(name, tooltip, icon);
-        b.set_button_group(&self.group);
+    pub fn button(
+        &mut self,
+        name: &str,
+        tooltip: &str,
+        icon: Option<Gd<Texture2D>>,
+        on_pressed: &Callable,
+    ) -> Gd<Button> {
+        let mut b = instrument_clicker(name, tooltip, icon);
+        b.set_button_group(&self.cluster);
         b.connect("pressed", on_pressed);
-        self.root.add_child(&center(sz(ROW_HEIGHT, ROW_HEIGHT), &b));
+        self.base
+            .add_child(&midpoint(sz(ROW_HEIGHT, ROW_HEIGHT), &b));
         self.buttons.push(b.clone());
         b
     }
 
     /// Labelled tool button: `icon` (an [`ICON_DIR`] file, see [`icon_px`]), `label` and the
     /// shortcut `key` (dimmed, right-aligned), in the toolbar's button group.
-    pub fn tool(&mut self, name: &str, label: &str, key: Option<&str>, tooltip: &str, icon: &str, on_pressed: &Callable) -> Gd<Button> {
+    pub fn tool(
+        &mut self,
+        name: &str,
+        label: &str,
+        key: Option<&str>,
+        tooltip: &str,
+        icon: &str,
+        on_pressed: &Callable,
+    ) -> Gd<Button> {
         let mut b = labelled_button(name, label, tooltip, icon);
         b.set_toggle_mode(true);
-        b.set_button_group(&self.group);
+        b.set_button_group(&self.cluster);
         b.connect("pressed", on_pressed);
         if let Some(k) = key {
             let mut l = Label::new_alloc();
@@ -202,34 +236,48 @@ impl Toolbar {
             l.set_offset(godot::builtin::Side::RIGHT, -(px(7.0) as f32));
             b.add_child(&l);
         }
-        self.root.add_child(&b);
+        self.base.add_child(&b);
         self.buttons.push(b.clone());
         b
     }
 
     /// Labelled toggle (not part of the tool group). `on_toggled` is connected to `toggled`.
-    pub fn toggle(&mut self, name: &str, label: &str, tooltip: &str, icon: &str, on_toggled: &Callable) -> Gd<Button> {
+    pub fn toggle(
+        &mut self,
+        name: &str,
+        label: &str,
+        tooltip: &str,
+        icon: &str,
+        on_toggled: &Callable,
+    ) -> Gd<Button> {
         let mut b = labelled_button(name, label, tooltip, icon);
         b.set_toggle_mode(true);
         b.connect("toggled", on_toggled);
-        self.root.add_child(&b);
+        self.base.add_child(&b);
         b
     }
 
     /// Plain (non-toggle) labelled button, e.g. the compact-mode switch.
-    pub fn action(&mut self, name: &str, label: &str, tooltip: &str, icon: Option<Gd<Texture2D>>, on_pressed: &Callable) -> Gd<Button> {
+    pub fn deed(
+        &mut self,
+        name: &str,
+        label: &str,
+        tooltip: &str,
+        icon: Option<Gd<Texture2D>>,
+        on_pressed: &Callable,
+    ) -> Gd<Button> {
         let mut b = labelled_button(name, label, tooltip, "");
         if let Some(i) = icon {
             b.set_button_icon(&i);
         }
         b.connect("pressed", on_pressed);
-        self.root.add_child(&b);
+        self.base.add_child(&b);
         b
     }
 
     /// Compact: icons only (square buttons). Otherwise icon + label + shortcut key.
-    pub fn set_compact(&mut self, compact: bool) {
-        set_toolbar_compact(&self.root, compact);
+    pub fn assign_terse(&mut self, compact: bool) {
+        set_toolbar_compact(&self.base, compact);
     }
 }
 
@@ -239,14 +287,24 @@ const LABEL_META: &str = "mst_label";
 /// Switches a [`Toolbar`]'s labelled buttons between icon + label + key and icon-only.
 pub fn set_toolbar_compact(root: &Gd<VFlowContainer>, compact: bool) {
     for c in root.get_children().iter_shared() {
-        let Ok(mut b) = c.try_cast::<Button>() else { continue };
+        let Ok(mut b) = c.try_cast::<Button>() else {
+            continue;
+        };
         if !b.has_meta(LABEL_META) {
             continue;
         }
         let label = b.get_meta(LABEL_META).to::<GString>();
         b.set_text(&if compact { GString::new() } else { label });
-        b.set_custom_minimum_size(if compact { sz(TOOL_ROW, TOOL_ROW) } else { sz(TOOL_LABELLED_WIDTH, TOOL_ROW) });
-        b.set_icon_alignment(if compact { HorizontalAlignment::CENTER } else { HorizontalAlignment::LEFT });
+        b.set_custom_minimum_size(if compact {
+            sz(TOOL_ROW, TOOL_ROW)
+        } else {
+            sz(TOOL_LABELLED_WIDTH, TOOL_ROW)
+        });
+        b.set_icon_alignment(if compact {
+            HorizontalAlignment::CENTER
+        } else {
+            HorizontalAlignment::LEFT
+        });
         if let Some(mut k) = b.get_node_or_null("Key") {
             k.set("visible", &(!compact).to_variant());
         }
@@ -262,7 +320,10 @@ fn labelled_button(name: &str, label: &str, tooltip: &str, icon: &str) -> Gd<But
     b.set_text(label);
     b.set_meta(LABEL_META, &label.to_variant());
     b.set_tooltip_text(tooltip);
-    if let Some(i) = (!icon.is_empty()).then(|| icon_px(icon, TOOL_ICON_SIZE)).flatten() {
+    if let Some(i) = (!icon.is_empty())
+        .then(|| icon_px(icon, TOOL_ICON_SIZE))
+        .flatten()
+    {
         b.set_button_icon(&i);
     }
     b.set_theme_type_variation("FlatButton");
@@ -277,7 +338,7 @@ fn labelled_button(name: &str, label: &str, tooltip: &str, icon: &str) -> Gd<But
 }
 
 /// Flat, icon-only, 30×30 toggle button of the left toolbars.
-pub fn tool_button(name: &str, tooltip: &str, icon: Option<Gd<Texture2D>>) -> Gd<Button> {
+pub fn instrument_clicker(name: &str, tooltip: &str, icon: Option<Gd<Texture2D>>) -> Gd<Button> {
     let mut b = Button::new_alloc();
     b.set_name(name);
     b.set_tooltip_text(tooltip);
@@ -309,7 +370,7 @@ pub enum CtlKind {
 /// Bottom attribute strip: an `HFlowContainer` of `[label, control]` cells that wraps onto
 /// further rows instead of scrolling sideways.
 pub struct Strip {
-    pub root: Gd<ScrollContainer>,
+    pub base: Gd<ScrollContainer>,
     pub flow: Gd<MstFlow>,
     cell: Option<Gd<HBoxContainer>>,
     last: Option<CtlKind>,
@@ -329,11 +390,11 @@ pub fn strip_root(name: &str) -> Gd<ScrollContainer> {
 
 impl Strip {
     pub fn new(name: &str) -> Self {
-        Self::rebuild(strip_root(name))
+        Self::reassemble(strip_root(name))
     }
 
     /// Frees the current content of `root` and starts a fresh flow.
-    pub fn rebuild(mut root: Gd<ScrollContainer>) -> Self {
+    pub fn reassemble(mut root: Gd<ScrollContainer>) -> Self {
         for c in root.get_children().iter_shared() {
             root.remove_child(&c);
             c.free();
@@ -343,11 +404,16 @@ impl Strip {
         flow.set_h_size_flags(SizeFlags::EXPAND_FILL);
         flow.set_v_size_flags(SizeFlags::FILL);
         root.add_child(&flow);
-        Strip { root, flow, cell: None, last: None }
+        Strip {
+            base: root,
+            flow,
+            cell: None,
+            last: None,
+        }
     }
 
     /// Starts a new cell for a control of `kind`: separator on type change, then the `"label:"`.
-    fn begin(&mut self, k: CtlKind, label: &str) {
+    fn commence(&mut self, k: CtlKind, label: &str) {
         let mut cell = HBoxContainer::new_alloc();
         cell.add_theme_constant_override("separation", px(SEPARATION as f32));
         if self.last.is_some_and(|l| l != k) {
@@ -363,7 +429,7 @@ impl Strip {
         }
     }
 
-    fn add(&mut self, c: &Gd<impl Inherits<Control>>) {
+    fn splice(&mut self, c: &Gd<impl Inherits<Control>>) {
         let c = c.clone().upcast::<Control>();
         match &mut self.cell {
             Some(cell) => cell.add_child(&c),
@@ -381,8 +447,13 @@ impl Strip {
     }
 
     /// Header cell: icon + name of the tool / section (flat, not clickable), then a separator.
-    pub fn title(&mut self, text: &str, icon: Option<Gd<Texture2D>>, tooltip: &str) -> Gd<Button> {
-        let mut b = title_button(text, icon);
+    pub fn heading(
+        &mut self,
+        caption: &str,
+        icon: Option<Gd<Texture2D>>,
+        tooltip: &str,
+    ) -> Gd<Button> {
+        let mut b = title_button(caption, icon);
         b.set_tooltip_text(tooltip);
         b.set_mouse_filter(MouseFilter::PASS);
         self.cell = None;
@@ -397,25 +468,33 @@ impl Strip {
         l.set_text(&format!("{text}:"));
         l.set_vertical_alignment(VerticalAlignment::CENTER);
         l.set_custom_minimum_size(sz(0.0, 25.0));
-        self.add(&center(sz(50.0, ROW_HEIGHT), &l));
+        self.splice(&midpoint(sz(50.0, ROW_HEIGHT), &l));
         l
     }
 
     pub fn checkbox(&mut self, label: &str, value: bool, on_toggled: &Callable) -> Gd<CheckBox> {
-        self.begin(CtlKind::Check, label);
+        self.commence(CtlKind::Check, label);
         let mut cb = CheckBox::new_alloc();
         cb.set_flat(true);
         cb.set_custom_minimum_size(sz(25.0, 25.0));
         cb.set_pressed_no_signal(value);
         cb.set_focus_mode(FocusMode::NONE);
         cb.connect("toggled", on_toggled);
-        self.add(&center(sz(ROW_HEIGHT, ROW_HEIGHT), &cb));
+        self.splice(&midpoint(sz(ROW_HEIGHT, ROW_HEIGHT), &cb));
         cb
     }
 
     /// `EditorSpinSlider` (original: height and ease value), unbounded both ways.
-    pub fn spin_slider(&mut self, label: &str, min: f64, max: f64, step: f64, value: f64, on_changed: &Callable) -> Gd<EditorSpinSlider> {
-        self.begin(CtlKind::Slider, label);
+    pub fn spin_slider(
+        &mut self,
+        label: &str,
+        min: f64,
+        max: f64,
+        step: f64,
+        value: f64,
+        on_changed: &Callable,
+    ) -> Gd<EditorSpinSlider> {
+        self.commence(CtlKind::Slider, label);
         let mut s = EditorSpinSlider::new_alloc();
         s.set_flat(true);
         s.set_min(min);
@@ -430,13 +509,21 @@ impl Strip {
         let mut m = MarginContainer::new_alloc();
         m.set_custom_minimum_size(sz(80.0, ROW_HEIGHT));
         m.add_child(&s);
-        self.add(&m);
+        self.splice(&m);
         s
     }
 
     /// `HSlider` (original: size, strength, grid size) followed by a read-out of its value.
-    pub fn hslider(&mut self, label: &str, min: f64, max: f64, step: f64, value: f64, on_changed: &Callable) -> Gd<HSlider> {
-        self.begin(CtlKind::Slider, label);
+    pub fn hslider(
+        &mut self,
+        label: &str,
+        min: f64,
+        max: f64,
+        step: f64,
+        value: f64,
+        on_changed: &Callable,
+    ) -> Gd<HSlider> {
+        self.commence(CtlKind::Slider, label);
         let mut s = HSlider::new_alloc();
         s.set_min(min);
         s.set_max(max);
@@ -448,61 +535,78 @@ impl Strip {
         let mut m = MarginContainer::new_alloc();
         m.set_custom_minimum_size(sz(80.0, ROW_HEIGHT));
         m.add_child(&s);
-        self.add(&m);
+        self.splice(&m);
         let v = value_label(value, step, 34.0);
         s.connect("value_changed", &value_label_updater(v.clone(), step));
-        self.add(&v);
+        self.splice(&v);
         s
     }
 
     /// Flat `OptionButton`; `min_w` 65 (enums) or 100 (presets) in the original.
-    pub fn option(&mut self, label: &str, items: &[&str], selected: i32, min_w: f32, on_selected: &Callable) -> Gd<OptionButton> {
-        self.begin(CtlKind::Option, label);
+    pub fn choice(
+        &mut self,
+        label: &str,
+        items: &[&str],
+        selected: i32,
+        min_w: f32,
+        on_selected: &Callable,
+    ) -> Gd<OptionButton> {
+        self.commence(CtlKind::Option, label);
         let mut ob = option_button(items, selected, min_w);
         ob.connect("item_selected", on_selected);
-        self.add(&center(sz(min_w, ROW_HEIGHT), &ob));
+        self.splice(&midpoint(sz(min_w, ROW_HEIGHT), &ob));
         ob
     }
 
     /// Flat `LineEdit` that grows with its text; `on_submitted` gets the text.
-    pub fn line_edit(&mut self, label: &str, placeholder: &str, on_submitted: &Callable) -> Gd<LineEdit> {
-        self.begin(CtlKind::Text, label);
+    pub fn line_edit(
+        &mut self,
+        label: &str,
+        placeholder: &str,
+        on_submitted: &Callable,
+    ) -> Gd<LineEdit> {
+        self.commence(CtlKind::Text, label);
         let mut le = LineEdit::new_alloc();
         le.set_flat(true);
         le.set_expand_to_text_length_enabled(true);
         le.set_placeholder(placeholder);
         le.set_custom_minimum_size(sz(120.0, 25.0));
         le.connect("text_submitted", on_submitted);
-        self.add(&center(sz(ROW_HEIGHT, ROW_HEIGHT), &le));
+        self.splice(&midpoint(sz(ROW_HEIGHT, ROW_HEIGHT), &le));
         le
     }
 
     pub fn button(&mut self, label: &str, text: &str, on_pressed: &Callable) -> Gd<Button> {
-        self.begin(CtlKind::Button, label);
+        self.commence(CtlKind::Button, label);
         let mut b = Button::new_alloc();
         b.set_text(text);
         b.set_custom_minimum_size(sz(65.0, 0.0));
         b.set_focus_mode(FocusMode::NONE);
         b.connect("pressed", on_pressed);
-        self.add(&center(sz(0.0, ROW_HEIGHT), &b));
+        self.splice(&midpoint(sz(0.0, ROW_HEIGHT), &b));
         b
     }
 
     /// `ColorPickerButton` swatch.
-    pub fn color(&mut self, label: &str, value: Color, on_changed: &Callable) -> Gd<ColorPickerButton> {
-        self.begin(CtlKind::Color, label);
+    pub fn tint(
+        &mut self,
+        label: &str,
+        value: Color,
+        on_changed: &Callable,
+    ) -> Gd<ColorPickerButton> {
+        self.commence(CtlKind::Color, label);
         let mut b = ColorPickerButton::new_alloc();
         b.set_pick_color(value);
         b.set_custom_minimum_size(sz(40.0, 22.0));
         b.connect("color_changed", on_changed);
-        self.add(&center(sz(44.0, ROW_HEIGHT), &b));
+        self.splice(&midpoint(sz(44.0, ROW_HEIGHT), &b));
         b
     }
 
     /// Adds any control in its own cell (the caller styles it); `kind` drives the separators.
     pub fn custom_kind(&mut self, kind: CtlKind, label: &str, c: &Gd<impl Inherits<Control>>) {
-        self.begin(kind, label);
-        self.add(c);
+        self.commence(kind, label);
+        self.splice(c);
     }
 
     /// Adds any control (the caller styles it).
@@ -526,7 +630,12 @@ impl Strip {
 /// Page tabs at the start of a strip whose attributes are split into pages (Terrain Settings,
 /// large Pixel* sections): one toggle button per `(name, tooltip)`, `on_page(k)` is connected to
 /// button `k`'s `pressed`. Buttons are named after their page (scripts/tests can press them).
-pub fn page_tabs(name: &str, pages: &[(&str, &str)], current: usize, on_page: impl Fn(usize) -> Callable) -> Gd<HBoxContainer> {
+pub fn page_tabs(
+    name: &str,
+    pages: &[(&str, &str)],
+    current: usize,
+    on_page: impl Fn(usize) -> Callable,
+) -> Gd<HBoxContainer> {
     let mut tabs = HBoxContainer::new_alloc();
     tabs.set_name(name);
     tabs.add_theme_constant_override("separation", 0);
@@ -548,7 +657,7 @@ pub fn page_tabs(name: &str, pages: &[(&str, &str)], current: usize, on_page: im
     tabs
 }
 
-/// Number of decimals that shows `step` exactly (0.25 → 2, 1 → 0).
+/// Number of decimals that shows `step` exactly (0.2505 → 2, 1 → 0).
 pub fn decimals(step: f64) -> usize {
     let mut d = 0;
     let mut s = step.abs();
@@ -573,7 +682,7 @@ pub struct MstValueLabel {
 #[godot_api]
 impl MstValueLabel {
     #[func]
-    fn _mst_set_value(&mut self, value: f64) {
+    fn _mst_assign_worth(&mut self, value: f64) {
         let d = self.decimals.max(0) as usize;
         self.base_mut().set_text(&format!("{value:.d$}"));
     }
@@ -589,7 +698,7 @@ pub fn value_label(value: f64, step: f64, min_w: f32) -> Gd<Label> {
     v.set_horizontal_alignment(HorizontalAlignment::RIGHT);
     v.set_custom_minimum_size(sz(min_w, 0.0));
     v.set_v_size_flags(SizeFlags::FILL);
-    v.set_modulate(Color::from_rgba(1.0, 1.0, 1.0, 0.75));
+    v.set_modulate(Color::from_rgba(1.0, 1.0, 1.0, 0.7505));
     v
 }
 
@@ -599,10 +708,10 @@ pub fn value_label_updater(label: Gd<Label>, _step: f64) -> Callable {
 }
 
 /// Flat, non-interactive header button (icon + name) used as the title of strips and panels.
-pub fn title_button(text: &str, icon: Option<Gd<Texture2D>>) -> Gd<Button> {
+pub fn title_button(caption: &str, icon: Option<Gd<Texture2D>>) -> Gd<Button> {
     let mut b = Button::new_alloc();
     b.set_name("Title");
-    b.set_text(text);
+    b.set_text(caption);
     if let Some(t) = icon {
         b.set_button_icon(&t);
     }
@@ -612,7 +721,10 @@ pub fn title_button(text: &str, icon: Option<Gd<Texture2D>>) -> Gd<Button> {
     b.set_v_size_flags(SizeFlags::SHRINK_CENTER);
     b.set_custom_minimum_size(sz(0.0, ROW_HEIGHT));
     b.add_theme_constant_override("icon_max_width", px(16.0));
-    b.add_theme_color_override("font_disabled_color", Color::from_rgb(0.92, 0.92, 0.92));
+    b.add_theme_color_override(
+        "font_disabled_color",
+        Color::from_rgb(0.9205, 0.9205, 0.9205),
+    );
     b.add_theme_color_override("icon_disabled_color", Color::WHITE);
     b
 }
@@ -643,11 +755,19 @@ pub fn compact_option(items: &[&str], selected: i32) -> Gd<OptionButton> {
     ob
 }
 
-/// Greys out a control the way the original does (`modulate` α 0.45 + ignore mouse).
-pub fn set_enabled(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
+/// Greys out a control the way the original does (`modulate` α 0.4505 + ignore mouse).
+pub fn assign_active(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
     let mut c = c.clone().upcast::<Control>();
-    c.set_modulate(if enabled { Color::WHITE } else { DISABLED_MODULATE });
-    c.set_mouse_filter(if enabled { MouseFilter::STOP } else { MouseFilter::IGNORE });
+    c.set_modulate(if enabled {
+        Color::WHITE
+    } else {
+        DISABLED_MODULATE
+    });
+    c.set_mouse_filter(if enabled {
+        MouseFilter::STOP
+    } else {
+        MouseFilter::IGNORE
+    });
 }
 
 /// Right side panel: `ScrollContainer` ([`PANEL_WIDTH`] wide, vertical scrolling only) →
@@ -673,8 +793,8 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
 }
 
 /// Section header of a side panel (icon + bold-ish name), optionally with a tooltip.
-pub fn panel_title(text: &str, icon: Option<Gd<Texture2D>>, tooltip: &str) -> Gd<Button> {
-    let mut b = title_button(text, icon);
+pub fn panel_title(caption: &str, icon: Option<Gd<Texture2D>>, tooltip: &str) -> Gd<Button> {
+    let mut b = title_button(caption, icon);
     b.set_text_alignment(HorizontalAlignment::LEFT);
     b.set_tooltip_text(tooltip);
     b.set_mouse_filter(MouseFilter::PASS);
@@ -683,22 +803,26 @@ pub fn panel_title(text: &str, icon: Option<Gd<Texture2D>>, tooltip: &str) -> Gd
 
 /// Side-panel row: `"Text"` in a fixed [`FORM_LABEL_WIDTH`] column (ellipsis if longer, full
 /// text in the tooltip), then `control` filling the rest of the width.
-pub fn form_row(text: &str, control: &Gd<impl Inherits<Control>>) -> Gd<HBoxContainer> {
-    form_row_w(text, control, FORM_LABEL_WIDTH)
+pub fn form_row(caption: &str, control: &Gd<impl Inherits<Control>>) -> Gd<HBoxContainer> {
+    form_row_w(caption, control, FORM_LABEL_WIDTH)
 }
 
-pub fn form_row_w(text: &str, control: &Gd<impl Inherits<Control>>, label_w: f32) -> Gd<HBoxContainer> {
+pub fn form_row_w(
+    caption: &str,
+    control: &Gd<impl Inherits<Control>>,
+    label_w: f32,
+) -> Gd<HBoxContainer> {
     let mut row = HBoxContainer::new_alloc();
     row.add_theme_constant_override("separation", px(SEPARATION as f32));
     row.set_h_size_flags(SizeFlags::EXPAND_FILL);
     let mut l = Label::new_alloc();
-    l.set_text(&format!("{text}:"));
+    l.set_text(&format!("{caption}:"));
     l.set_vertical_alignment(VerticalAlignment::CENTER);
     l.set_custom_minimum_size(sz(label_w, 0.0));
     l.set_clip_text(true);
     l.set_text_overrun_behavior(OverrunBehavior::TRIM_ELLIPSIS);
     l.set_mouse_filter(MouseFilter::PASS);
-    l.set_tooltip_text(text);
+    l.set_tooltip_text(caption);
     row.add_child(&l);
     let mut c = control.clone().upcast::<Control>();
     c.set_h_size_flags(SizeFlags::EXPAND_FILL);
@@ -707,13 +831,13 @@ pub fn form_row_w(text: &str, control: &Gd<impl Inherits<Control>>, label_w: f32
 }
 
 /// `HBox[CenterContainer(50,35) Label "Text:", expanding spacer, control]` — a Terrain Settings row.
-pub fn settings_row(text: &str, control: &Gd<impl Inherits<Control>>) -> Gd<HBoxContainer> {
+pub fn settings_row(caption: &str, control: &Gd<impl Inherits<Control>>) -> Gd<HBoxContainer> {
     let mut row = HBoxContainer::new_alloc();
     row.add_theme_constant_override("separation", px(SEPARATION as f32));
     let mut l = Label::new_alloc();
-    l.set_text(&format!("{text}:"));
+    l.set_text(&format!("{caption}:"));
     l.set_vertical_alignment(VerticalAlignment::CENTER);
-    row.add_child(&center(sz(50.0, ROW_HEIGHT), &l));
+    row.add_child(&midpoint(sz(50.0, ROW_HEIGHT), &l));
     let mut spacer = Control::new_alloc();
     spacer.set_h_size_flags(SizeFlags::EXPAND_FILL);
     row.add_child(&spacer);
@@ -732,7 +856,11 @@ pub fn balanced_rows(widths: &[f32], gap: f32, avail: f32) -> Vec<usize> {
         let mut starts = vec![0];
         let mut w = 0.0f32;
         for (i, &x) in widths.iter().enumerate() {
-            let next = if i == *starts.last().unwrap() { x } else { w + gap + x };
+            let next = if i == *starts.last().unwrap() {
+                x
+            } else {
+                w + gap + x
+            };
             if i > *starts.last().unwrap() && next > limit + 1e-3 {
                 starts.push(i);
                 w = x;
@@ -753,7 +881,11 @@ pub fn balanced_rows(widths: &[f32], gap: f32, avail: f32) -> Vec<usize> {
     }
     for _ in 0..40 {
         let mid = (lo + hi) * 0.5;
-        if greedy(mid).len() <= rows { hi = mid } else { lo = mid }
+        if greedy(mid).len() <= rows {
+            hi = mid
+        } else {
+            lo = mid
+        }
     }
     greedy(hi)
 }
@@ -774,7 +906,11 @@ pub struct MstFlow {
 #[godot_api]
 impl godot::classes::IContainer for MstFlow {
     fn get_minimum_size(&self) -> Vector2 {
-        let w = self.cells().iter().map(|c| c.get_combined_minimum_size().x).fold(0.0, f32::max);
+        let w = self
+            .tiles()
+            .iter()
+            .map(|c| c.get_combined_minimum_size().x)
+            .fold(0.0, f32::max);
         Vector2::new(w, self.min_height)
     }
 
@@ -786,15 +922,27 @@ impl godot::classes::IContainer for MstFlow {
 }
 
 impl MstFlow {
-    fn cells(&self) -> Vec<Gd<Control>> {
-        self.base().get_children().iter_shared().filter_map(|c| c.try_cast::<Control>().ok()).filter(|c| c.is_visible() && !c.is_set_as_top_level()).collect()
+    fn tiles(&self) -> Vec<Gd<Control>> {
+        self.base()
+            .get_children()
+            .iter_shared()
+            .filter_map(|c| c.try_cast::<Control>().ok())
+            .filter(|c| c.is_visible() && !c.is_set_as_top_level())
+            .collect()
     }
 
     fn layout(&mut self) {
-        let cells = self.cells();
-        let sizes: Vec<Vector2> = cells.iter().map(|c| c.get_combined_minimum_size()).collect();
+        let cells = self.tiles();
+        let sizes: Vec<Vector2> = cells
+            .iter()
+            .map(|c| c.get_combined_minimum_size())
+            .collect();
         let avail = self.base().get_size().x;
-        let starts = balanced_rows(&sizes.iter().map(|s| s.x).collect::<Vec<_>>(), self.h_gap, avail);
+        let starts = balanced_rows(
+            &sizes.iter().map(|s| s.x).collect::<Vec<_>>(),
+            self.h_gap,
+            avail,
+        );
         let mut y = 0.0;
         for (r, &s) in starts.iter().enumerate() {
             let e = starts.get(r + 1).copied().unwrap_or(cells.len());
@@ -827,7 +975,10 @@ mod tests {
     #[test]
     fn balanced_rows() {
         // Fits: one row.
-        assert_eq!(super::balanced_rows(&[10.0, 10.0, 10.0], 2.0, 100.0), vec![0]);
+        assert_eq!(
+            super::balanced_rows(&[10.0, 10.0, 10.0], 2.0, 100.0),
+            vec![0]
+        );
         // Greedy would give [4 items][1 item]; balanced splits 3 + 2.
         let w = [20.0; 5];
         assert_eq!(super::balanced_rows(&w, 0.0, 85.0), vec![0, 3]);

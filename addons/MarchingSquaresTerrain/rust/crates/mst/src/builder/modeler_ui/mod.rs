@@ -1,9 +1,9 @@
-//! The Xogot layout (docs/port/07-xogot-ui.md) and [`LayoutUi`], the widgets of whichever
-//! layout is active. A layout only builds and syncs widgets: every control calls the same
-//! `PixelBuilderPlugin` entry points as the MST layout, so mode, selection, settings and undo
-//! are shared. One module per Xogot surface: `toolbar` (toolbar, Add Mesh palette, Actions menu,
-//! Selection & Handles), `paint` (Paint popover), `options` (Modeler Options dialog), `hud`
-//! (viewport HUD tool / message content and Tool Options).
+//! The alternate layout and [`LayoutUi`], the widgets of whichever layout is active. A layout
+//! only builds and syncs widgets: every control calls the same `PixelBuilderPlugin` entry points
+//! as the MST layout, so mode, selection, settings and undo are shared. One module per surface of
+//! the layout: `toolbar` (toolbar, Add Mesh palette, Actions menu, Selection & Handles), `paint`
+//! (Paint popover), `options` (Modeler Options dialog), `hud` (viewport HUD tool / message content
+//! and Tool Options).
 //!
 //! Built in code like the rest of the builder UI (no `.tscn`), the project convention.
 
@@ -13,18 +13,20 @@ pub mod paint;
 pub mod toolbar;
 
 use godot::classes::editor_plugin::CustomControlContainer;
-use godot::classes::{ConfirmationDialog, Control, EditorFileDialog, EditorInterface, Material, Node};
+use godot::classes::{
+    ConfirmationDialog, Control, EditorFileDialog, EditorInterface, Material, Node,
+};
 use godot::prelude::*;
 
 use super::forms::FieldForm;
 use super::layout::Layout;
 use super::ui::{SyncState, Ui, Values};
 
-/// The Xogot layout's widgets.
-pub struct XogotUi {
+/// The alternate layout's widgets.
+pub struct ModelerUi {
     pub toolbar: toolbar::Toolbar,
-    pub paint: paint::Paint,
-    pub options: options::Options,
+    pub coat: paint::Paint,
+    pub choices: options::Options,
     pub hud: hud::Hud,
     /// Material / palette file dialog and what it is open for.
     pub files: Option<Gd<EditorFileDialog>>,
@@ -34,66 +36,121 @@ pub struct XogotUi {
     target: Gd<Object>,
 }
 
-/// Xogot's action confirmation (`action_confirmation.rs`): title, "Run <title>?" or the action's
-/// option rows, OK / Cancel. The rows edit the same fields as the strip / Options.
+/// The action confirmation dialog: title, "Run <title>?" or the action's option rows, OK /
+/// Cancel. The rows edit the same fields as the strip / Options.
 pub struct Confirm {
     pub dialog: Gd<ConfirmationDialog>,
     pub form: FieldForm,
-    /// The action waiting for OK (the original's `_confirming`).
-    pub action: Option<super::ui::Action>,
+    /// The action waiting for OK.
+    pub deed: Option<super::ui::Action>,
 }
 
 impl Confirm {
-    pub fn build(target: &Gd<Object>) -> Confirm {
+    pub fn assemble(addressee: &Gd<Object>) -> Confirm {
         let mut dialog = ConfirmationDialog::new_alloc();
-        dialog.set_name("XogotModelerConfirmation");
+        dialog.set_name("ModelerCoreConfirmation");
         dialog.set_title("Confirm");
         let form = FieldForm::new("Form");
-        dialog.add_child(&form.root);
+        dialog.add_child(&form.base);
         if let Some(mut ok) = dialog.get_ok_button() {
             ok.set_text("Run");
         }
         // OK / Cancel are user clicks (the plugin is not bound then); tests use the debug hook.
-        dialog.connect("confirmed", &Callable::from_object_method(target, "on_xg_confirmed"));
-        dialog.connect("canceled", &Callable::from_object_method(target, "on_xg_confirm_canceled"));
+        dialog.connect(
+            "confirmed",
+            &Callable::from_object_method(addressee, "on_xg_confirmed"),
+        );
+        dialog.connect(
+            "canceled",
+            &Callable::from_object_method(addressee, "on_xg_confirm_canceled"),
+        );
         if let Some(mut base) = EditorInterface::singleton().get_base_control() {
             base.add_child(&dialog);
         }
-        Confirm { dialog, form, action: None }
+        Confirm {
+            dialog,
+            form,
+            deed: None,
+        }
     }
 
     /// Shows the dialog for `a`: the rows, else the "Run <title>?" line.
-    pub fn open(&mut self, target: &Gd<Object>, a: super::ui::Action, title: &str, fields: &[super::ui::Field], v: &Values, st: &SyncState) {
-        self.action = Some(a);
+    pub fn unveil(
+        &mut self,
+        addressee: &Gd<Object>,
+        a: super::ui::Action,
+        title: &str,
+        fields: &[super::ui::Field],
+        v: &Values,
+        st: &SyncState,
+    ) {
+        self.deed = Some(a);
         self.dialog.set_title(title);
-        let rows: Vec<super::forms::Row> = fields.iter().map(|f| super::forms::Row::Field(*f)).collect();
-        self.form.set_rows(target, &rows, v, st);
-        self.dialog.set_text(&if rows.is_empty() { format!("Run {title}?") } else { String::new() });
+        let rows: Vec<super::forms::Row> = fields
+            .iter()
+            .map(|f| super::forms::Row::Field(*f))
+            .collect();
+        self.form.set_rows(addressee, &rows, v, st);
+        self.dialog.set_text(&if rows.is_empty() {
+            format!("Run {title}?")
+        } else {
+            String::new()
+        });
         self.dialog.reset_size();
         self.dialog.popup_centered();
     }
 }
 
-/// Builder actions the Xogot toolbar owns (mode buttons, Add Mesh tiles, Make Editable, Snap;
+/// Builder actions the layout's toolbar owns (mode buttons, Add Mesh tiles, Make Editable, Snap;
 /// the Select tool is the mode buttons / Esc).
 #[cfg_attr(not(test), allow(dead_code))] // reverse-coverage table (unit test)
 pub const TOOLBAR_ACTIONS: &[super::ui::Action] = {
     use super::ui::Action as A;
-    &[A::ModeObject, A::ModeFace, A::ModeEdge, A::ModeVertex, A::ToolSelect, A::ToolShape, A::ToolBezier, A::Convert, A::SnapGrid]
+    &[
+        A::ModeObject,
+        A::ModeFace,
+        A::ModeEdge,
+        A::ModeVertex,
+        A::ToolSelect,
+        A::ToolShape,
+        A::ToolBezier,
+        A::Convert,
+        A::SnapGrid,
+    ]
 };
 /// Builder actions the Paint popover owns (header tool toggles, Paint, Paint Options menu).
 #[cfg_attr(not(test), allow(dead_code))] // reverse-coverage table (unit test)
 pub const PAINT_ACTIONS: &[super::ui::Action] = {
     use super::ui::Action as A;
-    &[A::ToolPaint, A::ToolVertexPaint, A::PaintColour, A::BlendMaterial, A::InvertAlpha]
+    &[
+        A::ToolPaint,
+        A::ToolVertexPaint,
+        A::PaintColour,
+        A::BlendMaterial,
+        A::InvertAlpha,
+    ]
 };
 /// Builder menu entries kept in both layouts.
 #[cfg_attr(not(test), allow(dead_code))] // reverse-coverage table (unit test)
 pub const BUILDER_MENU_ACTIONS: &[super::ui::Action] = {
     use super::ui::Action as A;
-    &[A::UvEditor, A::Preferences, A::BakeMesh, A::ExportObj, A::ExportGltf, A::FreezeTransform, A::CenterPivot, A::ExportStl, A::ExportPly, A::ExportOptions, A::ReusablePart, A::GenerateUv2, A::ExportRes]
+    &[
+        A::UvEditor,
+        A::Preferences,
+        A::BakeMesh,
+        A::ExportObj,
+        A::ExportGltf,
+        A::FreezeTransform,
+        A::CenterPivot,
+        A::ExportStl,
+        A::ExportPly,
+        A::ExportOptions,
+        A::ReusablePart,
+        A::GenerateUv2,
+        A::ExportRes,
+    ]
 };
-/// Strip fields with no Xogot-layout control (kept for `debug_field` ids).
+/// Strip fields with no control in this layout (kept for `debug_field` ids).
 #[cfg_attr(not(test), allow(dead_code))] // reverse-coverage table (unit test)
 pub const HIDDEN_FIELDS: &[super::ui::Field] = &[super::ui::Field::MirrorAxis];
 
@@ -102,31 +159,47 @@ pub const FILE_SLOT: i64 = 0;
 pub const FILE_PALETTE_LOAD: i64 = 1;
 pub const FILE_PALETTE_SAVE: i64 = 2;
 
-impl XogotUi {
-    pub fn build(target: &Gd<Object>, v: &Values, st: &SyncState) -> XogotUi {
-        let tb = toolbar::build(target, v, st);
-        let mut paint = paint::build(target);
+impl ModelerUi {
+    pub fn assemble(addressee: &Gd<Object>, v: &Values, st: &SyncState) -> ModelerUi {
+        let tb = toolbar::assemble(addressee, v, st);
+        let mut paint = paint::assemble(addressee);
         let mut tbx = tb.hbox.clone();
         tbx.add_child(&paint.popup);
         paint.page = 0;
-        let options = options::build(target);
+        let options = options::assemble(addressee);
         if let Some(mut base) = EditorInterface::singleton().get_base_control() {
             base.add_child(&options.dialog);
         }
-        let hud = hud::build(target);
-        XogotUi { toolbar: tb, paint, options, hud, files: None, file_purpose: (0, 0), confirm: None, target: target.clone() }
+        let hud = hud::assemble(addressee);
+        ModelerUi {
+            toolbar: tb,
+            coat: paint,
+            choices: options,
+            hud,
+            files: None,
+            file_purpose: (0, 0),
+            confirm: None,
+            target: addressee.clone(),
+        }
     }
 
-    pub fn sync(&mut self, v: &Values, st: &SyncState, materials: &[Option<Gd<Material>>], groups: &[(u16, usize)], hud: Option<hud::Content>) {
+    pub fn sync(
+        &mut self,
+        v: &Values,
+        st: &SyncState,
+        materials: &[Option<Gd<Material>>],
+        groups: &[(u16, usize)],
+        hud: Option<hud::Content>,
+    ) {
         let t = self.target.clone();
         self.toolbar.sync(&t, v, st);
-        self.paint.refresh(&t, v, st, materials, groups);
-        if self.options.dialog.is_visible() {
-            self.options.form.sync(v, st);
+        self.coat.renew(&t, v, st, materials, groups);
+        if self.choices.dialog.is_visible() {
+            self.choices.form.sync(v, st);
         }
         self.hud.show(hud, st);
         if self.hud.tool_options.is_visible() {
-            self.hud.refresh_tool_options(&t, v, st);
+            self.hud.renew_instrument_choices(&t, v, st);
         }
         if let Some(c) = &mut self.confirm
             && c.dialog.is_visible()
@@ -140,9 +213,12 @@ impl XogotUi {
         use godot::classes::file_dialog::{Access, FileMode};
         if self.files.as_ref().is_none_or(|f| !f.is_instance_valid()) {
             let mut d = EditorFileDialog::new_alloc();
-            d.set_name("XogotModelerFiles");
+            d.set_name("ModelerCoreFiles");
             d.set_access(Access::RESOURCES);
-            d.connect("file_selected", &Callable::from_object_method(&self.target, "on_xg_file"));
+            d.connect(
+                "file_selected",
+                &Callable::from_object_method(&self.target, "on_xg_file"),
+            );
             if let Some(mut base) = EditorInterface::singleton().get_base_control() {
                 base.add_child(&d);
             }
@@ -155,24 +231,34 @@ impl XogotUi {
             FILE_SLOT => {
                 d.set_file_mode(FileMode::OPEN_FILE);
                 d.set_title("Load Material");
-                d.add_filter_ex("*.tres, *.res, *.material").description("Materials").done();
+                d.add_filter_ex("*.tres, *.res, *.material")
+                    .description("Materials")
+                    .done();
             }
             FILE_PALETTE_LOAD => {
                 d.set_file_mode(FileMode::OPEN_FILE);
                 d.set_title("Load Palette");
-                d.add_filter_ex("*.json").description("Mesh palettes").done();
+                d.add_filter_ex("*.json")
+                    .description("Mesh palettes")
+                    .done();
             }
             _ => {
                 d.set_file_mode(FileMode::SAVE_FILE);
                 d.set_title("Save Palette");
-                d.add_filter_ex("*.json").description("Mesh palettes").done();
+                d.add_filter_ex("*.json")
+                    .description("Mesh palettes")
+                    .done();
             }
         }
         d.popup_file_dialog();
     }
 
     fn free_nodes(&mut self, now: bool) {
-        let mut nodes: Vec<Gd<Node>> = vec![self.toolbar.hbox.clone().upcast(), self.options.dialog.clone().upcast(), self.hud.panel.clone().upcast()];
+        let mut nodes: Vec<Gd<Node>> = vec![
+            self.toolbar.hbox.clone().upcast(),
+            self.choices.dialog.clone().upcast(),
+            self.hud.panel.clone().upcast(),
+        ];
         if let Some(f) = self.files.take() {
             nodes.push(f.upcast());
         }
@@ -197,21 +283,26 @@ impl XogotUi {
 /// The active layout's widgets.
 pub enum LayoutUi {
     Mst(Ui),
-    Xogot(Box<XogotUi>),
+    Modeler(Box<ModelerUi>),
 }
 
 impl LayoutUi {
-    pub fn build(layout: Layout, target: &Gd<Object>, v: &Values, st: &SyncState) -> LayoutUi {
+    pub fn assemble(
+        layout: Layout,
+        addressee: &Gd<Object>,
+        v: &Values,
+        st: &SyncState,
+    ) -> LayoutUi {
         match layout {
-            Layout::Mst => LayoutUi::Mst(super::ui::build(target, v)),
-            Layout::Xogot => LayoutUi::Xogot(Box::new(XogotUi::build(target, v, st))),
+            Layout::Mst => LayoutUi::Mst(super::ui::assemble(addressee, v)),
+            Layout::Modeler => LayoutUi::Modeler(Box::new(ModelerUi::assemble(addressee, v, st))),
         }
     }
 
     pub fn layout(&self) -> Layout {
         match self {
             LayoutUi::Mst(_) => Layout::Mst,
-            LayoutUi::Xogot(_) => Layout::Xogot,
+            LayoutUi::Modeler(_) => Layout::Modeler,
         }
     }
 
@@ -226,18 +317,21 @@ impl LayoutUi {
                     (CustomControlContainer::SPATIAL_EDITOR_SIDE_RIGHT, pal),
                 ]
             }
-            LayoutUi::Xogot(x) => vec![(CustomControlContainer::SPATIAL_EDITOR_MENU, x.toolbar.hbox.clone().upcast())],
+            LayoutUi::Modeler(x) => vec![(
+                CustomControlContainer::SPATIAL_EDITOR_MENU,
+                x.toolbar.hbox.clone().upcast(),
+            )],
         }
     }
 
-    pub fn set_visible(&mut self, visible: bool, has_target: bool) {
+    pub fn assign_shown(&mut self, shown: bool, has_target: bool) {
         match self {
-            LayoutUi::Mst(u) => u.set_visible(visible, has_target),
-            LayoutUi::Xogot(x) => {
-                x.toolbar.hbox.set_visible(visible);
-                if !visible {
+            LayoutUi::Mst(u) => u.assign_shown(shown, has_target),
+            LayoutUi::Modeler(x) => {
+                x.toolbar.hbox.set_visible(shown);
+                if !shown {
                     x.hud.panel.set_visible(false);
-                    x.paint.popup.hide();
+                    x.coat.popup.hide();
                     x.toolbar.handles_popup.hide();
                     x.toolbar.palette.hide();
                 }
@@ -248,14 +342,14 @@ impl LayoutUi {
     pub fn rebuild_slots(&mut self, materials: &[Option<Gd<Material>>], current: i64) {
         match self {
             LayoutUi::Mst(u) => u.rebuild_slots(materials, current),
-            LayoutUi::Xogot(x) => x.paint.invalidate(),
+            LayoutUi::Modeler(x) => x.coat.invalidate(),
         }
     }
 
-    pub fn set_swatch(&mut self, i: usize, c: Color) {
+    pub fn assign_pat(&mut self, i: usize, c: Color) {
         match self {
-            LayoutUi::Mst(u) => u.set_swatch(i, c),
-            LayoutUi::Xogot(x) => x.paint.invalidate(),
+            LayoutUi::Mst(u) => u.assign_pat(i, c),
+            LayoutUi::Modeler(x) => x.coat.invalidate(),
         }
     }
 
@@ -281,7 +375,7 @@ impl LayoutUi {
                     }
                 }
             }
-            LayoutUi::Xogot(mut x) => x.free_nodes(now),
+            LayoutUi::Modeler(mut x) => x.free_nodes(now),
         }
     }
 }
@@ -306,33 +400,57 @@ mod tests {
     fn in_menu(a: Action) -> bool {
         [Mode::Object, Mode::Face, Mode::Edge, Mode::Vertex]
             .iter()
-            .any(|m| commands::actions_menu(*m, |x, mask| mask & m.bit() != 0 || x == Action::Preferences).iter().any(|s| s.entries.iter().any(|e| e.action == a)))
+            .any(|m| {
+                commands::actions_menu(*m, |x, mask| {
+                    mask & m.bit() != 0 || x == Action::Preferences
+                })
+                .iter()
+                .any(|s| s.entries.iter().any(|e| e.deed == a))
+            })
     }
 
-    /// docs/port/07-xogot-ui.md §5: every MST control has a home in the Xogot layout.
+    /// Every MST control has a home in this layout.
     #[test]
-    fn every_builder_action_has_a_xogot_home() {
+    fn every_builder_action_has_a_modeler_home() {
         let rows = all_rows();
-        let toggled = |a: Action| rows.iter().any(|r| matches!(r, Row::Toggle(x, _) if *x == a));
+        let toggled = |a: Action| {
+            rows.iter()
+                .any(|r| matches!(r, Row::Toggle(x, _) if *x == a))
+        };
         for (a, _) in ui::toolbar_actions().chain(ui::MENU_ACTIONS.iter().map(|m| (m.0, m.2))) {
-            let home = in_menu(a) || TOOLBAR_ACTIONS.contains(&a) || PAINT_ACTIONS.contains(&a) || BUILDER_MENU_ACTIONS.contains(&a) || toggled(a);
-            assert!(home, "{a:?} has no home in the Xogot layout");
+            let home = in_menu(a)
+                || TOOLBAR_ACTIONS.contains(&a)
+                || PAINT_ACTIONS.contains(&a)
+                || BUILDER_MENU_ACTIONS.contains(&a)
+                || toggled(a);
+            assert!(home, "{a:?} has no home in the Modeler layout");
         }
-        // The owned ones really are owned by a Xogot control.
+        // The owned ones really are owned by a control of this layout.
         for a in commands::OWNED {
-            assert!(TOOLBAR_ACTIONS.contains(a) || PAINT_ACTIONS.contains(a) || BUILDER_MENU_ACTIONS.contains(a) || toggled(*a) || in_menu(*a), "{a:?} owned by nothing");
+            assert!(
+                TOOLBAR_ACTIONS.contains(a)
+                    || PAINT_ACTIONS.contains(a)
+                    || BUILDER_MENU_ACTIONS.contains(a)
+                    || toggled(*a)
+                    || in_menu(*a),
+                "{a:?} owned by nothing"
+            );
         }
     }
 
     #[test]
-    fn every_field_has_a_xogot_home() {
+    fn every_field_has_a_modeler_home() {
         let rows = all_rows();
         for f in Field::ALL {
-            let home = rows.contains(&Row::Field(f)) || ui::is_tool_field(f) || HIDDEN_FIELDS.contains(&f);
-            assert!(home, "{f:?} has no home in the Xogot layout");
+            let home =
+                rows.contains(&Row::Field(f)) || ui::is_tool_field(f) || HIDDEN_FIELDS.contains(&f);
+            assert!(home, "{f:?} has no home in the Modeler layout");
         }
         // The strip's non-Field shape checks live in Tool Options.
-        assert!(hud::tool_rows().contains(&Row::ShapeSmooth) && hud::tool_rows().contains(&Row::ShapeArched));
+        assert!(
+            hud::tool_rows().contains(&Row::ShapeSmooth)
+                && hud::tool_rows().contains(&Row::ShapeArched)
+        );
         for u in UvField::ALL {
             assert!(rows.contains(&Row::Uv(u)), "{u:?} missing from Options");
         }

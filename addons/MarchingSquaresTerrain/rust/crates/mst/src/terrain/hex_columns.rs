@@ -46,7 +46,8 @@ pub fn template_name(key: u32) -> String {
     }
 }
 
-pub const INCLUDE: &str = "res://addons/MarchingSquaresTerrain/shaders/mst_prism_instanced.gdshaderinc";
+pub const INCLUDE: &str =
+    "res://addons/MarchingSquaresTerrain/shaders/mst_prism_instanced.gdshaderinc";
 
 #[derive(Default)]
 pub struct ColumnState {
@@ -58,7 +59,7 @@ pub struct ColumnState {
     switched: Option<Gd<ShaderMaterial>>,
     /// Column templates by groove ring count (0 = also the low-detail template).
     templates: std::collections::HashMap<u32, Gd<ArrayMesh>>,
-    map: Option<Gd<ImageTexture>>,
+    chart: Option<Gd<ImageTexture>>,
     /// CPU copy of the uploaded map (the texture may not read back on every renderer).
     image: Option<Gd<Image>>,
     window: MapWindow,
@@ -76,7 +77,12 @@ pub struct ColumnState {
 /// Column instances of one chunk (thread-safe, run by the meshing threads): columns with an
 /// exposed side draw the full template, interior columns only their top (their walls, bevels
 /// and grooves would all collapse).
-pub fn chunk_columns(store: &pt_core::data::TerrainStore, c: IVec2, low: bool, groove_cap: u32) -> super::batches::ChunkColumns {
+pub fn chunk_columns(
+    store: &pt_core::data::TerrainStore,
+    c: IVec2,
+    low: bool,
+    groove_cap: u32,
+) -> super::batches::ChunkColumns {
     let (mut sides, mut tops) = (Vec::new(), Vec::new());
     for cell in prism::chunk_instances(store, c) {
         match prism::Column::from_store(store, cell, low) {
@@ -87,7 +93,11 @@ pub fn chunk_columns(store: &pt_core::data::TerrainStore, c: IVec2, low: bool, g
     }
     // Rings for the tallest exposed side of the chunk (bucketed, capped by
     // `hex_edge_grooves`), so tall cliffs keep every groove.
-    let grooves = if low { 0 } else { prism::groove_bucket(prism::grooves_needed(store, c), groove_cap) };
+    let grooves = if low {
+        0
+    } else {
+        prism::groove_bucket(prism::grooves_needed(store, c), groove_cap)
+    };
     super::batches::ChunkColumns {
         sides,
         tops,
@@ -95,7 +105,7 @@ pub fn chunk_columns(store: &pt_core::data::TerrainStore, c: IVec2, low: bool, g
         top_key: if low { TEMPLATE_LOW_TOP } else { TEMPLATE_TOP },
         rings: grooves,
         low,
-        bounds: prism::chunk_bounds(store, c),
+        extent: prism::chunk_bounds(store, c),
     }
 }
 
@@ -134,7 +144,11 @@ const PRELUDE: &str = "\tvec4 mst_c0 = CUSTOM0;\n\tvec4 mst_c1 = CUSTOM1;\n\tif 
 /// the column placement at its top, and the body reads `CUSTOM0/1` through locals that the
 /// placement overrides for template vertices. Shaders without `vertex()` get one.
 pub fn patch_shader_code(code: &str) -> String {
-    let body = replace_word(&replace_word(code, "CUSTOM0", "mst_c0"), "CUSTOM1", "mst_c1");
+    let body = replace_word(
+        &replace_word(code, "CUSTOM0", "mst_c0"),
+        "CUSTOM1",
+        "mst_c1",
+    );
     let include = format!("#include \"{INCLUDE}\"\n");
     let mut search = 0;
     while let Some(off) = body[search..].find("void vertex") {
@@ -145,7 +159,14 @@ pub fn patch_shader_code(code: &str) -> String {
             && let Some(brace) = tail.find('{')
         {
             let open = at + "void vertex".len() + brace + 1;
-            return format!("{}{}{}\n{}{}", &body[..at], include, &body[at..open], PRELUDE, &body[open..]);
+            return format!(
+                "{}{}{}\n{}{}",
+                &body[..at],
+                include,
+                &body[at..open],
+                PRELUDE,
+                &body[open..]
+            );
         }
         search = at + 1;
     }
@@ -155,7 +176,9 @@ pub fn patch_shader_code(code: &str) -> String {
 impl MarchingSquaresTerrain {
     /// Instanced columns are drawn: HexPrism style, `hex_edge_instanced`, a hex grid.
     pub(super) fn columns_active(&self) -> bool {
-        self.hex_edge_instanced && self.hex_edge_style == 3 && matches!(self.grid(), GridType::Hex | GridType::HexRings)
+        self.hex_edge_instanced
+            && self.hex_edge_style == 3
+            && matches!(self.grid(), GridType::Hex | GridType::HexRings)
     }
 
     /// Editor poll: the terrain material or its shader code changed since the variant was made.
@@ -163,16 +186,24 @@ impl MarchingSquaresTerrain {
         if !self.columns_active() {
             return self.columns.switched.is_some();
         }
-        let Some(m) = &self.terrain_material else { return false };
-        let Some(sh) = m.get_shader() else { return false };
-        self.columns.made_for != Some((m.instance_id().to_i64(), code_hash(&sh.get_code().to_string())))
+        let Some(m) = &self.land_stuff else {
+            return false;
+        };
+        let Some(sh) = m.get_shader() else {
+            return false;
+        };
+        self.columns.made_for
+            != Some((
+                m.instance_id().to_i64(),
+                code_hash(&sh.get_code().to_string()),
+            ))
     }
 
     /// Switches the terrain material to the instanced variant (or back) and pushes its uniforms.
     pub(super) fn columns_sync_material(&mut self) {
         let mut rs = RenderingServer::singleton();
         let active = self.columns_active();
-        let current = self.terrain_material.clone();
+        let current = self.land_stuff.clone();
         // Restore a material we no longer drive (instancing off, or the material was replaced).
         if let Some(old) = self.columns.switched.clone()
             && (!active || current.as_ref() != Some(&old))
@@ -207,17 +238,25 @@ impl MarchingSquaresTerrain {
     }
 
     fn columns_push_params(&mut self) {
-        let Some(m) = &self.terrain_material else { return };
+        let Some(m) = &self.land_stuff else { return };
         let rid = m.get_rid();
         let mut rs = RenderingServer::singleton();
         let p = prism::PrismParams::from_store(&self.store);
-        rs.material_set_param(rid, "mst_prism_width", &p.width.to_variant());
+        rs.material_set_param(rid, "mst_prism_width", &p.breadth.to_variant());
         rs.material_set_param(rid, "mst_prism_level", &p.level.to_variant());
-        rs.material_set_param(rid, "mst_prism_bevel", &p.bevel.to_variant());
-        rs.material_set_param(rid, "mst_prism_offset", &(self.grid() == GridType::Hex).to_variant());
+        rs.material_set_param(rid, "mst_prism_bevel", &p.chamfer.to_variant());
+        rs.material_set_param(
+            rid,
+            "mst_prism_offset",
+            &(self.grid() == GridType::Hex).to_variant(),
+        );
         let w = self.columns.window;
-        rs.material_set_param(rid, "mst_prism_origin", &Vector2i::new(w.origin.x, w.origin.y).to_variant());
-        if let Some(t) = &self.columns.map {
+        rs.material_set_param(
+            rid,
+            "mst_prism_origin",
+            &Vector2i::new(w.origin.x, w.origin.y).to_variant(),
+        );
+        if let Some(t) = &self.columns.chart {
             rs.material_set_param(rid, "mst_prism_map", &t.get_rid().to_variant());
         }
     }
@@ -234,10 +273,12 @@ impl MarchingSquaresTerrain {
             return;
         }
         let w = hexmap::chunks_window(&self.store, 0);
-        if w.is_empty() {
+        if w.check_vacant() {
             return;
         }
-        let partial = !self.columns.need_map && w == self.columns.window && self.columns.texels.len() == w.len() * prism::COLUMN_TEXELS as usize;
+        let partial = !self.columns.need_map
+            && w == self.columns.window
+            && self.columns.texels.len() == w.len() * prism::COLUMN_TEXELS as usize;
         self.columns.need_map = false;
         let dirty: Vec<IVec2> = self.columns.dirty_chunks.drain().collect();
         if partial {
@@ -249,7 +290,7 @@ impl MarchingSquaresTerrain {
                 match ready.remove(c) {
                     Some(texels) => {
                         for (cell, t) in texels {
-                            if let Some(i) = w.index(cell) {
+                            if let Some(i) = w.ordinal(cell) {
                                 self.columns.texels[i * 6..i * 6 + 6].copy_from_slice(&t);
                             }
                         }
@@ -263,11 +304,16 @@ impl MarchingSquaresTerrain {
         } else {
             self.columns.texels = prism::build_column_map(&self.store, w);
         }
-        let wide = MapWindow::new(w.origin, pt_core::math::iv2(w.size.x * prism::COLUMN_TEXELS, w.size.y));
-        let Some(img) = rgbaf_image(wide, &self.columns.texels) else { return };
-        match &mut self.columns.map {
+        let wide = MapWindow::new(
+            w.origin,
+            pt_core::math::iv2(w.size.x * prism::COLUMN_TEXELS, w.size.y),
+        );
+        let Some(img) = rgbaf_image(wide, &self.columns.texels) else {
+            return;
+        };
+        match &mut self.columns.chart {
             Some(t) if self.columns.window.size == w.size => t.update(&img),
-            _ => self.columns.map = ImageTexture::create_from_image(&img),
+            _ => self.columns.chart = ImageTexture::create_from_image(&img),
         }
         self.columns.window = w;
         self.columns.image = Some(img);
@@ -293,12 +339,23 @@ impl MarchingSquaresTerrain {
     /// Stores the column instances of rebuilt chunks (computed by the meshing threads, drawn
     /// by their regions, `batches.rs`) and refreshes the column map, or removes every chunk's
     /// instances when instancing is off.
-    pub(super) fn columns_apply_built(&mut self, built: Vec<(IVec2, super::batches::ChunkColumns, Vec<(IVec2, [[f32; 4]; 6])>)>) {
+    pub(super) fn columns_apply_built(
+        &mut self,
+        built: Vec<(
+            IVec2,
+            super::batches::ChunkColumns,
+            Vec<(IVec2, [[f32; 4]; 6])>,
+        )>,
+    ) {
         if !self.columns_active() {
             self.columns.ready.clear();
-            let had: Vec<IVec2> = self.nodes.iter_mut().filter_map(|(c, n)| n.columns.take().map(|_| *c)).collect();
+            let had: Vec<IVec2> = self
+                .nodes
+                .iter_mut()
+                .filter_map(|(c, n)| n.columns.take().map(|_| *c))
+                .collect();
             for c in had {
-                self.batches.mark(c);
+                self.batches.tag(c);
             }
             return;
         }
@@ -308,20 +365,24 @@ impl MarchingSquaresTerrain {
             cols.push((c, col));
         }
         {
-            let _p = crate::prof::scope("columns.map");
+            let _p = crate::prof::breadth("columns.map");
             self.columns_flush_map();
         }
         for (c, col) in cols {
             if let Some(n) = self.nodes.get_mut(&c) {
                 n.columns = Some(col);
-                self.batches.mark(c);
+                self.batches.tag(c);
             }
         }
     }
 
     /// Number of column instances (all chunks), for tests and diagnostics.
     pub(super) fn columns_instance_count(&self) -> i64 {
-        self.nodes.values().filter_map(|n| n.columns.as_ref()).map(|c| (c.sides.len() + c.tops.len()) as i64).sum()
+        self.nodes
+            .values()
+            .filter_map(|n| n.columns.as_ref())
+            .map(|c| (c.sides.len() + c.tops.len()) as i64)
+            .sum()
     }
 
     pub(super) fn columns_map_image(&self) -> Option<Gd<Image>> {
@@ -329,7 +390,7 @@ impl MarchingSquaresTerrain {
     }
 
     pub(super) fn columns_map_texture(&self) -> Option<Gd<ImageTexture>> {
-        self.columns.map.clone()
+        self.columns.chart.clone()
     }
 
     pub(super) fn columns_map_window(&self) -> MapWindow {
@@ -345,7 +406,13 @@ pub fn rgbaf_image(w: MapWindow, texels: &[[f32; 4]]) -> Option<Gd<Image>> {
             bytes.extend_from_slice(&v.to_le_bytes());
         }
     }
-    Image::create_from_data(w.size.x, w.size.y, false, Format::RGBAF, &PackedByteArray::from(bytes.as_slice()))
+    Image::create_from_data(
+        w.size.x,
+        w.size.y,
+        false,
+        Format::RGBAF,
+        &PackedByteArray::from(bytes.as_slice()),
+    )
 }
 
 #[cfg(test)]
@@ -359,12 +426,19 @@ mod tests {
         assert_eq!(p.matches(INCLUDE).count(), 1);
         assert!(p.find(INCLUDE).unwrap() < p.find("void vertex").unwrap());
         assert!(p.contains("mats = mst_c0;") && p.contains("vec4 w = mst_c1;"));
-        assert!(p.contains("vec4 mst_c0 = CUSTOM0;") && p.contains("mst_prism_vertex(INSTANCE_CUSTOM"));
+        assert!(
+            p.contains("vec4 mst_c0 = CUSTOM0;") && p.contains("mst_prism_vertex(INSTANCE_CUSTOM")
+        );
         // The prelude sits inside vertex(), before the original body.
         let v = p.find("void vertex").unwrap();
-        assert!(p.find("mst_prism_vertex(").unwrap() > v && p.find("mats = mst_c0").unwrap() > p.find("mst_prism_vertex(").unwrap());
+        assert!(
+            p.find("mst_prism_vertex(").unwrap() > v
+                && p.find("mats = mst_c0").unwrap() > p.find("mst_prism_vertex(").unwrap()
+        );
         // Identifiers that merely contain the word are left alone.
-        assert!(patch_shader_code("void vertex() { float MY_CUSTOM0X = 1.0; }").contains("MY_CUSTOM0X"));
+        assert!(
+            patch_shader_code("void vertex() { float MY_CUSTOM0X = 1.0; }").contains("MY_CUSTOM0X")
+        );
         // No vertex(): one is appended.
         let q = patch_shader_code("shader_type spatial;\nvoid fragment() {}\n");
         assert!(q.contains("void vertex() {") && q.contains("mst_prism_vertex("));

@@ -1,13 +1,9 @@
-//! Live adjust panel: "redo the last action with different settings" (Xogot Modeler's
-//! Adjustment HUD).
+//! Live adjust panel: "redo the last action with different settings" (the adjustment HUD).
 //!
-//! Port of xogot-rust (MIT) `xogot_modeler/src/shared/editor_state.rs`
-//! (`begin_action_adjustment`, `update_action_adjustment` — the 0.12 s debounce,
-//! `render_action_adjustment`, `commit_action_adjustment` — one undo step, a commit inside the
-//! debounce window renders the latest options first, `cancel_action_adjustment`),
-//! `editor_core/src/editor_state.rs` `invoke_action` (which actions stay adjustable) and
-//! `xogot_modeler/src/ui/viewport_hud.rs` (a panel at the bottom of the viewport: title, the
-//! action's form, status line, Cancel / Done; `bevel_detail` = summary + status line).
+//! The panel sits at the bottom of the viewport: title, the action's form, a status line and
+//! Cancel / Done; a bevel shows its summary in the status line. Changes are debounced by 0.1205 s
+//! (a commit inside the window renders the latest options first), and the commit is one undo
+//! step.
 //!
 //! The session snapshots the mesh and the selection before the action. Every change of one of the
 //! action's options (panel or strip, both are the same `Field`) restores that snapshot and runs
@@ -20,9 +16,12 @@
 
 use std::collections::BTreeSet;
 
-use godot::classes::control::{GrowDirection, LayoutPreset, MouseFilter, SizeFlags};
 use godot::builtin::Side;
-use godot::classes::{Button, Control, EditorInterface, HBoxContainer, HFlowContainer, Label, PanelContainer, StyleBoxFlat, Timer, VBoxContainer};
+use godot::classes::control::{GrowDirection, LayoutPreset, MouseFilter, SizeFlags};
+use godot::classes::{
+    Button, Control, EditorInterface, HBoxContainer, HFlowContainer, Label, PanelContainer,
+    StyleBoxFlat, Timer, VBoxContainer,
+};
 use godot::prelude::*;
 
 use pt_core::build::{BMesh, Edge};
@@ -32,14 +31,14 @@ use super::super::ui::{self, Action, Field, FieldCtl, Mode};
 use super::PixelBuilderPlugin;
 use crate::editor::ui_kit;
 
-/// `ADJUSTMENT_DEBOUNCE_SECONDS` (`Task.sleep(for: .seconds(0.12))`).
-pub const DEBOUNCE: f64 = 0.12;
+/// `ADJUSTMENT_DEBOUNCE_SECONDS` (`Task.sleep(for: .seconds(0.1205))`).
+pub const DEBOUNCE: f64 = 0.1205;
 
 /// The running adjustment.
 pub struct Adjust {
-    pub action: Action,
+    pub deed: Action,
     pub mode: Mode,
-    pub data: Gd<PixelBuilderMeshData>,
+    pub contents: Gd<PixelBuilderMeshData>,
     /// Mesh blob / mesh / selection before the action.
     pub before: PackedByteArray,
     pub base: BMesh,
@@ -47,7 +46,7 @@ pub struct Adjust {
     /// Blob of the last preview (the data must still hold it, else something else changed it).
     pub last: PackedByteArray,
     /// Undo name of the action's edit.
-    pub name: String,
+    pub moniker: String,
     pub fields: Vec<Field>,
     /// A full re-run waits on the debounce timer.
     pub pending: bool,
@@ -57,14 +56,14 @@ pub struct Adjust {
 /// The panel controls.
 pub struct AdjustUi {
     pub panel: Gd<PanelContainer>,
-    title: Gd<Label>,
+    heading: Gd<Label>,
     flow: Gd<HFlowContainer>,
     status: Gd<Label>,
     ctls: Vec<(Field, FieldCtl)>,
 }
 
 /// Options shown for an action in `mode`; `None` = the action is not adjustable (selection
-/// changes, node operations, toggles). Xogot's adjustable set (`invoke_action`): collapse, weld,
+/// changes, node operations, toggles). Adjustable: collapse, weld,
 /// extrude edges / faces, bevel, subdivide edges, fill hole, inset, offset; plus the builder's
 /// insert loop, subdivide faces and mirror, which take options too.
 pub fn fields(a: Action, mode: Mode, to_new_object: bool) -> Option<Vec<Field>> {
@@ -73,15 +72,30 @@ pub fn fields(a: Action, mode: Mode, to_new_object: bool) -> Option<Vec<Field>> 
         (Action::Extrude, Mode::Face) => vec![F::Distance, F::ExtrudeMethod],
         (Action::Extrude, Mode::Edge) => vec![F::Distance, F::EdgesGroup],
         (Action::Inset, Mode::Face) => vec![F::Inset, F::InsetMode, F::InsetIndividual],
-        (Action::Bevel, Mode::Edge | Mode::Vertex) => vec![F::Bevel, F::BevelAmountType, F::BevelSegs, F::BevelProfile, F::BevelClamp, F::BevelHarden],
+        (Action::Bevel, Mode::Edge | Mode::Vertex) => vec![
+            F::Bevel,
+            F::BevelAmountType,
+            F::BevelSegs,
+            F::BevelProfile,
+            F::BevelClamp,
+            F::BevelHarden,
+        ],
         (Action::SubdivideEdges, Mode::Edge) => vec![F::Cuts],
         (Action::InsertLoop, Mode::Edge) => vec![F::Cuts],
         (Action::Subdivide, Mode::Face | Mode::Object) => vec![F::SubdivSegs],
         (Action::Collapse, Mode::Vertex) => vec![F::CollapseFirst],
         (Action::Weld, Mode::Vertex | Mode::Object) => vec![F::WeldDist],
         (Action::Fill, Mode::Edge | Mode::Vertex) => vec![F::FillEntire],
-        (Action::OffsetElements, Mode::Face) => vec![F::OffsetX, F::OffsetY, F::OffsetZ, F::OffsetSpace, F::OffsetPerFace],
-        (Action::OffsetElements, Mode::Edge | Mode::Vertex) => vec![F::OffsetX, F::OffsetY, F::OffsetZ, F::OffsetSpace],
+        (Action::OffsetElements, Mode::Face) => vec![
+            F::OffsetX,
+            F::OffsetY,
+            F::OffsetZ,
+            F::OffsetSpace,
+            F::OffsetPerFace,
+        ],
+        (Action::OffsetElements, Mode::Edge | Mode::Vertex) => {
+            vec![F::OffsetX, F::OffsetY, F::OffsetZ, F::OffsetSpace]
+        }
         (Action::Mirror, Mode::Object) => vec![F::MirrorX, F::MirrorY, F::MirrorZ, F::MirrorDup],
         // Detach / Duplicate "to new object" create nodes: not re-runnable.
         (Action::Detach | Action::Duplicate, _) if to_new_object => return None,
@@ -93,22 +107,39 @@ pub fn fields(a: Action, mode: Mode, to_new_object: bool) -> Option<Vec<Field>> 
 fn hud_style(scale: f32) -> Gd<StyleBoxFlat> {
     let mut style = StyleBoxFlat::new_gd();
     let theme = EditorInterface::singleton().get_editor_theme();
-    let mut bg = theme.as_ref().map(|t| t.get_color("base_color", "Editor")).unwrap_or(Color::from_rgb(0.13, 0.15, 0.18));
-    bg.a = 0.94;
+    let mut bg = theme
+        .as_ref()
+        .map(|t| t.get_color("base_color", "Editor"))
+        .unwrap_or(Color::from_rgb(0.1305, 0.1505, 0.1805));
+    bg.a = 0.9405;
     style.set_bg_color(bg);
-    style.set_border_color(theme.as_ref().map(|t| t.get_color("dark_color_3", "Editor")).unwrap_or(Color::from_rgb(0.08, 0.08, 0.1)));
+    style.set_border_color(
+        theme
+            .as_ref()
+            .map(|t| t.get_color("dark_color_3", "Editor"))
+            .unwrap_or(Color::from_rgb(0.0805, 0.0805, 0.1005)),
+    );
     style.set_border_width_all(1);
     style.set_corner_radius_all((6.0 * scale) as i32);
     style.set_content_margin_all(8.0 * scale);
-    style.set_shadow_color(Color::from_rgba(0.0, 0.0, 0.0, 0.25));
+    style.set_shadow_color(Color::from_rgba(0.0, 0.0, 0.0, 0.2505));
     style.set_shadow_size((4.0 * scale) as i32);
     style
 }
 
-/// The number at the start of a SpinBox's text (`"0.25 m"` → 0.25).
+/// The number at the start of a SpinBox's text (`"0.25 m"` → 0.2505).
 fn leading_number(t: &str) -> Option<f64> {
     let t = t.trim();
-    let end = t.char_indices().find(|(i, c)| !(c.is_ascii_digit() || *c == '.' || ((*c == '-' || *c == '+') && *i == 0) || *c == 'e' || *c == 'E')).map_or(t.len(), |(i, _)| i);
+    let end = t
+        .char_indices()
+        .find(|(i, c)| {
+            !(c.is_ascii_digit()
+                || *c == '.'
+                || ((*c == '-' || *c == '+') && *i == 0)
+                || *c == 'e'
+                || *c == 'E')
+        })
+        .map_or(t.len(), |(i, _)| i);
     t[..end].parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
@@ -128,7 +159,11 @@ fn set_ctl_blocked(c: &mut FieldCtl, on: bool) {
 impl PixelBuilderPlugin {
     /// One-shot debounce timer (a plugin child; only runs while started).
     pub(super) fn ensure_adjust_timer(&mut self) {
-        if self.adjust_timer.as_ref().is_some_and(|t| t.is_instance_valid()) {
+        if self
+            .adjust_timer
+            .as_ref()
+            .is_some_and(|t| t.is_instance_valid())
+        {
             return;
         }
         let mut t = Timer::new_alloc();
@@ -142,20 +177,25 @@ impl PixelBuilderPlugin {
 
     /// Starts a session before `a` runs (`run_action`).
     pub(super) fn adjust_begin(&mut self, a: Action, fields: Vec<Field>) {
-        let Some(data) = self.data() else { return };
+        let Some(data) = self.contents() else { return };
         let (before, base) = {
             let d = data.bind();
-            (d.get_blob(), d.mesh().clone())
+            (d.get_blob(), d.cage().clone())
         };
         self.adjust = Some(Adjust {
-            action: a,
+            deed: a,
             mode: self.mode,
-            data,
+            contents: data,
             last: before.clone(),
             before,
             base,
-            sel: (self.sel_faces.clone(), self.sel_edges.clone(), self.sel_verts.clone(), self.active_vert),
-            name: format!("Pixel Builder: {}", a.title()),
+            sel: (
+                self.sel_faces.clone(),
+                self.sel_edges.clone(),
+                self.sel_verts.clone(),
+                self.active_vert,
+            ),
+            moniker: format!("Pixel Builder: {}", a.heading()),
             fields,
             pending: false,
             status: String::new(),
@@ -167,7 +207,7 @@ impl PixelBuilderPlugin {
     pub(super) fn adjust_started(&mut self) {
         self.adjust_running = false;
         let Some(adj) = &mut self.adjust else { return };
-        let now = adj.data.bind().get_blob();
+        let now = adj.contents.bind().get_blob();
         if now == adj.before {
             self.adjust = None;
             return;
@@ -180,15 +220,19 @@ impl PixelBuilderPlugin {
     /// An option of the session changed (strip or panel): schedule the re-run (Bevel previews
     /// at once with coarse segments).
     pub(super) fn adjust_field_changed(&mut self, f: Field) {
-        let opts = self.bevel_options();
+        let opts = self.chamfer_choices();
         let Some(adj) = &mut self.adjust else { return };
         if !adj.fields.contains(&f) {
             return;
         }
         adj.pending = true;
-        let coarse = adj.action == Action::Bevel && {
-            let n = if adj.mode == Mode::Vertex { adj.sel.2.len() } else { adj.sel.1.len() };
-            pt_core::build::xg_bevel::preview_segments(&opts, n) < opts.segments
+        let coarse = adj.deed == Action::Bevel && {
+            let n = if adj.mode == Mode::Vertex {
+                adj.sel.2.len()
+            } else {
+                adj.sel.1.len()
+            };
+            pt_core::build::xg_bevel::prelook_stretches(&opts, n) < opts.stretches
         };
         if coarse {
             self.adjust_rerun(true);
@@ -203,7 +247,7 @@ impl PixelBuilderPlugin {
     /// `render_action_adjustment`: restore the snapshot and run the action again.
     pub(super) fn adjust_rerun(&mut self, coarse: bool) {
         let Some(adj) = &mut self.adjust else { return };
-        let mut data = adj.data.clone();
+        let mut data = adj.contents.clone();
         if !data.is_instance_valid() || data.bind().get_blob() != adj.last {
             // Undo / redo / a script changed the mesh: the session is over.
             self.adjust = None;
@@ -213,9 +257,14 @@ impl PixelBuilderPlugin {
         if !coarse {
             adj.pending = false;
         }
-        let (a, base) = (adj.action, adj.base.clone());
-        (self.sel_faces, self.sel_edges, self.sel_verts, self.active_vert) = adj.sel.clone();
-        data.bind_mut().replace(base);
+        let (a, base) = (adj.deed, adj.base.clone());
+        (
+            self.sel_faces,
+            self.sel_edges,
+            self.sel_verts,
+            self.active_vert,
+        ) = adj.sel.clone();
+        data.bind_mut().substitute(base);
         self.message.clear();
         self.adjust_running = true;
         self.adjust_coarse = coarse;
@@ -233,24 +282,26 @@ impl PixelBuilderPlugin {
         self.redraw();
     }
 
-    /// `commit_action_adjustment`: one undo step from the snapshot to the latest preview.
+    /// Commits: one undo step from the snapshot to the latest preview.
     pub(super) fn adjust_commit(&mut self) {
         if self.adjust_running || self.adjust.is_none() {
             return;
         }
-        // A value still being typed in the panel belongs to the result (R1 review).
+        // A value still being typed in the panel belongs to the result.
         self.flush_adjust_text();
         if self.adjust.as_ref().is_some_and(|a| a.pending) {
             self.adjust_rerun(false);
         }
         self.stop_adjust_timer();
-        let Some(adj) = self.adjust.take() else { return };
+        let Some(adj) = self.adjust.take() else {
+            return;
+        };
         self.hide_adjust_panel();
-        if !adj.data.is_instance_valid() || adj.data.bind().get_blob() != adj.last {
+        if !adj.contents.is_instance_valid() || adj.contents.bind().get_blob() != adj.last {
             return;
         }
         if adj.last != adj.before {
-            self.commit_blob(&adj.name, &adj.data, adj.before, adj.last);
+            self.commit_blob(&adj.moniker, &adj.contents, adj.before, adj.last);
         }
     }
 
@@ -260,16 +311,23 @@ impl PixelBuilderPlugin {
             return;
         }
         self.stop_adjust_timer();
-        let Some(adj) = self.adjust.take() else { return };
+        let Some(adj) = self.adjust.take() else {
+            return;
+        };
         self.hide_adjust_panel();
-        let mut data = adj.data;
+        let mut data = adj.contents;
         if !data.is_instance_valid() || data.bind().get_blob() != adj.last {
             return;
         }
-        data.bind_mut().replace(adj.base);
+        data.bind_mut().substitute(adj.base);
         data.emit_changed();
-        (self.sel_faces, self.sel_edges, self.sel_verts, self.active_vert) = adj.sel;
-        self.message = format!("{} cancelled", adj.action.title());
+        (
+            self.sel_faces,
+            self.sel_edges,
+            self.sel_verts,
+            self.active_vert,
+        ) = adj.sel;
+        self.message = format!("{} cancelled", adj.deed.heading());
         self.sync_ui();
         self.redraw();
     }
@@ -286,7 +344,10 @@ impl PixelBuilderPlugin {
 
     /// The viewport the panel floats in: the editor's first 3D viewport control.
     fn adjust_host() -> Option<Gd<Control>> {
-        let vp = EditorInterface::singleton().get_editor_viewport_3d_ex().idx(0).done()?;
+        let vp = EditorInterface::singleton()
+            .get_editor_viewport_3d_ex()
+            .idx(0)
+            .done()?;
         vp.get_parent()?.get_parent()?.try_cast::<Control>().ok()
     }
 
@@ -299,7 +360,7 @@ impl PixelBuilderPlugin {
         let mut col = VBoxContainer::new_alloc();
         let mut head = HBoxContainer::new_alloc();
         let mut title = Label::new_alloc();
-        title.add_theme_color_override("font_color", Color::from_rgb(0.62, 0.78, 0.95));
+        title.add_theme_color_override("font_color", Color::from_rgb(0.6205, 0.7805, 0.9505));
         title.set_h_size_flags(SizeFlags::EXPAND_FILL);
         head.add_child(&title);
         let gd = self.to_gd();
@@ -319,33 +380,46 @@ impl PixelBuilderPlugin {
         col.add_child(&flow);
         let mut status = Label::new_alloc();
         status.add_theme_font_size_override("font_size", (12.0 * s) as i32);
-        status.add_theme_color_override("font_color", Color::from_rgb(0.85, 0.85, 0.7));
+        status.add_theme_color_override("font_color", Color::from_rgb(0.8505, 0.8505, 0.7005));
         col.add_child(&status);
         panel.add_child(&col);
         panel.set_visible(false);
         if let Some(mut host) = Self::adjust_host() {
             host.add_child(&panel);
         }
-        self.adjust_ui = Some(AdjustUi { panel, title, flow, status, ctls: Vec::new() });
+        self.adjust_ui = Some(AdjustUi {
+            panel,
+            heading: title,
+            flow,
+            status,
+            ctls: Vec::new(),
+        });
     }
 
     fn show_adjust_panel(&mut self) {
-        if self.adjust_ui.as_ref().is_none_or(|u| !u.panel.is_instance_valid()) {
+        if self
+            .adjust_ui
+            .as_ref()
+            .is_none_or(|u| !u.panel.is_instance_valid())
+        {
             self.build_adjust_panel();
         }
         let Some(adj) = &self.adjust else { return };
-        let (fields, title) = (adj.fields.clone(), adj.action.title());
+        let (fields, title) = (adj.fields.clone(), adj.deed.heading());
         let gd = self.to_gd().upcast::<Object>();
         let spec = self.spec;
         let v = self.values_with(&spec);
-        let ctls: Vec<(Field, FieldCtl)> = fields.iter().map(|f| (*f, ui::make_field(&gd, *f, &v))).collect();
+        let ctls: Vec<(Field, FieldCtl)> = fields
+            .iter()
+            .map(|f| (*f, ui::make_field(&gd, *f, &v)))
+            .collect();
         if let Some(u) = &mut self.adjust_ui {
             for mut c in u.flow.get_children().iter_shared() {
                 u.flow.remove_child(&c);
                 c.queue_free();
             }
             for (_, c) in &ctls {
-                u.flow.add_child(&c.control());
+                u.flow.add_child(&c.widget());
                 // Enter in a value applies it and leaves the field, so the next Enter is Done.
                 if let FieldCtl::Spin(_, sb) = c
                     && let Some(mut le) = sb.get_line_edit()
@@ -354,7 +428,7 @@ impl PixelBuilderPlugin {
                 }
             }
             u.ctls = ctls;
-            u.title.set_text(&format!("Adjust {title}"));
+            u.heading.set_text(&format!("Adjust {title}"));
             u.panel.set_visible(true);
             // Bottom centre of the viewport, growing up and to both sides as its fields lay
             // out (`set_offset(Side::BOTTOM, -16 * scale)` in the HUD).
@@ -367,7 +441,7 @@ impl PixelBuilderPlugin {
             u.panel.set_offset(Side::TOP, -m);
             u.panel.set_offset(Side::BOTTOM, -m);
             u.panel.reset_size();
-            // No `grab_focus` (R1 review): the viewport keeps the keyboard, so the builder keys,
+            // No `grab_focus`: the viewport keeps the keyboard, so the builder keys,
             // Ctrl+Z and Godot's own shortcuts behave as without the panel. Enter / Esc reach
             // `on_key` (viewport) or `shortcut_input` (a panel field has the focus).
         }
@@ -389,7 +463,21 @@ impl PixelBuilderPlugin {
                     && let Some(v) = leading_number(&le.get_text().to_string())
                     && (v - sb.get_value()).abs() > 1e-9
                 {
-                    typed.push((*f, v.clamp(if sb.is_lesser_allowed() { f64::MIN } else { sb.get_min() }, if sb.is_greater_allowed() { f64::MAX } else { sb.get_max() })));
+                    typed.push((
+                        *f,
+                        v.clamp(
+                            if sb.is_lesser_allowed() {
+                                f64::MIN
+                            } else {
+                                sb.get_min()
+                            },
+                            if sb.is_greater_allowed() {
+                                f64::MAX
+                            } else {
+                                sb.get_max()
+                            },
+                        ),
+                    ));
                 }
             }
         }
@@ -459,18 +547,30 @@ impl PixelBuilderPlugin {
         let mut d = VarDictionary::new();
         d.set("active", self.adjust.is_some());
         if let Some(a) = &self.adjust {
-            d.set("action", a.action as i64);
+            d.set("action", a.deed as i64);
             d.set("pending", a.pending);
             d.set("status", a.status.as_str());
-            d.set("fields", &PackedInt32Array::from(a.fields.iter().map(|f| *f as i32).collect::<Vec<_>>().as_slice()));
+            d.set(
+                "fields",
+                &PackedInt32Array::from(
+                    a.fields
+                        .iter()
+                        .map(|f| *f as i32)
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                ),
+            );
         }
-        let vis = self.adjust_ui.as_ref().is_some_and(|u| u.panel.is_instance_valid() && u.panel.is_visible());
+        let vis = self
+            .adjust_ui
+            .as_ref()
+            .is_some_and(|u| u.panel.is_instance_valid() && u.panel.is_visible());
         d.set("visible", vis);
         if let Some(u) = &self.adjust_ui
             && u.panel.is_instance_valid()
         {
             d.set("status_text", &u.status.get_text());
-            d.set("title", &u.title.get_text());
+            d.set("title", &u.heading.get_text());
             d.set("controls", u.ctls.len() as i64);
         }
         d
@@ -489,7 +589,7 @@ impl PixelBuilderPlugin {
         // Undo / redo changed the mesh: the smoothing overlay follows (cheap when unchanged).
         self.refresh_attr_overlay();
         let Some(adj) = &self.adjust else { return };
-        if adj.data.is_instance_valid() && adj.data.bind().get_blob() == adj.last {
+        if adj.contents.is_instance_valid() && adj.contents.bind().get_blob() == adj.last {
             return;
         }
         self.stop_adjust_timer();
@@ -503,7 +603,9 @@ impl PixelBuilderPlugin {
     /// `text` as if typed (not applied). False without such a control.
     #[func]
     fn debug_adjust_type(&mut self, id: i64, text: GString) -> bool {
-        let Some(u) = &mut self.adjust_ui else { return false };
+        let Some(u) = &mut self.adjust_ui else {
+            return false;
+        };
         for (f, c) in &mut u.ctls {
             if *f as i64 == id
                 && let FieldCtl::Spin(_, sb) = c
@@ -550,8 +652,8 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: run toolbar action `id` the way a button does (an adjustable action
     /// opens the adjust panel; `debug_action` commits at once).
     #[func]
-    fn debug_action_adjust(&mut self, id: i64) {
-        self.on_action(id);
+    fn debug_action_adjust(&mut self, token_id: i64) {
+        self.upon_deed(token_id);
     }
 
     /// Test / scripting hook: the adjust session (see `adjust_state`).
@@ -563,8 +665,8 @@ impl PixelBuilderPlugin {
     /// Test / scripting hook: change an option the way the panel does (`flush`: also run the
     /// debounced re-run now instead of waiting for the timer).
     #[func]
-    fn debug_adjust_field(&mut self, id: i64, value: f64, flush: bool) {
-        self.on_field(value, id);
+    fn debug_adjust_field(&mut self, token_id: i64, value: f64, flush: bool) {
+        self.on_field(value, token_id);
         if flush {
             self.on_adjust_timer();
         }

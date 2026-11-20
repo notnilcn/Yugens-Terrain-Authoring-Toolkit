@@ -20,8 +20,8 @@ use crate::math::*;
 const MAGIC: &[u8; 4] = b"PTBM";
 pub const VERSION: u16 = 3;
 
-pub fn encode(m: &BMesh) -> Vec<u8> {
-    let mut b = Vec::with_capacity(16 + m.positions.len() * 12 + m.faces.len() * 48);
+pub fn pack(m: &BMesh) -> Vec<u8> {
+    let mut b = Vec::with_capacity(16 + m.positions.len() * 12 + m.facets.len() * 48);
     b.extend_from_slice(MAGIC);
     b.extend_from_slice(&VERSION.to_le_bytes());
     b.extend_from_slice(&0u16.to_le_bytes());
@@ -31,17 +31,23 @@ pub fn encode(m: &BMesh) -> Vec<u8> {
             b.extend_from_slice(&c.to_le_bytes());
         }
     }
-    b.extend_from_slice(&(m.faces.len() as u32).to_le_bytes());
-    for f in &m.faces {
+    b.extend_from_slice(&(m.facets.len() as u32).to_le_bytes());
+    for f in &m.facets {
         b.extend_from_slice(&(f.verts.len() as u16).to_le_bytes());
         for v in &f.verts {
             b.extend_from_slice(&v.to_le_bytes());
         }
-        b.extend_from_slice(&f.material.to_le_bytes());
-        b.extend_from_slice(&f.smooth.to_le_bytes());
-        b.extend_from_slice(&f.color);
-        b.push(f.uv.world as u8);
-        for c in [f.uv.offset.x, f.uv.offset.y, f.uv.rotation, f.uv.scale.x, f.uv.scale.y] {
+        b.extend_from_slice(&f.stuff.to_le_bytes());
+        b.extend_from_slice(&f.glide.to_le_bytes());
+        b.extend_from_slice(&f.tint);
+        b.push(f.tex_coord.world as u8);
+        for c in [
+            f.tex_coord.offset.x,
+            f.tex_coord.offset.y,
+            f.tex_coord.rotation,
+            f.tex_coord.magnify.x,
+            f.tex_coord.magnify.y,
+        ] {
             b.extend_from_slice(&c.to_le_bytes());
         }
         b.push(f.uv_manual as u8);
@@ -62,13 +68,16 @@ pub fn encode(m: &BMesh) -> Vec<u8> {
 }
 
 struct Reader<'a> {
-    b: &'a [u8],
+    bx: &'a [u8],
     i: usize,
 }
 
 impl Reader<'_> {
     fn take(&mut self, n: usize) -> Result<&[u8], String> {
-        let s = self.b.get(self.i..self.i + n).ok_or_else(|| format!("truncated at byte {}", self.i))?;
+        let s = self
+            .bx
+            .get(self.i..self.i + n)
+            .ok_or_else(|| format!("truncated at byte {}", self.i))?;
         self.i += n;
         Ok(s)
     }
@@ -86,11 +95,11 @@ impl Reader<'_> {
     }
 }
 
-pub fn decode(bytes: &[u8]) -> Result<BMesh, String> {
+pub fn unpack(bytes: &[u8]) -> Result<BMesh, String> {
     if bytes.is_empty() {
         return Ok(BMesh::default());
     }
-    let mut r = Reader { b: bytes, i: 0 };
+    let mut r = Reader { bx: bytes, i: 0 };
     if r.take(4)? != MAGIC {
         return Err("not a builder mesh blob".into());
     }
@@ -148,7 +157,22 @@ pub fn decode(bytes: &[u8]) -> Result<BMesh, String> {
                 color_corners.push([c[0], c[1], c[2], c[3]]);
             }
         }
-        m.faces.push(Face { verts, material, smooth, color, uv: UvParams { offset, rotation, scale, world }, uv_manual, uv_coords, uv_axis, color_corners });
+        m.facets.push(Face {
+            verts,
+            stuff: material,
+            glide: smooth,
+            tint: color,
+            tex_coord: UvParams {
+                offset,
+                rotation,
+                magnify: scale,
+                world,
+            },
+            uv_manual,
+            uv_coords,
+            uv_axis,
+            color_corners,
+        });
     }
     Ok(m)
 }
@@ -160,18 +184,28 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let mut m = generate(&ShapeSpec { kind: ShapeKind::Stairs, ..Default::default() }, None);
-        m.faces[2].material = 3;
-        m.faces[1].color = [10, 20, 30, 40];
-        m.faces[0].uv.rotation = 90.0;
-        m.faces[0].uv.world = false;
-        m.faces[3].uv_manual = true;
-        m.faces[3].uv_coords = (0..m.faces[3].verts.len()).map(|i| v2(i as f32 * 0.25, 0.5)).collect();
-        m.faces[4].uv_axis = v3(0.0, 0.6, 0.8);
-        m.faces[4].color_corners = (0..m.faces[4].verts.len()).map(|i| [i as u8, 200, 30, 255 - i as u8]).collect();
-        let b = encode(&m);
-        assert_eq!(decode(&b).unwrap(), m);
-        assert_eq!(decode(&[]).unwrap(), BMesh::default());
+        let mut m = produce(
+            &ShapeSpec {
+                sort: ShapeKind::Stairs,
+                ..Default::default()
+            },
+            None,
+        );
+        m.facets[2].stuff = 3;
+        m.facets[1].tint = [10, 20, 30, 40];
+        m.facets[0].tex_coord.rotation = 90.0;
+        m.facets[0].tex_coord.world = false;
+        m.facets[3].uv_manual = true;
+        m.facets[3].uv_coords = (0..m.facets[3].verts.len())
+            .map(|i| v2(i as f32 * 0.25, 0.5))
+            .collect();
+        m.facets[4].uv_axis = v3(0.0, 0.6, 0.8);
+        m.facets[4].color_corners = (0..m.facets[4].verts.len())
+            .map(|i| [i as u8, 200, 30, 255 - i as u8])
+            .collect();
+        let b = pack(&m);
+        assert_eq!(unpack(&b).unwrap(), m);
+        assert_eq!(unpack(&[]).unwrap(), BMesh::default());
     }
 
     /// Version 1 blobs (no manual UV block) still decode, with automatic UVs.
@@ -188,33 +222,45 @@ mod tests {
                 v1.extend_from_slice(&c.to_le_bytes());
             }
         }
-        v1.extend_from_slice(&(m.faces.len() as u32).to_le_bytes());
-        for f in &m.faces {
+        v1.extend_from_slice(&(m.facets.len() as u32).to_le_bytes());
+        for f in &m.facets {
             v1.extend_from_slice(&(f.verts.len() as u16).to_le_bytes());
             for v in &f.verts {
                 v1.extend_from_slice(&v.to_le_bytes());
             }
-            v1.extend_from_slice(&f.material.to_le_bytes());
-            v1.extend_from_slice(&f.smooth.to_le_bytes());
-            v1.extend_from_slice(&f.color);
-            v1.push(f.uv.world as u8);
-            for c in [f.uv.offset.x, f.uv.offset.y, f.uv.rotation, f.uv.scale.x, f.uv.scale.y] {
+            v1.extend_from_slice(&f.stuff.to_le_bytes());
+            v1.extend_from_slice(&f.glide.to_le_bytes());
+            v1.extend_from_slice(&f.tint);
+            v1.push(f.tex_coord.world as u8);
+            for c in [
+                f.tex_coord.offset.x,
+                f.tex_coord.offset.y,
+                f.tex_coord.rotation,
+                f.tex_coord.magnify.x,
+                f.tex_coord.magnify.y,
+            ] {
                 v1.extend_from_slice(&c.to_le_bytes());
             }
         }
-        let d = decode(&v1).unwrap();
+        let d = unpack(&v1).unwrap();
         assert_eq!(d, m);
-        assert!(d.faces.iter().all(|f| !f.uv_manual && f.uv_coords.is_empty()));
+        assert!(
+            d.facets
+                .iter()
+                .all(|f| !f.uv_manual && f.uv_coords.is_empty())
+        );
         // Re-encoding writes the current version.
-        assert_eq!(u16::from_le_bytes([encode(&d)[4], encode(&d)[5]]), VERSION);
+        assert_eq!(u16::from_le_bytes([pack(&d)[4], pack(&d)[5]]), VERSION);
     }
 
     /// Version 2 blobs (manual UVs, no axis / corner colours) still decode.
     #[test]
     fn migrates_version_2() {
         let mut m = cuboid(v3(1.0, 2.0, 3.0));
-        m.faces[1].uv_manual = true;
-        m.faces[1].uv_coords = (0..m.faces[1].verts.len()).map(|i| v2(i as f32, 1.0)).collect();
+        m.facets[1].uv_manual = true;
+        m.facets[1].uv_coords = (0..m.facets[1].verts.len())
+            .map(|i| v2(i as f32, 1.0))
+            .collect();
         let mut v2b = Vec::new();
         v2b.extend_from_slice(MAGIC);
         v2b.extend_from_slice(&2u16.to_le_bytes());
@@ -225,17 +271,23 @@ mod tests {
                 v2b.extend_from_slice(&c.to_le_bytes());
             }
         }
-        v2b.extend_from_slice(&(m.faces.len() as u32).to_le_bytes());
-        for f in &m.faces {
+        v2b.extend_from_slice(&(m.facets.len() as u32).to_le_bytes());
+        for f in &m.facets {
             v2b.extend_from_slice(&(f.verts.len() as u16).to_le_bytes());
             for v in &f.verts {
                 v2b.extend_from_slice(&v.to_le_bytes());
             }
-            v2b.extend_from_slice(&f.material.to_le_bytes());
-            v2b.extend_from_slice(&f.smooth.to_le_bytes());
-            v2b.extend_from_slice(&f.color);
-            v2b.push(f.uv.world as u8);
-            for c in [f.uv.offset.x, f.uv.offset.y, f.uv.rotation, f.uv.scale.x, f.uv.scale.y] {
+            v2b.extend_from_slice(&f.stuff.to_le_bytes());
+            v2b.extend_from_slice(&f.glide.to_le_bytes());
+            v2b.extend_from_slice(&f.tint);
+            v2b.push(f.tex_coord.world as u8);
+            for c in [
+                f.tex_coord.offset.x,
+                f.tex_coord.offset.y,
+                f.tex_coord.rotation,
+                f.tex_coord.magnify.x,
+                f.tex_coord.magnify.y,
+            ] {
                 v2b.extend_from_slice(&c.to_le_bytes());
             }
             v2b.push(f.uv_manual as u8);
@@ -245,22 +297,26 @@ mod tests {
                 v2b.extend_from_slice(&c.y.to_le_bytes());
             }
         }
-        let d = decode(&v2b).unwrap();
+        let d = unpack(&v2b).unwrap();
         assert_eq!(d, m);
-        assert!(d.faces.iter().all(|f| f.uv_axis == Vec3::ZERO && f.color_corners.is_empty()));
-        assert_eq!(d.faces[1].manual_uvs().map(|c| c.len()), Some(4));
-        assert_eq!(decode(&encode(&d)).unwrap(), m);
+        assert!(
+            d.facets
+                .iter()
+                .all(|f| f.uv_axis == Vec3::ZERO && f.color_corners.is_empty())
+        );
+        assert_eq!(d.facets[1].by_hand_tex_coords().map(|c| c.len()), Some(4));
+        assert_eq!(unpack(&pack(&d)).unwrap(), m);
     }
 
     #[test]
     fn rejects_truncated_and_garbage() {
-        let b = encode(&cuboid(v3(1.0, 1.0, 1.0)));
+        let b = pack(&cuboid(v3(1.0, 1.0, 1.0)));
         for cut in [3, 8, 20, b.len() - 1] {
-            assert!(decode(&b[..cut]).is_err(), "cut {cut}");
+            assert!(unpack(&b[..cut]).is_err(), "cut {cut}");
         }
-        assert!(decode(b"XXXX\x01\x00\x00\x00").is_err());
+        assert!(unpack(b"XXXX\x01\x00\x00\x00").is_err());
         let mut v = b.clone();
         v[4] = 9;
-        assert!(decode(&v).is_err());
+        assert!(unpack(&v).is_err());
     }
 }

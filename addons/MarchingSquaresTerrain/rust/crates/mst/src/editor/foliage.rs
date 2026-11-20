@@ -14,7 +14,8 @@ use std::collections::HashMap;
 use godot::classes::control::SizeFlags;
 use godot::classes::item_list::{IconMode, SelectMode};
 use godot::classes::{
-    Button, Camera3D, EditorFileDialog, EditorInterface, HBoxContainer, InputEventMouseButton, ItemList, Label, Mesh, Object, PackedScene, ResourceLoader, Texture2D,
+    Button, Camera3D, EditorFileDialog, EditorInterface, HBoxContainer, InputEventMouseButton,
+    ItemList, Label, Mesh, Object, PackedScene, ResourceLoader, Texture2D,
 };
 use godot::global::MouseButton;
 use godot::prelude::*;
@@ -73,12 +74,12 @@ pub struct Foliage {
 
 fn preview_key(item: &PixelScatterItem) -> String {
     let id = |r: Option<i64>| r.unwrap_or(0);
-    let c = item.color;
+    let c = item.tint;
     format!(
         "{}:{}:{}:{}:{:.3},{:.3},{:.3}",
-        item.shape,
+        item.form,
         item.shape_seed,
-        id(item.mesh.as_ref().map(|m| m.instance_id().to_i64())),
+        id(item.cage.as_ref().map(|m| m.instance_id().to_i64())),
         id(item.scene.as_ref().map(|m| m.instance_id().to_i64())),
         c.r,
         c.g,
@@ -87,7 +88,8 @@ fn preview_key(item: &PixelScatterItem) -> String {
 }
 
 fn items_of(t: &Gd<MarchingSquaresTerrain>) -> Vec<Option<Gd<PixelScatterItem>>> {
-    let arr: Array<Option<Gd<PixelScatterItem>>> = t.get("scatter_items").try_to().unwrap_or_default();
+    let arr: Array<Option<Gd<PixelScatterItem>>> =
+        t.get("scatter_items").try_to().unwrap_or_default();
     arr.iter_shared().collect()
 }
 
@@ -113,13 +115,25 @@ impl MarchingSquaresTerrainPlugin {
 
     /// Indices (into `scatter_items`) of the selected props.
     fn foliage_selected_items(&self) -> Vec<usize> {
-        let Some(t) = &self.terrain else { return Vec::new() };
-        items_of(t).iter().enumerate().filter(|(_, it)| it.as_ref().is_some_and(|it| self.foliage.items.contains(&it.instance_id()))).map(|(i, _)| i).collect()
+        let Some(t) = &self.terrain else {
+            return Vec::new();
+        };
+        items_of(t)
+            .iter()
+            .enumerate()
+            .filter(|(_, it)| {
+                it.as_ref()
+                    .is_some_and(|it| self.foliage.items.contains(&it.instance_id()))
+            })
+            .map(|(i, _)| i)
+            .collect()
     }
 
     /// Something to paint is selected (grass, a prop or a not-yet-added built-in).
     pub(super) fn foliage_has_selection(&self) -> bool {
-        self.foliage.grass || !self.foliage.builtins.is_empty() || !self.foliage_selected_items().is_empty()
+        self.foliage.grass
+            || !self.foliage.builtins.is_empty()
+            || !self.foliage_selected_items().is_empty()
     }
 
     /// Names of what LMB paints, for the viewport hint ("Tree, Bush").
@@ -150,8 +164,15 @@ impl MarchingSquaresTerrainPlugin {
         if names.is_empty() {
             return "Pick Grass, a tree or a rock in the Foliage palette on the right  ·  then LMB-drag on the terrain to paint it".to_string();
         }
-        let erase = if self.state.erase_all { "RMB / Shift+LMB: erase every prop" } else { "RMB / Shift+LMB: erase" };
-        format!("Painting {}  ·  LMB-drag: paint  ·  {erase}  ·  Shift+wheel: size  ·  palette on the right: pick what to paint", names.join(", "))
+        let erase = if self.state.erase_all {
+            "RMB / Shift+LMB: erase every prop"
+        } else {
+            "RMB / Shift+LMB: erase"
+        };
+        format!(
+            "Painting {}  ·  LMB-drag: paint  ·  {erase}  ·  Shift+wheel: size  ·  palette on the right: pick what to paint",
+            names.join(", ")
+        )
     }
 
     /// Default selection, applied when the tool first opens on a terrain (and again for every
@@ -159,7 +180,9 @@ impl MarchingSquaresTerrainPlugin {
     /// on the first stroke), so LMB paints trees straight away. Ids of items that no longer
     /// exist (undo, inspector edits) are dropped.
     fn foliage_default_selection(&mut self) {
-        let Some(t) = self.terrain.clone() else { return };
+        let Some(t) = self.terrain.clone() else {
+            return;
+        };
         let items: Vec<Gd<PixelScatterItem>> = items_of(&t).into_iter().flatten().collect();
         let ids: Vec<InstanceId> = items.iter().map(|it| it.instance_id()).collect();
         let added = &self.foliage.added;
@@ -174,17 +197,22 @@ impl MarchingSquaresTerrainPlugin {
         self.foliage.builtins.extend(back);
         let builtin_of = |it: &Gd<PixelScatterItem>| {
             let b = it.bind();
-            if b.mesh.is_some() || b.scene.is_some() {
+            if b.cage.is_some() || b.scene.is_some() {
                 return None;
             }
-            SCATTER_BUILTINS.iter().find(|(_, s)| *s == b.shape).map(|(k, _)| *k)
+            SCATTER_BUILTINS
+                .iter()
+                .find(|(_, s)| *s == b.form)
+                .map(|(k, _)| *k)
         };
         // A pending built-in the terrain got meanwhile (undo / redo of its add, inspector):
         // select that item instead.
         let pending = std::mem::take(&mut self.foliage.builtins);
         for kind in pending {
             match items.iter().find(|it| builtin_of(it) == Some(kind)) {
-                Some(it) if !self.foliage.items.contains(&it.instance_id()) => self.foliage.items.push(it.instance_id()),
+                Some(it) if !self.foliage.items.contains(&it.instance_id()) => {
+                    self.foliage.items.push(it.instance_id())
+                }
                 Some(_) => {}
                 None => self.foliage.builtins.push(kind),
             }
@@ -197,7 +225,10 @@ impl MarchingSquaresTerrainPlugin {
         self.foliage.builtins.clear();
         self.foliage.added.clear();
         self.foliage.note = None;
-        let pick = items.iter().find(|it| builtin_of(it) == Some("Tree")).or(items.first());
+        let pick = items
+            .iter()
+            .find(|it| builtin_of(it) == Some("Tree"))
+            .or(items.first());
         match pick {
             Some(it) => self.foliage.items = vec![it.instance_id()],
             None => self.foliage.builtins = vec!["Tree"],
@@ -210,7 +241,9 @@ impl MarchingSquaresTerrainPlugin {
         if self.foliage.builtins.is_empty() {
             return;
         }
-        let Some(terrain) = self.terrain.clone() else { return };
+        let Some(terrain) = self.terrain.clone() else {
+            return;
+        };
         let kinds = std::mem::take(&mut self.foliage.builtins);
         let old = terrain.get("scatter_items");
         let arr: Array<Option<Gd<PixelScatterItem>>> = old.try_to().unwrap_or_default();
@@ -235,7 +268,9 @@ impl MarchingSquaresTerrainPlugin {
 
     /// Rebuilds the palette in the right side panel (Foliage tool only).
     pub(super) fn rebuild_foliage_panel(&mut self) {
-        let Some(mut vbox) = self.texture_vbox.clone() else { return };
+        let Some(mut vbox) = self.texture_vbox.clone() else {
+            return;
+        };
         for c in vbox.get_children().iter_shared() {
             vbox.remove_child(&c);
             c.free();
@@ -244,13 +279,15 @@ impl MarchingSquaresTerrainPlugin {
         self.slot_previews.clear();
         self.slot_tex_pickers.clear();
         self.foliage.list = None;
-        let Some(t) = self.terrain.clone() else { return };
+        let Some(t) = self.terrain.clone() else {
+            return;
+        };
         self.foliage_default_selection();
         self.foliage.signature = signature_of(&t);
 
         vbox.add_child(&ui_kit::panel_title(
             "Foliage",
-            ui_kit::icon("scatter_tool.svg"),
+            ui_kit::glyph("scatter_tool.svg"),
             "What the Foliage tool paints: grass and the terrain's Scatter Items (PixelScatterItem resources).",
         ));
         let mut hint = Label::new_alloc();
@@ -270,7 +307,7 @@ impl MarchingSquaresTerrainPlugin {
         for (kind, shape) in SCATTER_BUILTINS {
             let has = items.iter().flatten().any(|it| {
                 let b = it.bind();
-                b.shape == shape && b.mesh.is_none() && b.scene.is_none()
+                b.form == shape && b.cage.is_none() && b.scene.is_none()
             });
             if !has {
                 entries.push(Entry::Builtin(kind));
@@ -289,13 +326,13 @@ impl MarchingSquaresTerrainPlugin {
         list.set_auto_height(true);
         list.set_h_size_flags(SizeFlags::EXPAND_FILL);
         list.set_tooltip_text("Click to paint it, Ctrl/Shift+click to paint several together. Double-click a prop to edit it in the inspector.");
-        let scatter_icon = ui_kit::icon("scatter_tool.svg");
+        let scatter_icon = ui_kit::glyph("scatter_tool.svg");
         for (row, e) in entries.iter().enumerate() {
             let row = row as i32;
             match e {
                 Entry::Grass => {
                     list.add_item("Grass");
-                    if let Some(ic) = ui_kit::icon("grass_mask_tool.svg") {
+                    if let Some(ic) = ui_kit::glyph("grass_mask_tool.svg") {
                         list.set_item_icon(row, &ic);
                     }
                     list.set_item_tooltip(row, "Grass (the terrain's grass mask). Grows only on textures with Grass ticked in the Vertex Painting panel.");
@@ -304,13 +341,18 @@ impl MarchingSquaresTerrainPlugin {
                     }
                 }
                 Entry::Item(i, id) => {
-                    let Some(Some(it)) = items.get(*i) else { continue };
+                    let Some(Some(it)) = items.get(*i) else {
+                        continue;
+                    };
                     let (label, key) = {
                         let b = it.bind();
                         (b.get_label().to_string(), preview_key(&b))
                     };
                     list.add_item(&label);
-                    list.set_item_tooltip(row, &format!("{label} (Scatter Item {}). Double-click to edit it.", i + 1));
+                    list.set_item_tooltip(
+                        row,
+                        &format!("{label} (Scatter Item {}). Double-click to edit it.", i + 1),
+                    );
                     match self.foliage.thumbs.get(&key) {
                         Some(tex) => list.set_item_icon(row, tex),
                         None => {
@@ -346,8 +388,14 @@ impl MarchingSquaresTerrainPlugin {
                 }
             }
         }
-        list.connect("multi_selected", &self.to_gd().callable("on_foliage_selected"));
-        list.connect("item_activated", &self.to_gd().callable("on_foliage_activated"));
+        list.connect(
+            "multi_selected",
+            &self.to_gd().callable("on_foliage_selected"),
+        );
+        list.connect(
+            "item_activated",
+            &self.to_gd().callable("on_foliage_activated"),
+        );
         vbox.add_child(&list);
         self.foliage.entries = entries;
         self.foliage.list = Some(list);
@@ -379,7 +427,13 @@ impl MarchingSquaresTerrainPlugin {
 
     fn refresh_foliage_buttons(&mut self) {
         let any = !self.foliage_selected_items().is_empty();
-        for b in [&mut self.foliage.edit_button, &mut self.foliage.remove_button].into_iter().flatten() {
+        for b in [
+            &mut self.foliage.edit_button,
+            &mut self.foliage.remove_button,
+        ]
+        .into_iter()
+        .flatten()
+        {
             if b.is_instance_valid() {
                 b.set_disabled(!any);
             }
@@ -387,14 +441,27 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     fn queue_foliage_thumb(&self, item: &PixelScatterItem, key: String) {
-        let Some(res) = item.preview_resource() else { return };
-        let Some(mut prev) = EditorInterface::singleton().get_resource_previewer() else { return };
+        let Some(res) = item.preview_resource() else {
+            return;
+        };
+        let Some(mut prev) = EditorInterface::singleton().get_resource_previewer() else {
+            return;
+        };
         // Deferred: a cached preview calls back at once, into this (still bound) plugin.
         // Files (scenes / models / meshes) get the FileSystem dock's thumbnail by path; the
         // edited-resource previewer does not render imported scenes.
         let path = res.get_path().to_string();
-        let (method, target) = if !path.is_empty() && !path.contains("::") { ("queue_resource_preview", path.to_variant()) } else { ("queue_edited_resource_preview", res.to_variant()) };
-        let args = [target, self.to_gd().to_variant(), "on_foliage_thumb".to_variant(), key.to_variant()];
+        let (method, target) = if !path.is_empty() && !path.contains("::") {
+            ("queue_resource_preview", path.to_variant())
+        } else {
+            ("queue_edited_resource_preview", res.to_variant())
+        };
+        let args = [
+            target,
+            self.to_gd().to_variant(),
+            "on_foliage_thumb".to_variant(),
+            key.to_variant(),
+        ];
         prev.call_deferred(method, &args);
     }
 
@@ -413,11 +480,17 @@ impl MarchingSquaresTerrainPlugin {
     // ------------------------------------------------------------------ input
 
     /// Mouse buttons of the Foliage tool. Returns "consumed".
-    pub(super) fn foliage_mouse_button(&mut self, camera: &Gd<Camera3D>, mb: &Gd<InputEventMouseButton>, shift: bool, ctrl: bool) -> bool {
+    pub(super) fn foliage_mouse_button(
+        &mut self,
+        lens: &Gd<Camera3D>,
+        mb: &Gd<InputEventMouseButton>,
+        shift: bool,
+        ctrl: bool,
+    ) -> bool {
         let button = mb.get_button_index();
         let (is_l, is_r) = (button == MouseButton::LEFT, button == MouseButton::RIGHT);
         if !mb.is_pressed() {
-            if let Some(s) = &mut self.stroke {
+            if let Some(s) = &mut self.sweep {
                 if is_l {
                     s.lmb = false;
                 }
@@ -432,9 +505,9 @@ impl MarchingSquaresTerrainPlugin {
             return false;
         }
         if !(is_l || is_r) || ctrl {
-            return self.stroke.is_some();
+            return self.sweep.is_some();
         }
-        if self.stroke.is_some() {
+        if self.sweep.is_some() {
             return true;
         }
         let Some(h) = self.hover else { return false };
@@ -442,7 +515,9 @@ impl MarchingSquaresTerrainPlugin {
         self.foliage_default_selection();
         if !self.foliage_has_selection() && !(erasing && self.state.erase_all) {
             // Said in the viewport hint (the Output panel is easy to miss).
-            self.foliage.note = Some("Nothing to paint: click Grass, a tree or a rock in the Foliage palette on the right first");
+            self.foliage.note = Some(
+                "Nothing to paint: click Grass, a tree or a rock in the Foliage palette on the right first",
+            );
             self.base().update_overlays();
             return true;
         }
@@ -454,13 +529,16 @@ impl MarchingSquaresTerrainPlugin {
         self.foliage.erasing = erasing;
         let slope = (self.state.slope_min, self.state.slope_max);
         self.foliage.rules = match &self.terrain {
-            Some(t) if !erasing => t.bind().scatter_hand_rules(&props, slope, godot::global::randi() as u32),
+            Some(t) if !erasing => {
+                t.bind()
+                    .scatter_hand_rules(&props, slope, godot::global::randi() as u32)
+            }
             _ => Vec::new(),
         };
         let before = self.terrain.as_ref().map(|t| t.bind().scatter_bytes());
-        let mut st = self.new_stroke(camera, mb, Tool::Scatter, h, is_l, is_r);
+        let mut st = self.new_stroke(lens, mb, Tool::Scatter, h, is_l, is_r);
         st.scatter_before = before;
-        self.stroke = Some(st);
+        self.sweep = Some(st);
         self.foliage_dab(true);
         true
     }
@@ -472,11 +550,18 @@ impl MarchingSquaresTerrainPlugin {
 
     /// The Foliage brush: round, hard-edged, the tool's Size.
     pub(super) fn foliage_brush(&self) -> Brush {
-        Brush { shape: BrushShape::Round, radius: self.state.brush.radius, falloff: false, ..Default::default() }
+        Brush {
+            form: BrushShape::Round,
+            radius: self.state.brush.radius,
+            falloff: false,
+            ..Default::default()
+        }
     }
 
     fn foliage_dab(&mut self, first: bool) {
-        let (Some(h), Some(mut t)) = (self.hover, self.terrain.clone()) else { return };
+        let (Some(h), Some(mut t)) = (self.hover, self.terrain.clone()) else {
+            return;
+        };
         let brush = self.foliage_brush();
         let erase = self.foliage.erasing;
         let slope = (self.state.slope_min, self.state.slope_max);
@@ -499,21 +584,37 @@ impl MarchingSquaresTerrainPlugin {
                     !items.is_empty() && tb.scatter_erase_items(Some(&items), &brush, center)
                 }
             } else {
-                tb.scatter_paint_items(&self.foliage.rules, &brush, center, self.state.scatter_density, first)
+                tb.scatter_paint_items(
+                    &self.foliage.rules,
+                    &brush,
+                    center,
+                    self.state.scatter_density,
+                    first,
+                )
             }
         };
     }
 
     /// Cursor color: green paints, red erases.
     pub(super) fn foliage_cursor_color(&self) -> Color {
-        let erasing = if self.stroke.is_some() { self.foliage.erasing } else { godot::classes::Input::singleton().is_key_pressed(godot::global::Key::SHIFT) };
-        if erasing { Color::from_rgb(1.0, 0.3, 0.25) } else { Color::from_rgb(0.45, 1.0, 0.35) }
+        let erasing = if self.sweep.is_some() {
+            self.foliage.erasing
+        } else {
+            godot::classes::Input::singleton().is_key_pressed(godot::global::Key::SHIFT)
+        };
+        if erasing {
+            Color::from_rgb(1.0, 0.3005, 0.2505)
+        } else {
+            Color::from_rgb(0.4505, 1.0, 0.3505)
+        }
     }
 
     /// Ends a Foliage stroke: one undo action for the grass mask (chunk blobs) and the props
     /// (scatter blob) it changed.
     pub(super) fn finish_foliage_stroke(&mut self, stroke: super::plugin::Stroke) {
-        let Some(mut terrain) = self.terrain.clone() else { return };
+        let Some(mut terrain) = self.terrain.clone() else {
+            return;
+        };
         let mut before = VarDictionary::new();
         let mut after = VarDictionary::new();
         let mut coords: Vec<IVec2> = Vec::new();
@@ -523,8 +624,14 @@ impl MarchingSquaresTerrainPlugin {
                 let a = t.chunk_bytes(*c);
                 if a != *b {
                     coords.push(*c);
-                    before.set(from_iv(*c), &PackedByteArray::from(b.clone().unwrap_or_default().as_slice()));
-                    after.set(from_iv(*c), &PackedByteArray::from(a.unwrap_or_default().as_slice()));
+                    before.set(
+                        from_iv(*c),
+                        &PackedByteArray::from(b.clone().unwrap_or_default().as_slice()),
+                    );
+                    after.set(
+                        from_iv(*c),
+                        &PackedByteArray::from(a.unwrap_or_default().as_slice()),
+                    );
                 }
             }
         }
@@ -547,22 +654,39 @@ impl MarchingSquaresTerrainPlugin {
         if scatter.is_some() {
             terrain.bind_mut().scatter_write();
         }
-        let Some(mut ur) = self.base().get_undo_redo() else { return };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
         let obj = terrain.upcast::<Object>();
         let what = match (coords.is_empty(), scatter.is_none()) {
             (true, _) => "props",
             (false, true) => "grass",
             (false, false) => "grass + props",
         };
-        let name = format!("terrain foliage {} {what}", if self.foliage.erasing { "erase" } else { "paint" });
+        let name = format!(
+            "terrain foliage {} {what}",
+            if self.foliage.erasing {
+                "erase"
+            } else {
+                "paint"
+            }
+        );
         ur.create_action(&name);
         if !coords.is_empty() {
             ur.add_do_method(&obj, "set_chunks_data", &[after.to_variant()]);
             ur.add_undo_method(&obj, "set_chunks_data", &[before.to_variant()]);
         }
         if let Some((b, a)) = scatter {
-            ur.add_do_method(&obj, "set_scatter_data", &[PackedByteArray::from(a.as_slice()).to_variant()]);
-            ur.add_undo_method(&obj, "set_scatter_data", &[PackedByteArray::from(b.as_slice()).to_variant()]);
+            ur.add_do_method(
+                &obj,
+                "set_scatter_data",
+                &[PackedByteArray::from(a.as_slice()).to_variant()],
+            );
+            ur.add_undo_method(
+                &obj,
+                "set_scatter_data",
+                &[PackedByteArray::from(b.as_slice()).to_variant()],
+            );
         }
         ur.commit_action_ex().execute(false).done();
     }
@@ -571,13 +695,17 @@ impl MarchingSquaresTerrainPlugin {
 
     /// Fill Terrain / Clear for the selected props (one undo step each).
     pub(super) fn foliage_action(&mut self, s: Setting) {
-        let Some(mut t) = self.terrain.clone() else { return };
+        let Some(mut t) = self.terrain.clone() else {
+            return;
+        };
         if s == Setting::ScatterFill {
             self.foliage_materialize();
         }
         let items = self.foliage_selected_items();
         if items.is_empty() {
-            self.foliage.note = Some("Fill Terrain / Clear act on props: select one or more props (not only Grass) in the palette first");
+            self.foliage.note = Some(
+                "Fill Terrain / Clear act on props: select one or more props (not only Grass) in the palette first",
+            );
             self.base().update_overlays();
             return;
         }
@@ -592,12 +720,21 @@ impl MarchingSquaresTerrainPlugin {
             }
             tb.update();
         }
-        self.commit_scatter_undo(if s == Setting::ScatterFill { "terrain foliage fill" } else { "terrain foliage clear" }, before);
+        self.commit_scatter_undo(
+            if s == Setting::ScatterFill {
+                "terrain foliage fill"
+            } else {
+                "terrain foliage clear"
+            },
+            before,
+        );
     }
 
     /// Appends `item` to the terrain's Scatter Items (undoable) and selects it alone.
     fn foliage_add_item(&mut self, item: Gd<PixelScatterItem>, name: &str) {
-        let Some(terrain) = self.terrain.clone() else { return };
+        let Some(terrain) = self.terrain.clone() else {
+            return;
+        };
         let old = terrain.get("scatter_items");
         let arr: Array<Option<Gd<PixelScatterItem>>> = old.try_to().unwrap_or_default();
         let mut arr = arr.duplicate_shallow();
@@ -628,8 +765,15 @@ impl MarchingSquaresTerrainPlugin {
     /// Palette selection changed (ItemList `multi_selected`).
     #[func]
     fn on_foliage_selected(&mut self, _index: i64, _selected: bool) {
-        let Some(list) = self.foliage.list.clone() else { return };
-        let rows: Vec<usize> = list.get_selected_items().as_slice().iter().map(|r| *r as usize).collect();
+        let Some(list) = self.foliage.list.clone() else {
+            return;
+        };
+        let rows: Vec<usize> = list
+            .get_selected_items()
+            .as_slice()
+            .iter()
+            .map(|r| *r as usize)
+            .collect();
         let mut grass = false;
         let mut items = Vec::new();
         let mut builtins = Vec::new();
@@ -661,17 +805,24 @@ impl MarchingSquaresTerrainPlugin {
     #[func]
     fn on_foliage_edit(&mut self) {
         let Some(t) = &self.terrain else { return };
-        let Some(i) = self.foliage_selected_items().first().copied() else { return };
+        let Some(i) = self.foliage_selected_items().first().copied() else {
+            return;
+        };
         if let Some(Some(item)) = items_of(t).get(i) {
             // Inspector only: the terrain stays the edited node, so the tool stays open.
-            EditorInterface::singleton().inspect_object_ex(item).inspector_only(true).done();
+            EditorInterface::singleton()
+                .inspect_object_ex(item)
+                .inspector_only(true)
+                .done();
         }
     }
 
     /// Remove: drops the selected props and their instances (one undo step restoring both).
     #[func]
     fn on_foliage_remove(&mut self) {
-        let Some(mut terrain) = self.terrain.clone() else { return };
+        let Some(mut terrain) = self.terrain.clone() else {
+            return;
+        };
         let mut idx = self.foliage_selected_items();
         if idx.is_empty() {
             return;
@@ -689,7 +840,11 @@ impl MarchingSquaresTerrainPlugin {
                 ur.add_do_method(&obj, "remove_scatter_item", &[(i as i64).to_variant()]);
             }
             ur.add_undo_property(&obj, "scatter_items", &items_before);
-            ur.add_undo_method(&obj, "set_scatter_data", &[PackedByteArray::from(before.as_slice()).to_variant()]);
+            ur.add_undo_method(
+                &obj,
+                "set_scatter_data",
+                &[PackedByteArray::from(before.as_slice()).to_variant()],
+            );
             ur.commit_action_ex().execute(false).done();
         }
         self.foliage.items.clear();
@@ -705,7 +860,10 @@ impl MarchingSquaresTerrainPlugin {
         d.set_access(Access::RESOURCES);
         d.add_filter("*.tscn, *.scn, *.glb, *.gltf, *.blend, *.fbx, *.obj ; Scenes and models");
         d.add_filter("*.mesh, *.tres, *.res ; Meshes");
-        let on = self.to_gd().callable("on_foliage_file").bind(&[d.to_variant()]);
+        let on = self
+            .to_gd()
+            .callable("on_foliage_file")
+            .bind(&[d.to_variant()]);
         d.connect("file_selected", &on);
         let free = Callable::from_object_method(&d, "queue_free");
         d.connect("canceled", &free);
@@ -723,18 +881,25 @@ impl MarchingSquaresTerrainPlugin {
             return;
         };
         let mut item = PixelScatterItem::new_gd();
-        let stem = path.to_string().rsplit('/').next().unwrap_or("Prop").rsplit_once('.').map(|x| x.0.to_string()).unwrap_or_default();
+        let stem = path
+            .to_string()
+            .rsplit('/')
+            .next()
+            .unwrap_or("Prop")
+            .rsplit_once('.')
+            .map(|x| x.0.to_string())
+            .unwrap_or_default();
         {
             let mut b = item.bind_mut();
             if let Ok(scene) = res.clone().try_cast::<PackedScene>() {
                 b.scene = Some(scene);
             } else if let Ok(mesh) = res.try_cast::<Mesh>() {
-                b.mesh = Some(mesh);
+                b.cage = Some(mesh);
             } else {
                 godot_warn!("Marching Squares Terrain: {path} is neither a mesh nor a scene.");
                 return;
             }
-            b.shape = 0;
+            b.form = 0;
             b.display_name = stem.replace('_', " ").as_str().into();
         }
         self.foliage_add_item(item, &stem);
@@ -742,17 +907,35 @@ impl MarchingSquaresTerrainPlugin {
 
     /// Thumbnail ready (`EditorResourcePreview`).
     #[func]
-    fn on_foliage_thumb(&mut self, _path: GString, preview: Option<Gd<Texture2D>>, _thumb: Option<Gd<Texture2D>>, key: Variant) {
-        let (Some(tex), Ok(key)) = (preview, key.try_to::<GString>()) else { return };
+    fn on_foliage_thumb(
+        &mut self,
+        _path: GString,
+        preview: Option<Gd<Texture2D>>,
+        _thumb: Option<Gd<Texture2D>>,
+        key: Variant,
+    ) {
+        let (Some(tex), Ok(key)) = (preview, key.try_to::<GString>()) else {
+            return;
+        };
         let key = key.to_string();
         self.foliage.thumbs.insert(key.clone(), tex.clone());
-        let Some(mut list) = self.foliage.list.clone().filter(|l| l.is_instance_valid()) else { return };
-        let Some(t) = self.terrain.clone() else { return };
+        let Some(mut list) = self.foliage.list.clone().filter(|l| l.is_instance_valid()) else {
+            return;
+        };
+        let Some(t) = self.terrain.clone() else {
+            return;
+        };
         let items = items_of(&t);
         for (row, e) in self.foliage.entries.iter().enumerate() {
             let k = match e {
-                Entry::Item(i, _) => items.get(*i).cloned().flatten().map(|it| preview_key(&it.bind())),
-                Entry::Builtin(kind) => Some(preview_key(&PixelScatterItem::create_builtin(kind.to_lowercase().as_str().into()).bind())),
+                Entry::Item(i, _) => items
+                    .get(*i)
+                    .cloned()
+                    .flatten()
+                    .map(|it| preview_key(&it.bind())),
+                Entry::Builtin(kind) => Some(preview_key(
+                    &PixelScatterItem::create_builtin(kind.to_lowercase().as_str().into()).bind(),
+                )),
                 Entry::Grass => None,
             };
             if k.as_deref() == Some(key.as_str()) {

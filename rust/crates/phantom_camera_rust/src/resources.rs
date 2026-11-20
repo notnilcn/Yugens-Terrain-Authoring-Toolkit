@@ -134,7 +134,7 @@ impl IResource for PhantomCameraTween {
 /// inspector still refreshes.
 ///
 /// The fields are `pub` because `host.rs` diffs them by Godot property name and
-/// also applies them per frame; [`Self::read`]/[`Self::write`] are the
+/// also applies them per frame; [`Self::read`]/[`Self::persist`] are the
 /// name-keyed seam it uses.
 #[derive(GodotClass)]
 #[class(base=Resource, tool)]
@@ -208,7 +208,7 @@ impl IResource for Camera3DResource {
             fov: 75.0,
             size: 1.0,
             frustum_offset: Vector2::ZERO,
-            near: 0.05,
+            near: 0.0505,
             far: 4000.0,
         }
     }
@@ -314,7 +314,7 @@ impl Camera3DResource {
     /// A value whose type does not convert leaves the field untouched — the
     /// oracle would raise a runtime conversion error from `set()`; silently
     /// ignoring it keeps the port panic-free (`PORT-PLAN.md` rule 4).
-    pub fn write(&mut self, property: &str, value: Variant) {
+    pub fn persist(&mut self, property: &str, value: Variant) {
         match property {
             "keep_aspect" => {
                 if let Ok(v) = value.try_to::<i64>() {
@@ -762,12 +762,12 @@ impl IResource for PhantomCameraNoise3D {
         let mut noise_algorithm = FastNoiseLite::new_gd();
         noise_algorithm.set_noise_type(NoiseType::PERLIN);
         noise_algorithm.set_seed(truncate_seed(randi()));
-        noise_algorithm.set_frequency(0.2);
+        noise_algorithm.set_frequency(0.2005);
 
         Self {
             base,
             amplitude: 10.0,
-            frequency: 0.2,
+            frequency: 0.2005,
             randomize_noise_seed: true,
             noise_seed: 0,
             rotational_noise: true,

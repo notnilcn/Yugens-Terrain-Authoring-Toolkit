@@ -12,7 +12,17 @@ use godot::prelude::*;
 pub const SHADER_CODE: &str = include_str!("blend.gdshader");
 
 /// Uniform base names carried per layer; each exists as `<name>_a` and `<name>_b`.
-pub const LAYER_UNIFORMS: [&str; 9] = ["texture", "albedo", "height_map", "height_offset", "emission_map", "emission", "emission_energy", "uv_scale", "uv_offset"];
+pub const LAYER_UNIFORMS: [&str; 9] = [
+    "texture",
+    "albedo",
+    "height_map",
+    "height_offset",
+    "emission_map",
+    "emission",
+    "emission_energy",
+    "uv_scale",
+    "uv_offset",
+];
 
 pub fn layer_suffix(layer: i64) -> &'static str {
     if layer == 1 { "_b" } else { "_a" }
@@ -43,7 +53,10 @@ impl IShaderMaterial for PixelBuilderBlendMaterial {
 
     // Required by the Material virtuals; ShaderMaterial's own (C++) implementation answers.
     fn get_shader_rid(&self) -> Rid {
-        self.base().get_shader().map(|s| s.get_rid()).unwrap_or(Rid::Invalid)
+        self.base()
+            .get_shader()
+            .map(|s| s.get_rid())
+            .unwrap_or(Rid::Invalid)
     }
 
     fn get_shader_mode(&self) -> godot::classes::shader::Mode {
@@ -82,7 +95,10 @@ impl PixelBuilderBlendMaterial {
         let suffix = layer_suffix(layer);
         let mut out = VarDictionary::new();
         for name in LAYER_UNIFORMS {
-            out.set(name, &self.base().get_shader_parameter(&format!("{name}{suffix}")));
+            out.set(
+                name,
+                &self.base().get_shader_parameter(&format!("{name}{suffix}")),
+            );
         }
         out
     }
@@ -93,7 +109,8 @@ impl PixelBuilderBlendMaterial {
         let suffix = layer_suffix(layer);
         for (k, v) in values.iter_shared() {
             let name = k.to_string();
-            self.base_mut().set_shader_parameter(&format!("{name}{suffix}"), &v);
+            self.base_mut()
+                .set_shader_parameter(&format!("{name}{suffix}"), &v);
         }
     }
 
@@ -101,13 +118,41 @@ impl PixelBuilderBlendMaterial {
     #[func]
     pub fn layer_from_standard(src: Gd<BaseMaterial3D>) -> VarDictionary {
         let mut d = VarDictionary::new();
-        d.set("texture", &src.get_texture(TextureParam::ALBEDO).to_variant());
+        d.set(
+            "texture",
+            &src.get_texture(TextureParam::ALBEDO).to_variant(),
+        );
         d.set("albedo", &src.get_albedo().to_variant());
         let em = src.get_feature(Feature::EMISSION);
-        d.set("emission_map", &if em { src.get_texture(TextureParam::EMISSION).to_variant() } else { Variant::nil() });
-        d.set("emission", &if em { src.get_emission() } else { Color::from_rgba(0.0, 0.0, 0.0, 1.0) }.to_variant());
-        d.set("emission_energy", &src.get_emission_energy_multiplier().to_variant());
-        d.set("height_map", &if src.get_feature(Feature::HEIGHT_MAPPING) { src.get_texture(TextureParam::HEIGHTMAP).to_variant() } else { Variant::nil() });
+        d.set(
+            "emission_map",
+            &if em {
+                src.get_texture(TextureParam::EMISSION).to_variant()
+            } else {
+                Variant::nil()
+            },
+        );
+        d.set(
+            "emission",
+            &if em {
+                src.get_emission()
+            } else {
+                Color::from_rgba(0.0, 0.0, 0.0, 1.0)
+            }
+            .to_variant(),
+        );
+        d.set(
+            "emission_energy",
+            &src.get_emission_energy_multiplier().to_variant(),
+        );
+        d.set(
+            "height_map",
+            &if src.get_feature(Feature::HEIGHT_MAPPING) {
+                src.get_texture(TextureParam::HEIGHTMAP).to_variant()
+            } else {
+                Variant::nil()
+            },
+        );
         let s = src.get_uv1_scale();
         let o = src.get_uv1_offset();
         d.set("uv_scale", &Vector2::new(s.x, s.y).to_variant());

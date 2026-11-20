@@ -4,9 +4,13 @@ use crate::math::*;
 
 /// Orthonormal tangent pair `(u, v)` with `u × v = n`.
 pub fn plane_basis(n: Vec3) -> (Vec3, Vec3) {
-    let n = n.normalized();
-    let a = if n.y.abs() < 0.9 { Vec3::UP } else { v3(1.0, 0.0, 0.0) };
-    let u = a.cross(n).normalized();
+    let n = n.unitized();
+    let a = if n.y.abs() < 0.9005 {
+        Vec3::UP
+    } else {
+        v3(1.0, 0.0, 0.0)
+    };
+    let u = a.cross(n).unitized();
     let v = n.cross(u);
     (u, v)
 }
@@ -30,12 +34,17 @@ pub fn triangulate_2d(pts: &[Vec2]) -> Vec<[usize; 3]> {
         return vec![[0, 1, 2]];
     }
     // Normalise winding.
-    let area: f32 = (0..n).map(|i| cross2(Vec2::ZERO, pts[i], pts[(i + 1) % n])).sum();
+    let area: f32 = (0..n)
+        .map(|i| cross2(Vec2::ZERO, pts[i], pts[(i + 1) % n]))
+        .sum();
     let mut idx: Vec<usize> = (0..n).collect();
     if area < 0.0 {
         idx.reverse();
     }
-    let scale = pts.iter().fold(0.0f32, |m, p| m.max(p.x.abs()).max(p.y.abs())).max(1e-6);
+    let scale = pts
+        .iter()
+        .fold(0.0f32, |m, p| m.max(p.x.abs()).max(p.y.abs()))
+        .max(1e-6);
     let eps = 1e-9 * scale * scale;
     let mut out = Vec::with_capacity(n - 2);
     let mut guard = 0;
@@ -49,7 +58,15 @@ pub fn triangulate_2d(pts: &[Vec2]) -> Vec<[usize; 3]> {
             if cross2(a, b, c) <= eps {
                 continue; // reflex or collinear
             }
-            let blocked = idx.iter().any(|&j| j != ia && j != ib && j != ic && pts[j] != a && pts[j] != b && pts[j] != c && in_triangle(pts[j], a, b, c));
+            let blocked = idx.iter().any(|&j| {
+                j != ia
+                    && j != ib
+                    && j != ic
+                    && pts[j] != a
+                    && pts[j] != b
+                    && pts[j] != c
+                    && in_triangle(pts[j], a, b, c)
+            });
             if blocked {
                 continue;
             }
@@ -61,7 +78,15 @@ pub fn triangulate_2d(pts: &[Vec2]) -> Vec<[usize; 3]> {
         if !clipped {
             // Degenerate (collinear runs / self-touching): drop a collinear vertex if any,
             // otherwise fan the rest.
-            if let Some(i) = (0..m).find(|&i| cross2(pts[idx[(i + m - 1) % m]], pts[idx[i]], pts[idx[(i + 1) % m]]).abs() <= eps) {
+            if let Some(i) = (0..m).find(|&i| {
+                cross2(
+                    pts[idx[(i + m - 1) % m]],
+                    pts[idx[i]],
+                    pts[idx[(i + 1) % m]],
+                )
+                .abs()
+                    <= eps
+            }) {
                 idx.remove(i);
                 continue;
             }
@@ -84,12 +109,15 @@ pub fn triangulate_2d(pts: &[Vec2]) -> Vec<[usize; 3]> {
 
 /// Triangulates a planar 3D loop (wound CCW around `normal`). Returns corner index triples
 /// with the same winding as the loop.
-pub fn triangulate(points: &[Vec3], normal: Vec3) -> Vec<[usize; 3]> {
+pub fn mesh_fill(points: &[Vec3], normal: Vec3) -> Vec<[usize; 3]> {
     if points.len() == 3 {
         return vec![[0, 1, 2]];
     }
     let (u, v) = plane_basis(normal);
-    let pts: Vec<Vec2> = points.iter().map(|p| v2(p.dot(u), p.dot(v))).collect();
+    let pts: Vec<Vec2> = points
+        .iter()
+        .map(|p| v2(p.innerprod(u), p.innerprod(v)))
+        .collect();
     let tris = triangulate_2d(&pts);
     // `triangulate_2d` preserves the input winding; it is CCW around `normal` by construction.
     tris
@@ -100,16 +128,34 @@ mod tests {
     use super::*;
 
     fn area(pts: &[Vec2], tris: &[[usize; 3]]) -> f32 {
-        tris.iter().map(|t| cross2(pts[t[0]], pts[t[1]], pts[t[2]]) * 0.5).sum()
+        tris.iter()
+            .map(|t| cross2(pts[t[0]], pts[t[1]], pts[t[2]]) * 0.5)
+            .sum()
     }
 
     #[test]
     fn concave_l_and_u_cover_exact_area() {
-        let l = [v2(0.0, 0.0), v2(2.0, 0.0), v2(2.0, 1.0), v2(1.0, 1.0), v2(1.0, 2.0), v2(0.0, 2.0)];
+        let l = [
+            v2(0.0, 0.0),
+            v2(2.0, 0.0),
+            v2(2.0, 1.0),
+            v2(1.0, 1.0),
+            v2(1.0, 2.0),
+            v2(0.0, 2.0),
+        ];
         let t = triangulate_2d(&l);
         assert_eq!(t.len(), 4);
         assert!((area(&l, &t) - 3.0).abs() < 1e-5);
-        let u = [v2(0.0, 0.0), v2(3.0, 0.0), v2(3.0, 2.0), v2(2.0, 2.0), v2(2.0, 1.0), v2(1.0, 1.0), v2(1.0, 2.0), v2(0.0, 2.0)];
+        let u = [
+            v2(0.0, 0.0),
+            v2(3.0, 0.0),
+            v2(3.0, 2.0),
+            v2(2.0, 2.0),
+            v2(2.0, 1.0),
+            v2(1.0, 1.0),
+            v2(1.0, 2.0),
+            v2(0.0, 2.0),
+        ];
         let t = triangulate_2d(&u);
         assert_eq!(t.len(), 6);
         assert!((area(&u, &t) - 5.0).abs() < 1e-5);
@@ -125,7 +171,13 @@ mod tests {
 
     #[test]
     fn collinear_points_are_ok() {
-        let p = [v2(0.0, 0.0), v2(1.0, 0.0), v2(2.0, 0.0), v2(2.0, 1.0), v2(0.0, 1.0)];
+        let p = [
+            v2(0.0, 0.0),
+            v2(1.0, 0.0),
+            v2(2.0, 0.0),
+            v2(2.0, 1.0),
+            v2(0.0, 1.0),
+        ];
         let t = triangulate_2d(&p);
         assert!((area(&p, &t) - 2.0).abs() < 1e-5);
     }
