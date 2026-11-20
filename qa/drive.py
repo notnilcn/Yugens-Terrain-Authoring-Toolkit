@@ -267,6 +267,12 @@ def main() -> int:
     sub.add_parser("windows")
     sub.add_parser("popups")
 
+    p = sub.add_parser("window-resize")
+    p.add_argument("width", type=int)
+    p.add_argument("height", type=int)
+    p.add_argument("--title", default=None)
+    p.add_argument("--path", default=None)
+
     p = sub.add_parser("ensure-visible")
     p.add_argument("text", nargs="?")
     p.add_argument("--path", default=None)
@@ -431,6 +437,13 @@ def main() -> int:
         return out(rpc.call({"cmd": "windows"}))
     if a.cmd == "popups":
         return out(rpc.call({"cmd": "popups"}))
+    if a.cmd == "window-resize":
+        req = {"cmd": "window_resize", "width": a.width, "height": a.height}
+        if a.title:
+            req["title"] = a.title
+        if a.path:
+            req["path"] = a.path
+        return out(rpc.call(req))
     if a.cmd == "ensure-visible":
         req = {"cmd": "ensure_visible"}
         if a.path:

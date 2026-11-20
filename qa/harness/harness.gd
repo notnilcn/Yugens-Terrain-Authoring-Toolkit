@@ -109,6 +109,8 @@ func _dispatch(peer: StreamPeerTCP, line: String) -> void:
 			res = _cmd_popups()
 		"ensure_visible":
 			res = await _cmd_ensure_visible(req)
+		"window_resize":
+			res = await _cmd_window_resize(req)
 		"control_at":
 			res = _cmd_control_at(req)
 		"click":
@@ -500,6 +502,41 @@ func _find_control_by_text(node: Node, text: String) -> Control:
 		for c in n.get_children(true):
 			stack.append(c)
 	return best
+
+func _cmd_window_resize(req: Dictionary) -> Dictionary:
+	var target: Window = null
+	if req.has("path"):
+		var n := get_node_or_null(NodePath(str(req["path"])))
+		if n is Window:
+			target = n as Window
+	if target == null and req.has("title"):
+		var title := str(req["title"])
+		var stack: Array[Node] = [get_tree().root]
+		while not stack.is_empty():
+			var n: Node = stack.pop_back()
+			if n is Window and n != get_tree().root:
+				var w: Window = n
+				if w.visible and (title == "" or w.title == title):
+					target = w
+					break
+			for c in n.get_children(true):
+				stack.append(c)
+	if target == null:
+		return {"ok": false, "error": "window not found"}
+	var desired_w := int(req.get("width", 800))
+	var desired_h := int(req.get("height", 600))
+	target.size = Vector2i(desired_w, desired_h)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return {
+		"ok": true,
+		"title": target.title,
+		"actual": [target.size.x, target.size.y],
+		"resizable": not target.unresizable,
+		"min": [target.min_size.x, target.min_size.y],
+		"max": [target.max_size.x, target.max_size.y],
+	}
 
 func _cmd_control_at(req: Dictionary) -> Dictionary:
 	var pos := Vector2(float(req.get("x", 0)), float(req.get("y", 0)))
