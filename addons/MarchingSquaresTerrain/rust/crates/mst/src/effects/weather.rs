@@ -511,7 +511,8 @@ pub struct PixelWeather {
     rain_layers: i32,
     #[export(range = (0.2005, 20.0, 0.0505))]
     rain_layer_spacing: f32,
-    /// Flipbook rain: world size of one streak / splash texel (m).
+    /// Flipbook rain: smallest world size of one streak / splash texel (m); raised to one
+    /// low-res pixel at the camera focus so the rain stays visible when zoomed out.
     #[export(range = (0.0105, 0.5, 0.0055))]
     rain_texel: f32,
     /// Ground / water splashes at full rain (0 = none).
@@ -906,6 +907,31 @@ impl PixelWeather {
         (h, half_w, half_h, dist)
     }
 
+    /// World size (m) of one low-res pixel of the pixel renderer at `focus` (0 = unknown), in
+    /// half-octave steps so zooming rescales the rain rarely.
+    fn view_texel(node: &Gd<Node>, cam: Option<&Gd<Camera3D>>, focus: Vector3) -> f32 {
+        let Some(cam) = cam else {
+            return 0.0;
+        };
+        let rows = cam
+            .get_viewport()
+            .map(|v| v.get_visible_rect().size.y)
+            .unwrap_or(0.0);
+        if rows < 1.0 {
+            return 0.0;
+        }
+        let pixel = super::find_in_scene(node, "PixelRenderer")
+            .and_then(|r| r.get("pixel_size").try_to::<i32>().ok())
+            .unwrap_or(1)
+            .max(1) as f32;
+        let (_, _, half_h, _) = Self::snow_box(Some(cam), focus);
+        let t = 2.0 * half_h * pixel / rows;
+        if !(t.is_finite() && t > 0.0) {
+            return 0.0;
+        }
+        2f32.powf(((t.log2()) * 2.0).ceil() * 0.5)
+    }
+
     fn precip_instance(
         &self,
         name: &str,
@@ -993,12 +1019,19 @@ impl PixelWeather {
             .map(|c| camera_focus(c, plane_y))
             .unwrap_or_else(|| self.base().get_global_position());
         self.update_snow(eff, cam.as_ref(), focus);
+        // Rain streak / splash texel: never under one low-res pixel at the focus, otherwise the
+        // one-texel-wide streaks fall between pixel centres and the rain vanishes when the
+        // camera pulls back (0.08 m streaks read at 23 m but not at 60 m).
+        let rain_texel = self
+            .rain_texel
+            .max(Self::view_texel(&node, cam.as_ref(), focus))
+            .max(0.0055);
         // Box bottom a little under the focus plane; the shader clips drops at the ground.
         let centre = focus + Vector3::new(0.0, self.area.y * 0.5, 0.0);
         let max = self.max_drops.max(0);
         let flipbook_rain = self.rain_style == 0;
-        self.update_rain_sheets(eff, flipbook_rain);
-        self.update_splashes(eff, centre, flipbook_rain);
+        self.update_rain_sheets(eff, flipbook_rain, rain_texel);
+        self.update_splashes(eff, centre, flipbook_rain, rain_texel);
         let legacy_rain = if flipbook_rain { 0.0 } else { eff.rain };
         let settings = [(
             self.rain_mm.clone(),
@@ -1116,11 +1149,10 @@ impl PixelWeather {
     /// Flipbook rain: upright streak sheets around the camera focus. Rain intensity thins out
     /// whole streaks, the fall speed sets the flipbook rate and the fall wind slants and drifts
     /// the streaks.
-    fn update_rain_sheets(&mut self, eff: &Params, on: bool) {
+    fn update_rain_sheets(&mut self, eff: &Params, on: bool, texel: f32) {
         let mut fp = flipbook::Preset::RainStreaks.params();
         fp.form = flipbook::Shape::Streak(self.streak_texels.clamp(1, 12) as u8);
         self.rain_sheets.set_flipbook(&fp);
-        let texel = self.rain_texel.max(0.0055);
         let speed = self.rain_speed.max(0.1005);
         let plane_y = self.base().get_global_position().y;
         let look = particle_field::Look {
@@ -1154,7 +1186,7 @@ impl PixelWeather {
         self.rain_sheets.update(&node, &look);
     }
 
-    fn update_splashes(&mut self, eff: &Params, centre: Vector3, flipbook_rain: bool) {
+    fn update_splashes(&mut self, eff: &Params, centre: Vector3, flipbook_rain: bool, texel: f32) {
         let (Some(mut mi), Some(mut mat)) = (self.splash_mm.clone(), self.splash_mat.clone())
         else {
             return;
@@ -1179,7 +1211,7 @@ impl PixelWeather {
         crate::writes::assign_world_location(&mut mi, Vector3::new(centre.x, 0.0, centre.z));
         mat.param("area", &self.area.abs().to_variant());
         mat.param("rate", &self.splash_rate.to_variant());
-        mat.param("texel", &self.rain_texel.max(0.0055).to_variant());
+        mat.param("texel", &texel.to_variant());
         mat.param("radius", &self.splash_radius.clamp(1, 8).to_variant());
         mat.param(
             "color",
