@@ -3865,13 +3865,17 @@ impl PixelBuilderPlugin {
     }
 
     /// Builder toolbar button under the mouse (-1 = none): its name and shortcut in the strip.
+    /// The toolbar buttons no longer call this (their hover signals set the label directly,
+    /// deferred, r4 #2); kept for scripts. The label is updated through a deferred call so this
+    /// never touches a control while a container sort is in progress.
     #[func]
-    fn on_button_hover(&mut self, token_id: i64) {
+    fn on_button_hover(&self, token_id: i64) {
         let text = Action::from_i64(token_id)
             .map(ui::hover_text)
             .unwrap_or_default();
-        if let Some(LayoutUi::Mst(u)) = &mut self.ui {
-            u.hover.set_text(&text);
+        if let Some(LayoutUi::Mst(u)) = &self.ui {
+            let mut l = u.hover.clone();
+            l.call_deferred("set_text", &[GString::from(text.as_str()).to_variant()]);
         }
     }
 

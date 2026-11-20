@@ -2388,6 +2388,20 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     rail.set_vertical_custom_step(ui_kit::sz(0.0, CELL_PX).y);
     rail.add_theme_stylebox_override("focus", &godot::classes::StyleBoxEmpty::new_gd());
     rail.add_child(&toolbar);
+    // The strip's hover readout (name + shortcut of the toolbar button under the mouse). Built
+    // before the buttons so their `mouse_entered` / `mouse_exited` signals can target the label
+    // itself (deferred) instead of the plugin: a `mouse_exited` fired while the plugin was
+    // mutably bound (a toolbar rebuild / container sort during `select`) re-entered
+    // `PixelBuilderPlugin::on_button_hover` and panicked with "already bound" (r4 #2).
+    // A fixed, clipped width: a label that grew with its text re-wrapped the strip, moved the
+    // toolbar under the pointer and fed an enter/exit -> re-sort loop.
+    let mut hover = Label::new_alloc();
+    hover.set_name("PixelBuilderHover");
+    hover.add_theme_color_override("font_color", Color::from_rgb(0.6205, 0.7805, 0.9505));
+    hover.set_custom_minimum_size(Vector2::new(220.0 * ui_kit::editor_scale(), 0.0));
+    hover.set_clip_text(true);
+    hover.set_text_overrun_behavior(godot::classes::text_server::OverrunBehavior::TRIM_ELLIPSIS);
+    hover.set_tooltip_text("Name and shortcut of the builder button under the mouse");
     let mut buttons = Vec::new();
     let mut sections = Vec::new();
     let groups = [
@@ -2454,15 +2468,18 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
             "pressed",
             &Callable::from_object_method(addressee, "upon_deed").bind(&[(*a as i64).to_variant()]),
         );
-        b.connect(
+        // Hover readout: straight to the label, deferred; never through the plugin (see above).
+        b.connect_flags(
             "mouse_entered",
-            &Callable::from_object_method(addressee, "on_button_hover")
-                .bind(&[(*a as i64).to_variant()]),
+            &Callable::from_object_method(&hover, "set_text")
+                .bind(&[GString::from(hover_text(*a).as_str()).to_variant()]),
+            godot::classes::object::ConnectFlags::DEFERRED,
         );
-        b.connect(
+        b.connect_flags(
             "mouse_exited",
-            &Callable::from_object_method(addressee, "on_button_hover")
-                .bind(&[(-1i64).to_variant()]),
+            &Callable::from_object_method(&hover, "set_text")
+                .bind(&[GString::new().to_variant()]),
+            godot::classes::object::ConnectFlags::DEFERRED,
         );
         toolbar.add_child(&ui_kit::midpoint(ui_kit::sz(CELL_PX, CELL_PX), &b));
         buttons.push((*a, b, *mask));
@@ -2484,11 +2501,6 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
         peel.add_child(&strip);
     }
 
-    let mut hover = Label::new_alloc();
-    hover.set_name("PixelBuilderHover");
-    hover.add_theme_color_override("font_color", Color::from_rgb(0.6205, 0.7805, 0.9505));
-    hover.set_custom_minimum_size(Vector2::new(150.0 * ui_kit::editor_scale(), 0.0));
-    hover.set_tooltip_text("Name and shortcut of the builder button under the mouse");
     strip.add_child(&hover);
 
     let mut kind_box = HBoxContainer::new_alloc();
