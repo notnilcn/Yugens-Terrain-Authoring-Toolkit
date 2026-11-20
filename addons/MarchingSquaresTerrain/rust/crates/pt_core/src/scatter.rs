@@ -608,12 +608,33 @@ impl ScatterSet {
                 cfg.world_to_sample(p)
             }
         };
+        let old = self.tiles.clone();
         let mut t = self.remove_where(min - pad, max + pad, Some(item), |p| {
             set.contains(&owner(p))
         });
         for c in cands {
             t.insert(self.splice(c));
         }
+        // A refill that regenerates the same instances only reorders them inside their tiles
+        // (removed, then appended after the other items): keep those tiles as they were, so an
+        // unchanged Fill Terrain is a real no-op (no undo step, no tile rebuild).
+        t.retain(|k| {
+            let now = self.tiles.get(k).map(Vec::as_slice).unwrap_or(&[]);
+            let was = old.get(k).map(Vec::as_slice).unwrap_or(&[]);
+            if same_instances(now, was) {
+                match old.get(k) {
+                    Some(v) => {
+                        self.tiles.insert(*k, v.clone());
+                    }
+                    None => {
+                        self.tiles.remove(k);
+                    }
+                }
+                false
+            } else {
+                true
+            }
+        });
         t
     }
 
@@ -928,9 +949,65 @@ impl PropMesh {
     }
 }
 
+/// Saved form of an instance (hue / worth quantized like [`ScatterSet::to_bytes`]), for
+/// order-insensitive comparisons.
+fn saved_key(i: &ScatterInstance) -> (u16, [u32; 4], i8, i8) {
+    (
+        i.item,
+        [i.pos.x, i.pos.y, i.yaw, i.magnify].map(f32::to_bits),
+        (i.hue * 254.0).round().clamp(-127.0, 127.0) as i8,
+        (i.worth * 127.0).round().clamp(-127.0, 127.0) as i8,
+    )
+}
+
+/// Whether two tiles hold the same instances (as saved), in any order.
+fn same_instances(a: &[ScatterInstance], b: &[ScatterInstance]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut ka: Vec<_> = a.iter().map(saved_key).collect();
+    let mut kb: Vec<_> = b.iter().map(saved_key).collect();
+    ka.sort_unstable();
+    kb.sort_unstable();
+    ka == kb
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn refill_with_the_same_result_changes_nothing() {
+        let cfg = GridConfig::default();
+        let tree = ScatterRules {
+            density: 0.3,
+            ..Default::default()
+        };
+        let rock = ScatterRules {
+            density: 0.2,
+            ..Default::default()
+        };
+        let surf = flat(0.0);
+        let cells: Vec<IVec2> = (0..8)
+            .flat_map(|z| (0..8).map(move |x| iv2(x, z)))
+            .collect();
+        let mut s = ScatterSet::default();
+        s.fill_cells(&tree, 0, &cfg, &cells, &surf);
+        s.fill_cells(&rock, 1, &cfg, &cells, &surf);
+        assert!(s.count_item(0) > 0 && s.count_item(1) > 0);
+        let bytes = s.to_bytes();
+        // Item 0 again: the same instances come back (they used to be moved after item 1).
+        let t = s.fill_cells(&tree, 0, &cfg, &cells, &surf);
+        assert!(t.is_empty(), "{t:?}");
+        assert_eq!(s.to_bytes(), bytes);
+        // A real change still reports its tiles.
+        let reseeded = ScatterRules {
+            seed: tree.seed.wrapping_add(1),
+            ..tree
+        };
+        assert!(!s.fill_cells(&reseeded, 0, &cfg, &cells, &surf).is_empty());
+        assert_ne!(s.to_bytes(), bytes);
+    }
 
     #[test]
     fn remap_items_drops_and_reindexes() {

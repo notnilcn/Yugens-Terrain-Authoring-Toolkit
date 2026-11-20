@@ -720,6 +720,13 @@ impl MarchingSquaresTerrainPlugin {
             }
             tb.update();
         }
+        if s == Setting::ScatterFill && t.bind().scatter_bytes() == before {
+            // Say why nothing happened (and no History entry appeared).
+            self.foliage.note =
+                Some("Fill Terrain: nothing to add (already filled where the props' rules allow)");
+            self.base().update_overlays();
+            return;
+        }
         self.commit_scatter_undo(
             if s == Setting::ScatterFill {
                 "terrain foliage fill"
