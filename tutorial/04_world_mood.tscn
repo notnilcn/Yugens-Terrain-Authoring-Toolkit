@@ -264,6 +264,8 @@ scatter_items = Array[PixelScatterItem]([SubResource("PixelScatterItem_6vres"), 
 [node name="PixelWater" type="PixelWater" parent="." unique_id=195415122]
 size = Vector2(300, 300)
 subdivisions = 128
+follow_camera = true
+rim_fade = 0.35
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 1.2, 48)
 
 [node name="Camera" type="Camera3D" parent="." unique_id=351674225]
