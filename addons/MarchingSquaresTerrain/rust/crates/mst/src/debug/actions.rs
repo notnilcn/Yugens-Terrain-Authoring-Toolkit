@@ -275,7 +275,7 @@ pub fn live_text(class: &str, o: &mut Gd<Object>) -> Option<String> {
     }
     match class {
         "PixelWeather" => {
-            let name = o.call("get_weather_name", &[]).to_string();
+            let name = o.call("fetch_climate_moniker", &[]).to_string();
             let p = f(o, "get_transition_progress");
             let arrow = if p < 0.9995 {
                 format!(" (blending {:.0}%)", p * 100.0)

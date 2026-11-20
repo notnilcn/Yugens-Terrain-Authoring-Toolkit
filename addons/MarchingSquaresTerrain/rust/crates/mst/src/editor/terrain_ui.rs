@@ -249,7 +249,7 @@ impl MarchingSquaresTerrainPlugin {
                 le.set_text("");
                 le.upcast()
             }
-            Kind::Button(text) => strip.button("", text, &self.cb1("on_action", id)).upcast(),
+            Kind::Button(text) => strip.button("", text, &self.cb1("upon_deed", id)).upcast(),
             Kind::Option => {
                 let names: Vec<String> = match s {
                     Setting::BrushType => BRUSH_TYPES.iter().map(|x| x.to_string()).collect(),
@@ -664,7 +664,7 @@ const TERRAIN_SETTINGS: [TSetting; 40] = [
     ),
     ts(
         "Extra Collision Layer",
-        "collision_layer",
+        "impact_stratum",
         TKind::ExtraLayer,
         "Adds one extra physics layer (9-32) to the terrain collision.",
     ),
@@ -780,7 +780,7 @@ const TERRAIN_SETTINGS: [TSetting; 40] = [
     ),
     ts(
         "Bake Collision",
-        "bake_collision",
+        "bake_impact",
         TKind::Bool,
         "Baked storage: also store the collision faces.",
     ),
@@ -858,7 +858,7 @@ pub(super) const SETTINGS_PAGES: [(&str, &str); 6] = [
 fn settings_page_of(t: &TSetting) -> usize {
     match t.prop {
         "grid_type" | "chunk_size" | "ring_radius" | "cell_size" | "wrap_chunks" | "blend_mode"
-        | "default_merge_mode" | "hex_edge_style" | "hex_edge_instanced" | "collision_layer" => 0,
+        | "default_merge_mode" | "hex_edge_style" | "hex_edge_instanced" | "impact_stratum" => 0,
         "default_floor_slot"
         | "default_wall_slot"
         | "new_chunk_noise_amplitude"
@@ -932,7 +932,7 @@ impl MarchingSquaresTerrainPlugin {
                 "ring_radius" | "wrap_chunks" => rings,
                 "hex_edge_style" => grid != 0,
                 "hex_edge_instanced" => grid >= 2,
-                "bake_grass" | "bake_collision" => storage == 1,
+                "bake_grass" | "bake_impact" => storage == 1,
                 "data_directory" => storage != 0,
                 _ => !matches!(t.sort, TKind::Action("save")) || storage != 0,
             })
@@ -1384,7 +1384,7 @@ impl MarchingSquaresTerrainPlugin {
         ur.create_action("Import MST terrain data");
         ur.add_do_method(&obj, "import_mst", &[path.to_variant()]);
         for prop in [
-            "data",
+            "contents",
             "grid_type",
             "cell_size",
             "blend_mode",
@@ -1755,12 +1755,12 @@ impl MarchingSquaresTerrainPlugin {
             });
             p
         };
-        let old = terrain.get("texture_set");
+        let old = terrain.get("tex_assign");
         if let Some(mut ur) = self.base().get_undo_redo() {
             let obj = terrain.upcast::<Object>();
             ur.create_action("terrain texture preset");
-            ur.add_do_property(&obj, "texture_set", &new.to_variant());
-            ur.add_undo_property(&obj, "texture_set", &old);
+            ur.add_do_property(&obj, "tex_assign", &new.to_variant());
+            ur.add_undo_property(&obj, "tex_assign", &old);
             ur.commit_action();
         }
         self.refresh_material_names();

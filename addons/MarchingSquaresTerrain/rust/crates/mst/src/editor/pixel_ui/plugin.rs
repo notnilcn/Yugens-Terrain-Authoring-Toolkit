@@ -575,7 +575,7 @@ impl PixelizerEditorPlugin {
                 let mut b = strip.button(
                     "",
                     fd.label,
-                    &Callable::from_object_method(&gd, "on_action").bind(&[id]),
+                    &Callable::from_object_method(&gd, "upon_deed").bind(&[id]),
                 );
                 b.set_name(fd.label);
                 b.set_tooltip_text(&format!("{}\n{class}.{method}() (undoable)", fd.label));
@@ -607,7 +607,7 @@ impl PixelizerEditorPlugin {
                 ));
                 b.connect(
                     "pressed",
-                    &Callable::from_object_method(&gd, "on_cancel").bind(&[id]),
+                    &Callable::from_object_method(&gd, "upon_abort").bind(&[id]),
                 );
                 row.add_child(&b);
                 strip.custom_kind(CtlKind::Custom, fd.label, &row);

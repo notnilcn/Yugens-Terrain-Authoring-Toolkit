@@ -59,7 +59,7 @@ fn spawn_point() -> Vector3 {
     let fwd = -t.basis.col_c();
     if let Some(mut terrain) = find_in_scene("MarchingSquaresTerrain") {
         let hit = terrain.call(
-            "raycast",
+            "ray_hit",
             &[
                 t.origin.to_variant(),
                 fwd.to_variant(),

@@ -705,8 +705,8 @@ impl MarchingSquaresTerrain {
         ur.add_do_method(&obj, "import_mst", &[path.to_variant()]);
         // Field values directly: reading properties through `get` would re-enter this object.
         let old: [(&str, Variant); 8] = [
-            ("data", self.contents.to_variant()),
-            ("texture_set", self.tex_assign.to_variant()),
+            ("contents", self.contents.to_variant()),
+            ("tex_assign", self.tex_assign.to_variant()),
             ("grid_type", self.grid_type.to_variant()),
             ("cell_size", self.cell_size.to_variant()),
             ("blend_mode", self.blend_mode.to_variant()),

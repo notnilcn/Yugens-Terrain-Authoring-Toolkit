@@ -24,7 +24,7 @@ pub enum Kind {
     Action(&'static str),
     /// Progress of a background job: a progress bar fed by the `getter` method (0..1, < 0 =
     /// idle) and a button calling `cancel`. Shown only while the job runs; the section's
-    /// Action buttons are disabled meanwhile (MarchingSquaresErosion `get_progress` / `cancel`).
+    /// Action buttons are disabled meanwhile (MarchingSquaresErosion `get_progress` / `abort`).
     Progress {
         getter: &'static str,
         cancel: &'static str,
@@ -37,7 +37,7 @@ pub enum Store {
     /// A property of the section's target node.
     Prop,
     /// A shader parameter of the `ShaderMaterial` in the named property of the target
-    /// (PixelWater `material` / `waterfall_material`).
+    /// (PixelWater `stuff` / `cascade_stuff`).
     Shader(&'static str),
     /// Component 0/1/2 (x/y/z) of a Vector2/Vector3 property.
     Axis(u8),
@@ -129,12 +129,12 @@ const fn progress(label: &'static str, getter: &'static str, cancel: &'static st
     }
 }
 const fn shader(mut fd: Field) -> Field {
-    fd.store = Store::Shader("material");
+    fd.store = Store::Shader("stuff");
     fd
 }
-/// PixelWater `waterfall_material` (`waterfall.gdshader`; created once the water has falls).
+/// PixelWater `cascade_stuff` (`waterfall.gdshader`; created once the water has falls).
 const fn fall_shader(mut fd: Field) -> Field {
-    fd.store = Store::Shader("waterfall_material");
+    fd.store = Store::Shader("cascade_stuff");
     fd
 }
 const fn axle(mut fd: Field, a: u8) -> Field {
@@ -382,7 +382,7 @@ pub static SECTIONS: &[Section] = &[
         class: Some(RENDERER),
         group_start: true,
         fields: &[
-            bx("Enabled", "enabled"),
+            bx("Enabled", "active"),
             e("Mode", "mode", &[("Anchor", 0), ("Low Res", 1)]),
             ig("Pixel Size", "pixel_size", 1.0, 16.0),
             i("Fixed Height", "fixed_height", 0.0, 1080.0),
@@ -444,7 +444,7 @@ pub static SECTIONS: &[Section] = &[
         fields: &[
             bx("God Rays", "god_rays"),
             f("Ray Alpha", "ray_alpha", 0.0, 4.0, 0.0105),
-            cx("Color", "ray_color"),
+            cx("Color", "beam_tint"),
             i("Max Sheets", "ray_count", 2.0, 52.0),
             f("Ray Depth", "ray_depth", 1.0, 4000.0, 1.0),
             f("Reach", "ray_reach", 0.0, 1000.0, 0.1005),
@@ -654,7 +654,7 @@ pub static SECTIONS: &[Section] = &[
             axle(f("Area Y", "extents", 0.1005, 100.0, 0.1005), 1),
             axle(f("Area Z", "extents", 0.1005, 500.0, 0.1005), 2),
             i("Seed", "seed", 0.0, 99999.0),
-            cx("Color", "color"),
+            cx("Color", "tint"),
             f("Size", "size", 0.0105, 2.0, 0.0105),
             f("Wander", "wander", 0.0, 4.0, 0.0105),
             f("Blink", "blink_speed", 0.0, 10.0, 0.0105),
@@ -693,7 +693,7 @@ pub static SECTIONS: &[Section] = &[
             f("Spacing", "spacing", 0.0505, 20.0, 0.0105),
             f("Texel", "texel_size", 0.0105, 1.0, 0.0055),
             f("Extent", "extent", 0.0, 500.0, 0.5),
-            f("Height", "height", 0.5, 200.0, 0.5),
+            f("Height", "stature", 0.5, 200.0, 0.5),
             f("Band", "band", 0.0, 50.0, 0.1005),
             f("Fall", "fall_speed", -10.0, 30.0, 0.0105),
             axle(f("Wind X", "wind", -20.0, 20.0, 0.0105), 0),
@@ -710,7 +710,7 @@ pub static SECTIONS: &[Section] = &[
             i("Streak", "streak_length", 0.0, 12.0),
             i("Seed", "seed", 0.0, 99999.0),
             f("FPS", "fps", 0.0, 60.0, 0.1005),
-            cx("Color", "color"),
+            cx("Color", "tint"),
             cx("Color B", "color_b"),
             f("Brightness", "brightness", 0.0, 8.0, 0.0105),
             f("Sunlit", "sunlit", 0.0, 1.0, 0.0105),
@@ -744,7 +744,7 @@ pub static SECTIONS: &[Section] = &[
             bx("Landing", "landing"),
             bx("Outline", "outline"),
             bx("In Editor", "preview_in_editor"),
-            cx("Color", "color"),
+            cx("Color", "tint"),
         ],
     },
     Section {
@@ -771,9 +771,9 @@ pub static SECTIONS: &[Section] = &[
             bx("Sky Wind", "use_sky_wind"),
             bx("Outline", "outline"),
             bx("Fire", "fire"),
-            cx("Smoke", "smoke_color"),
-            cx("Soot", "soot_color"),
-            cx("Flame", "flame_color"),
+            cx("Smoke", "fumes_tint"),
+            cx("Soot", "ash_tint"),
+            cx("Flame", "fire_tint"),
         ],
     },
     Section {
@@ -785,7 +785,7 @@ pub static SECTIONS: &[Section] = &[
         group_start: false,
         fields: &[
             f("Radius", "radius", 0.1005, 100.0, 0.1005),
-            cx("Color", "light_color"),
+            cx("Color", "lamp_tint"),
             f("Energy", "energy", 0.0, 16.0, 0.0105),
             f("Flicker", "flicker", 0.0, 1.0, 0.0105),
             bx("Shadows", "shadows"),
@@ -811,8 +811,8 @@ pub static SECTIONS: &[Section] = &[
             i("Outline Id", "outline_id", -1.0, 253.0),
             e("Palette", "palette", INHERIT_TRI),
             e("Dither", "dither", INHERIT_TRI),
-            bx("Own Color", "override_outline_color"),
-            cx("Outline Col.", "outline_color"),
+            bx("Own Color", "supersede_contour_tint"),
+            cx("Outline Col.", "contour_tint"),
             bx("Texel Snap", "snap_to_texel"),
             bx("Convert", "convert_materials"),
             i("Bands", "bands", 1.0, 8.0),
@@ -888,7 +888,7 @@ pub static SECTIONS: &[Section] = &[
         group_start: false,
         fields: &[
             perform("Erode", "erode"),
-            progress("Eroding", "get_progress", "cancel"),
+            progress("Eroding", "get_progress", "abort"),
             i("Droplets", "iterations", 100.0, 500000.0),
             i("Seed", "seed", -2147483648.0, 2147483647.0),
             e("Mode", "mode", &[("Auto", 0), ("Raw", 1), ("Terraced", 2)]),

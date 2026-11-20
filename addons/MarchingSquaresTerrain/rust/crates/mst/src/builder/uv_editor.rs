@@ -1391,7 +1391,7 @@ impl PixelBuilderUvCanvas {
         // Follow the data resource: undo / redo and 3D edits refresh the canvas.
         let data = self.contents();
         if self.connected != data {
-            let cb = self.to_gd().callable("refresh");
+            let cb = self.to_gd().callable("renew");
             if let Some(mut old) = self.connected.take()
                 && old.is_instance_valid()
                 && old.is_connected("changed", &cb)
@@ -1814,7 +1814,7 @@ pub fn build_panel() -> (Gd<PanelContainer>, Gd<PixelBuilderUvCanvas>) {
         let mut b = button(&mut bar, text, ic, tip, false);
         b.connect(
             "pressed",
-            &Callable::from_object_method(&canvas, "act").bind(&[(*a as i64).to_variant()]),
+            &Callable::from_object_method(&canvas, "perform").bind(&[(*a as i64).to_variant()]),
         );
     }
     let mut fs = button(
@@ -1826,7 +1826,7 @@ pub fn build_panel() -> (Gd<PanelContainer>, Gd<PixelBuilderUvCanvas>) {
     );
     fs.connect(
         "pressed",
-        &Callable::from_object_method(&canvas, "act").bind(&[(Act::FrameSel as i64).to_variant()]),
+        &Callable::from_object_method(&canvas, "perform").bind(&[(Act::FrameSel as i64).to_variant()]),
     );
     bar.add_child(&VSeparator::new_alloc());
     for (text, ic, tip, flag, on) in [
@@ -1911,7 +1911,7 @@ pub fn build_panel() -> (Gd<PanelContainer>, Gd<PixelBuilderUvCanvas>) {
     );
     sc.connect(
         "pressed",
-        &Callable::from_object_method(&canvas, "act").bind(&[(Act::Scale as i64).to_variant()]),
+        &Callable::from_object_method(&canvas, "perform").bind(&[(Act::Scale as i64).to_variant()]),
     );
 
     // ---------------------------------------------------------------- Auto UVs (modeler)
@@ -2008,7 +2008,7 @@ pub fn build_panel() -> (Gd<PanelContainer>, Gd<PixelBuilderUvCanvas>) {
     );
     apply.connect(
         "pressed",
-        &Callable::from_object_method(&canvas, "act").bind(&[(Act::ApplyAuto as i64).to_variant()]),
+        &Callable::from_object_method(&canvas, "perform").bind(&[(Act::ApplyAuto as i64).to_variant()]),
     );
     auto.add_child(&VSeparator::new_alloc());
     // ---------------------------------------------------------------- UV template (modeler)

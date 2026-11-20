@@ -86,7 +86,7 @@ impl Tool {
     }
 }
 
-/// Toolbar buttons (bound to `on_action`).
+/// Toolbar buttons (bound to `upon_deed`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i64)]
 pub enum Action {
@@ -2433,7 +2433,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
         }
         b.connect(
             "pressed",
-            &Callable::from_object_method(addressee, "on_action").bind(&[(*a as i64).to_variant()]),
+            &Callable::from_object_method(addressee, "upon_deed").bind(&[(*a as i64).to_variant()]),
         );
         b.connect(
             "mouse_entered",

@@ -24,7 +24,7 @@ enum RKind {
 const RULES: [(&str, &str, RKind, &str); 18] = [
     (
         "Auto Texture",
-        "enabled",
+        "active",
         RKind::Bool,
         "Texture unpainted ground by rules (manual paint wins).",
     ),

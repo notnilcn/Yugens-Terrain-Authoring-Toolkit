@@ -1100,7 +1100,7 @@ impl IEditorPlugin for PixelBuilderPlugin {
             .done()
             .iter_shared()
         {
-            let Ok(res) = n.get("data").try_to::<Gd<godot::classes::Resource>>() else {
+            let Ok(res) = n.get("contents").try_to::<Gd<godot::classes::Resource>>() else {
                 continue;
             };
             let path = res.get_path().to_string();
@@ -1307,7 +1307,7 @@ impl PixelBuilderPlugin {
                 .cloned()
         });
         if let Some(mut s) = stats {
-            s.call_deferred("refresh", &[]);
+            s.call_deferred("renew", &[]);
         }
     }
 
@@ -1379,7 +1379,7 @@ impl PixelBuilderPlugin {
             .iter_shared()
             .filter(|n| n.instance_id() != t.instance_id())
             .any(|n| {
-                n.get("data")
+                n.get("contents")
                     .try_to::<Gd<Object>>()
                     .is_ok_and(|o| o.instance_id() == id)
             });

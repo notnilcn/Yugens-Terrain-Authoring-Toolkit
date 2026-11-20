@@ -730,7 +730,7 @@ impl PixelFireSystem {
             l.set("pool_scale", &1.2f32.to_variant());
             l.set("glow_steps", &3i32.to_variant());
             l.set("flicker", &0.45f32.to_variant());
-            l.set("light_color", &self.fire_tint.to_variant());
+            l.set("lamp_tint", &self.fire_tint.to_variant());
             l.set("radius", &self.light_range.to_variant());
             l.set_as_top_level(true);
             let mut this = self.to_gd();
@@ -1239,7 +1239,7 @@ impl PixelFireSystem {
         self.fire_tint = v;
         self.update_materials();
         for l in &mut self.lights {
-            l.set("light_color", &v.to_variant());
+            l.set("lamp_tint", &v.to_variant());
         }
     }
     #[func]

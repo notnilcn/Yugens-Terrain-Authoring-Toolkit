@@ -171,7 +171,7 @@ pub fn assemble(addressee: &Gd<Object>) -> Paint {
         b.set_focus_mode(FocusMode::NONE);
         b.connect(
             "pressed",
-            &Callable::from_object_method(addressee, "on_action").bind(&[(a as i64).to_variant()]),
+            &Callable::from_object_method(addressee, "upon_deed").bind(&[(a as i64).to_variant()]),
         );
         b
     };
@@ -487,7 +487,7 @@ impl Paint {
                 paint.set_tooltip_text(&ui::action_tooltip(Action::PaintColour));
                 paint.connect(
                     "pressed",
-                    &Callable::from_object_method(addressee, "on_action")
+                    &Callable::from_object_method(addressee, "upon_deed")
                         .bind(&[(Action::PaintColour as i64).to_variant()]),
                 );
                 row.add_child(&paint);

@@ -570,9 +570,9 @@ impl PixelBuilderMesh {
         let skip = [
             "script",
             "mesh",
-            "data",
+            "contents",
             "collision",
-            "collision_layer",
+            "impact_stratum",
             "anchor_cell",
             "anchored",
         ];

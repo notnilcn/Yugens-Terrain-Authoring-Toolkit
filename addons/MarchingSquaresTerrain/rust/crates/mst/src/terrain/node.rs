@@ -626,7 +626,7 @@ impl INode3D for MarchingSquaresTerrain {
         match name.as_str() {
             // Directory modes keep the samples on disk: never embed them in the scene.
             "data" if self.directory_mode() => strip(property, U::STORAGE),
-            "bake_grass" | "bake_collision" if self.storage_mode != 1 => strip(property, U::EDITOR),
+            "bake_grass" | "bake_impact" if self.storage_mode != 1 => strip(property, U::EDITOR),
             "data_directory" | "save_data_button" if !self.directory_mode() => {
                 strip(property, U::EDITOR)
             }

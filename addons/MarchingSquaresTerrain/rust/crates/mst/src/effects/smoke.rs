@@ -412,7 +412,7 @@ impl PixelSmoke {
         l.set("radius", &state.2.to_variant());
         l.set("flicker", &state.3.to_variant());
         l.set("pool_energy", &state.4.to_variant());
-        l.set("light_color", &state.5.to_variant());
+        l.set("lamp_tint", &state.5.to_variant());
         self.light_state = Some(state);
     }
 }

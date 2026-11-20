@@ -231,7 +231,7 @@ pub fn assemble(addressee: &Gd<Object>) -> Hud {
     snap.set_focus_mode(godot::classes::control::FocusMode::NONE);
     snap.connect(
         "pressed",
-        &Callable::from_object_method(addressee, "on_action")
+        &Callable::from_object_method(addressee, "upon_deed")
             .bind(&[(ui::Action::SnapGrid as i64).to_variant()]),
     );
     buttons.add_child(&snap);

@@ -668,7 +668,7 @@ pub fn decimals(step: f64) -> usize {
     d
 }
 
-/// Slider value read-out. Updated through an object-method callable (`_mst_set_value`), not a
+/// Slider value read-out. Updated through an object-method callable (`_mst_assign_worth`), not a
 /// Rust closure: gdext tracks closure connections made in the editor and warns
 /// ("TypedSignal connections are now auto-disconnected") at editor shutdown for each one still
 /// connected.
@@ -704,7 +704,7 @@ pub fn value_label(value: f64, step: f64, min_w: f32) -> Gd<Label> {
 
 /// Callable for `value_changed(float)` that writes the value into `label` (made by [`value_label`]).
 pub fn value_label_updater(label: Gd<Label>, _step: f64) -> Callable {
-    label.callable("_mst_set_value")
+    label.callable("_mst_assign_worth")
 }
 
 /// Flat, non-interactive header button (icon + name) used as the title of strips and panels.

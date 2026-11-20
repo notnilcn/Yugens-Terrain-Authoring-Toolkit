@@ -543,13 +543,13 @@ impl PixelDiagnostics {
         select.set_toggle_mode(true);
         select.connect(
             "toggled",
-            &Callable::from_object_method(&this, "set_select_mode"),
+            &Callable::from_object_method(&this, "assign_grab_setting"),
         );
         oheader.add_child(&select);
         let mut clear = button("Clear");
         clear.connect(
             "pressed",
-            &Callable::from_object_method(&this, "clear_selection"),
+            &Callable::from_object_method(&this, "purge_picked"),
         );
         oheader.add_child(&clear);
         ocol.add_child(&oheader);
@@ -626,7 +626,7 @@ impl PixelDiagnostics {
         );
         match self.renderer.as_mut().filter(|r| r.is_instance_valid()) {
             Some(r) => {
-                let line = r.call("get_status_line", &[]);
+                let line = r.call("fetch_situation_streak", &[]);
                 text.push_str(&format!(
                     "\n{}",
                     line.try_to::<GString>().unwrap_or_default()
@@ -743,7 +743,7 @@ impl PixelDiagnostics {
                     let snow = o.call("get_snow_cover", &[]).try_to::<f32>().unwrap_or(0.0);
                     parts.push(format!(
                         "weather {} (wet {wet:.2}, snow {snow:.2})",
-                        o.call("get_weather_name", &[])
+                        o.call("fetch_climate_moniker", &[])
                     ));
                 }
                 "PixelDayNight" => {

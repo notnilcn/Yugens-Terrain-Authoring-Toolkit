@@ -6,7 +6,7 @@
 //! Editable*), and foldable Mesh / Shape / UV & Lightmap / Collision / Export & Data groups,
 //! plus the "Strip Editable Data?" confirmation. It is built from the node and its data only:
 //! it never binds the builder plugin (Godot calls `parse_begin` from `edit()` paths); buttons
-//! call the plugin's `on_action` through `Callable`s.
+//! call the plugin's `upon_deed` through `Callable`s.
 //!
 //! The counts and states (mesh, slots, lightmap UVs, collision) live in a
 //! [`PixelBuilderInspectorStats`] that refreshes itself on the data's `changed` signal
@@ -159,7 +159,7 @@ impl IEditorInspectorPlugin for PixelBuilderInspector {
             b.set_tooltip_text(tip);
             b.connect(
                 "pressed",
-                &Callable::from_object_method(&plugin, "on_action")
+                &Callable::from_object_method(&plugin, "upon_deed")
                     .bind(&[(a as i64).to_variant()]),
             );
             b
@@ -257,7 +257,7 @@ impl IEditorInspectorPlugin for PixelBuilderInspector {
                 if let Some(mut d) = data.clone() {
                     d.connect_flags(
                         "changed",
-                        &stats.callable("refresh"),
+                        &stats.callable("renew"),
                         godot::classes::object::ConnectFlags::DEFERRED,
                     );
                 }
@@ -285,7 +285,7 @@ impl IEditorInspectorPlugin for PixelBuilderInspector {
                 confirm.set_ok_button_text("Strip");
                 confirm.connect(
                     "confirmed",
-                    &Callable::from_object_method(&plugin, "on_action")
+                    &Callable::from_object_method(&plugin, "upon_deed")
                         .bind(&[(Action::BakeMesh as i64).to_variant()]),
                 );
                 strip.connect(

@@ -448,7 +448,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         }
         for t in terrains {
             let Ok(mut data) = t
-                .get("data")
+                .get("contents")
                 .try_to::<Gd<crate::terrain::data::MarchingSquaresTerrainData>>()
             else {
                 continue;
@@ -1701,7 +1701,7 @@ impl MarchingSquaresTerrainPlugin {
     #[func]
     fn on_slot_scale(&mut self, value: f64, index: i64, mut label: Gd<godot::classes::Label>) {
         label.set_text(&format!("{value:.1}"));
-        self.set_slot_prop(index as usize, "scale", (value as f32).to_variant());
+        self.set_slot_prop(index as usize, "magnify", (value as f32).to_variant());
     }
 
     #[func]

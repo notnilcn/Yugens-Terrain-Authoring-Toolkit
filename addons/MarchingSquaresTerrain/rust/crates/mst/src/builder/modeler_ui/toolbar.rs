@@ -206,7 +206,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values, st: &SyncState) -> Toolbar {
         };
         b.connect(
             "pressed",
-            &Callable::from_object_method(addressee, "on_action").bind(&[(a as i64).to_variant()]),
+            &Callable::from_object_method(addressee, "upon_deed").bind(&[(a as i64).to_variant()]),
         );
         hbox.add_child(&b);
         modes.push((mode, b));
@@ -230,7 +230,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values, st: &SyncState) -> Toolbar {
     );
     make_editable.connect(
         "pressed",
-        &Callable::from_object_method(addressee, "on_action")
+        &Callable::from_object_method(addressee, "upon_deed")
             .bind(&[(Action::Convert as i64).to_variant()]),
     );
     hbox.add_child(&make_editable);
@@ -266,7 +266,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values, st: &SyncState) -> Toolbar {
     snap.set_toggle_mode(true);
     snap.connect(
         "pressed",
-        &Callable::from_object_method(addressee, "on_action")
+        &Callable::from_object_method(addressee, "upon_deed")
             .bind(&[(Action::SnapGrid as i64).to_variant()]),
     );
     hbox.add_child(&snap);
