@@ -44,7 +44,7 @@ use std::f32::consts::{PI, TAU};
 use godot::classes::{
     Camera3D, CharacterBody3D, ICharacterBody3D, Input, InputEvent, InputEventKey,
     InputEventMouseButton, InputEventMouseMotion, InputMap, Material, MeshInstance3D, PackedScene,
-    PhysicsRayQueryParameters3D, ProjectSettings, Shader, ShaderMaterial, Skeleton3D,
+    PhysicsPointQueryParameters3D, PhysicsRayQueryParameters3D, ProjectSettings, Shader, ShaderMaterial, Skeleton3D,
 };
 
 use crate::anim::{Animator, ClipPlayer, Gait};
@@ -68,6 +68,8 @@ const XRAY_PROBE_HZ: f32 = 30.0;
 const BODY_RAYS: [f32; 5] = [0.2005, 0.5505, 0.9005, 1.2505, 1.6005];
 /// The body origin sits at the capsule centre, 0.9005 m above the feet (`player.tscn`).
 const FEET_BELOW_ORIGIN: f32 = 0.9005;
+/// Fractions of the spring arm (inner to outer) whose ground the camera clamp checks.
+const ARM_SAMPLES: [f32; 7] = [0.2505, 0.3755, 0.5005, 0.6255, 0.7505, 0.8755, 1.0];
 
 const ACTION_KEYS: [(&str, Key); 10] = [
     (ACT_FORWARD, Key::W),
@@ -116,6 +118,10 @@ pub struct MstDemoPlayer {
     /// The `MarchingSquaresTerrain`. Empty: the first one in the owning scene.
     #[export]
     terrain: Option<Gd<Node3D>>,
+    /// The sea (`PixelWater`) the camera must stay above. Empty: the first one in the owning
+    /// scene (none: no sea floor for the camera).
+    #[export]
+    water: Option<Gd<Node3D>>,
 
     #[export_group(name = "Animation")]
     /// The node that turns to face the movement (the knight model).
@@ -202,6 +208,8 @@ pub struct MstDemoPlayer {
     /// Pitch (degrees below the horizon) the orbit input asked for; the applied pitch can be
     /// higher where the ground would swallow the camera. `None` until the first orbit.
     user_pitch: Option<f32>,
+    /// `find_water` ran (the scene has no sea when `water` is still empty).
+    water_searched: bool,
     /// Action state, refreshed by `input` on every action event (never polled per frame):
     /// movement (x right, y back), camera orbit keys, walk and jump held.
     move_input: Vector2,
@@ -239,6 +247,7 @@ impl ICharacterBody3D for MstDemoPlayer {
             spawn_on_terrain: true,
             fall_limit: -40.0,
             terrain: None,
+            water: None,
             visual: None,
             animation_source: None,
             walk_clip_speed: 1.8005,
@@ -266,6 +275,7 @@ impl ICharacterBody3D for MstDemoPlayer {
             xray_rim_color: Color::from_rgb(0.8005, 0.9305, 1.0),
             dragging: false,
             user_pitch: None,
+            water_searched: false,
             move_input: Vector2::ZERO,
             orbit_input: Vector2::ZERO,
             walk_held: false,
@@ -576,11 +586,21 @@ impl MstDemoPlayer {
 
     /// Lowest pitch (degrees below the horizon, at least `start`) at `yaw_deg` and the current
     /// spring length that keeps the camera and the outer part of its arm at least
-    /// `ground_clearance` above the terrain surface. `None` without a pcam, a follow target or
-    /// a terrain answering `get_height_at`.
+    /// `ground_clearance` above the ground under them, and the camera out of prop colliders.
+    ///
+    /// "Ground" at an arm sample is `max(terrain, edge, sea)`: the terrain height there, or, where
+    /// the arm has left the terrain (over the sea off an island), the height of the last terrain
+    /// sample nearer the player (the island edge, starting from the player's feet); never below
+    /// the sea plane (`PixelWater`). A camera above the edge top can not see the island's
+    /// underside (those faces point down and lie below the edge), and one above the sea plane
+    /// can not dive under the water. `None` without a pcam, a follow target or a terrain
+    /// answering `get_height_at`.
     fn ground_pitch(&self, yaw_deg: f32, start: f32) -> Option<f32> {
         let mut pcam = self.phantom_camera.clone()?;
         let len = self.spring_length()?;
+        if len <= 0.01 {
+            return Some(start);
+        }
         let follow = pcam
             .call("get_follow_target", &[])
             .try_to::<Gd<Node3D>>()
@@ -594,27 +614,40 @@ impl MstDemoPlayer {
             .terrain
             .clone()
             .filter(|t| t.is_instance_valid() && t.has_method("get_height_at"))?;
+        let feet_y = self.base().get_global_position().y - FEET_BELOW_ORIGIN;
+        let sea_y = self
+            .water
+            .as_ref()
+            .filter(|w| w.is_instance_valid() && w.is_inside_tree())
+            .map(|w| w.get_global_position().y)
+            .unwrap_or(f32::NEG_INFINITY);
         let yaw = yaw_deg.to_radians();
         let hi = self.pitch_max_deg.max(self.pitch_min_deg);
         let mut down = start;
         // The ground height depends on where the arm ends, which depends on the pitch: a few
         // fixed-point rounds settle it (each round only ever raises the camera).
-        for _ in 0..4 {
+        for _ in 0..6 {
             let p = down.to_radians();
             let back = Vector3::new(yaw.sin() * p.cos(), p.sin(), yaw.cos() * p.cos());
             let mut need = down;
-            // The camera and two points on the outer half of the arm: a ridge just in front of
-            // the camera would otherwise fill the view.
-            for f in [1.0f32, 0.75, 0.5] {
+            // Inner to outer along the arm, so `edge` is the last terrain height before the arm
+            // leaves the terrain. The outer samples keep a ridge just in front of the camera
+            // from filling the view.
+            let mut edge = feet_y;
+            for f in ARM_SAMPLES {
                 let at = target + back * (len * f);
                 let h = terrain
                     .call("get_height_at", vslice![at, f32::NAN])
                     .try_to::<f32>()
                     .unwrap_or(f32::NAN);
-                if !h.is_finite() {
-                    continue;
+                let ground = if h.is_finite() {
+                    edge = h;
+                    h
+                } else {
+                    edge
                 }
-                let rise = (h + self.ground_clearance - target.y) / (len * f);
+                .max(sea_y);
+                let rise = (ground + self.ground_clearance - target.y) / (len * f);
                 if rise > -1.0 {
                     need = need.max(rise.min(1.0).asin().to_degrees());
                 }
@@ -623,6 +656,33 @@ impl MstDemoPlayer {
                 break;
             }
             down = need.min(hi);
+        }
+        // Props (trees, rocks): raise the arm in small steps while the camera sits inside one
+        // of their colliders (physics layers of `xray_mask` other than the terrain's layer 1).
+        let prop_mask = self.xray_mask & !1;
+        if prop_mask != 0
+            && let Some(mut space) = self
+                .base()
+                .get_world_3d()
+                .and_then(|w| w.get_direct_space_state())
+        {
+            let mut exclude = Array::new();
+            exclude.push(self.base().get_rid());
+            for _ in 0..12 {
+                if down >= hi {
+                    break;
+                }
+                let p = down.to_radians();
+                let back = Vector3::new(yaw.sin() * p.cos(), p.sin(), yaw.cos() * p.cos());
+                let mut q = PhysicsPointQueryParameters3D::new_gd();
+                q.set_position(target + back * len);
+                q.set_collision_mask(prop_mask);
+                q.set_exclude(&exclude);
+                if space.intersect_point_ex(&q).max_results(1).done().is_empty() {
+                    break;
+                }
+                down = (down + 4.0).min(hi);
+            }
         }
         Some(down)
     }
@@ -639,6 +699,7 @@ impl MstDemoPlayer {
         if self.terrain.is_none() {
             self.find_terrain();
         }
+        self.find_water();
         let rot = pcam
             .call("get_third_person_rotation_degrees", &[])
             .try_to::<Vector3>()
@@ -865,6 +926,27 @@ impl MstDemoPlayer {
         };
         self.terrain = found.and_then(|n| n.try_cast::<Node3D>().ok());
         self.terrain.clone()
+    }
+
+    /// The sea plane the camera stays above: `water`, else the first `PixelWater` in the
+    /// owning scene (looked up once).
+    fn find_water(&mut self) {
+        if self.water_searched {
+            return;
+        }
+        self.water_searched = true;
+        if self.water.is_none() {
+            self.water = self
+                .scene_root()
+                .find_children_ex("*")
+                .type_("PixelWater")
+                .recursive(true)
+                .owned(false)
+                .done()
+                .iter_shared()
+                .next()
+                .and_then(|n| n.try_cast::<Node3D>().ok());
+        }
     }
 
     /// Stands the body on the terrain surface under it; false while the terrain is not ready

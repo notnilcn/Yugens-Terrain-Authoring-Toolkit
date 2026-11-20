@@ -236,7 +236,7 @@ shader_parameter/shade_floor = 0.35
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_tree"]
 display_name = "Tree"
-shape = 3
+form = 3
 shape_seed = 3
 density = 0.2
 scale_min = 0.85
@@ -247,11 +247,11 @@ slope_max = 25.0
 wind_sway = 0.05
 collision = 1
 collision_size = Vector3(0.4, 1, 0.4)
-collision_layer = 4
+impact_stratum = 4
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_pine"]
 display_name = "Pine"
-shape = 4
+form = 4
 shape_seed = 5
 density = 0.08
 scale_max = 1.5
@@ -263,11 +263,11 @@ cluster_threshold = -0.15
 wind_sway = 0.03
 collision = 1
 collision_size = Vector3(0.4, 1, 0.4)
-collision_layer = 4
+impact_stratum = 4
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_bush"]
 display_name = "Bush"
-shape = 2
+form = 2
 shape_seed = 2
 scale_min = 0.6
 align_to_normal = 0.3
@@ -291,12 +291,12 @@ slope_max = 55.0
 hue_jitter = 0.01
 collision = 1
 collision_size = Vector3(0.8, 1, 0.8)
-collision_layer = 4
+impact_stratum = 4
 collision_min_scale = 0.8
 
 [sub_resource type="PixelScatterItem" id="PixelScatterItem_flowers"]
 display_name = "Flowers"
-shape = 5
+form = 5
 shape_seed = 4
 density = 0.09
 align_to_normal = 0.6
@@ -417,7 +417,7 @@ lod_distance = 48.0
 lod_focus = NodePath("../PlayerRig/Pixel/Player")
 
 [node name="PixelWater" type="PixelWater" parent="." unique_id=807881125]
-measure = Vector2(900, 900)
+size = Vector2(900, 900)
 subdivisions = 225
 follow_camera = true
 rim_fade = 0.4
