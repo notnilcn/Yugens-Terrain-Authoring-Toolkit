@@ -282,6 +282,10 @@ pub struct PixelBuilderPlugin {
     ui: Option<LayoutUi>,
     /// HUD content key last drawn (the overlay schedules a deferred HUD refresh on change).
     hud_key: String,
+    /// Mesh data last seen by the builder (instance, revision, face count, vertex count):
+    /// recorded at each own commit and on every history change, so an undo / redo that changed
+    /// the topology clears the selection whose indices it invalidated (r4 #13).
+    seen_mesh: Option<(InstanceId, u64, usize, usize)>,
     /// Inspector "Editable Mesh" section.
     inspector: Option<Gd<super::inspector::PixelBuilderInspector>>,
     gizmo: Option<Gd<MeshInstance3D>>,
@@ -2115,6 +2119,19 @@ impl PixelBuilderPlugin {
         ur.add_do_method(data, "set_blob", &[after.to_variant()]);
         ur.add_undo_method(data, "set_blob", &[before.to_variant()]);
         ur.commit_action_ex().execute(false).done();
+        self.seen_mesh = Self::mesh_stamp(data);
+    }
+
+    /// (instance, revision, face count, vertex count) of a mesh data resource.
+    pub(super) fn mesh_stamp(
+        data: &Gd<PixelBuilderMeshData>,
+    ) -> Option<(InstanceId, u64, usize, usize)> {
+        if !data.is_instance_valid() {
+            return None;
+        }
+        let b = data.bind();
+        let m = b.cage();
+        Some((data.instance_id(), b.revision(), m.facets.len(), m.positions.len()))
     }
 
     fn every_or_picked_facets(&self, m: &BMesh) -> BTreeSet<usize> {
@@ -2775,7 +2792,13 @@ impl PixelBuilderPlugin {
                     Action::Connect
                 },
             ),
-            "fill" => run(et, Action::Fill),
+            // Only where a fill can run (Edge / Vertex mode with a selection); otherwise `F`
+            // goes to Godot and frames the selection (r4 #9: F never framed in an element mode).
+            "fill" => run(
+                has && matches!(self.mode, Mode::Edge | Mode::Vertex)
+                    && !(self.sel_edges.is_empty() && self.sel_verts.is_empty()),
+                Action::Fill,
+            ),
             "triangulate" => run(
                 has && matches!(self.mode, Mode::Object | Mode::Face),
                 Action::Triangulate,
@@ -3865,13 +3888,17 @@ impl PixelBuilderPlugin {
     }
 
     /// Builder toolbar button under the mouse (-1 = none): its name and shortcut in the strip.
+    /// The toolbar buttons no longer call this (their hover signals set the label directly,
+    /// deferred, r4 #2); kept for scripts. The label is updated through a deferred call so this
+    /// never touches a control while a container sort is in progress.
     #[func]
-    fn on_button_hover(&mut self, token_id: i64) {
+    fn on_button_hover(&self, token_id: i64) {
         let text = Action::from_i64(token_id)
             .map(ui::hover_text)
             .unwrap_or_default();
-        if let Some(LayoutUi::Mst(u)) = &mut self.ui {
-            u.hover.set_text(&text);
+        if let Some(LayoutUi::Mst(u)) = &self.ui {
+            let mut l = u.hover.clone();
+            l.call_deferred("set_text", &[GString::from(text.as_str()).to_variant()]);
         }
     }
 

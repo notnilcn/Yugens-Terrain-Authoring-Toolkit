@@ -316,7 +316,8 @@ impl PixelBuilderPlugin {
                         Color::from_rgba(1.0, 1.0, 1.0, 0.9005),
                     )
                     .filled(h)
-                    .width(1.5005)
+                    // A width with `filled` warns "width has no effect" once per draw (r4 #35).
+                    .width(if h { -1.0 } else { 1.5005 })
                     .done();
                 if let Some(d) = &self.drag {
                     let v = d.last_delta;

@@ -460,9 +460,11 @@ const BODY: Vector2 = Vector2::new(460.0, 640.0);
 
 /// Body height that keeps the popup (body + panel margins) inside a `window_h` tall editor:
 /// the preferred height, else what fits, never below a few rows (the body scrolls).
+/// The whole popup stays within `window_h - 80` (r4: clamp to screen − 80): 80 px plus the
+/// panel's own margins.
 pub fn body_height(window_h: f32, scale: f32) -> f32 {
     let want = BODY.y * scale;
-    let margin = 64.0 * scale;
+    let margin = 96.0 * scale;
     want.min(window_h - margin).max(160.0 * scale)
 }
 
@@ -656,8 +658,10 @@ mod tests {
     fn body_fits_small_windows() {
         // Tall window: the preferred 640 px.
         assert_eq!(super::body_height(900.0, 1.0), 640.0);
+        // 1366x768: 768 - 96.
+        assert_eq!(super::body_height(768.0, 1.0), 640.0);
         // 600 px window: the popup (body + margins) stays inside it.
-        assert_eq!(super::body_height(600.0, 1.0), 536.0);
+        assert_eq!(super::body_height(600.0, 1.0), 504.0);
         // Tiny window: a few rows, the rest scrolls.
         assert_eq!(super::body_height(100.0, 1.0), 160.0);
         assert_eq!(super::body_height(1500.0, 2.0), 1280.0);
