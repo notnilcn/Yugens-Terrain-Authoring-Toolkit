@@ -208,7 +208,11 @@ impl MarchingSquaresTerrainPlugin {
         title.set_name("ToolTitle");
         match self.state.tool {
             Tool::ChunkManager => self.build_chunk_strip(&mut strip),
-            Tool::TerrainSettings => self.build_settings_strip(&mut strip),
+            Tool::TerrainSettings => {
+                // Same strip height on every page: the page tabs stay under the pointer.
+                strip.pin_height();
+                self.build_settings_strip(&mut strip)
+            }
             t => {
                 for &s in tools::settings_for(t) {
                     let c = self.build_setting(&mut strip, s, t);
@@ -974,6 +978,7 @@ impl MarchingSquaresTerrainPlugin {
                     .unwrap_or(1200.0)
             }
         };
+        self.settings_strip_w = avail;
         // Per column: its widest row, the separator and the box separation on both sides of it.
         let gap = sz(ui_kit::CELL_GAP * 2.0 + 8.0, 0.0).x;
         let min_rows = 2.min(built.len().max(1));
@@ -1445,6 +1450,19 @@ impl MarchingSquaresTerrainPlugin {
             vbox.add_child(&l);
             return;
         }
+        // At the top, not under the 16 slots: reachable without scrolling the whole panel.
+        let mut m = godot::classes::MarginContainer::new_alloc();
+        m.add_theme_constant_override("margin_bottom", 4);
+        let mut b = Button::new_alloc();
+        b.set_name("ExportTexturePreset");
+        b.set_text("Export Texture Preset");
+        b.set_tooltip_text(&format!(
+            "Save this terrain's texture set as a preset in {PRESET_DIR}."
+        ));
+        b.set_h_size_flags(SizeFlags::EXPAND_FILL);
+        b.connect("pressed", &self.cb("on_export_preset"));
+        m.add_child(&b);
+        vbox.add_child(&m);
         let group = ButtonGroup::new_gd();
         for i in 0..SLOT_COUNT {
             let Some(slot) = self.slot_res(i) else {
@@ -1589,17 +1607,6 @@ impl MarchingSquaresTerrainPlugin {
             vbox.add_child(&HSeparator::new_alloc());
         }
         self.build_auto_rules_section(&mut vbox);
-        let mut m = godot::classes::MarginContainer::new_alloc();
-        m.add_theme_constant_override("margin_bottom", 7);
-        let mut b = Button::new_alloc();
-        b.set_text("Export Texture Preset");
-        b.set_tooltip_text(&format!(
-            "Save this terrain's texture set as a preset in {PRESET_DIR}."
-        ));
-        b.set_h_size_flags(SizeFlags::EXPAND_FILL);
-        b.connect("pressed", &self.cb("on_export_preset"));
-        m.add_child(&b);
-        vbox.add_child(&m);
     }
 
     pub(super) fn refresh_texture_panel_selection(&mut self) {

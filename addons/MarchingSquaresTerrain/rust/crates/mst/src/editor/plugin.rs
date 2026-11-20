@@ -55,6 +55,8 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) terrain: Option<Gd<MarchingSquaresTerrain>>,
     pub(super) state: State,
     pub(super) toolbar: Option<Gd<VFlowContainer>>,
+    /// Scrolling single-column rail holding [`Self::toolbar`] (what the editor container holds).
+    pub(super) toolbar_rail: Option<Gd<ScrollContainer>>,
     pub(super) tool_buttons: Vec<Gd<Button>>,
     pub(super) peel: Option<Gd<ScrollContainer>>,
     pub(super) texture_panel: Option<Gd<ScrollContainer>>,
@@ -63,6 +65,8 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) chunk_list: Option<Gd<OptionButton>>,
     /// Terrain Settings page shown in the strip (index into `terrain_ui::SETTINGS_PAGES`).
     pub(super) settings_page: usize,
+    /// Strip width the Terrain Settings columns were laid out for (rebuilt when it changes).
+    pub(super) settings_strip_w: f32,
     pub(super) slot_buttons: Vec<Gd<Button>>,
     pub(super) slot_previews: Vec<Gd<godot::classes::TextureRect>>,
     /// Ground texture picker per slot (index = slot), updated when the pattern changes.
@@ -95,6 +99,57 @@ pub struct MarchingSquaresTerrainPlugin {
 
 /// Separator of the parts of a [`Tool::hint`] (the overlay wraps the hint there).
 const HINT_SEPARATOR: &str = "  ·  ";
+/// Separator of the parts of the overlay status line (wrapped there too).
+const STATUS_SEPARATOR: &str = "  |  ";
+
+/// Splits `text` at any of `seps` into `(separator before the part, part)` pairs (the first
+/// part has an empty separator; empty parts are dropped).
+fn split_parts<'a>(text: &'a str, seps: &[&'static str]) -> Vec<(&'static str, &'a str)> {
+    let mut out = Vec::new();
+    let (mut rest, mut sep) = (text, "");
+    loop {
+        let next = seps
+            .iter()
+            .filter_map(|s| rest.find(s).map(|i| (i, *s)))
+            .min_by_key(|(i, _)| *i);
+        let (part, tail) = match next {
+            Some((i, s)) => (&rest[..i], Some((s, &rest[i + s.len()..]))),
+            None => (rest, None),
+        };
+        if !part.is_empty() {
+            out.push((if out.is_empty() { "" } else { sep }, part));
+        }
+        match tail {
+            Some((s, t)) => {
+                sep = s;
+                rest = t;
+            }
+            None => return out,
+        }
+    }
+}
+
+#[cfg(test)]
+mod hint_tests {
+    #[test]
+    fn split_parts() {
+        let p = super::split_parts(
+            "Brush  |  height 1  |  LMB: a  ·  Shift: b",
+            &[super::STATUS_SEPARATOR, super::HINT_SEPARATOR],
+        );
+        assert_eq!(
+            p,
+            vec![
+                ("", "Brush"),
+                ("  |  ", "height 1"),
+                ("  |  ", "LMB: a"),
+                ("  ·  ", "Shift: b")
+            ]
+        );
+        // A leading separator (drag status appended as "  |  ...") is not an empty part.
+        assert_eq!(super::split_parts("  |  x", &["  |  "]), vec![("", "x")]);
+    }
+}
 
 pub(super) const LEFT: CustomControlContainer = CustomControlContainer::SPATIAL_EDITOR_SIDE_LEFT;
 const BOTTOM: CustomControlContainer = CustomControlContainer::SPATIAL_EDITOR_BOTTOM;
@@ -105,12 +160,13 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     fn enter_tree(&mut self) {
         self.state = State::default();
         let toolbar = self.build_toolbar();
+        let rail = super::ui_kit::toolbar_rail(&toolbar);
         let strip = super::ui_kit::strip_root("MarchingSquaresToolAttributes");
         let (mut panel, vbox) = super::ui_kit::side_panel("MarchingSquaresTextureSettings");
         // Wider than the original 195 px: rows also hold pattern, color and grass sprite pickers.
         panel.set_custom_minimum_size(super::ui_kit::sz(250.0, 0.0));
         for (c, ctl) in [
-            (LEFT, toolbar.clone().upcast::<Control>()),
+            (LEFT, rail.clone().upcast::<Control>()),
             (BOTTOM, strip.clone().upcast()),
             (RIGHT, panel.clone().upcast()),
         ] {
@@ -119,6 +175,17 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             ctl.set_visible(false);
         }
         self.toolbar = Some(toolbar);
+        self.toolbar_rail = Some(rail);
+        {
+            // Terrain Settings lays its columns out for the strip width: redo on resize.
+            let cb = self.base().callable("_mst_on_strip_resized");
+            let mut st = strip.clone();
+            st.connect_flags(
+                "resized",
+                &cb,
+                godot::classes::object::ConnectFlags::DEFERRED,
+            );
+        }
         self.peel = Some(strip);
         self.texture_panel = Some(panel);
         self.texture_vbox = Some(vbox);
@@ -142,7 +209,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         self.drop_cursor();
         self.extra_drop();
         let parts: [(CustomControlContainer, Option<Gd<Control>>); 3] = [
-            (LEFT, self.toolbar.take().map(|c| c.upcast())),
+            (LEFT, self.toolbar_rail.take().map(|c| c.upcast())),
             (BOTTOM, self.peel.take().map(|c| c.upcast())),
             (RIGHT, self.texture_panel.take().map(|c| c.upcast())),
         ];
@@ -152,6 +219,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 ctl.free();
             }
         }
+        self.toolbar = None; // freed with its rail
         self.tool_buttons.clear();
         self.setting_controls.clear();
         self.chunk_list = None;
@@ -187,7 +255,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
 
     fn make_visible(&mut self, shown: bool) {
         self.visible = shown;
-        if let Some(p) = &mut self.toolbar {
+        if let Some(p) = &mut self.toolbar_rail {
             p.set_visible(shown);
         }
         if let Some(p) = &mut self.peel {
@@ -395,29 +463,44 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 .modulate(color)
                 .done();
         };
-        if let Some(l) = status {
-            text(&l, y, Color::from_rgba(1.0, 1.0, 1.0, 0.8505));
-            y -= line_h;
-        }
-        // The hint wraps at its "  ·  " separators when the view is too narrow for one line.
+        // Both lines wrap at their separators when the view is too narrow for one line (the
+        // status line at "  |  ", the hint at "  ·  "), so nothing is cut at the right edge.
         let avail = size.x - super::ui_kit::px(28.0) as f32;
         let width = |l: &str| font.get_string_size_ex(l).font_size(fs).done().x;
-        let mut lines: Vec<String> = Vec::new();
+        let wrap = |text: &str| {
+            let mut lines: Vec<String> = Vec::new();
+            for (sep, part) in split_parts(text, &[STATUS_SEPARATOR, HINT_SEPARATOR]) {
+                match lines.last_mut() {
+                    Some(l) if width(&format!("{l}{sep}{part}")) <= avail => {
+                        l.push_str(sep);
+                        l.push_str(part);
+                    }
+                    _ => lines.push(part.to_string()),
+                }
+            }
+            lines
+        };
+        // Lines are stacked upwards from the bottom; stop below the viewport's own top-left
+        // menu ("Perspective") rather than drawing over it in a short view.
+        let top = super::ui_kit::px(44.0) as f32 + fs as f32;
+        if let Some(l) = status {
+            for l in wrap(&l).iter().rev() {
+                if y < top {
+                    return;
+                }
+                text(l, y, Color::from_rgba(1.0, 1.0, 1.0, 0.8505));
+                y -= line_h;
+            }
+        }
         let hint = if self.state.tool == Tool::Scatter {
             self.foliage_hint()
         } else {
             self.state.tool.hint().to_string()
         };
-        for part in hint.split(HINT_SEPARATOR) {
-            match lines.last_mut() {
-                Some(l) if width(&format!("{l}{HINT_SEPARATOR}{part}")) <= avail => {
-                    l.push_str(HINT_SEPARATOR);
-                    l.push_str(part);
-                }
-                _ => lines.push(part.to_string()),
+        for l in wrap(&hint).iter().rev() {
+            if y < top {
+                return;
             }
-        }
-        for l in lines.iter().rev() {
             text(l, y, Color::from_rgba(1.0, 0.9205, 0.6005, 0.9505));
             y -= line_h;
         }
@@ -1553,6 +1636,19 @@ impl MarchingSquaresTerrainPlugin {
     #[func]
     fn rebuild_strip_now(&mut self) {
         self.rebuild_strip();
+    }
+
+    #[func]
+    fn _mst_on_strip_resized(&mut self) {
+        let Some(w) = self.peel.as_ref().map(|p| p.get_size().x) else {
+            return;
+        };
+        if self.visible
+            && self.state.tool == Tool::TerrainSettings
+            && (w - self.settings_strip_w).abs() > super::ui_kit::sz(32.0, 0.0).x
+        {
+            self.rebuild_strip();
+        }
     }
 
     #[func]

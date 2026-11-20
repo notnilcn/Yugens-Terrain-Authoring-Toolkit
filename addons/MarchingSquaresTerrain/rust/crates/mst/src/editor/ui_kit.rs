@@ -281,6 +281,77 @@ impl Toolbar {
     }
 }
 
+/// Wraps a [`Toolbar`]'s flow in a vertical-only `ScrollContainer` (named `<flow name>Rail`)
+/// and keeps the flow in a single column ([`fit_rail`]): a fixed-width tool rail that scrolls
+/// when the window is short, instead of a `VFlowContainer` that wraps into 2–3 columns and
+/// takes that width from the 3D viewport. Add the returned rail to the editor container (not
+/// the flow); show / hide the rail.
+pub fn toolbar_rail(flow: &Gd<VFlowContainer>) -> Gd<ScrollContainer> {
+    let mut rail = MstRail::new_alloc();
+    rail.set_name(&format!("{}Rail", flow.get_name()));
+    rail.add_theme_stylebox_override("focus", &StyleBoxEmpty::new_gd());
+    rail.set_horizontal_scroll_mode(ScrollMode::DISABLED);
+    rail.set_vertical_scroll_mode(ScrollMode::AUTO);
+    rail.set_vertical_custom_step(sz(0.0, TOOL_ROW).y);
+    rail.add_child(flow);
+    fit_rail(flow);
+    rail.upcast()
+}
+
+/// `ScrollContainer` of a [`toolbar_rail`]: refits its flow's single column whenever the theme
+/// (fonts, separators) is known or changes, and before each layout.
+#[derive(GodotClass)]
+#[class(tool, init, base = ScrollContainer, internal)]
+pub struct MstRail {
+    base: Base<ScrollContainer>,
+}
+
+#[godot_api]
+impl godot::classes::IScrollContainer for MstRail {
+    fn on_notification(&mut self, what: godot::classes::notify::ContainerNotification) {
+        use godot::classes::notify::ContainerNotification as N;
+        if matches!(
+            what,
+            N::THEME_CHANGED | N::ENTER_TREE | N::PRE_SORT_CHILDREN
+        ) && let Some(f) = self
+            .base()
+            .get_child(0)
+            .and_then(|c| c.try_cast::<VFlowContainer>().ok())
+        {
+            fit_rail(&f);
+        }
+    }
+}
+
+/// Single column for a flow inside a [`toolbar_rail`]: its minimum height is the sum of its
+/// visible children, so it never wraps (the rail scrolls instead). Call again after showing /
+/// hiding / resizing buttons ([`set_toolbar_compact`] does).
+pub fn fit_rail(flow: &Gd<VFlowContainer>) {
+    if flow
+        .get_parent()
+        .and_then(|p| p.try_cast::<ScrollContainer>().ok())
+        .is_none()
+    {
+        return;
+    }
+    let sep = flow.get_theme_constant("v_separation") as f32;
+    let (mut h, mut n) = (0.0f32, 0);
+    for c in flow.get_children().iter_shared() {
+        if let Ok(c) = c.try_cast::<Control>()
+            && c.is_visible()
+        {
+            h += c.get_combined_minimum_size().y;
+            n += 1;
+        }
+    }
+    h += sep * (n.max(1) - 1) as f32;
+    let mut f = flow.clone();
+    let cur = f.get_custom_minimum_size();
+    if (cur.y - h.ceil()).abs() > 0.5 {
+        f.set_custom_minimum_size(Vector2::new(cur.x, h.ceil()));
+    }
+}
+
 /// Meta on labelled toolbar buttons holding their label (see [`set_toolbar_compact`]).
 const LABEL_META: &str = "mst_label";
 
@@ -309,6 +380,7 @@ pub fn set_toolbar_compact(root: &Gd<VFlowContainer>, compact: bool) {
             k.set("visible", &(!compact).to_variant());
         }
     }
+    fit_rail(root);
 }
 
 /// Toolbar button with a crisp [`icon_px`] icon and a visible label, drawn with the editor's
@@ -376,16 +448,56 @@ pub struct Strip {
     last: Option<CtlKind>,
 }
 
-/// Root of the bottom strip (created once; [`Strip::rebuild`] replaces its content).
-/// Both scroll modes are disabled, so the strip takes the height of its wrapped rows.
+/// Tallest a bottom strip gets before it scrolls (7 rows), before [`editor_scale`].
+pub const STRIP_MAX_HEIGHT: f32 = 245.0;
+/// Largest share of the 3D area (viewport + strip) a bottom strip may take.
+pub const STRIP_MAX_SHARE: f32 = 0.35;
+
+/// Root of the bottom strip (created once; [`Strip::reassemble`] replaces its content).
+///
+/// The strip is as tall as its wrapped rows, but never taller than [`strip_cap`]: past that it
+/// scrolls vertically (visible scrollbar) instead of pushing the 3D viewport down to its
+/// minimum. The height is driven by the [`MstFlow`] inside (it sets the root's custom minimum
+/// height after each layout and whenever the 3D area is resized). The root's minimum height
+/// must not follow the flow's content height directly: the flow's height depends on its width,
+/// and an uncapped strip used to overflow the editor's main screen, which in turn changed the
+/// width of the wrapping toolbars beside it — a layout feedback loop that never converged
+/// (`Container::_sort_children` message-queue overflow / editor crash at 1024×600).
 pub fn strip_root(name: &str) -> Gd<ScrollContainer> {
     let mut root = ScrollContainer::new_alloc();
     root.set_name(name);
     root.set_custom_minimum_size(sz(0.0, ROW_HEIGHT));
     root.add_theme_stylebox_override("focus", &StyleBoxEmpty::new_gd());
-    root.set_vertical_scroll_mode(ScrollMode::DISABLED);
-    root.set_horizontal_scroll_mode(ScrollMode::DISABLED);
+    root.set_vertical_scroll_mode(ScrollMode::AUTO);
+    // Rows wrap, so this only scrolls when a single cell is wider than the strip; the point is
+    // that the strip's minimum width does not follow its content either (a wide cell would
+    // otherwise widen the whole editor window past the screen).
+    root.set_horizontal_scroll_mode(ScrollMode::AUTO);
+    // One wheel notch = one strip row.
+    root.set_vertical_custom_step(sz(0.0, ROW_HEIGHT).y);
     root
+}
+
+/// Height cap of a bottom strip whose root is `root`: [`STRIP_MAX_HEIGHT`], at most
+/// [`STRIP_MAX_SHARE`] of the area it shares with the 3D viewport (the root's parent), and at
+/// least one row.
+pub fn strip_cap(root: &Gd<Control>) -> f32 {
+    let max = sz(0.0, STRIP_MAX_HEIGHT).y;
+    let row = sz(0.0, ROW_HEIGHT).y;
+    let area = root
+        .get_parent()
+        .and_then(|p| p.try_cast::<Control>().ok())
+        .map(|c| c.get_size().y)
+        .unwrap_or(0.0);
+    strip_cap_for(area, max, row)
+}
+
+/// [`strip_cap`] for an area height (0 = unknown).
+pub fn strip_cap_for(area: f32, max: f32, row: f32) -> f32 {
+    if area <= 0.0 {
+        return max;
+    }
+    (area * STRIP_MAX_SHARE).min(max).max(row).floor()
 }
 
 impl Strip {
@@ -410,6 +522,12 @@ impl Strip {
             cell: None,
             last: None,
         }
+    }
+
+    /// Keeps the strip at its full height cap ([`strip_cap`]) whatever its content needs, so
+    /// controls at the top (page tabs) stay at the same place when the content changes height.
+    pub fn pin_height(&mut self) {
+        self.flow.bind_mut().pinned = true;
     }
 
     /// Starts a new cell for a control of `kind`: separator on type change, then the `"label:"`.
@@ -456,6 +574,8 @@ impl Strip {
         let mut b = title_button(caption, icon);
         b.set_tooltip_text(tooltip);
         b.set_mouse_filter(MouseFilter::PASS);
+        // Top of its row when the row is taller (a Settings page block beside it).
+        b.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
         self.cell = None;
         self.flow.add_child(&b);
         self.separator();
@@ -779,6 +899,10 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
     root.set_custom_minimum_size(sz(PANEL_WIDTH, 0.0));
     root.add_theme_stylebox_override("focus", &StyleBoxEmpty::new_gd());
     root.set_horizontal_scroll_mode(ScrollMode::DISABLED);
+    // Always show the scrollbar (the panels are long: 16 texture slots), and scroll three rows
+    // per wheel notch instead of the default 1/8 page.
+    root.set_vertical_scroll_mode(ScrollMode::SHOW_ALWAYS);
+    root.set_vertical_custom_step(sz(0.0, ROW_HEIGHT * 3.0).y);
     let mut vbox = VBoxContainer::new_alloc();
     vbox.set_h_size_flags(SizeFlags::EXPAND_FILL);
     vbox.add_theme_constant_override("separation", px(4.0));
@@ -900,6 +1024,8 @@ pub struct MstFlow {
     pub h_gap: f32,
     /// Height of the last layout (reported as the minimum height).
     min_height: f32,
+    /// Strip root height pinned to the cap ([`Strip::pin_height`]).
+    pub pinned: bool,
     base: Base<godot::classes::Container>,
 }
 
@@ -915,9 +1041,36 @@ impl godot::classes::IContainer for MstFlow {
     }
 
     fn on_notification(&mut self, what: godot::classes::notify::ContainerNotification) {
-        if what == godot::classes::notify::ContainerNotification::SORT_CHILDREN {
-            self.layout();
+        use godot::classes::notify::ContainerNotification as N;
+        match what {
+            N::SORT_CHILDREN => self.layout(),
+            // The cap follows the 3D area: refit when the area (the strip root's parent) resizes.
+            N::ENTER_TREE | N::EXIT_TREE => {
+                let cb = self.base().callable("_mst_refit");
+                if let Some(mut area) = self.strip_area() {
+                    let connected = area.is_connected("resized", &cb);
+                    if what == N::ENTER_TREE && !connected {
+                        area.connect_flags(
+                            "resized",
+                            &cb,
+                            godot::classes::object::ConnectFlags::DEFERRED,
+                        );
+                    } else if what == N::EXIT_TREE && connected {
+                        area.disconnect("resized", &cb);
+                    }
+                }
+            }
+            _ => {}
         }
+    }
+}
+
+#[godot_api]
+impl MstFlow {
+    /// Re-applies the strip root's height (the 3D area was resized).
+    #[func]
+    fn _mst_refit(&mut self) {
+        self.fit_root();
     }
 }
 
@@ -959,6 +1112,43 @@ impl MstFlow {
             self.min_height = y;
             self.base_mut().update_minimum_size();
         }
+        self.fit_root();
+    }
+
+    /// The strip root (a [`strip_root`] `ScrollContainer`) when this flow is its content.
+    fn strip_root(&self) -> Option<Gd<ScrollContainer>> {
+        self.base()
+            .get_parent()
+            .and_then(|p| p.try_cast::<ScrollContainer>().ok())
+    }
+
+    /// The area the strip shares with the 3D viewport (the strip root's parent).
+    fn strip_area(&self) -> Option<Gd<Control>> {
+        self.strip_root()
+            .and_then(|r| r.get_parent())
+            .and_then(|p| p.try_cast::<Control>().ok())
+    }
+
+    /// Sets the strip root's minimum height: the content height (or the cap when pinned),
+    /// bounded by [`strip_cap`]; the rest scrolls. A bounded value whose only input that can
+    /// change with the layout is the root's width (rows only grow as it shrinks), so the
+    /// layout converges.
+    fn fit_root(&mut self) {
+        let Some(mut root) = self.strip_root() else {
+            return;
+        };
+        let cap = strip_cap(&root.clone().upcast());
+        let row = sz(0.0, ROW_HEIGHT).y;
+        let want = if self.pinned {
+            cap
+        } else {
+            self.min_height.min(cap)
+        }
+        .max(row)
+        .ceil();
+        if (root.get_custom_minimum_size().y - want).abs() > 0.5 {
+            root.set_custom_minimum_size(Vector2::new(0.0, want));
+        }
     }
 }
 
@@ -986,6 +1176,16 @@ mod tests {
         let r = super::balanced_rows(&[50.0, 50.0, 200.0], 0.0, 120.0);
         assert_eq!(r.len(), 2);
         assert!(super::balanced_rows(&[], 0.0, 10.0).is_empty());
+    }
+
+    #[test]
+    fn strip_cap() {
+        // Unknown area: the fixed maximum.
+        assert_eq!(super::strip_cap_for(0.0, 245.0, 35.0), 245.0);
+        // Big area: the fixed maximum; small area: its share; tiny area: one row.
+        assert_eq!(super::strip_cap_for(1000.0, 245.0, 35.0), 245.0);
+        assert_eq!(super::strip_cap_for(400.0, 245.0, 35.0), 140.0);
+        assert_eq!(super::strip_cap_for(60.0, 245.0, 35.0), 35.0);
     }
 
     #[test]
