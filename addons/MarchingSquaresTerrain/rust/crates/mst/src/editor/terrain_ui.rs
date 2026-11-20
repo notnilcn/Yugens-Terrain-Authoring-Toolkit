@@ -1377,6 +1377,36 @@ impl MarchingSquaresTerrainPlugin {
         if new == old {
             return;
         }
+        if t.prop == "grid_type" {
+            let n = terrain.bind().store().chunk_coords().len();
+            if n > 0 {
+                // Each grid type keeps its own chunks: switching shows the other grid's
+                // (often none), which looked like the island being deleted. Ask first; the
+                // dropdown shows the current type again until confirmed.
+                self.confirm_grid_type(index, new, n);
+                self.rebuild_strip_deferred();
+                return;
+            }
+        }
+        self.commit_terrain_setting(index, new);
+    }
+
+    /// Writes Terrain Settings row `index` = `new` through the undo manager (one step).
+    fn commit_terrain_setting(&mut self, index: usize, new: Variant) {
+        let Some(t) = TERRAIN_SETTINGS.get(index) else {
+            return;
+        };
+        let Some(terrain) = self.terrain.clone() else {
+            return;
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
+        let obj = terrain.clone().upcast::<Object>();
+        let old = terrain.get(t.prop);
+        if new == old {
+            return;
+        }
         ur.create_action(&format!("terrain setting {}", t.label.to_lowercase()));
         ur.add_do_property(&obj, t.prop, &new);
         ur.add_undo_property(&obj, t.prop, &old);
@@ -1398,6 +1428,47 @@ impl MarchingSquaresTerrainPlugin {
             self.rebuild_strip_deferred();
         }
         self.redraw();
+    }
+}
+
+// ---------------------------------------------------------------------- grid type confirmation
+
+const GRID_NAMES: [&str; 4] = ["Square", "Triangle", "Hex", "Hex Rings"];
+
+impl MarchingSquaresTerrainPlugin {
+    fn confirm_grid_type(&mut self, index: usize, new: Variant, chunks: usize) {
+        let Some(mut base) = EditorInterface::singleton().get_base_control() else {
+            return;
+        };
+        let name = |v: i64| GRID_NAMES.get(v as usize).copied().unwrap_or("?");
+        let cur = self.terrain_prop("grid_type").try_to::<i64>().unwrap_or(0);
+        let to = setting_num(&new) as i64;
+        let mut d = ConfirmationDialog::new_alloc();
+        d.set_title("Change Grid Type?");
+        d.set_text(&format!(
+            "This terrain has {chunks} chunk{} on the {} grid.\n\nEach grid type keeps its own chunks: \
+             switching to {} shows that grid's chunks (none if it was never used), so the \
+             current terrain disappears from the view.\nThe {} chunks are kept and come back \
+             when you switch back or press Ctrl+Z.",
+            if chunks == 1 { "" } else { "s" },
+            name(cur),
+            name(to),
+            name(cur),
+        ));
+        d.set_ok_button_text(&format!("Switch to {}", name(to)));
+        d.set_autowrap(true);
+        d.set_size(Vector2i::new(
+            (440.0 * ui_kit::editor_scale()) as i32,
+            (180.0 * ui_kit::editor_scale()) as i32,
+        ));
+        let on_ok = self
+            .cb("on_grid_type_confirmed")
+            .bind(&[new, (index as i64).to_variant(), d.to_variant()]);
+        d.connect("confirmed", &on_ok);
+        let free = Callable::from_object_method(&d, "queue_free");
+        d.connect("canceled", &free);
+        base.add_child(&d);
+        d.popup_centered();
     }
 }
 
@@ -1494,6 +1565,13 @@ impl MarchingSquaresTerrainPlugin {
 
 #[godot_api(secondary)]
 impl MarchingSquaresTerrainPlugin {
+    /// "Change Grid Type?" confirmed.
+    #[func]
+    fn on_grid_type_confirmed(&mut self, new: Variant, index: i64, mut dialog: Gd<Node>) {
+        dialog.queue_free();
+        self.commit_terrain_setting(index.max(0) as usize, new);
+    }
+
     /// Import dialog result: one undoable action (`import_mst` / restore the old data + grid settings).
     #[func]
     fn on_import_mst_path(&mut self, path: GString, mut dialog: Gd<godot::classes::Node>) {
