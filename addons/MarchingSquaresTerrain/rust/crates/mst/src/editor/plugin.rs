@@ -875,7 +875,10 @@ impl MarchingSquaresTerrainPlugin {
         let is_r = button == MouseButton::RIGHT;
         let is_m = button == MouseButton::MIDDLE;
         if tool == Tool::TerrainSettings {
-            return false;
+            // No viewport action, but a plain LMB click must not reach Godot's selection either:
+            // a click on the sky deselected the terrain and closed the tool with its strip.
+            // Alt+LMB (orbit in some navigation schemes) still goes to the editor.
+            return is_l && !Input::singleton().is_key_pressed(Key::ALT);
         }
         if tool.is_extra() {
             return self.extra_mouse_button(lens, mb, shift, ctrl);
@@ -1363,17 +1366,23 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         terrain.bind_mut().write_chunks(&coords);
+        // Smooth names its mode (both used to read "terrain smooth").
+        let tool_name = match stroke.tool {
+            Tool::Smooth if self.state.smooth_sloped => "terrain smooth sloped",
+            Tool::Smooth => "terrain smooth terraced",
+            t => t.undo_name(),
+        };
         // Quick Paint names the sculpt tool too ("terrain level with quick paint").
         let name = if self.state.quick_paint != 0
             && matches!(
                 stroke.tool,
                 Tool::Brush | Tool::Level | Tool::Smooth | Tool::Bridge | Tool::RaiseLower
             ) {
-            format!("{} with quick paint", stroke.tool.undo_name())
+            format!("{tool_name} with quick paint")
         } else if stroke.tool == Tool::VertexPaint && self.state.paint_walls {
             "terrain wall paint".to_string()
         } else {
-            stroke.tool.undo_name().to_string()
+            tool_name.to_string()
         };
         self.commit_undo(&name, before, after);
     }
@@ -1495,7 +1504,15 @@ impl MarchingSquaresTerrainPlugin {
         }
         terrain.bind_mut().write_chunks(&coords);
         terrain.bind_mut().update();
-        self.commit_undo("chunk merge mode", before, after);
+        self.commit_undo(
+            if all {
+                "apply chunk merge mode to all"
+            } else {
+                "chunk merge mode"
+            },
+            before,
+            after,
+        );
     }
 
     fn debug_print(&self) {
