@@ -30,6 +30,11 @@ impl GizmoLock {
                 .as_ref()
                 .filter(|t| t.is_instance_valid())
                 .map(|t| t.instance_id());
+        // A target freed behind our back (scene closed) is simply forgotten: no method may be
+        // called on it (`upcast_ref` after free floods the Output every frame).
+        if self.target.as_ref().is_some_and(|t| !t.is_instance_valid()) {
+            self.target = None;
+        }
         if same
             && self
                 .target

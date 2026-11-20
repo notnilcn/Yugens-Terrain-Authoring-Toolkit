@@ -254,6 +254,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     }
 
     fn edit(&mut self, entity: Option<Gd<Object>>) {
+        // The previous terrain may already be freed (scene closed): forget it instead of
+        // finishing its stroke on a dead instance.
+        self.terrain_alive();
         self.finish_stroke();
         self.drop_cursor();
         self.extra_drop();
@@ -270,6 +273,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     }
 
     fn make_visible(&mut self, shown: bool) {
+        self.terrain_alive();
         self.visible = shown;
         if let Some(p) = &mut self.toolbar_rail {
             p.set_visible(shown);
@@ -293,6 +297,8 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     fn process(&mut self, delta: f64) {
         crate::prof::report();
         let _p = crate::prof::breadth("plugin.process");
+        // Closing the scene frees the terrain without always calling `edit(None)` first.
+        self.terrain_alive();
         self.sync_gizmo_lock();
         self.foliage_poll();
         // Chunk outlines skipped while the terrain kept remeshing (`cursor::OUTLINE_INTERVAL_MS`).
@@ -345,7 +351,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     /// focused control used. With the focus in the viewport `forward_3d_gui_input` handles
     /// them first. Text fields keep their keys (they consume them before this runs).
     fn shortcut_input(&mut self, happening: Gd<InputEvent>) {
-        if self.terrain.is_none()
+        if !self.terrain_alive()
             || !self.visible
             || !self
                 .toolbar
@@ -384,7 +390,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         let (Some(camera), Some(event)) = (lens, happening) else {
             return pass;
         };
-        if self.terrain.is_none() || !self.visible {
+        if !self.terrain_alive() || !self.visible {
             return pass;
         }
 
@@ -465,6 +471,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         let Some(font) = overlay.get_theme_default_font() else {
             return;
         };
+        if !self.terrain_alive() {
+            return;
+        }
         let Some(t) = &self.terrain else { return };
         let fs = super::ui_kit::px(13.0);
         let line_h = fs as f32 * 1.5005;
@@ -711,6 +720,40 @@ impl MarchingSquaresTerrainPlugin {
             .callable("_mst_frame_if_buried")
             .bind(&[t.to_variant()]);
         cb.call_deferred(&[]);
+    }
+
+    /// True while a live terrain is edited. A terrain freed behind the plugin's back (Scene →
+    /// Close Scene / reload frees it, sometimes before `edit(None)`) is forgotten here together
+    /// with everything derived from it, so no later call reaches the dead instance
+    /// (`Node3D::upcast_ref … after it has been freed`). Selecting a terrain again re-attaches.
+    pub(super) fn terrain_alive(&mut self) -> bool {
+        match &self.terrain {
+            None => false,
+            Some(t) if t.is_instance_valid() => true,
+            Some(_) => {
+                self.forget_terrain();
+                false
+            }
+        }
+    }
+
+    fn forget_terrain(&mut self) {
+        self.terrain = None;
+        // No undo step can be recorded for a freed terrain.
+        self.sweep = None;
+        self.handle_drag = None;
+        self.selection.clear();
+        self.hover = None;
+        self.hover_chunk = None;
+        self.selected_chunk = None;
+        self.mouse_ray = None;
+        self.view = None;
+        self.chunk_list = None;
+        if let Some(c) = self.cursor.take() {
+            c.free();
+        }
+        self.extra_drop();
+        self.gizmo_lock.purge();
     }
 
     // ------------------------------------------------------------------ input
@@ -1719,6 +1762,9 @@ impl MarchingSquaresTerrainPlugin {
 
     #[func]
     fn _mst_on_undo_version(&mut self) {
+        if !self.terrain_alive() {
+            return;
+        }
         // Texture slots / preset: the side panel shows the restored values (QA #9).
         if self.visible && self.state.tool == Tool::VertexPaint {
             self.sync_texture_panel();
