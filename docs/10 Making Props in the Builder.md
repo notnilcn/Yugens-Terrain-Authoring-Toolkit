@@ -51,7 +51,7 @@ This is the whole beginner workflow. We will make a coloured stone block.
 11. `Ctrl+S` saves the scene. The mesh data is stored inside the scene.
 
 > [!warning]
-> Without `Shift`, pressing `C` and drawing creates a **new sibling mesh** next to the one you selected. Hold `Shift` while drawing if you want to add the new shape to the currently selected mesh.
+> Pressing `C` and drawing creates a **new sibling mesh** next to the one you selected. Hold `Shift` while you click to finish (or stamp) the shape if you want to add it to the currently selected mesh instead. (`Shift+C` opens the Bezier tool, not append.)
 
 > [!warning]
 > Do not change **W/H/D** after you have moved individual vertices or faces. Changing the recipe rebuilds the shape and replaces those edits. Use the Object-mode scale gizmo for non-destructive resizing.
