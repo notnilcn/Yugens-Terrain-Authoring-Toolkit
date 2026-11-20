@@ -277,7 +277,7 @@ impl MarchingSquaresTerrainPlugin {
         }
         self.slot_buttons.clear();
         self.slot_previews.clear();
-        self.slot_tex_pickers.clear();
+        self.slot_uis.clear();
         self.foliage.list = None;
         let Some(t) = self.terrain.clone() else {
             return;

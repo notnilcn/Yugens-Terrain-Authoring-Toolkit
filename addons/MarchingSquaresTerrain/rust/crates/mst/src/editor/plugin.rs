@@ -74,8 +74,10 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) settings_version: Option<u64>,
     pub(super) slot_buttons: Vec<Gd<Button>>,
     pub(super) slot_previews: Vec<Gd<godot::classes::TextureRect>>,
-    /// Ground texture picker per slot (index = slot), updated when the pattern changes.
-    pub(super) slot_tex_pickers: Vec<(usize, Gd<godot::classes::EditorResourcePicker>)>,
+    /// Controls of each texture slot in the side panel (refreshed after undo / redo).
+    pub(super) slot_uis: Vec<super::terrain_ui::SlotUi>,
+    /// Texture set + slot instance ids the texture panel was built for.
+    pub(super) texture_panel_ids: Vec<Option<InstanceId>>,
     pub(super) cursor: Option<Cursor>,
     pub(super) hover: Option<Vector3>,
     pub(super) hover_chunk: Option<IVec2>,
@@ -240,7 +242,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         self.texture_vbox = None;
         self.slot_buttons.clear();
         self.slot_previews.clear();
-        self.slot_tex_pickers.clear();
+        self.slot_uis.clear();
     }
 
     fn get_plugin_name(&self) -> GString {
@@ -440,6 +442,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                     return stop;
                 }
                 return pass;
+            }
+            if mb.is_pressed() {
+                release_text_focus();
             }
             if self.handle_press(&camera, &mb) {
                 return stop;
@@ -1714,6 +1719,10 @@ impl MarchingSquaresTerrainPlugin {
 
     #[func]
     fn _mst_on_undo_version(&mut self) {
+        // Texture slots / preset: the side panel shows the restored values (QA #9).
+        if self.visible && self.state.tool == Tool::VertexPaint {
+            self.sync_texture_panel();
+        }
         let own = self.settings_version.take();
         if own.is_some() && own == self.terrain_undo_version() {
             return;
@@ -1797,12 +1806,14 @@ impl MarchingSquaresTerrainPlugin {
             let i = self.state.paint_slot as usize;
             self.set_slot_prop(i, "display_name", caption.to_variant());
             self.refresh_material_names();
-            // Clear the field after submitting (original behaviour).
+            // Clear the field after submitting (original behaviour) and leave it, so the next
+            // Ctrl+Z undoes the rename instead of editing the field's text (QA #54).
             for (s, c) in &self.setting_controls {
                 if *s == Setting::TextureName
                     && let Ok(mut le) = c.clone().try_cast::<godot::classes::LineEdit>()
                 {
-                    le.set_text("");
+                    le.clear();
+                    le.release_focus();
                 }
             }
             self.to_gd().call_deferred("rebuild_texture_panel_now", &[]);
@@ -1873,6 +1884,27 @@ impl MarchingSquaresTerrainPlugin {
     fn on_slot_name(&mut self, caption: GString, index: i64) {
         self.set_slot_prop(index as usize, "display_name", caption.to_variant());
         self.refresh_material_names();
+        // Enter leaves the field, so the next Ctrl+Z reaches the History (QA #54).
+        if let Some(ui) = self.slot_uis.iter_mut().find(|u| u.slot == index as usize)
+            && ui.name.is_instance_valid()
+        {
+            ui.name.release_focus();
+        }
+    }
+
+    /// The slot name field lost focus: apply what was typed (deferred; the field may be gone).
+    #[func]
+    fn on_slot_name_left(&mut self, index: i64) {
+        let Some(text) = self
+            .slot_uis
+            .iter()
+            .find(|u| u.slot == index as usize && u.name.is_instance_valid())
+            .map(|u| u.name.get_text())
+        else {
+            return;
+        };
+        self.set_slot_prop(index as usize, "display_name", text.to_variant());
+        self.refresh_material_names();
     }
 
     #[func]
@@ -1887,7 +1919,8 @@ impl MarchingSquaresTerrainPlugin {
 
     #[func]
     fn on_slot_scale(&mut self, value: f64, index: i64, mut label: Gd<godot::classes::Label>) {
-        label.set_text(&format!("{value:.1}"));
+        // Same format as the initial read-out (`ui_kit::value_label`).
+        label.call("_mst_assign_worth", &[value.to_variant()]);
         self.set_slot_prop(index as usize, "magnify", (value as f32).to_variant());
     }
 
@@ -1920,11 +1953,25 @@ impl MarchingSquaresTerrainPlugin {
     fn on_export_confirmed(
         &mut self,
         edit: Gd<godot::classes::LineEdit>,
-        mut dialog: Gd<godot::classes::AcceptDialog>,
+        mut dialog: Gd<godot::classes::ConfirmationDialog>,
     ) {
         let name = edit.get_text().to_string();
+        if name.trim().is_empty() {
+            // Stays open (hide_on_ok is off); the dialog already says why.
+            return;
+        }
         dialog.queue_free();
         self.export_preset(name, false);
+    }
+
+    #[func]
+    fn on_export_name_changed(
+        &mut self,
+        text: GString,
+        mut dialog: Gd<godot::classes::ConfirmationDialog>,
+        mut file: Gd<godot::classes::Label>,
+    ) {
+        super::terrain_ui::export_name_feedback(&text.to_string(), &mut dialog, &mut file);
     }
 
     #[func]
@@ -1935,6 +1982,22 @@ impl MarchingSquaresTerrainPlugin {
     ) {
         dialog.queue_free();
         self.export_preset(name.to_string(), true);
+    }
+}
+
+/// A click in the 3D view leaves a focused text field (the slot / Texture Name fields), like
+/// clicking anywhere else in the editor: otherwise the plugin consumes the click, the field
+/// keeps the focus and Ctrl+Z keeps editing its text instead of undoing (QA #54).
+fn release_text_focus() {
+    use godot::classes::{EditorInterface, LineEdit, TextEdit};
+    let Some(base) = EditorInterface::singleton().get_base_control() else {
+        return;
+    };
+    let Some(vp) = base.get_viewport() else { return };
+    if let Some(mut f) = vp.gui_get_focus_owner()
+        && (f.clone().try_cast::<LineEdit>().is_ok() || f.clone().try_cast::<TextEdit>().is_ok())
+    {
+        f.release_focus();
     }
 }
 
