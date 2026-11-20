@@ -179,8 +179,8 @@ grass_min_height = 1.2
 scatter_items = Array[PixelScatterItem]([SubResource("PixelScatterItem_6vres"), SubResource("PixelScatterItem_libji")])
 
 [node name="PixelWater" type="PixelWater" parent="." unique_id=195415122]
-size = Vector2(300, 300)
-subdivisions = 128
+size = Vector2(1600, 1600)
+subdivisions = 256
 follow_camera = true
 rim_fade = 0.35
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 1.2, 48)
@@ -194,6 +194,9 @@ script = ExtResource("17_kpnmw")
 target = Vector3(48, 3, 48)
 distance = 165.0
 yaw_deg = 36.0
+max_distance = 300.0
+max_size = 260.0
+min_pitch_deg = 14.0
 
 [node name="PixelRenderer" type="PixelRenderer" parent="." unique_id=1077395288]
 pixel_size = 2

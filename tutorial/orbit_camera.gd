@@ -9,6 +9,11 @@ extends Camera3D
 @export var pitch_deg := 38.0
 @export var min_distance := 6.0
 @export var max_distance := 400.0
+## Lowest / highest orbit pitch (degrees above the target's horizon). Grazing views of an
+## orthographic camera look kilometres across the ground, past a finite sea: keep the minimum
+## high enough that the view stays on the scene.
+@export var min_pitch_deg := 5.0
+@export var max_pitch_deg := 88.0
 ## Orthographic zoom limits (the wheel changes Size, not distance).
 @export var min_size := 4.0
 @export var max_size := 400.0
@@ -21,7 +26,7 @@ var _dragging := false
 
 func _ready() -> void:
 	_yaw = deg_to_rad(yaw_deg)
-	_pitch = deg_to_rad(pitch_deg)
+	_pitch = deg_to_rad(clampf(pitch_deg, min_pitch_deg, max_pitch_deg))
 	_dist = distance
 	_target = target
 	_apply()
@@ -52,7 +57,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom(1.1)
 	elif event is InputEventMouseMotion and _dragging:
 		_yaw -= event.relative.x * 0.006
-		_pitch = clampf(_pitch - event.relative.y * 0.006, deg_to_rad(5.0), deg_to_rad(88.0))
+		_pitch = clampf(_pitch - event.relative.y * 0.006, deg_to_rad(min_pitch_deg), deg_to_rad(max_pitch_deg))
 		_apply()
 
 func _process(delta: float) -> void:
