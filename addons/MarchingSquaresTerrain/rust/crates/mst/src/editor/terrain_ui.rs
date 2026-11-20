@@ -1394,7 +1394,7 @@ impl MarchingSquaresTerrainPlugin {
         ] {
             ur.add_undo_property(&obj, prop, &terrain.get(prop));
         }
-        ur.add_undo_method(&obj, "rebuild", &[]);
+        ur.add_undo_method(&obj, "reassemble", &[]);
         ur.commit_action();
         self.selection.clear();
         self.refresh_chunk_list();

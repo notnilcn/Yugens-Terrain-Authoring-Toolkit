@@ -390,7 +390,7 @@ impl PixelBuilderMesh {
             return;
         }
         self.rebuild_queued = true;
-        self.to_gd().call_deferred("rebuild", &[]);
+        self.to_gd().call_deferred("reassemble", &[]);
     }
 
     /// Compiles the polygon data into the displayed mesh (and collider at runtime).

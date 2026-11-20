@@ -19,6 +19,8 @@ You need Godot 4.7 and Rust 1.88+.
 git clone --recursive <this repo> && cd <repo>
 tools/build.sh            # builds the addon + demo libraries into their bin/ folders
                           # (Windows: powershell -File tools/build.ps1)
+tools/build.sh --ship     # optimized, stripped libraries only — use this for a game build
+                          # (the plain and _release names share one file; no debug builds)
 godot -e --path .         # open the project
 ```
 

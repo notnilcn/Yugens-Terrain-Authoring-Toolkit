@@ -30,3 +30,6 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
+# Shipping libraries keep no symbol table; the GDExtension entry point lives in .dynsym and is
+# unaffected. This is a large size win with no runtime cost.
+strip = "symbols"

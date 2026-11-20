@@ -4,3 +4,4 @@ rust/target/
 addons/MarchingSquaresTerrain/rust/target/
 tests/captures/
 *.tmp
+build/

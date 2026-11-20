@@ -717,7 +717,7 @@ impl MarchingSquaresTerrain {
         for (prop, v) in old {
             ur.add_undo_property(&obj, prop, &v);
         }
-        ur.add_undo_method(&obj, "rebuild", &[]);
+        ur.add_undo_method(&obj, "reassemble", &[]);
         // Deferred: the do-method needs `self` unbound.
         ur.call_deferred("commit_action", &[]);
     }
