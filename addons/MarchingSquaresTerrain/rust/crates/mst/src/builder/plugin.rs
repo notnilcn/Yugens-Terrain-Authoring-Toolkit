@@ -282,6 +282,10 @@ pub struct PixelBuilderPlugin {
     ui: Option<LayoutUi>,
     /// HUD content key last drawn (the overlay schedules a deferred HUD refresh on change).
     hud_key: String,
+    /// Mesh data last seen by the builder (instance, revision, face count, vertex count):
+    /// recorded at each own commit and on every history change, so an undo / redo that changed
+    /// the topology clears the selection whose indices it invalidated (r4 #13).
+    seen_mesh: Option<(InstanceId, u64, usize, usize)>,
     /// Inspector "Editable Mesh" section.
     inspector: Option<Gd<super::inspector::PixelBuilderInspector>>,
     gizmo: Option<Gd<MeshInstance3D>>,
@@ -2115,6 +2119,19 @@ impl PixelBuilderPlugin {
         ur.add_do_method(data, "set_blob", &[after.to_variant()]);
         ur.add_undo_method(data, "set_blob", &[before.to_variant()]);
         ur.commit_action_ex().execute(false).done();
+        self.seen_mesh = Self::mesh_stamp(data);
+    }
+
+    /// (instance, revision, face count, vertex count) of a mesh data resource.
+    pub(super) fn mesh_stamp(
+        data: &Gd<PixelBuilderMeshData>,
+    ) -> Option<(InstanceId, u64, usize, usize)> {
+        if !data.is_instance_valid() {
+            return None;
+        }
+        let b = data.bind();
+        let m = b.cage();
+        Some((data.instance_id(), b.revision(), m.facets.len(), m.positions.len()))
     }
 
     fn every_or_picked_facets(&self, m: &BMesh) -> BTreeSet<usize> {

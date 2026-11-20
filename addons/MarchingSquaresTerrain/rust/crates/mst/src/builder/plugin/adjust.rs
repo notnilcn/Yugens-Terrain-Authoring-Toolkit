@@ -588,6 +588,34 @@ impl PixelBuilderPlugin {
         }
         // Undo / redo changed the mesh: the smoothing overlay follows (cheap when unchanged).
         self.refresh_attr_overlay();
+        // r4 #13: the HUD counters and the selection follow an undo / redo in the same action.
+        // A revision the builder did not commit itself whose topology differs from the last one
+        // seen came from undo / redo (or another editor action): the selected indices no longer
+        // name the same elements (an undone Extrude left a stale selected face), so clear them.
+        let stamp = self.contents().and_then(|d| Self::mesh_stamp(&d));
+        if let (Some(old), Some(new)) = (self.seen_mesh, stamp)
+            && old.0 == new.0
+            && old.1 != new.1
+        {
+            if (old.2, old.3) != (new.2, new.3) {
+                self.sel_faces.clear();
+                self.sel_edges.clear();
+                self.sel_verts.clear();
+                self.hover_face = None;
+                self.hover_edge = None;
+                self.hover_vert = None;
+            }
+            self.seen_mesh = stamp;
+            if self.adjust.is_none() {
+                // `redraw` prunes any remaining out-of-range index; `sync_ui` refreshes the strip
+                // facts / modeler HUD counters.
+                self.sync_ui();
+                self.redraw();
+                return;
+            }
+        } else {
+            self.seen_mesh = stamp;
+        }
         let Some(adj) = &self.adjust else { return };
         if adj.contents.is_instance_valid() && adj.contents.bind().get_blob() == adj.last {
             return;
