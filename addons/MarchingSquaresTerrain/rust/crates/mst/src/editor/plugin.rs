@@ -469,15 +469,24 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             let t = t.bind();
             let s = t.store().config.world_to_sample(v2(h.x, h.z));
             let c = t.store().config.chunk_of(s);
-            let mut l = format!(
-                "{}  |  height {:.2}  cell ({}, {})  chunk ({}, {})",
-                self.state.tool.moniker(),
-                h.y,
-                s.x,
-                s.y,
-                c.x,
-                c.y
-            );
+            let mut l = if self.state.tool == Tool::VertexPaint && self.state.paint_walls {
+                // Wall mode paints cliff faces: the ground height under the cursor says nothing
+                // about them (QA #16).
+                format!(
+                    "Wall Painting  |  cell ({}, {})  chunk ({}, {})",
+                    s.x, s.y, c.x, c.y
+                )
+            } else {
+                format!(
+                    "{}  |  height {:.2}  cell ({}, {})  chunk ({}, {})",
+                    self.state.tool.moniker(),
+                    h.y,
+                    s.x,
+                    s.y,
+                    c.x,
+                    c.y
+                )
+            };
             if !self.selection.is_empty() {
                 l.push_str(&format!("  |  {} selected", self.selection.len()));
             }
@@ -547,6 +556,8 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             self.foliage_hint()
         } else if self.vertex_handles_shown() {
             "LMB-drag a vertex handle: move that sample up / down  ·  RMB: cancel the drag  ·  Ctrl+LMB: select chunk".to_string()
+        } else if self.state.tool == Tool::VertexPaint && self.state.paint_walls {
+            "Paint Walls: LMB-drag paints the Material on cliff walls  ·  Ctrl+LMB: pick the wall material under the cursor  ·  Shift+wheel: size".to_string()
         } else {
             self.state.tool.hint().to_string()
         };
