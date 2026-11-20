@@ -25,5 +25,9 @@ void fragment() {
 	// Darken with the night factor published by PixelDayNight.
 	ALBEDO *= mix(1.0, 0.25, pt_night);
 	float b = float(alpha_bands);
-	ALPHA = floor(d * opacity * b + 0.5) / b;
+	// Fade the deck out towards its rim (in the same alpha bands as the clouds), so the
+	// finite plane never shows a hard square edge against the sky.
+	vec2 r = abs(UV * 2.0 - 1.0);
+	float rim = 1.0 - smoothstep(0.6, 1.0, max(r.x, r.y));
+	ALPHA = floor(d * opacity * rim * b + 0.5) / b;
 }

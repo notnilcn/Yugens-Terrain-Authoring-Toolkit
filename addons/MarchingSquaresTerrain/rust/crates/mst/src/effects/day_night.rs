@@ -52,14 +52,21 @@ fn keys(evening: bool) -> [Key; 7] {
             rgb(1.0, 0.5, 0.3405),
         )
     } else {
+        // Morning: a paler, cooler gold than the evening. The saturated rose sun and horizon
+        // (sun 1.0/0.66/0.5 at energy 1.15) washed water and terrain pink at dawn.
         (
-            rgb(1.0, 0.8805, 0.7205),
-            rgb(0.9605, 0.8005, 0.7005),
-            rgb(1.0, 0.7605, 0.5605),
-            rgb(0.9805, 0.6805, 0.5605),
-            rgb(1.0, 0.6605, 0.5),
-            rgb(0.9805, 0.6005, 0.5205),
+            rgb(1.0, 0.9105, 0.7905),
+            rgb(0.8805, 0.8205, 0.7805),
+            rgb(1.0, 0.8505, 0.7005),
+            rgb(0.8805, 0.7605, 0.7205),
+            rgb(1.0, 0.7905, 0.6505),
+            rgb(0.8605, 0.7005, 0.6805),
         )
+    };
+    let blue_hour_horizon = if evening {
+        rgb(0.8005, 0.4405, 0.5)
+    } else {
+        rgb(0.6205, 0.5205, 0.6405)
     };
     [
         // Night: a readable moonlit blue (silhouettes, rim, lanterns and fireflies carry it),
@@ -88,7 +95,7 @@ fn keys(evening: bool) -> [Key; 7] {
             sun: rgb(0.9505, 0.6205, 0.7405),
             sun_energy: 0.4505,
             sky_top: rgb(0.1405, 0.1705, 0.4405),
-            sky_horizon: rgb(0.8005, 0.4405, 0.5),
+            sky_horizon: blue_hour_horizon,
             ambient: rgb(0.4005, 0.4805, 0.9505),
             ambient_energy: 0.8005,
         },
@@ -119,17 +126,22 @@ fn keys(evening: bool) -> [Key; 7] {
             ambient: rgb(0.5, 0.5605, 0.7605),
             ambient_energy: 0.5405,
         },
+        // Day: sun + ambient kept under white on a bright albedo (sand at energy 1.1 + 0.6
+        // ambient clipped to a flat pale yellow at noon and lost its texture and shape).
         Key {
             elevation: 0.5,
             sun: rgb(1.0, 0.9705, 0.9005),
-            sun_energy: 1.1005,
+            sun_energy: NOON_SUN_ENERGY,
             sky_top: rgb(0.3505, 0.5505, 0.8505),
             sky_horizon: rgb(0.6505, 0.7805, 0.9005),
             ambient: rgb(0.5505, 0.6005, 0.7005),
-            ambient_energy: 0.6005,
+            ambient_energy: 0.4505,
         },
     ]
 }
+
+/// Sun energy of the day key (also the "full daylight" reference of `pt_sun_light`).
+const NOON_SUN_ENERGY: f32 = 0.9505;
 
 /// Sun elevation (sine of the altitude) below which the light becomes the moon. Between it and
 /// the horizon the sun still lights the scene, aimed from no lower than [`MIN_SUN_ELEVATION`].
@@ -179,6 +191,12 @@ fn probe(e: f32, evening: bool) -> Key {
         }
     }
     last
+}
+
+/// `c` moved `amount` (0..1) towards its own luminance grey.
+fn desaturate(c: Color, amount: f32) -> Color {
+    let l = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722;
+    c.lerp(Color::from_rgba(l, l, l, c.a), amount.clamp(0.0, 1.0) as f64)
 }
 
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
@@ -568,9 +586,9 @@ impl PixelDayNight {
         }
 
         globals::assign("pt_night", &night.to_variant());
-        // Sun light vs daylight (noon energy 1.1005): god rays fade with it through the sunset.
+        // Sun light vs daylight (noon energy): god rays fade with it through the sunset.
         let sun_light = if elevation >= DUSK_FLOOR {
-            key.sun_energy / 1.1005
+            key.sun_energy / NOON_SUN_ENERGY
         } else {
             0.0
         };
@@ -697,7 +715,9 @@ impl PixelDayNight {
         }
         let mut color = match &mut self.fog_gradient {
             Some(g) => g.sample(t),
-            None => key.sky_horizon.lerp(key.ambient, 0.2505),
+            // Fog veils the whole far scene: a desaturated horizon, so a rose dawn horizon
+            // does not wash the water and terrain pink.
+            None => desaturate(key.sky_horizon.lerp(key.ambient, 0.2505), 0.5),
         };
         let mut density = 0.0;
         if self.apply_fog {

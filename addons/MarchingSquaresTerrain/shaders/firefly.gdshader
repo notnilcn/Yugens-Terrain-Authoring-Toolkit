@@ -1,6 +1,6 @@
 // Marching Squares Terrain - fireflies (MultiMesh quads). INSTANCE_CUSTOM.x = random phase.
 shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
 
 // Shared effect clock (clock.rs), used instead of TIME so the editor can idle.
 global uniform float pt_time;

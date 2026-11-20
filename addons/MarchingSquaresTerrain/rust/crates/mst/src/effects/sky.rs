@@ -69,7 +69,8 @@ pub struct PixelSky {
     #[export]
     #[var(set = set_deck_enabled)]
     deck_enabled: bool,
-    /// Side length of the deck plane.
+    /// Side length of the deck plane (grown automatically when the camera is far below or
+    /// above the clouds, so the deck always reaches the horizon of the view).
     #[export(range = (10.0, 4000.0, 1.0, or_greater))]
     deck_size: f32,
     #[export(range = (0.0, 1.0, 0.0105))]
@@ -287,9 +288,15 @@ impl PixelSky {
         } else {
             self.base().get_viewport().and_then(|vp| vp.get_camera_3d())
         };
-        let centre = match cam {
+        // The deck must reach well past the view: a high deck (e.g. 300 m) over a low camera is
+        // only seen at shallow angles, far from the point above the camera, so a fixed 400-900 m
+        // deck left the visible sky empty (and coverage changes then showed no difference).
+        // Grow it with the camera's distance to the cloud plane; the shader fades its rim.
+        let (centre, s) = match cam {
             Some(c) => {
                 let t = c.get_global_transform();
+                let gap = (self.cloud_height - t.origin.y).abs();
+                let s = self.deck_size.max(gap * 12.0).clamp(1.0, 20000.0);
                 let fwd = -t.basis.col_c();
                 let hit = if fwd.y.abs() > 1e-3 {
                     (self.cloud_height - t.origin.y) / fwd.y
@@ -297,18 +304,22 @@ impl PixelSky {
                     -1.0
                 };
                 let p = if hit > 0.0 {
-                    t.origin + fwd * hit.min(self.deck_size)
+                    t.origin + fwd * hit.min(s * 0.25)
                 } else {
                     t.origin
                 };
-                Vector3::new(p.x, self.cloud_height, p.z)
+                (Vector3::new(p.x, self.cloud_height, p.z), s)
             }
             None => {
                 let p = self.base().get_global_position();
-                Vector3::new(p.x, self.cloud_height, p.z)
+                (
+                    Vector3::new(p.x, self.cloud_height, p.z),
+                    self.deck_size.max(1.0),
+                )
             }
         };
-        let s = self.deck_size.max(1.0);
+        // Coarse steps, so the transform (and the editor redraw) changes rarely.
+        let s = 2f32.powf((s.log2() * 4.0).ceil() * 0.25);
         writes::set_global_transform(
             &mut deck,
             Transform3D::new(Basis::from_scale(Vector3::new(s, 1.0, s)), centre),

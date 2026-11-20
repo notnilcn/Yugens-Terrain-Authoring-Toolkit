@@ -13,6 +13,7 @@
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::object::ConnectFlags;
 use godot::classes::camera_3d::ProjectionType;
+use godot::classes::Camera3D;
 use godot::classes::{INode3D, MeshInstance3D, Node, Node3D, PlaneMesh, ShaderMaterial};
 use godot::prelude::*;
 
@@ -104,8 +105,8 @@ pub struct PixelWater {
     #[var(set = assign_cascade_stuff)]
     cascade_stuff: Option<Gd<ShaderMaterial>>,
 
-    /// `follow_camera` under an orthographic camera: the plane is scaled by this power of two
-    /// so it covers the zoomed-out view (runtime only).
+    /// `follow_camera`: the plane is scaled by this power of two so it covers the view out to
+    /// where the camera sees the water (runtime only).
     follow_scale: f32,
     falls_dirty: bool,
     falls_node: Option<Gd<MeshInstance3D>>,
@@ -119,6 +120,10 @@ pub struct PixelWater {
 
 /// Properties of the old `MeshInstance3D`-based PixelWater still found in saved scenes; the node
 /// rebuilds its meshes and material itself, so they are accepted and ignored.
+/// Largest power-of-two growth of a `follow_camera` plane (a low orthographic orbit sees the
+/// water out to the far plane).
+const MAX_FOLLOW_SCALE: f32 = 64.0;
+
 const LEGACY_PROPS: &[&str] = &[
     "mesh",
     "material_override",
@@ -380,29 +385,23 @@ impl PixelWater {
         let node_xf = self.base().get_global_transform();
         let mut offset = Vector3::ZERO;
         let mut scale_k = 1.0f32;
+        let mut view_far = 0.0f32;
         if self.follow_camera {
             let me: Gd<Node> = self.to_gd().upcast();
             if let Some(cam) = super::active_camera(&me) {
-                if cam.get_projection() == ProjectionType::ORTHOGONAL {
-                    // Ground footprint of the orthographic view (half of its long diagonal,
-                    // stretched by the view's tilt), plus the rim's fade band: grow the plane
-                    // in powers of two, so its lattice changes only on large zoom steps.
-                    let aspect = cam
-                        .get_viewport()
-                        .map(|vp| {
-                            let r = vp.get_visible_rect().size;
-                            r.x / r.y.max(1.0)
-                        })
-                        .unwrap_or(1.7778);
-                    let tilt = (-cam.get_global_basis().col_c()).y.abs().max(0.25);
-                    let reach = 0.5 * cam.get_size() * (aspect * aspect + 1.0 / (tilt * tilt)).sqrt();
-                    let half = 0.5 * self.size.x.min(self.size.y).max(0.0105);
-                    let need = reach / (1.0 - self.rim_fade.clamp(0.0, 0.9));
-                    while half * scale_k < need && scale_k < 16.0 {
-                        scale_k *= 2.0;
-                    }
-                }
+                view_far = cam.get_far();
                 let focus = super::camera_focus(&cam, node_xf.origin.y);
+                // Ground footprint of the view: where the four corner rays meet the water (or
+                // the far plane, for rays that pass over it), plus the rim's fade band. Grow the
+                // plane in powers of two, so its lattice changes only on large zoom steps. The
+                // old orthographic-only estimate (tilt floored at 0.25) left a low orbit, or any
+                // perspective camera, looking past the plane's edge into the void.
+                let reach = Self::view_reach(&cam, node_xf.origin.y, focus);
+                let half = 0.5 * self.size.x.min(self.size.y).max(0.0105);
+                let need = reach / (1.0 - self.rim_fade.clamp(0.0, 0.9));
+                while half * scale_k < need && scale_k < MAX_FOLLOW_SCALE {
+                    scale_k *= 2.0;
+                }
                 let local = node_xf.affine_inverse() * focus;
                 let cells = (self.subdivisions.clamp(0, 256) + 1) as f32;
                 let step = Vector2::new(
@@ -434,7 +433,47 @@ impl PixelWater {
             );
             m.param("plane_rect", &rect.to_variant());
             m.param("rim_fade", &self.rim_fade.clamp(0.0, 1.0).to_variant());
+            m.param("view_far", &view_far.to_variant());
         }
+    }
+
+    /// Largest horizontal distance from `focus` to where the view's corner rays meet the plane
+    /// `y = level`. Orthographic: a ray that misses it, or meets it past the far plane, counts
+    /// to the far plane (an ortho view has no horizon: past the plane is the void).
+    /// Perspective: rays over the horizon are skipped (the rim fades into the sky behind it
+    /// there) and hits count to a quarter of the far plane at most, so the grid stays fine.
+    fn view_reach(cam: &Gd<Camera3D>, level: f32, focus: Vector3) -> f32 {
+        let ortho = cam.get_projection() == ProjectionType::ORTHOGONAL;
+        let size = cam
+            .get_viewport()
+            .map(|vp| vp.get_visible_rect().size)
+            .unwrap_or(Vector2::new(1920.0, 1080.0));
+        let far = if ortho {
+            cam.get_far().max(1.0)
+        } else {
+            (cam.get_far() * 0.25).max(1.0)
+        };
+        let mut reach = 0.0f32;
+        for p in [
+            Vector2::ZERO,
+            Vector2::new(size.x, 0.0),
+            Vector2::new(0.0, size.y),
+            size,
+            Vector2::new(size.x * 0.5, 0.0),
+        ] {
+            let o = cam.project_ray_origin(p);
+            let d = cam.project_ray_normal(p);
+            let t = if d.y < -1e-4 {
+                ((level - o.y) / d.y).clamp(0.0, far)
+            } else if ortho {
+                far
+            } else {
+                continue;
+            };
+            let h = o + d * t;
+            reach = reach.max(Vector2::new(h.x - focus.x, h.z - focus.z).length());
+        }
+        if reach.is_finite() { reach } else { far }
     }
 
     /// Updates the plane mesh and material.

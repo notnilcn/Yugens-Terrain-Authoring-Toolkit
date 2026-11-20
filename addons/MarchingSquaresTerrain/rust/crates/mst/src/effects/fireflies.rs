@@ -9,7 +9,9 @@
 use crate::writes::ShaderParams;
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::multi_mesh::TransformFormat;
-use godot::classes::{INode3D, MultiMesh, MultiMeshInstance3D, Node3D, QuadMesh, ShaderMaterial};
+use godot::classes::{
+    INode3D, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh, ShaderMaterial,
+};
 use godot::prelude::*;
 
 use super::Rng;
@@ -67,6 +69,10 @@ pub struct PixelFireflies {
     layers: u32,
 
     stuff: Option<Gd<ShaderMaterial>>,
+    /// Terrain the swarm hovers over (fireflies under the ground surface are depth-hidden).
+    terrain: Option<Gd<Node>>,
+    /// Whether the last build found the terrain (else `process` retries once it loads).
+    grounded: bool,
     /// Internal swarm node (never saved).
     swarm: Option<Gd<MultiMeshInstance3D>>,
     base: Base<Node3D>,
@@ -121,6 +127,8 @@ impl INode3D for PixelFireflies {
             energy: 2.0,
             layers: 1,
             stuff: None,
+            terrain: None,
+            grounded: false,
             swarm: None,
             base,
         }
@@ -135,6 +143,16 @@ impl INode3D for PixelFireflies {
         crate::features::observe(&self.to_gd());
         self.reassemble();
         super::gate(&self.to_gd(), Feature::Fireflies);
+    }
+
+    fn process(&mut self, _delta: f64) {
+        // The terrain may load after this node (or be added later): lift the swarm onto it then.
+        if !self.grounded && self.swarm.is_some() {
+            let node: Gd<Node> = self.to_gd().upcast();
+            if super::find_terrain(&node).is_some() {
+                self.reassemble();
+            }
+        }
     }
 
     fn get_configuration_warnings(&self) -> PackedStringArray {
@@ -181,18 +199,45 @@ impl PixelFireflies {
         mm.set_instance_count(n);
         let mut rng = Rng(self.seed as u64 ^ 0x5DEE_CE66_D1CE_4E5B);
         let e = self.extents.abs();
+        let node: Gd<Node> = self.to_gd().upcast();
+        if !self.terrain.as_ref().is_some_and(|t| t.is_instance_valid()) {
+            self.terrain = super::find_terrain(&node);
+        }
+        self.grounded = self.terrain.is_some();
+        let gt = self.base().get_global_transform();
+        let inv = gt.affine_inverse();
+        // Fireflies hover between `CLEARANCE` and the box height above the ground: a box
+        // centred at ground level (as placed by hand or by Add) put half of them under the
+        // terrain, where the depth test hid them, and a low box hid them all.
+        const CLEARANCE: f32 = 0.35;
+        let band = (e.y * 2.0).max(0.6);
+        let (mut lo, mut hi) = (Vector3::splat(f32::MAX), Vector3::splat(f32::MIN));
         for i in 0..n {
-            let p = Vector3::new(
+            let mut p = Vector3::new(
                 (rng.next_f32() * 2.0 - 1.0) * e.x,
                 (rng.next_f32() * 2.0 - 1.0) * e.y,
                 (rng.next_f32() * 2.0 - 1.0) * e.z,
             );
+            let lift = rng.next_f32();
+            if self.grounded {
+                let mut w = gt * p;
+                let ground = super::ground_height(&mut self.terrain, w, f32::NEG_INFINITY);
+                if ground.is_finite() && w.y < ground + CLEARANCE {
+                    w.y = ground + CLEARANCE + lift * band;
+                    p = inv * w;
+                }
+            }
+            lo = Vector3::new(lo.x.min(p.x), lo.y.min(p.y), lo.z.min(p.z));
+            hi = Vector3::new(hi.x.max(p.x), hi.y.max(p.y), hi.z.max(p.z));
             mm.set_instance_transform(i, Transform3D::new(Basis::IDENTITY, p));
             mm.set_instance_custom_data(i, Color::from_rgba(rng.next_f32(), 0.0, 0.0, 0.0));
         }
+        if n == 0 {
+            (lo, hi) = (-e, e);
+        }
         // The shader moves vertices, so give culling a box that covers the whole swarm.
-        let grow = Vector3::splat(self.wander + self.size);
-        mm.set_custom_aabb(Aabb::new(-e - grow, (e + grow) * 2.0));
+        let grow = Vector3::splat(self.wander + self.size + 0.5);
+        mm.set_custom_aabb(Aabb::new(lo - grow, hi - lo + grow * 2.0));
         self.swarm().set_multimesh(&mm);
 
         if self.stuff.is_none() {
