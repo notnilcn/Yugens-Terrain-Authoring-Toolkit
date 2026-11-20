@@ -5,7 +5,8 @@ editor scale 1.0; primary window 1600×900, plus 1920×1080, 1366×768, 1280×80
 driving the actual UI with synthetic mouse and keyboard input. `--headless` (dummy renderer) cannot render or screenshot the editor, so the
 virtual-display setup was the closest headless-capable equivalent that still produces images.
 Screenshots and per-area reproduction notes live in [`qa/`](qa/) (`qa/screenshots/<area>/`,
-`qa/findings/<area>.md`).
+`qa/findings/<area>.md`); the orchestrator runbook is
+[`qa/METHODOLOGY.md`](qa/METHODOLOGY.md).
 
 Legend: **Critical** = crash/blocker; **Error** = a documented control does nothing or data is
 lost; **Warning** = a feature works but is misleading, unreachable, or not undoable;

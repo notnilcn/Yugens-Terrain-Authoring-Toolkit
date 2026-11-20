@@ -1,7 +1,8 @@
 # QA harness for MarchingSquaresTerrain
 
 Tools used to drive the **real Godot editor** (not a mock) and capture evidence for
-`ISSUES.md` / `FEEDBACK.md`. Everything here is disposable QA scaffolding; no addon code is
+`ISSUES.md` / `FEEDBACK.md`. For an end-to-end runbook (setup, waves, subagent briefs, failure
+playbook, re-run checklist), see [`METHODOLOGY.md`](METHODOLOGY.md). Everything here is disposable QA scaffolding; no addon code is
 changed.
 
 ## What runs
