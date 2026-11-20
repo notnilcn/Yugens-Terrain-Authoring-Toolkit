@@ -494,8 +494,14 @@ impl MarchingSquaresTexturePreset {
             }
             None => (None, 12),
         };
+        // `get_image()` hands out the editor's cached image of the texture itself (Compatibility
+        // renderer, `image_cache_2d`): work on a copy. Resizing / tinting it in place shrank the
+        // shared image and multiplied every slot's tint into it, so a texture used by several
+        // slots (MST Classic: `mst_noise.png` in slots 1-6) turned black in the resource
+        // picker thumbnails, later previews and the terrain's texture array (QA #21).
         texture
             .and_then(|t| t.get_image())
+            .map(|img| img.duplicate_resource())
             .map(|mut img| {
                 if img.is_compressed() {
                     img.decompress();

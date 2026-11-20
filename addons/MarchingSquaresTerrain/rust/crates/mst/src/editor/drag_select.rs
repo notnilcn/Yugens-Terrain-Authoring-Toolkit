@@ -139,9 +139,10 @@ impl MarchingSquaresTerrainPlugin {
         Some(if self.selection.is_empty() {
             "  |  LMB: select cells".to_string()
         } else if self.hover_selected() {
-            "  |  LMB-drag: move selection  Shift: add  Ctrl: remove  RMB/Esc: clear".to_string()
+            "  |  LMB-drag: move selection  ·  Shift: add  ·  Ctrl: remove  ·  RMB/Esc: clear"
+                .to_string()
         } else {
-            "  |  LMB: new selection (drag a white cell to move)  Shift: add  RMB/Esc: clear"
+            "  |  LMB: new selection (drag a white cell to move)  ·  Shift: add  ·  RMB/Esc: clear"
                 .to_string()
         })
     }

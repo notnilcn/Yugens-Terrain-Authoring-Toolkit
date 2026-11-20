@@ -59,7 +59,7 @@ pub const BRUSH_MODES: [&str; 2] = ["Drag", "Raise / Lower"];
 const BRUSH_SHORTCUTS: &str = "[SHORTCUTS]
 • Shift+LMB+Drag: Add cells to the current draw selection.
 • Shift+MWU/MWD: Increase or decrease the brush size.
-• Ctrl+MWU/MWD: Increase or decrease the strength.
+• Ctrl+MWU/MWD: Increase or decrease the strength (Raise / Lower, Smooth, Gradient).
 • Alt/RMB/Esc: Reset the current draw selection.
 • 1-9: Switch tools.
 These shortcuts apply to all brush related tools.";
@@ -113,13 +113,13 @@ impl Tool {
                 "LMB: paint a selection  ·  LMB-drag selected cells: raise / lower  ·  Shift: add  ·  Ctrl: remove  ·  Alt: one cell  ·  RMB / Esc: clear"
             }
             Tool::RaiseLower => {
-                "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size"
+                "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Level => {
-                "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
+                "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size"
             }
             Tool::Smooth => {
-                "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size"
+                "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Bridge => {
                 "LMB-drag from the start to the end point: build a ramp  ·  Shift+wheel: width"
@@ -139,7 +139,7 @@ impl Tool {
                 "LMB: stamp  ·  LMB-drag: size + rotation  ·  Shift / Ctrl / Alt+wheel: size / height / rotate"
             }
             Tool::Gradient => {
-                "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp"
+                "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Select => {
                 "LMB-drag: select  ·  C: copy  ·  V: paste (Z / X rotate, M mirror)  ·  Alt / Esc: clear"
@@ -426,6 +426,9 @@ pub fn portray(s: Setting, t: Tool) -> (&'static str, Kind) {
         Height => ("Height", Kind::Spin(-50.0, 50.0, 0.1005)),
         Floor => ("Floor", Kind::Spin(-50.0, 50.0, 0.1005)),
         Strength if t == Tool::RaiseLower => ("Strength", Kind::HSlider(0.2505, 30.0, 0.2505)),
+        // Gradient strength is a 0..1 blend per stroke step (the state clamps it there); the
+        // Smooth range topped out at 0.3, so clicks past 30 % of the slider all read 0.300.
+        Strength if t == Tool::Gradient => ("Strength", Kind::HSlider(0.0055, 1.0, 0.0055)),
         Strength => ("Strength", Kind::HSlider(0.0255, 0.3005, 0.0055)),
         Flatten => ("Flatten", Kind::Check),
         Falloff => ("Falloff", Kind::Check),

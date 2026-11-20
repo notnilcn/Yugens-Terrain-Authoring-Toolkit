@@ -308,8 +308,11 @@ pub struct PixelDayNight {
     #[export]
     fog_density_curve: Option<Gd<Curve>>,
 
-    /// Fog was switched on for PixelWeather only (not `apply_fog`).
-    weather_fog_on: bool,
+    /// The environment's own fog (enabled, light color, density) from before this node took it
+    /// over (`apply_fog` or PixelWeather fog); restored when neither drives the fog any more,
+    /// so turning `apply_fog` off (or undoing a lighting preset) does not leave the last tinted
+    /// fog behind.
+    fog_saved: Option<(bool, Color, f32)>,
     #[export_subgroup(name = "Light", prefix = "light_")]
     #[export_group(name = "Lighting")]
     /// Cel light ramp for every pixel shader's sun light (replaces the even toon bands):
@@ -374,7 +377,7 @@ impl INode for PixelDayNight {
             fog_density: 0.0025,
             fog_night_density: 0.0065,
             fog_density_curve: None,
-            weather_fog_on: false,
+            fog_saved: None,
             light_ramp_preset: 0,
             light_ramp: None,
             light_wrap: 0.0,
@@ -500,7 +503,7 @@ impl PixelDayNight {
         let mut sun_extra = 0.0;
         if let Some(m) = weather {
             key.sun_energy *= m.p.sun_scale;
-            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * 2.5005;
+            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * m.flash_energy;
             key.sky_top = super::weather::overcast(key.sky_top, m.p.sky_darken);
             key.sky_horizon = super::weather::overcast(key.sky_horizon, m.p.sky_darken);
             let flash = Color::from_rgb(0.8005, 0.8505, 1.0);
@@ -677,12 +680,20 @@ impl PixelDayNight {
         let weather = super::weather::mingle();
         let weather_fog = weather.map(|m| m.p.fog_density).unwrap_or(0.0);
         if !self.apply_fog && weather_fog <= 1e-5 {
-            if self.weather_fog_on {
-                // Weather fog cleared and the day/night does not drive fog: switch it back off.
-                crate::set_changed!(env, is_fog_enabled, set_fog_enabled, false);
-                self.weather_fog_on = false;
+            if let Some((on, color, density)) = self.fog_saved.take() {
+                // Nothing drives the fog any more: give the environment its own fog back.
+                crate::set_changed!(env, is_fog_enabled, set_fog_enabled, on);
+                crate::set_changed!(env, get_fog_light_color, set_fog_light_color, color);
+                crate::set_changed!(env, get_fog_density, set_fog_density, density);
             }
             return;
+        }
+        if self.fog_saved.is_none() {
+            self.fog_saved = Some((
+                env.is_fog_enabled(),
+                env.get_fog_light_color(),
+                env.get_fog_density(),
+            ));
         }
         let mut color = match &mut self.fog_gradient {
             Some(g) => g.sample(t),
@@ -694,8 +705,6 @@ impl PixelDayNight {
             if let Some(c) = &self.fog_density_curve {
                 density *= c.sample(t);
             }
-        } else {
-            self.weather_fog_on = true;
         }
         if let Some(m) = weather {
             density += m.p.fog_density;

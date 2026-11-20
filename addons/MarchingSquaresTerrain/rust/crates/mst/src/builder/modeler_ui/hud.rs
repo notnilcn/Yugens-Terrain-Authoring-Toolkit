@@ -6,7 +6,7 @@
 //! The panel sits at the bottom centre of the viewport: bold title, detail line, form, buttons
 //! Snap / Options / Cancel / Done, all `FOCUS_NONE`; the *ToolOptions* popup with the tool's form
 //! and its commands. Content priority is tool > message, the done button reads "Create" / "Done",
-//! and messages dismiss. Tool Options shows the strip fields the tool uses (`ui::field_visible`,
+//! and error messages dismiss (informational ones stay in the overlay status lines). Tool Options shows the strip fields the tool uses (`ui::field_visible`,
 //! the MST strip's rule).
 
 use godot::builtin::Side;
@@ -40,8 +40,9 @@ pub struct Content {
     pub done: String,
 }
 
-/// Tool (any drawing tool) > message; none in the Select tool without a message or while the
-/// adjust panel is open.
+/// Tool (any drawing tool) > error message; none in the Select tool without an error message
+/// (informational messages stay in the top-left overlay status) or while the adjust panel is
+/// open.
 pub fn payload(st: &SyncState, kind: ShapeKind, bezier_block: bool) -> Option<Content> {
     if st.adjusting || !st.visible {
         return None;
@@ -93,6 +94,12 @@ pub fn payload(st: &SyncState, kind: ShapeKind, bezier_block: bool) -> Option<Co
         ]
         .iter()
         .any(|w| st.message.to_lowercase().contains(w));
+        // Informational messages ("Created Box", layout switches) already show in the
+        // top-left overlay status lines; a card at the bottom centre would cover the model
+        // and swallow clicks on the faces under it. Only errors get the dismissable card.
+        if !error {
+            return None;
+        }
         return Some(Content {
             heading: "Modeler".into(),
             detail: st.message.clone(),
@@ -457,5 +464,36 @@ impl Hud {
         self.remove_point
             .set_visible(matches!(st.tool, Tool::Bezier | Tool::Knife | Tool::Shape));
         self.tool_options.reset_size();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state(message: &str) -> SyncState {
+        SyncState {
+            visible: true,
+            message: message.into(),
+            ..SyncState::default()
+        }
+    }
+
+    /// Informational messages stay in the overlay status lines; only errors get the card.
+    #[test]
+    fn only_error_messages_get_the_card() {
+        assert_eq!(payload(&state("Created Box"), ShapeKind::Box, false), None);
+        assert_eq!(payload(&state(""), ShapeKind::Box, false), None);
+        let c = payload(
+            &state("Poly shape: cannot triangulate"),
+            ShapeKind::Box,
+            false,
+        )
+        .expect("error card");
+        assert!(c.error && !c.tool);
+        // A drawing tool keeps its panel.
+        let mut st = state("Created Box");
+        st.tool = Tool::Shape;
+        assert!(payload(&st, ShapeKind::Box, false).is_some_and(|c| c.tool));
     }
 }

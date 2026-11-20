@@ -4,7 +4,7 @@
 
 use godot::classes::control::SizeFlags;
 use godot::classes::{
-    AcceptDialog, Button, ButtonGroup, CheckBox, ColorPickerButton, ConfirmationDialog, Control,
+    Button, ButtonGroup, CheckBox, ColorPickerButton, ConfirmationDialog, Control,
     DirAccess, EditorInterface, EditorResourcePicker, EditorSpinSlider, HBoxContainer, HSeparator,
     HSlider, ImageTexture, Label, LineEdit, OptionButton, ResourceLoader, ResourceSaver, SpinBox,
     TextureRect, VBoxContainer, VFlowContainer,
@@ -25,6 +25,16 @@ use crate::terrain::textures::{
 pub const PRESET_DIR: &str = "res://addons/MarchingSquaresTerrain/texture_presets/";
 /// Metadata on a terrain's (duplicated) preset remembering which file it came from.
 const PRESET_META: &str = "mst_preset_path";
+/// Number carried by a control's signal: `item_selected` sends an int, `value_changed` a
+/// float, `toggled` a bool. `Variant::try_to::<f64>` is strict (an int variant fails), so read
+/// whichever it is.
+pub(super) fn setting_num(v: &Variant) -> f64 {
+    v.try_to::<f64>()
+        .or_else(|_| v.try_to::<i64>().map(|i| i as f64))
+        .or_else(|_| v.try_to::<bool>().map(|b| b as i32 as f64))
+        .unwrap_or(0.0)
+}
+
 /// Name of the toolbar's compact-mode switch.
 const COMPACT_BUTTON: &str = "ToolbarCompact";
 /// Editor project metadata (section, key) remembering the toolbar's compact mode.
@@ -208,7 +218,11 @@ impl MarchingSquaresTerrainPlugin {
         title.set_name("ToolTitle");
         match self.state.tool {
             Tool::ChunkManager => self.build_chunk_strip(&mut strip),
-            Tool::TerrainSettings => self.build_settings_strip(&mut strip),
+            Tool::TerrainSettings => {
+                // Same strip height on every page: the page tabs stay under the pointer.
+                strip.pin_height();
+                self.build_settings_strip(&mut strip)
+            }
             t => {
                 for &s in tools::settings_for(t) {
                     let c = self.build_setting(&mut strip, s, t);
@@ -238,9 +252,18 @@ impl MarchingSquaresTerrainPlugin {
                     .hslider(label, min, max, step, v, &self.cb1("on_float", id))
                     .upcast()
             }
-            Kind::Spin(min, max, step) => strip
-                .spin_slider(label, min, max, step, v, &self.cb1("on_float", id))
-                .upcast(),
+            Kind::Spin(min, max, step) => {
+                let mut sl = strip.spin_slider(label, min, max, step, v, &self.cb1("on_float", id));
+                // Heights may be typed beyond the drag range (terrains taller than ±50); angles,
+                // ease and rotations stay inside their declared range.
+                if matches!(
+                    s,
+                    Setting::Ceiling | Setting::Height | Setting::Floor | Setting::StampHeight
+                ) {
+                    ui_kit::open_range(&mut sl, true, true);
+                }
+                sl.upcast()
+            }
             Kind::Check => strip
                 .checkbox(label, v != 0.0, &self.cb1("on_bool", id))
                 .upcast(),
@@ -337,7 +360,7 @@ impl MarchingSquaresTerrainPlugin {
                 continue;
             }
             if let Ok(mut r) = c.clone().try_cast::<godot::classes::Range>() {
-                r.set_value_no_signal(v);
+                ui_kit::show_value(&mut r, v);
             } else if let Ok(mut cb) = c.clone().try_cast::<CheckBox>() {
                 cb.set_pressed_no_signal(v != 0.0);
             } else if let Ok(mut ob) = c.clone().try_cast::<OptionButton>() {
@@ -447,9 +470,59 @@ impl MarchingSquaresTerrainPlugin {
             .as_ref()
             .is_some_and(|t| t.get("chunk_handles").to::<bool>());
         let mut h = strip.checkbox("Vertex Handles", handles, &self.cb("on_chunk_handles"));
-        h.set_tooltip_text("Drag handles on every sample of the selected chunk (the original's chunk gizmo; one undo step per drag).");
+        h.set_tooltip_text("Drag handles on every sample of the selected chunk (the original's chunk gizmo; one undo step per drag). While on, clicks do not add or remove chunks.");
         strip.separator();
-        strip.hint("LMB +: add chunk  ·  LMB chunk: remove  ·  Ctrl+LMB: select");
+        strip.hint(if self.vertex_handles_shown() {
+            "LMB-drag handle: move sample  ·  Ctrl+LMB: select"
+        } else {
+            "LMB +: add chunk  ·  LMB chunk: remove  ·  Ctrl+LMB: select"
+        });
+    }
+
+    /// A click can add chunk `c`: it is empty and touches an existing chunk (or the terrain
+    /// has none yet). Only these slots get a "+" handle.
+    pub(super) fn chunk_addable(&self, c: pt_core::math::IVec2) -> bool {
+        self.terrain.as_ref().is_some_and(|t| {
+            let t = t.bind();
+            let st = t.store();
+            !st.has_chunk(c)
+                && (st.chunks.is_empty()
+                    || st.config.chunk_neighbors(c).iter().any(|n| st.has_chunk(*n)))
+        })
+    }
+
+    /// Chunk Manager with Vertex Handles on and a chunk to show them on: clicks only drag
+    /// handles (no chunk add / remove).
+    pub(super) fn vertex_handles_shown(&self) -> bool {
+        self.state.tool == Tool::ChunkManager
+            && self.terrain.as_ref().is_some_and(|t| {
+                t.get("chunk_handles").try_to::<bool>().unwrap_or(false)
+                    && t.bind().store().has_chunk(crate::util::to_iv(
+                        t.get("handle_chunk").try_to::<Vector2i>().unwrap_or_default(),
+                    ))
+            })
+    }
+
+    /// Chunk Manager part of the viewport status line: what a click on the hovered slot does.
+    pub(super) fn chunk_status(&self) -> Option<String> {
+        if self.state.tool != Tool::ChunkManager {
+            return None;
+        }
+        if self.vertex_handles_shown() {
+            return Some("  |  Vertex Handles: LMB-drag a handle (chunk add / remove off)".into());
+        }
+        let c = self.hover_chunk?;
+        let exists = self.terrain.as_ref()?.bind().store().has_chunk(c);
+        Some(if exists {
+            format!("  |  LMB: remove chunk ({}, {})", c.x, c.y)
+        } else if self.chunk_addable(c) {
+            format!("  |  LMB: add chunk ({}, {})", c.x, c.y)
+        } else {
+            format!(
+                "  |  chunk ({}, {}) cannot be added: new chunks must touch an existing chunk",
+                c.x, c.y
+            )
+        })
     }
 
     pub(super) fn refresh_chunk_list(&mut self) {
@@ -883,6 +956,14 @@ fn settings_page_of(t: &TSetting) -> usize {
     }
 }
 
+/// Settings fixed once chunks exist (see `MarchingSquaresTerrain::layout_fixed`).
+fn layout_prop(prop: &str) -> bool {
+    matches!(prop, "chunk_size" | "ring_radius")
+}
+
+const LAYOUT_FIXED_TIP: &str =
+    "Locked: chunks already exist for this grid type. Clear the terrain data or switch the grid type to change it.";
+
 fn spin(min: f64, max: f64, step: f64, value: f64) -> Gd<SpinBox> {
     let mut sb = SpinBox::new_alloc();
     sb.set_min(min);
@@ -903,8 +984,20 @@ impl MarchingSquaresTerrainPlugin {
             .unwrap_or_default()
     }
 
+    /// Version of the undo history that holds the terrain's actions.
+    pub(super) fn terrain_undo_version(&self) -> Option<u64> {
+        let t = self.terrain.as_ref()?;
+        let ur = self.base().get_undo_redo()?;
+        let id = ur.get_object_history_id(t);
+        Some(ur.get_history_undo_redo(id)?.get_version())
+    }
+
+    fn layout_fixed(&self) -> bool {
+        self.terrain.as_ref().is_some_and(|t| t.bind().layout_fixed())
+    }
+
     fn turf_stuff(&self) -> Option<Gd<godot::classes::ShaderMaterial>> {
-        self.terrain_prop("grass_material")
+        self.terrain_prop("turf_stuff")
             .try_to::<Gd<godot::classes::ShaderMaterial>>()
             .ok()
     }
@@ -937,13 +1030,19 @@ impl MarchingSquaresTerrainPlugin {
                 _ => !matches!(t.sort, TKind::Action("save")) || storage != 0,
             })
             .collect();
+        let fixed = self.layout_fixed();
         let built: Vec<Gd<HBoxContainer>> = rows
             .iter()
             .map(|(i, t)| {
                 let mut c = self.build_terrain_setting(*i, t);
-                c.set_tooltip_text(t.tip);
+                let tip = if layout_prop(t.prop) && fixed {
+                    format!("{}\n{LAYOUT_FIXED_TIP}", t.tip)
+                } else {
+                    t.tip.to_string()
+                };
+                c.set_tooltip_text(&tip);
                 let mut row = ui_kit::settings_row(t.label, &c);
-                row.set_tooltip_text(t.tip);
+                row.set_tooltip_text(&tip);
                 row
             })
             .collect();
@@ -974,6 +1073,7 @@ impl MarchingSquaresTerrainPlugin {
                     .unwrap_or(1200.0)
             }
         };
+        self.settings_strip_w = avail;
         // Per column: its widest row, the separator and the box separation on both sides of it.
         let gap = sz(ui_kit::CELL_GAP * 2.0 + 8.0, 0.0).x;
         let min_rows = 2.min(built.len().max(1));
@@ -1055,6 +1155,12 @@ impl MarchingSquaresTerrainPlugin {
                 );
                 // Pixel sizes are unbounded; the range is only the arrows' / drag's span.
                 sb.set_allow_greater(t.prop.ends_with("pixel_size"));
+                if layout_prop(t.prop) && self.layout_fixed() {
+                    // The terrain refuses a new chunk layout once chunks exist: show the field
+                    // read-only with the reason instead of a value that snaps back.
+                    sb.set_editable(false);
+                    sb.set_modulate(ui_kit::DISABLED_MODULATE);
+                }
                 sb.connect("value_changed", &on(0));
                 sb.upcast()
             }
@@ -1188,7 +1294,10 @@ impl MarchingSquaresTerrainPlugin {
         if let TKind::GrassFps = t.sort {
             let Some(mat) = self.turf_stuff() else { return };
             let old = mat.get_shader_parameter("animation_fps");
-            let new = value.try_to::<f64>().unwrap_or(0.0) as f32;
+            let new = setting_num(&value) as f32;
+            if old.try_to::<f64>().is_ok_and(|o| o as f32 == new) {
+                return;
+            }
             ur.create_action("terrain grass animation fps");
             let m = mat.upcast::<Object>();
             ur.add_do_method(
@@ -1202,10 +1311,16 @@ impl MarchingSquaresTerrainPlugin {
                 &["animation_fps".to_variant(), old],
             );
             ur.commit_action();
+            self.settings_version = self.terrain_undo_version();
             return;
         }
         if let TKind::Action(a) = t.sort {
             self.terrain_action(a);
+            return;
+        }
+        if layout_prop(t.prop) && self.layout_fixed() {
+            // Refused by the terrain: no (no-op) undo step; put the field back.
+            self.rebuild_strip_deferred();
             return;
         }
         let old = terrain.get(t.prop);
@@ -1221,12 +1336,12 @@ impl MarchingSquaresTerrainPlugin {
             TKind::Noise => value.clone(),
             TKind::Action(_) => unreachable!(),
             TKind::Enum(_) | TKind::Slot | TKind::Int(..) => {
-                (value.try_to::<f64>().unwrap_or(0.0).round() as i64).to_variant()
+                (setting_num(&value).round() as i64).to_variant()
             }
-            TKind::Float(..) | TKind::Unit => value.try_to::<f64>().unwrap_or(0.0).to_variant(),
+            TKind::Float(..) | TKind::Unit => setting_num(&value).to_variant(),
             TKind::Bool => value.try_to::<bool>().unwrap_or(false).to_variant(),
             TKind::ExtraLayer => {
-                let sel = value.try_to::<i64>().unwrap_or(0);
+                let sel = setting_num(&value).round() as i64;
                 let mut mask = old.try_to::<i64>().unwrap_or(1) as u32 & 0xff;
                 if sel > 0 {
                     mask |= 1 << (sel + 8 - 1);
@@ -1235,7 +1350,7 @@ impl MarchingSquaresTerrainPlugin {
             }
             TKind::Vec2(..) => {
                 let mut v = old.try_to::<Vector2>().unwrap_or(Vector2::ONE);
-                let x = value.try_to::<f64>().unwrap_or(0.0) as f32;
+                let x = setting_num(&value) as f32;
                 if comp == 0 {
                     v.x = x
                 } else {
@@ -1245,7 +1360,7 @@ impl MarchingSquaresTerrainPlugin {
             }
             TKind::Vec2i(..) => {
                 let mut v = old.try_to::<Vector2i>().unwrap_or(Vector2i::ZERO);
-                let x = value.try_to::<f64>().unwrap_or(0.0).round() as i32;
+                let x = setting_num(&value).round() as i32;
                 if comp == 0 {
                     v.x = x
                 } else {
@@ -1262,6 +1377,7 @@ impl MarchingSquaresTerrainPlugin {
         ur.add_do_property(&obj, t.prop, &new);
         ur.add_undo_property(&obj, t.prop, &old);
         ur.commit_action();
+        self.settings_version = self.terrain_undo_version();
         if t.prop == "show_grid_in_editor" {
             self.sync_grid_toggle();
         }
@@ -1269,7 +1385,11 @@ impl MarchingSquaresTerrainPlugin {
             t.prop,
             "grid_type" | "chunk_size" | "cell_size" | "ring_radius" | "storage_mode"
         ) {
-            // Layout / brush ranges depend on these: rebuild after the signal returns.
+            // Layout / brush ranges depend on these: rebuild after the signal returns. Reload
+            // now so the rebuilt strip sees the new grid's chunks (Chunk Size lock).
+            if let Some(mut t) = self.terrain.clone() {
+                t.bind_mut().update();
+            }
             self.selection.clear();
             self.rebuild_strip_deferred();
         }
@@ -1431,7 +1551,9 @@ impl MarchingSquaresTerrainPlugin {
         }
         self.slot_buttons.clear();
         self.slot_previews.clear();
-        self.slot_tex_pickers.clear();
+        self.slot_uis.clear();
+        // What the controls below show: `sync_texture_panel` rebuilds when these change.
+        self.texture_panel_ids = self.texture_ids();
         vbox.add_child(&ui_kit::panel_title(
             "Textures",
             ui_kit::glyph("vertex_paint_tool.svg"),
@@ -1445,6 +1567,19 @@ impl MarchingSquaresTerrainPlugin {
             vbox.add_child(&l);
             return;
         }
+        // At the top, not under the 16 slots: reachable without scrolling the whole panel.
+        let mut m = godot::classes::MarginContainer::new_alloc();
+        m.add_theme_constant_override("margin_bottom", 4);
+        let mut b = Button::new_alloc();
+        b.set_name("ExportTexturePreset");
+        b.set_text("Export Texture Preset");
+        b.set_tooltip_text(&format!(
+            "Save this terrain's texture set as a preset in {PRESET_DIR}."
+        ));
+        b.set_h_size_flags(SizeFlags::EXPAND_FILL);
+        b.connect("pressed", &self.cb("on_export_preset"));
+        m.add_child(&b);
+        vbox.add_child(&m);
         let group = ButtonGroup::new_gd();
         for i in 0..SLOT_COUNT {
             let Some(slot) = self.slot_res(i) else {
@@ -1501,8 +1636,15 @@ impl MarchingSquaresTerrainPlugin {
             le.set_text(&name);
             le.set_placeholder("Texture name");
             le.set_custom_minimum_size(sz(60.0, 22.0));
-            le.set_tooltip_text("Texture name (shown in the Material dropdown).");
-            le.connect("text_changed", &self.cb1("on_slot_name", i as i64));
+            le.set_tooltip_text("Texture name (shown in the Material dropdown). Enter applies.");
+            // Applied on Enter / leaving the field, not per keystroke: the field's own Ctrl+Z
+            // (text undo while typing) must not commit new History entries (QA #54).
+            le.connect("text_submitted", &self.cb1("on_slot_name", i as i64));
+            le.connect_flags(
+                "focus_exited",
+                &self.cb1("on_slot_name_left", i as i64),
+                godot::classes::object::ConnectFlags::DEFERRED,
+            );
             col.add_child(&le);
             head.add_child(&col);
             vbox.add_child(&head);
@@ -1517,14 +1659,25 @@ impl MarchingSquaresTerrainPlugin {
                 picker.set_edited_resource(&t.clone().upcast::<godot::classes::Resource>());
             }
             picker.connect("resource_changed", &self.cb1("on_slot_texture", i as i64));
-            self.slot_tex_pickers.push((i, picker.clone()));
             vbox.add_child(&ui_kit::form_row("Texture", &picker));
+            let mut ui = SlotUi {
+                slot: i,
+                name: le.clone(),
+                texture: picker.clone(),
+                pattern: None,
+                scale: None,
+                tint: None,
+                has_grass: None,
+                grass_tint: None,
+                sprite: None,
+            };
 
             if !void {
                 let mut pat = ui_kit::compact_option(&PATTERNS[..13], pattern.clamp(0, 12));
                 pat.set_tooltip_text("Ground pattern: picks the bundled ground texture of this pattern (textures/ground/). Without a texture the pattern is generated procedurally.");
                 pat.connect("item_selected", &self.cb1("on_slot_pattern", i as i64));
                 vbox.add_child(&ui_kit::form_row("Pattern", &pat));
+                ui.pattern = Some(pat.clone());
 
                 // Scale: slider + value read-out.
                 let mut row = HBoxContainer::new_alloc();
@@ -1547,6 +1700,7 @@ impl MarchingSquaresTerrainPlugin {
                 row.add_child(&slider);
                 row.add_child(&value);
                 vbox.add_child(&ui_kit::form_row("Scale", &row));
+                ui.scale = Some((slider.clone(), value.clone()));
 
                 let mut cp = ColorPickerButton::new_alloc();
                 cp.set_pick_color(tint);
@@ -1555,6 +1709,7 @@ impl MarchingSquaresTerrainPlugin {
                 cp.set_tooltip_text("Ground color (multiplies the texture / pattern).");
                 cp.connect("color_changed", &self.cb1("on_slot_tint", i as i64));
                 vbox.add_child(&ui_kit::form_row("Color", &cp));
+                ui.tint = Some(cp.clone());
 
                 let mut grass = HBoxContainer::new_alloc();
                 let mut cb = CheckBox::new_alloc();
@@ -1571,6 +1726,8 @@ impl MarchingSquaresTerrainPlugin {
                 gp.connect("color_changed", &self.cb1("on_slot_grass_tint", i as i64));
                 grass.add_child(&gp);
                 vbox.add_child(&ui_kit::form_row("Grass", &grass));
+                ui.has_grass = Some(cb.clone());
+                ui.grass_tint = Some(gp.clone());
 
                 // Grass instance sprite (original: grass_sprite_tex_N); empty = terrain default.
                 let mut sp = EditorResourcePicker::new_alloc();
@@ -1585,21 +1742,12 @@ impl MarchingSquaresTerrainPlugin {
                     &self.cb1("on_slot_grass_sprite", i as i64),
                 );
                 vbox.add_child(&ui_kit::form_row("Sprite", &sp));
+                ui.sprite = Some(sp.clone());
             }
+            self.slot_uis.push(ui);
             vbox.add_child(&HSeparator::new_alloc());
         }
         self.build_auto_rules_section(&mut vbox);
-        let mut m = godot::classes::MarginContainer::new_alloc();
-        m.add_theme_constant_override("margin_bottom", 7);
-        let mut b = Button::new_alloc();
-        b.set_text("Export Texture Preset");
-        b.set_tooltip_text(&format!(
-            "Save this terrain's texture set as a preset in {PRESET_DIR}."
-        ));
-        b.set_h_size_flags(SizeFlags::EXPAND_FILL);
-        b.connect("pressed", &self.cb("on_export_preset"));
-        m.add_child(&b);
-        vbox.add_child(&m);
     }
 
     pub(super) fn refresh_texture_panel_selection(&mut self) {
@@ -1629,7 +1777,16 @@ impl MarchingSquaresTerrainPlugin {
         }
         let obj = slot.upcast::<Object>();
         if let Some(mut ur) = self.base().get_undo_redo() {
-            ur.create_action_ex(&format!("terrain texture {} {}", i + 1, prop))
+            // History names follow the panel's labels, not the resource property names.
+            let what = match prop {
+                "magnify" => "scale",
+                "display_name" => "name",
+                "has_grass" => "grass",
+                "grass_tint" => "grass tint",
+                "grass_sprite" => "grass sprite",
+                p => p,
+            };
+            ur.create_action_ex(&format!("terrain texture {} {}", i + 1, what))
                 .merge_mode(godot::classes::undo_redo::MergeMode::ENDS)
                 .done();
             ur.add_do_property(&obj, prop, &value);
@@ -1657,12 +1814,100 @@ impl MarchingSquaresTerrainPlugin {
             ur.commit_action();
         }
         self.renew_pocket_prelook(i);
-        if let Some((_, p)) = self
-            .slot_tex_pickers
+        if let Some(ui) = self
+            .slot_uis
             .iter_mut()
-            .find(|(k, p)| *k == i && p.is_instance_valid())
+            .find(|u| u.slot == i && u.texture.is_instance_valid())
         {
-            p.set_edited_resource(tex.map(|t| t.upcast::<godot::classes::Resource>()).as_ref());
+            ui.texture
+                .set_edited_resource(tex.map(|t| t.upcast::<godot::classes::Resource>()).as_ref());
+        }
+    }
+
+    /// Instance ids of the texture set and its slots (what the texture panel was built for).
+    pub(super) fn texture_ids(&self) -> Vec<Option<InstanceId>> {
+        let ts = self.tex_assign();
+        let mut ids = vec![ts.as_ref().map(|t| t.instance_id())];
+        ids.extend((0..SLOT_COUNT).map(|i| self.slot_res(i).map(|s| s.instance_id())));
+        ids
+    }
+
+    /// Undo / redo / Inspector edits of the texture set: the panel, the Material names and the
+    /// preset dropdown show the restored values (QA #9). A replaced set or slot (preset undo)
+    /// rebuilds the panel and the strip; otherwise the controls are updated in place (no
+    /// signals), so the panel keeps its scroll position and an open picker its state.
+    pub(super) fn sync_texture_panel(&mut self) {
+        if self.state.tool != Tool::VertexPaint {
+            return;
+        }
+        if self.texture_ids() != self.texture_panel_ids {
+            self.rebuild_texture_panel();
+            self.rebuild_strip_deferred();
+            return;
+        }
+        self.refresh_material_names();
+        let Some(ts) = self.tex_assign() else { return };
+        let mut stale_previews = Vec::new();
+        for ui in &mut self.slot_uis {
+            let Some(slot) = ts.bind().pocket(ui.slot) else {
+                continue;
+            };
+            let b = slot.bind();
+            let mut look = false;
+            if ui.name.is_instance_valid()
+                && !ui.name.has_focus()
+                && ui.name.get_text() != b.display_name
+            {
+                ui.name.set_text(&b.display_name);
+            }
+            let res = |t: &Option<Gd<godot::classes::Texture2D>>| {
+                t.clone().map(|t| t.upcast::<godot::classes::Resource>())
+            };
+            if ui.texture.is_instance_valid() && ui.texture.get_edited_resource() != res(&b.texture)
+            {
+                ui.texture.set_edited_resource(res(&b.texture).as_ref());
+                look = true;
+            }
+            if let Some(p) = ui.pattern.as_mut().filter(|p| p.is_instance_valid()) {
+                let want = b.pattern.clamp(0, 12);
+                if p.get_selected() != want {
+                    p.select(want);
+                    look = true;
+                }
+            }
+            if let Some((sl, lab)) = ui.scale.as_mut().filter(|s| s.0.is_instance_valid()) {
+                let want = b.magnify as f64;
+                // The slider snaps to its step: compare within half a step.
+                if (sl.get_value() - want).abs() > sl.get_step() * 0.5 {
+                    sl.set_value_no_signal(want);
+                    lab.call("_mst_assign_worth", &[want.to_variant()]);
+                }
+            }
+            if let Some(cp) = ui.tint.as_mut().filter(|c| c.is_instance_valid())
+                && cp.get_pick_color() != b.tint
+            {
+                cp.set_pick_color(b.tint);
+                look = true;
+            }
+            if let Some(cb) = ui.has_grass.as_mut().filter(|c| c.is_instance_valid()) {
+                cb.set_pressed_no_signal(b.has_grass);
+            }
+            if let Some(gp) = ui.grass_tint.as_mut().filter(|c| c.is_instance_valid())
+                && gp.get_pick_color() != b.grass_tint
+            {
+                gp.set_pick_color(b.grass_tint);
+            }
+            if let Some(sp) = ui.sprite.as_mut().filter(|c| c.is_instance_valid())
+                && sp.get_edited_resource() != res(&b.grass_sprite)
+            {
+                sp.set_edited_resource(res(&b.grass_sprite).as_ref());
+            }
+            if look {
+                stale_previews.push(ui.slot);
+            }
+        }
+        for i in stale_previews {
+            self.renew_pocket_prelook(i);
         }
     }
 
@@ -1769,19 +2014,23 @@ impl MarchingSquaresTerrainPlugin {
         }
     }
 
+    /// "Export Texture Preset": name field + OK / Cancel. OK stays disabled (and Enter does
+    /// nothing) while the name is empty, with the reason shown in the dialog (QA #18, #19).
     pub(super) fn unveil_ship_out_popup(&mut self) {
         let mut base = EditorInterface::singleton()
             .get_base_control()
             .expect("editor base control");
-        let mut dlg = AcceptDialog::new_alloc();
+        let mut dlg = ConfirmationDialog::new_alloc();
         dlg.set_title("Save Preset");
+        // The dialog closes itself only after a valid name was saved (`on_export_confirmed`).
+        dlg.set_hide_on_ok(false);
         dlg.set_size(Vector2i::new(
-            (400.0 * ui_kit::editor_scale()) as i32,
-            (150.0 * ui_kit::editor_scale()) as i32,
+            (420.0 * ui_kit::editor_scale()) as i32,
+            (170.0 * ui_kit::editor_scale()) as i32,
         ));
         let mut v = VBoxContainer::new_alloc();
         let mut l = Label::new_alloc();
-        l.set_text(&format!("Preset name (saved to {PRESET_DIR}):"));
+        l.set_text("Preset name:");
         v.add_child(&l);
         let mut le = LineEdit::new_alloc();
         let current = self
@@ -1791,8 +2040,17 @@ impl MarchingSquaresTerrainPlugin {
         le.set_text(current.as_deref().unwrap_or("new_texture_preset"));
         le.select_all();
         v.add_child(&le);
+        // Target file on two short lines (the full path on one line made the dialog 558 px wide).
+        let mut file = Label::new_alloc();
+        file.set_modulate(ui_kit::DIM_MODULATE);
+        v.add_child(&file);
         dlg.add_child(&v);
         dlg.register_text_enter(&le);
+        let on_edit = self
+            .cb("on_export_name_changed")
+            .bind(&[dlg.to_variant(), file.to_variant()]);
+        le.connect("text_changed", &on_edit);
+        export_name_feedback(&le.get_text().to_string(), &mut dlg, &mut file);
         let (on_ok, on_cancel) = (
             self.cb("on_export_confirmed")
                 .bind(&[le.to_variant(), dlg.to_variant()]),
@@ -1862,6 +2120,44 @@ impl MarchingSquaresTerrainPlugin {
             self.rebuild_strip_deferred();
         }
     }
+}
+
+/// Save Preset dialog: shows the file a name saves to, or why it cannot be saved (empty name,
+/// OK disabled).
+pub(super) fn export_name_feedback(
+    name: &str,
+    dlg: &mut Gd<ConfirmationDialog>,
+    file: &mut Gd<Label>,
+) {
+    let empty = name.trim().is_empty();
+    if let Some(mut ok) = dlg.get_ok_button() {
+        ok.set_disabled(empty);
+    }
+    if empty {
+        file.set_text("Enter a name to save the preset.");
+        file.set_modulate(Color::from_rgb(1.0, 0.55, 0.45));
+    } else {
+        let split = PRESET_DIR.find("texture_presets").unwrap_or(PRESET_DIR.len());
+        let (head, tail) = PRESET_DIR.split_at(split);
+        file.set_text(&format!(
+            "Saved as {head}\n{tail}{}.tres",
+            snake_case(name.trim())
+        ));
+        file.set_modulate(ui_kit::DIM_MODULATE);
+    }
+}
+
+/// Controls of one texture slot in the side panel (kept to refresh them after undo / redo).
+pub(super) struct SlotUi {
+    pub slot: usize,
+    pub name: Gd<LineEdit>,
+    pub texture: Gd<EditorResourcePicker>,
+    pub pattern: Option<Gd<OptionButton>>,
+    pub scale: Option<(Gd<HSlider>, Gd<Label>)>,
+    pub tint: Option<Gd<ColorPickerButton>>,
+    pub has_grass: Option<Gd<CheckBox>>,
+    pub grass_tint: Option<Gd<ColorPickerButton>>,
+    pub sprite: Option<Gd<EditorResourcePicker>>,
 }
 
 fn snake_case(s: &str) -> String {

@@ -167,8 +167,15 @@ fn vertex_node_moniker(class: &str) -> String {
 /// a `Sun` light for sky/day-night, a `WorldEnvironment` for day-night, a camera for the
 /// renderer. Effects are placed where the editor camera looks (on the terrain); water is sized
 /// to the terrain. Terrain features (erosion, wild flowers) become children of the selected /
-/// first terrain. Returns the new node (selected deferred).
-pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<Node>> {
+/// first terrain. Adding an effect opts in to its project feature (`features::for_category`).
+/// Returns the new node; with `select` it is selected (deferred), otherwise the selection is
+/// kept (the Pixel World panel follows the selection, so adding a node its UI does not edit
+/// would close the panel).
+pub fn add_effect(
+    mut ur: Gd<EditorUndoRedoManager>,
+    class: &str,
+    select: bool,
+) -> Option<Gd<Node>> {
     let Some(root) = scene_root() else {
         godot_warn!("Pixel World: open a scene first.");
         return None;
@@ -191,6 +198,17 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
     } else {
         root.clone()
     };
+    // Adding an effect is opting in to it: turn its project feature on (else the new node
+    // builds and draws nothing).
+    if let Some(f) = crate::features::for_category(class)
+        && !crate::features::active(f)
+    {
+        crate::features::assign_active(f, true);
+        godot_print!(
+            "Pixel World: turned the \"{}\" feature on for this project.",
+            crate::features::info_of(f).label
+        );
+    }
     let Ok(mut node) = ClassDb::singleton().instantiate(class).try_to::<Gd<Node>>() else {
         godot_error!("Pixel World: cannot instantiate {class}");
         return None;
@@ -243,7 +261,7 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
     }
 
     // References: an existing sun/environment, or new ones added in the same action.
-    if matches!(class, "PixelSky" | "PixelDayNight" | "PixelWeather") {
+    if SUN_USERS.contains(&class) {
         let sun = match first_light() {
             Some(l) => l.upcast::<Node>(),
             None => {
@@ -287,7 +305,9 @@ pub fn add_effect(mut ur: Gd<EditorUndoRedoManager>, class: &str) -> Option<Gd<N
     ur.add_do_reference(&node);
     ur.add_undo_method(&parent, "remove_child", &[node.to_variant()]);
     ur.commit_action();
-    EditorInterface::singleton().call_deferred("edit_node", &[node.to_variant()]);
+    if select {
+        EditorInterface::singleton().call_deferred("edit_node", &[node.to_variant()]);
+    }
     Some(node)
 }
 
@@ -312,21 +332,25 @@ fn new_overview_camera() -> Gd<Camera3D> {
     cam
 }
 
-/// Fills empty `sun`/`environment` references of sky and day/night nodes (undoable).
+/// Classes with a `sun` (DirectionalLight3D) reference that "+ Add" / "Wire refs" fill in.
+const SUN_USERS: &[&str] = &["PixelSky", "PixelDayNight", "PixelWeather", "PixelSunShafts"];
+
+/// Fills empty `sun`/`environment` references of sky, day/night, weather and sun-shaft nodes
+/// (undoable).
 /// Returns how many references were set.
 pub fn wire_references(mut ur: Gd<EditorUndoRedoManager>) -> usize {
     let Some(root) = scene_root() else { return 0 };
     let sun = first_light().map(|l| l.to_variant());
     let env = first_world_env().map(|w| w.to_variant());
     let mut edits: Vec<(Gd<Node>, &str, Variant)> = Vec::new();
-    for class in ["PixelSky", "PixelDayNight", "PixelWeather"] {
+    for &class in SUN_USERS {
         for n in find_all(class) {
             if let Some(s) = &sun
                 && n.get("sun").is_nil()
             {
                 edits.push((n.clone(), "sun", s.clone()));
             }
-            if class != "PixelSky"
+            if matches!(class, "PixelDayNight" | "PixelWeather")
                 && let Some(e) = &env
                 && n.get("environment").is_nil()
             {

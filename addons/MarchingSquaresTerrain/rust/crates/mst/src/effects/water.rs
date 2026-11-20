@@ -12,12 +12,14 @@
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
 use godot::classes::object::ConnectFlags;
+use godot::classes::camera_3d::ProjectionType;
 use godot::classes::{INode3D, MeshInstance3D, Node, Node3D, PlaneMesh, ShaderMaterial};
 use godot::prelude::*;
 
 use crate::features::Feature;
 use crate::globals;
 use crate::util::*;
+use crate::writes::ShaderParams;
 
 /// A water plane for the pixel renderer. Depth bands, shoreline foam and sparkles are
 /// derived from the terrain height texture published by `MarchingSquaresTerrain`, so it needs no
@@ -47,6 +49,16 @@ pub struct PixelWater {
     #[export(flags_3d_render)]
     #[var(set = set_layers)]
     layers: u32,
+    /// Keep the plane centred under the camera's view (moved in whole grid cells, so the
+    /// world-space waves and foam stay put): a sea that never shows its edge. Leave off for
+    /// lakes and ponds that must stay where they are placed.
+    #[export]
+    follow_camera: bool,
+    /// Fraction of the plane's half size over which its rim fades into the horizon colour
+    /// (the sky published by PixelDayNight, else the material's `horizon_color`); 0 = a hard
+    /// edge. Pair with `follow_camera` for an open sea.
+    #[export(range = (0.0, 1.0, 0.0105))]
+    rim_fade: f32,
 
     #[export_group(name = "Caustics", prefix = "caustics_")]
     /// Brightness of the banded caustic web in the shallows and on nearby terrain (0 = off).
@@ -92,6 +104,9 @@ pub struct PixelWater {
     #[var(set = assign_cascade_stuff)]
     cascade_stuff: Option<Gd<ShaderMaterial>>,
 
+    /// `follow_camera` under an orthographic camera: the plane is scaled by this power of two
+    /// so it covers the zoomed-out view (runtime only).
+    follow_scale: f32,
     falls_dirty: bool,
     falls_node: Option<Gd<MeshInstance3D>>,
     /// Internal plane mesh (never saved).
@@ -141,6 +156,7 @@ impl INode3D for PixelWater {
             waterfall_min_levels: 5,
             waterfall_level_height: 0.0,
             cascade_stuff: None,
+            follow_scale: 1.0,
             falls_dirty: true,
             falls_node: None,
             skin: None,
@@ -148,6 +164,8 @@ impl INode3D for PixelWater {
             fall_info: Vec::new(),
             applied_mask: 0,
             layers: 1,
+            follow_camera: false,
+            rim_fade: 0.0,
             base,
         }
     }
@@ -185,6 +203,9 @@ impl INode3D for PixelWater {
         );
         globals::assign("pt_water_a", &a.to_variant());
         globals::assign("pt_water_b", &b.to_variant());
+        if visible {
+            self.place_plane();
+        }
     }
 
     fn exit_tree(&mut self) {
@@ -351,6 +372,71 @@ impl PixelWater {
         n
     }
 
+    /// `follow_camera`: moves the plane (in whole grid cells of the node's lattice) under the
+    /// point the camera looks at on the water; publishes the plane rect for the rim fade.
+    /// Change-only writes.
+    fn place_plane(&mut self) {
+        let mut skin = self.skin();
+        let node_xf = self.base().get_global_transform();
+        let mut offset = Vector3::ZERO;
+        let mut scale_k = 1.0f32;
+        if self.follow_camera {
+            let me: Gd<Node> = self.to_gd().upcast();
+            if let Some(cam) = super::active_camera(&me) {
+                if cam.get_projection() == ProjectionType::ORTHOGONAL {
+                    // Ground footprint of the orthographic view (half of its long diagonal,
+                    // stretched by the view's tilt), plus the rim's fade band: grow the plane
+                    // in powers of two, so its lattice changes only on large zoom steps.
+                    let aspect = cam
+                        .get_viewport()
+                        .map(|vp| {
+                            let r = vp.get_visible_rect().size;
+                            r.x / r.y.max(1.0)
+                        })
+                        .unwrap_or(1.7778);
+                    let tilt = (-cam.get_global_basis().col_c()).y.abs().max(0.25);
+                    let reach = 0.5 * cam.get_size() * (aspect * aspect + 1.0 / (tilt * tilt)).sqrt();
+                    let half = 0.5 * self.size.x.min(self.size.y).max(0.0105);
+                    let need = reach / (1.0 - self.rim_fade.clamp(0.0, 0.9));
+                    while half * scale_k < need && scale_k < 16.0 {
+                        scale_k *= 2.0;
+                    }
+                }
+                let focus = super::camera_focus(&cam, node_xf.origin.y);
+                let local = node_xf.affine_inverse() * focus;
+                let cells = (self.subdivisions.clamp(0, 256) + 1) as f32;
+                let step = Vector2::new(
+                    (self.size.x * scale_k / cells).max(0.0105),
+                    (self.size.y * scale_k / cells).max(0.0105),
+                );
+                offset = Vector3::new(
+                    (local.x / step.x).round() * step.x,
+                    0.0,
+                    (local.z / step.y).round() * step.y,
+                );
+            }
+        }
+        if scale_k != self.follow_scale {
+            self.follow_scale = scale_k;
+            self.reassemble();
+        }
+        if skin.get_position() != offset {
+            skin.set_position(offset);
+        }
+        if let Some(m) = &mut self.stuff {
+            let centre = node_xf * offset;
+            let scale = node_xf.basis.get_scale();
+            let rect = Vector4::new(
+                centre.x,
+                centre.z,
+                self.size.x * scale_k * 0.5 * scale.x.abs(),
+                self.size.y * scale_k * 0.5 * scale.z.abs(),
+            );
+            m.param("plane_rect", &rect.to_variant());
+            m.param("rim_fade", &self.rim_fade.clamp(0.0, 1.0).to_variant());
+        }
+    }
+
     /// Updates the plane mesh and material.
     fn reassemble(&mut self) {
         if self.stuff.is_none() {
@@ -361,9 +447,10 @@ impl PixelWater {
             .get_mesh()
             .and_then(|m| m.try_cast::<PlaneMesh>().ok())
             .unwrap_or_else(PlaneMesh::new_gd);
+        let k = if self.follow_camera { self.follow_scale } else { 1.0 };
         mesh.set_size(Vector2::new(
-            self.size.x.max(0.0105),
-            self.size.y.max(0.0105),
+            (self.size.x * k).max(0.0105),
+            (self.size.y * k).max(0.0105),
         ));
         let sub = self.subdivisions.clamp(0, 256);
         mesh.set_subdivide_width(sub);

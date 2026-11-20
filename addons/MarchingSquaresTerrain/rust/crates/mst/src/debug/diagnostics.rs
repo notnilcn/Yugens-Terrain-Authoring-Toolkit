@@ -130,6 +130,10 @@ pub struct PixelDiagnostics {
 
     status: Option<Gd<Label>>,
     tuner: Option<Gd<Control>>,
+    /// Everything of the tuner below its header (hidden while collapsed).
+    tuner_body: Vec<Gd<Control>>,
+    tuner_collapsed: bool,
+    collapse_button: Option<Gd<Button>>,
     sections: Vec<Gd<VBoxContainer>>,
     feature_checks: Vec<(Feature, Gd<CheckBox>)>,
     live: Vec<Live>,
@@ -164,6 +168,9 @@ impl ICanvasLayer for PixelDiagnostics {
             sections_start_folded: true,
             status: None,
             tuner: None,
+            tuner_body: Vec::new(),
+            tuner_collapsed: false,
+            collapse_button: None,
             sections: Vec::new(),
             feature_checks: Vec::new(),
             live: Vec::new(),
@@ -446,7 +453,7 @@ impl PixelDiagnostics {
     fn dock(&self, right: bool) -> Gd<PanelContainer> {
         let mut p = PanelContainer::new_alloc();
         p.add_theme_stylebox_override("panel", &panel_style());
-        let w = self.panel_width;
+        let w = self.dock_width();
         if right {
             p.set_anchors_preset(LayoutPreset::RIGHT_WIDE);
             p.set_offset(Side::LEFT, -w - 8.0);
@@ -461,6 +468,32 @@ impl PixelDiagnostics {
         p.set_offset(Side::TOP, 72.0);
         p.set_offset(Side::BOTTOM, -8.0);
         p
+    }
+
+    /// Small game windows (below ~1200 x 700): narrower docks, one-column feature list,
+    /// features folded.
+    fn compact(&self) -> bool {
+        self.base()
+            .get_viewport()
+            .map(|vp| {
+                let s = vp.get_visible_rect().size;
+                s.x < 1200.0 || s.y < 700.0
+            })
+            .unwrap_or(false)
+    }
+
+    /// Dock width: `panel_width`, narrowed to ~30% of a small window (at least 260 px).
+    fn dock_width(&self) -> f32 {
+        let vw = self
+            .base()
+            .get_viewport()
+            .map(|vp| vp.get_visible_rect().size.x)
+            .unwrap_or(1920.0);
+        if self.compact() {
+            self.panel_width.min((vw * 0.3).max(260.0))
+        } else {
+            self.panel_width
+        }
     }
 
     fn scroll_with(&self, inner: &Gd<VBoxContainer>) -> Gd<ScrollContainer> {
@@ -499,6 +532,13 @@ impl PixelDiagnostics {
         let mut rescan = button("Rescan");
         rescan.connect("pressed", &Callable::from_object_method(&this, "rescan"));
         header.add_child(&rescan);
+        let mut collapse = button("Hide");
+        collapse.set_tooltip_text("Collapse the tuner to this header (frees the game view).");
+        collapse.connect(
+            "pressed",
+            &Callable::from_object_method(&this, "toggle_tuner_collapsed"),
+        );
+        header.add_child(&collapse);
         col.add_child(&header);
 
         let mut dv_row = HBoxContainer::new_alloc();
@@ -528,6 +568,8 @@ impl PixelDiagnostics {
             sections.push(inner);
         }
         col.add_child(&tabs);
+        self.tuner_body = vec![dv_row.clone().upcast(), tabs.clone().upcast()];
+        self.collapse_button = Some(collapse);
         tuner.add_child(&col);
         tuner.set_visible(self.show_tuner);
         root.add_child(&tuner);
@@ -658,13 +700,25 @@ impl PixelDiagnostics {
             .selected
             .as_ref()
             .is_some_and(|s| s.is_instance_valid());
+        let w = self.dock_width();
+        let collapsed = self.tuner_collapsed;
         if let Some(t) = &mut self.tuner {
             t.set_visible(show_tuner);
             t.set_offset(Side::TOP, top);
+            t.set_offset(Side::LEFT, -w - 8.0);
+            // Collapsed: just the header, like the object inspector without a selection.
+            if collapsed {
+                t.set_anchor(Side::BOTTOM, 0.0);
+                t.set_offset(Side::BOTTOM, top);
+            } else {
+                t.set_anchor(Side::BOTTOM, 1.0);
+                t.set_offset(Side::BOTTOM, -8.0);
+            }
         }
         if let Some(t) = &mut self.object_panel {
             t.set_visible(show_obj);
             t.set_offset(Side::TOP, top);
+            t.set_offset(Side::RIGHT, w + 8.0);
             // Without a selection the inspector shrinks to its header instead of covering
             // the left of the screen.
             if has_selection {
@@ -770,11 +824,14 @@ impl PixelDiagnostics {
     /// The *Features* section: one switch per project feature (for this session).
     fn add_features_section(&mut self, mut container: Gd<VBoxContainer>) {
         self.feature_checks.clear();
+        let compact = self.compact();
         let mut fold = FoldableContainer::new_alloc();
         fold.set_title("Features (this session)");
+        // Small windows: start folded so the first effect's controls are in view.
+        fold.set_folded(compact);
         let mut col = VBoxContainer::new_alloc();
         let mut grid = GridContainer::new_alloc();
-        grid.set_columns(2);
+        grid.set_columns(if compact { 1 } else { 2 });
         for info in features::ALL {
             let mut c = CheckBox::new_alloc();
             c.set_text(info.label);
@@ -1420,6 +1477,20 @@ impl PixelDiagnostics {
         if let Some(m) = &mut self.marker {
             m.set_visible(shown && self.selected.is_some());
         }
+    }
+
+    /// Collapses the tuner to its header / expands it again.
+    #[func]
+    fn toggle_tuner_collapsed(&mut self) {
+        self.tuner_collapsed = !self.tuner_collapsed;
+        let shown = !self.tuner_collapsed;
+        for c in &mut self.tuner_body {
+            c.set_visible(shown);
+        }
+        if let Some(b) = &mut self.collapse_button {
+            b.set_text(if shown { "Hide" } else { "Show" });
+        }
+        self.update_status();
     }
 
     /// Toggles the overlay.

@@ -43,6 +43,8 @@ pub(super) struct Stroke {
     pub scatter_before: Option<Vec<u8>>,
     /// Tint strokes: the painted tint blob before the stroke (undo).
     pub tint_before: Option<Vec<u8>>,
+    /// Tint stroke started with RMB alone: an erase (History name).
+    pub tint_erase: bool,
     /// Selection stroke (tool = Debug) removes cells instead of adding them (Ctrl).
     pub deselect: bool,
     /// Brush selection drag: offset applied last (`drag_select`).
@@ -55,6 +57,8 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) terrain: Option<Gd<MarchingSquaresTerrain>>,
     pub(super) state: State,
     pub(super) toolbar: Option<Gd<VFlowContainer>>,
+    /// Scrolling single-column rail holding [`Self::toolbar`] (what the editor container holds).
+    pub(super) toolbar_rail: Option<Gd<ScrollContainer>>,
     pub(super) tool_buttons: Vec<Gd<Button>>,
     pub(super) peel: Option<Gd<ScrollContainer>>,
     pub(super) texture_panel: Option<Gd<ScrollContainer>>,
@@ -63,10 +67,17 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) chunk_list: Option<Gd<OptionButton>>,
     /// Terrain Settings page shown in the strip (index into `terrain_ui::SETTINGS_PAGES`).
     pub(super) settings_page: usize,
+    /// Strip width the Terrain Settings columns were laid out for (rebuilt when it changes).
+    pub(super) settings_strip_w: f32,
+    /// Undo version right after a Terrain Settings control committed its own action: that
+    /// `version_changed` needs no strip refresh (the control already shows the value).
+    pub(super) settings_version: Option<u64>,
     pub(super) slot_buttons: Vec<Gd<Button>>,
     pub(super) slot_previews: Vec<Gd<godot::classes::TextureRect>>,
-    /// Ground texture picker per slot (index = slot), updated when the pattern changes.
-    pub(super) slot_tex_pickers: Vec<(usize, Gd<godot::classes::EditorResourcePicker>)>,
+    /// Controls of each texture slot in the side panel (refreshed after undo / redo).
+    pub(super) slot_uis: Vec<super::terrain_ui::SlotUi>,
+    /// Texture set + slot instance ids the texture panel was built for.
+    pub(super) texture_panel_ids: Vec<Option<InstanceId>>,
     pub(super) cursor: Option<Cursor>,
     pub(super) hover: Option<Vector3>,
     pub(super) hover_chunk: Option<IVec2>,
@@ -95,6 +106,57 @@ pub struct MarchingSquaresTerrainPlugin {
 
 /// Separator of the parts of a [`Tool::hint`] (the overlay wraps the hint there).
 const HINT_SEPARATOR: &str = "  ·  ";
+/// Separator of the parts of the overlay status line (wrapped there too).
+const STATUS_SEPARATOR: &str = "  |  ";
+
+/// Splits `text` at any of `seps` into `(separator before the part, part)` pairs (the first
+/// part has an empty separator; empty parts are dropped).
+fn split_parts<'a>(text: &'a str, seps: &[&'static str]) -> Vec<(&'static str, &'a str)> {
+    let mut out = Vec::new();
+    let (mut rest, mut sep) = (text, "");
+    loop {
+        let next = seps
+            .iter()
+            .filter_map(|s| rest.find(s).map(|i| (i, *s)))
+            .min_by_key(|(i, _)| *i);
+        let (part, tail) = match next {
+            Some((i, s)) => (&rest[..i], Some((s, &rest[i + s.len()..]))),
+            None => (rest, None),
+        };
+        if !part.is_empty() {
+            out.push((if out.is_empty() { "" } else { sep }, part));
+        }
+        match tail {
+            Some((s, t)) => {
+                sep = s;
+                rest = t;
+            }
+            None => return out,
+        }
+    }
+}
+
+#[cfg(test)]
+mod hint_tests {
+    #[test]
+    fn split_parts() {
+        let p = super::split_parts(
+            "Brush  |  height 1  |  LMB: a  ·  Shift: b",
+            &[super::STATUS_SEPARATOR, super::HINT_SEPARATOR],
+        );
+        assert_eq!(
+            p,
+            vec![
+                ("", "Brush"),
+                ("  |  ", "height 1"),
+                ("  |  ", "LMB: a"),
+                ("  ·  ", "Shift: b")
+            ]
+        );
+        // A leading separator (drag status appended as "  |  ...") is not an empty part.
+        assert_eq!(super::split_parts("  |  x", &["  |  "]), vec![("", "x")]);
+    }
+}
 
 pub(super) const LEFT: CustomControlContainer = CustomControlContainer::SPATIAL_EDITOR_SIDE_LEFT;
 const BOTTOM: CustomControlContainer = CustomControlContainer::SPATIAL_EDITOR_BOTTOM;
@@ -105,12 +167,13 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
     fn enter_tree(&mut self) {
         self.state = State::default();
         let toolbar = self.build_toolbar();
+        let rail = super::ui_kit::toolbar_rail(&toolbar);
         let strip = super::ui_kit::strip_root("MarchingSquaresToolAttributes");
         let (mut panel, vbox) = super::ui_kit::side_panel("MarchingSquaresTextureSettings");
         // Wider than the original 195 px: rows also hold pattern, color and grass sprite pickers.
         panel.set_custom_minimum_size(super::ui_kit::sz(250.0, 0.0));
         for (c, ctl) in [
-            (LEFT, toolbar.clone().upcast::<Control>()),
+            (LEFT, rail.clone().upcast::<Control>()),
             (BOTTOM, strip.clone().upcast()),
             (RIGHT, panel.clone().upcast()),
         ] {
@@ -119,6 +182,26 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             ctl.set_visible(false);
         }
         self.toolbar = Some(toolbar);
+        self.toolbar_rail = Some(rail);
+        {
+            // Terrain Settings lays its columns out for the strip width: redo on resize.
+            let cb = self.base().callable("_mst_on_strip_resized");
+            let mut st = strip.clone();
+            st.connect_flags(
+                "resized",
+                &cb,
+                godot::classes::object::ConnectFlags::DEFERRED,
+            );
+        }
+        if let Some(mut ur) = self.base().get_undo_redo() {
+            // Undo / redo / Inspector edits: the Terrain Settings strip shows the new values.
+            let cb = self.base().callable("_mst_on_undo_version");
+            ur.connect_flags(
+                "version_changed",
+                &cb,
+                godot::classes::object::ConnectFlags::DEFERRED,
+            );
+        }
         self.peel = Some(strip);
         self.texture_panel = Some(panel);
         self.texture_vbox = Some(vbox);
@@ -142,7 +225,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         self.drop_cursor();
         self.extra_drop();
         let parts: [(CustomControlContainer, Option<Gd<Control>>); 3] = [
-            (LEFT, self.toolbar.take().map(|c| c.upcast())),
+            (LEFT, self.toolbar_rail.take().map(|c| c.upcast())),
             (BOTTOM, self.peel.take().map(|c| c.upcast())),
             (RIGHT, self.texture_panel.take().map(|c| c.upcast())),
         ];
@@ -152,13 +235,14 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 ctl.free();
             }
         }
+        self.toolbar = None; // freed with its rail
         self.tool_buttons.clear();
         self.setting_controls.clear();
         self.chunk_list = None;
         self.texture_vbox = None;
         self.slot_buttons.clear();
         self.slot_previews.clear();
-        self.slot_tex_pickers.clear();
+        self.slot_uis.clear();
     }
 
     fn get_plugin_name(&self) -> GString {
@@ -187,7 +271,7 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
 
     fn make_visible(&mut self, shown: bool) {
         self.visible = shown;
-        if let Some(p) = &mut self.toolbar {
+        if let Some(p) = &mut self.toolbar_rail {
             p.set_visible(shown);
         }
         if let Some(p) = &mut self.peel {
@@ -253,6 +337,40 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 self.quick_paint_at_hover();
             }
             _ => {}
+        }
+    }
+
+    /// Tool keys 1–9 and Esc (clear the selection) when the 3D viewport does not have the
+    /// keyboard focus (a toolbar button, a strip control or another dock took it): keys no
+    /// focused control used. With the focus in the viewport `forward_3d_gui_input` handles
+    /// them first. Text fields keep their keys (they consume them before this runs).
+    fn shortcut_input(&mut self, happening: Gd<InputEvent>) {
+        if self.terrain.is_none()
+            || !self.visible
+            || !self
+                .toolbar
+                .as_ref()
+                .is_some_and(|t| t.is_instance_valid() && t.is_visible_in_tree())
+        {
+            return;
+        }
+        let Ok(key) = happening.try_cast::<InputEventKey>() else {
+            return;
+        };
+        if !key.is_pressed() || key.is_echo() {
+            return;
+        }
+        let k = crate::util::undo_numpad_emulation(&key).get_keycode();
+        let digit = (Key::KEY_1.ord()..=Key::KEY_9.ord()).contains(&k.ord());
+        // Esc only when there is something to clear: it stays free for Godot otherwise.
+        let esc = k == Key::ESCAPE && (!self.selection.is_empty() || self.sweep.is_some());
+        if !(digit || esc) {
+            return;
+        }
+        if self.on_key(&key)
+            && let Some(mut vp) = self.base().get_viewport()
+        {
+            vp.set_input_as_handled();
         }
     }
 
@@ -325,6 +443,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 }
                 return pass;
             }
+            if mb.is_pressed() {
+                release_text_focus();
+            }
             if self.handle_press(&camera, &mb) {
                 return stop;
             }
@@ -353,15 +474,24 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             let t = t.bind();
             let s = t.store().config.world_to_sample(v2(h.x, h.z));
             let c = t.store().config.chunk_of(s);
-            let mut l = format!(
-                "{}  |  height {:.2}  cell ({}, {})  chunk ({}, {})",
-                self.state.tool.moniker(),
-                h.y,
-                s.x,
-                s.y,
-                c.x,
-                c.y
-            );
+            let mut l = if self.state.tool == Tool::VertexPaint && self.state.paint_walls {
+                // Wall mode paints cliff faces: the ground height under the cursor says nothing
+                // about them (QA #16).
+                format!(
+                    "Wall Painting  |  cell ({}, {})  chunk ({}, {})",
+                    s.x, s.y, c.x, c.y
+                )
+            } else {
+                format!(
+                    "{}  |  height {:.2}  cell ({}, {})  chunk ({}, {})",
+                    self.state.tool.moniker(),
+                    h.y,
+                    s.x,
+                    s.y,
+                    c.x,
+                    c.y
+                )
+            };
             if !self.selection.is_empty() {
                 l.push_str(&format!("  |  {} selected", self.selection.len()));
             }
@@ -369,6 +499,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 l.push_str(&d);
             }
             if let Some(e) = self.extra_status() {
+                l.push_str(&e);
+            }
+            if let Some(e) = self.chunk_status() {
                 l.push_str(&e);
             }
             l
@@ -395,29 +528,48 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 .modulate(color)
                 .done();
         };
-        if let Some(l) = status {
-            text(&l, y, Color::from_rgba(1.0, 1.0, 1.0, 0.8505));
-            y -= line_h;
-        }
-        // The hint wraps at its "  ·  " separators when the view is too narrow for one line.
+        // Both lines wrap at their separators when the view is too narrow for one line (the
+        // status line at "  |  ", the hint at "  ·  "), so nothing is cut at the right edge.
         let avail = size.x - super::ui_kit::px(28.0) as f32;
         let width = |l: &str| font.get_string_size_ex(l).font_size(fs).done().x;
-        let mut lines: Vec<String> = Vec::new();
+        let wrap = |text: &str| {
+            let mut lines: Vec<String> = Vec::new();
+            for (sep, part) in split_parts(text, &[STATUS_SEPARATOR, HINT_SEPARATOR]) {
+                match lines.last_mut() {
+                    Some(l) if width(&format!("{l}{sep}{part}")) <= avail => {
+                        l.push_str(sep);
+                        l.push_str(part);
+                    }
+                    _ => lines.push(part.to_string()),
+                }
+            }
+            lines
+        };
+        // Lines are stacked upwards from the bottom; stop below the viewport's own top-left
+        // menu ("Perspective") rather than drawing over it in a short view.
+        let top = super::ui_kit::px(44.0) as f32 + fs as f32;
+        if let Some(l) = status {
+            for l in wrap(&l).iter().rev() {
+                if y < top {
+                    return;
+                }
+                text(l, y, Color::from_rgba(1.0, 1.0, 1.0, 0.8505));
+                y -= line_h;
+            }
+        }
         let hint = if self.state.tool == Tool::Scatter {
             self.foliage_hint()
+        } else if self.vertex_handles_shown() {
+            "LMB-drag a vertex handle: move that sample up / down  ·  RMB: cancel the drag  ·  Ctrl+LMB: select chunk".to_string()
+        } else if self.state.tool == Tool::VertexPaint && self.state.paint_walls {
+            "Paint Walls: LMB-drag paints the Material on cliff walls  ·  Ctrl+LMB: pick the wall material under the cursor  ·  Shift+wheel: size".to_string()
         } else {
             self.state.tool.hint().to_string()
         };
-        for part in hint.split(HINT_SEPARATOR) {
-            match lines.last_mut() {
-                Some(l) if width(&format!("{l}{HINT_SEPARATOR}{part}")) <= avail => {
-                    l.push_str(HINT_SEPARATOR);
-                    l.push_str(part);
-                }
-                _ => lines.push(part.to_string()),
+        for l in wrap(&hint).iter().rev() {
+            if y < top {
+                return;
             }
-        }
-        for l in lines.iter().rev() {
             text(l, y, Color::from_rgba(1.0, 0.9205, 0.6005, 0.9505));
             y -= line_h;
         }
@@ -616,6 +768,9 @@ impl MarchingSquaresTerrainPlugin {
         if !key.is_pressed() || key.is_echo() {
             return false;
         }
+        // The 3D viewport turns the top-row digits into KP_1.. (numpad emulation) before
+        // forwarding them; without this the tool keys 1–9 ran Godot's view shortcuts instead.
+        let key = &crate::util::undo_numpad_emulation(key);
         if self.extra_key(key) {
             return true;
         }
@@ -630,6 +785,8 @@ impl MarchingSquaresTerrainPlugin {
                 self.cancel_stroke(s);
             }
             self.redraw();
+            // The status line ("N selected") is drawn over the viewport.
+            self.base().update_overlays();
             return had || k == Key::ESCAPE;
         }
         if key.is_ctrl_pressed()
@@ -827,6 +984,7 @@ impl MarchingSquaresTerrainPlugin {
             rmb: r,
             scatter_before: None,
             tint_before: None,
+            tint_erase: false,
             deselect: false,
             drag_offset: None,
         }
@@ -1126,7 +1284,13 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         if let Some(before) = stroke.tint_before {
-            self.commit_tint_undo(stroke.tool.undo_name(), before);
+            // RMB alone erases the painted tint (`tint_at_hover`).
+            let name = if stroke.tint_erase {
+                "terrain tint erase"
+            } else {
+                stroke.tool.undo_name()
+            };
+            self.commit_tint_undo(name, before);
             return;
         }
         let Some(mut terrain) = self.terrain.clone() else {
@@ -1156,18 +1320,19 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         terrain.bind_mut().write_chunks(&coords);
+        // Quick Paint names the sculpt tool too ("terrain level with quick paint").
         let name = if self.state.quick_paint != 0
             && matches!(
                 stroke.tool,
                 Tool::Brush | Tool::Level | Tool::Smooth | Tool::Bridge | Tool::RaiseLower
             ) {
-            "terrain brush with quick paint"
+            format!("{} with quick paint", stroke.tool.undo_name())
         } else if stroke.tool == Tool::VertexPaint && self.state.paint_walls {
-            "terrain wall paint"
+            "terrain wall paint".to_string()
         } else {
-            stroke.tool.undo_name()
+            stroke.tool.undo_name().to_string()
         };
-        self.commit_undo(name, before, after);
+        self.commit_undo(&name, before, after);
     }
 
     /// Esc during a stroke: restore the snapshot without recording an undo action.
@@ -1210,6 +1375,11 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     fn chunk_click(&mut self) {
+        if self.vertex_handles_shown() {
+            // Handle mode: a press that misses every handle must not add / remove a chunk
+            // (the handles sit on chunk borders; `handle_press` took the hits).
+            return;
+        }
         if let Some(c) = self.hover_chunk {
             self.toggle_chunk(c);
         }
@@ -1231,17 +1401,8 @@ impl MarchingSquaresTerrainPlugin {
                 self.selected_chunk = None;
             }
         } else {
-            let can_add = {
-                let t = terrain.bind();
-                t.store().chunks.is_empty()
-                    || t.store()
-                        .config
-                        .chunk_neighbors(c)
-                        .iter()
-                        .any(|n| t.store().has_chunk(*n))
-            };
-            if !can_add {
-                godot_warn!("Marching Squares Terrain: new chunks must touch an existing chunk.");
+            if !self.chunk_addable(c) {
+                // No "+" is drawn there; the viewport status line says why (`chunk_status`).
                 return;
             }
             before.set(from_iv(c), &PackedByteArray::new());
@@ -1450,6 +1611,7 @@ impl MarchingSquaresTerrainPlugin {
             },
             chunk_mode: tool == Tool::ChunkManager,
             hover_chunk: self.hover_chunk,
+            chunk_adds: !self.vertex_handles_shown(),
             selected_chunk: self.selected_chunk,
             show_chunk_lines: true,
             bridge_from: self
@@ -1556,6 +1718,34 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     #[func]
+    fn _mst_on_undo_version(&mut self) {
+        // Texture slots / preset: the side panel shows the restored values (QA #9).
+        if self.visible && self.state.tool == Tool::VertexPaint {
+            self.sync_texture_panel();
+        }
+        let own = self.settings_version.take();
+        if own.is_some() && own == self.terrain_undo_version() {
+            return;
+        }
+        if self.visible && self.state.tool == Tool::TerrainSettings {
+            self.rebuild_strip();
+        }
+    }
+
+    #[func]
+    fn _mst_on_strip_resized(&mut self) {
+        let Some(w) = self.peel.as_ref().map(|p| p.get_size().x) else {
+            return;
+        };
+        if self.visible
+            && self.state.tool == Tool::TerrainSettings
+            && (w - self.settings_strip_w).abs() > super::ui_kit::sz(32.0, 0.0).x
+        {
+            self.rebuild_strip();
+        }
+    }
+
+    #[func]
     fn rebuild_texture_panel_now(&mut self) {
         if self.state.tool == Tool::VertexPaint {
             self.rebuild_texture_panel();
@@ -1616,12 +1806,14 @@ impl MarchingSquaresTerrainPlugin {
             let i = self.state.paint_slot as usize;
             self.set_slot_prop(i, "display_name", caption.to_variant());
             self.refresh_material_names();
-            // Clear the field after submitting (original behaviour).
+            // Clear the field after submitting (original behaviour) and leave it, so the next
+            // Ctrl+Z undoes the rename instead of editing the field's text (QA #54).
             for (s, c) in &self.setting_controls {
                 if *s == Setting::TextureName
                     && let Ok(mut le) = c.clone().try_cast::<godot::classes::LineEdit>()
                 {
-                    le.set_text("");
+                    le.clear();
+                    le.release_focus();
                 }
             }
             self.to_gd().call_deferred("rebuild_texture_panel_now", &[]);
@@ -1649,6 +1841,12 @@ impl MarchingSquaresTerrainPlugin {
         if let Some(t) = self.terrain.as_mut() {
             t.set("chunk_handles", &on.to_variant());
         }
+        // Hint and viewport glyphs depend on the mode.
+        if self.state.tool == Tool::ChunkManager {
+            self.rebuild_strip_deferred();
+        }
+        self.redraw();
+        self.base().update_overlays();
     }
 
     #[func]
@@ -1686,6 +1884,27 @@ impl MarchingSquaresTerrainPlugin {
     fn on_slot_name(&mut self, caption: GString, index: i64) {
         self.set_slot_prop(index as usize, "display_name", caption.to_variant());
         self.refresh_material_names();
+        // Enter leaves the field, so the next Ctrl+Z reaches the History (QA #54).
+        if let Some(ui) = self.slot_uis.iter_mut().find(|u| u.slot == index as usize)
+            && ui.name.is_instance_valid()
+        {
+            ui.name.release_focus();
+        }
+    }
+
+    /// The slot name field lost focus: apply what was typed (deferred; the field may be gone).
+    #[func]
+    fn on_slot_name_left(&mut self, index: i64) {
+        let Some(text) = self
+            .slot_uis
+            .iter()
+            .find(|u| u.slot == index as usize && u.name.is_instance_valid())
+            .map(|u| u.name.get_text())
+        else {
+            return;
+        };
+        self.set_slot_prop(index as usize, "display_name", text.to_variant());
+        self.refresh_material_names();
     }
 
     #[func]
@@ -1700,7 +1919,8 @@ impl MarchingSquaresTerrainPlugin {
 
     #[func]
     fn on_slot_scale(&mut self, value: f64, index: i64, mut label: Gd<godot::classes::Label>) {
-        label.set_text(&format!("{value:.1}"));
+        // Same format as the initial read-out (`ui_kit::value_label`).
+        label.call("_mst_assign_worth", &[value.to_variant()]);
         self.set_slot_prop(index as usize, "magnify", (value as f32).to_variant());
     }
 
@@ -1733,11 +1953,25 @@ impl MarchingSquaresTerrainPlugin {
     fn on_export_confirmed(
         &mut self,
         edit: Gd<godot::classes::LineEdit>,
-        mut dialog: Gd<godot::classes::AcceptDialog>,
+        mut dialog: Gd<godot::classes::ConfirmationDialog>,
     ) {
         let name = edit.get_text().to_string();
+        if name.trim().is_empty() {
+            // Stays open (hide_on_ok is off); the dialog already says why.
+            return;
+        }
         dialog.queue_free();
         self.export_preset(name, false);
+    }
+
+    #[func]
+    fn on_export_name_changed(
+        &mut self,
+        text: GString,
+        mut dialog: Gd<godot::classes::ConfirmationDialog>,
+        mut file: Gd<godot::classes::Label>,
+    ) {
+        super::terrain_ui::export_name_feedback(&text.to_string(), &mut dialog, &mut file);
     }
 
     #[func]
@@ -1748,6 +1982,22 @@ impl MarchingSquaresTerrainPlugin {
     ) {
         dialog.queue_free();
         self.export_preset(name.to_string(), true);
+    }
+}
+
+/// A click in the 3D view leaves a focused text field (the slot / Texture Name fields), like
+/// clicking anywhere else in the editor: otherwise the plugin consumes the click, the field
+/// keeps the focus and Ctrl+Z keeps editing its text instead of undoing (QA #54).
+fn release_text_focus() {
+    use godot::classes::{EditorInterface, LineEdit, TextEdit};
+    let Some(base) = EditorInterface::singleton().get_base_control() else {
+        return;
+    };
+    let Some(vp) = base.get_viewport() else { return };
+    if let Some(mut f) = vp.gui_get_focus_owner()
+        && (f.clone().try_cast::<LineEdit>().is_ok() || f.clone().try_cast::<TextEdit>().is_ok())
+    {
+        f.release_focus();
     }
 }
 

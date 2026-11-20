@@ -85,6 +85,13 @@ uniform float horizon_start = 0.0;
 uniform float horizon_end = 0.0;
 // Fade colour when no PixelDayNight publishes the background (pt_horizon).
 uniform vec4 horizon_color : source_color = vec4(0.52, 0.66, 0.86, 1.0);
+// Fraction of the plane's half size over which its rim dissolves (ordered-dither discard) into
+// whatever is behind it, the sky or clear colour (set by PixelWater's `rim_fade`; 0 = off).
+// With `follow_camera` the plane stays centred under the view, so this hides the plane's edge
+// without fading the sea the camera looks at.
+uniform float rim_fade : hint_range(0.0, 1.0) = 0.0;
+// Plane centre (xy) and half size (zw) in world XZ, set by PixelWater.
+uniform vec4 plane_rect = vec4(0.0, 0.0, 0.0, 0.0);
 group_uniforms;
 
 group_uniforms Lighting;
@@ -166,6 +173,13 @@ void vertex() {
 }
 
 void fragment() {
+	if (rim_fade > 0.0 && plane_rect.z > 0.0 && plane_rect.w > 0.0) {
+		vec2 rr = abs(world_pos.xz - plane_rect.xy) / plane_rect.zw;
+		float rim = smoothstep(1.0 - rim_fade, 0.96, max(rr.x, rr.y));
+		if (rim > bayer4(FRAGCOORD.xy)) {
+			discard;
+		}
+	}
 	float ground = terrain_height(world_pos.xz);
 	float depth = ground < -1e5 ? depth_scale : max(world_pos.y - ground, 0.0);
 	vec3 wn;

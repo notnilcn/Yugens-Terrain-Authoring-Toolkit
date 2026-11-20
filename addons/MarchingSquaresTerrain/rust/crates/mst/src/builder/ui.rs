@@ -7,7 +7,7 @@ use godot::classes::control::{FocusMode, SizeFlags};
 use godot::classes::{
     Button, ButtonGroup, CheckBox, ColorPickerButton, Control, EditorResourcePicker, GridContainer,
     HBoxContainer, HFlowContainer, HSeparator, Label, Material, MenuButton, OptionButton,
-    PopupMenu, ScrollContainer, SpinBox, Texture2D, VBoxContainer, VFlowContainer, VSeparator,
+    PopupMenu, ScrollContainer, SpinBox, Texture2D, VBoxContainer, VSeparator,
 };
 use godot::prelude::*;
 use pt_core::build::{ShapeKind, ShapeSpec};
@@ -1802,8 +1802,11 @@ impl UvField {
 }
 
 pub struct Ui {
-    pub toolbar: Gd<VFlowContainer>,
-    pub peel: Gd<HFlowContainer>,
+    pub toolbar: Gd<HFlowContainer>,
+    /// The toolbar's scrolling column (the control added to the editor).
+    pub rail: Gd<ScrollContainer>,
+    /// The bottom strip's scrolling, height-capped root (the control added to the editor).
+    pub peel: Gd<ScrollContainer>,
     pub palette: Gd<ScrollContainer>,
     pub buttons: Vec<(Action, Gd<Button>, u8)>,
     /// (section, separator, header) of the toolbar; hidden while none of its buttons is.
@@ -2367,10 +2370,24 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     // ---------------------------------------------------------------- left toolbar
     // Same look as the terrain toolbar (`ui_kit::Toolbar`): 30 px flat icon buttons, centred in
     // their cells, groups split by a separator plus a small section header.
-    let mut toolbar = VFlowContainer::new_alloc();
+    //
+    // A fixed two-cell-wide grid (an `HFlowContainer` as wide as a section header) in a
+    // vertical-only `ScrollContainer`: a `VFlowContainer` wrapped into as many columns as the
+    // left panel's height needed (6 at 1600×900 in Face mode) and took that width from the 3D
+    // viewport; the rail scrolls instead.
+    let mut toolbar = HFlowContainer::new_alloc();
     toolbar.set_name("PixelBuilderToolbar");
-    toolbar.set_custom_minimum_size(ui_kit::sz(CELL_PX, CELL_PX));
+    toolbar.set_custom_minimum_size(ui_kit::sz(CELL_PX * 2.0, CELL_PX));
     toolbar.set_alignment(godot::classes::flow_container::AlignmentMode::BEGIN);
+    toolbar.add_theme_constant_override("h_separation", 0);
+    toolbar.add_theme_constant_override("v_separation", 0);
+    let mut rail = ScrollContainer::new_alloc();
+    rail.set_name("PixelBuilderToolbarRail");
+    rail.set_horizontal_scroll_mode(godot::classes::scroll_container::ScrollMode::DISABLED);
+    rail.set_vertical_scroll_mode(godot::classes::scroll_container::ScrollMode::AUTO);
+    rail.set_vertical_custom_step(ui_kit::sz(0.0, CELL_PX).y);
+    rail.add_theme_stylebox_override("focus", &godot::classes::StyleBoxEmpty::new_gd());
+    rail.add_child(&toolbar);
     let mut buttons = Vec::new();
     let mut sections = Vec::new();
     let groups = [
@@ -2387,6 +2404,8 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
         if last_section != Some(sec) {
             let mut sep = HSeparator::new_alloc();
             sep.set_name(&format!("{}Separator", SECTIONS[sec].0));
+            // A full grid row (the flow starts a new line for it).
+            sep.set_custom_minimum_size(ui_kit::sz(CELL_PX * 2.0, 0.0));
             toolbar.add_child(&sep);
             let mut head = Label::new_alloc();
             head.set_name(&format!("{}Header", SECTIONS[sec].0));
@@ -2450,9 +2469,20 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     }
 
     // ---------------------------------------------------------------- bottom strip
-    let mut strip = HFlowContainer::new_alloc();
+    // The terrain strips' root and flow (`ui_kit::strip_root` + `MstFlow`): the rows wrap and
+    // the strip is as tall as they are up to the shared height cap (`ui_kit::strip_cap`), then
+    // scrolls. A bare `HFlowContainer` reported its full wrapped height (447 px in Face mode at
+    // 1600×900) and the 3D viewport was squeezed to its 39 px minimum.
+    let peel = ui_kit::strip_root("PixelBuilderStripRoot");
+    let mut strip = ui_kit::MstFlow::new_alloc();
+    strip.bind_mut().h_gap = ui_kit::sz(4.0, 0.0).x;
     strip.set_name("PixelBuilderStrip");
     strip.set_h_size_flags(SizeFlags::EXPAND_FILL);
+    strip.set_v_size_flags(SizeFlags::FILL);
+    {
+        let mut peel = peel.clone();
+        peel.add_child(&strip);
+    }
 
     let mut hover = Label::new_alloc();
     hover.set_name("PixelBuilderHover");
@@ -2751,7 +2781,8 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
 
     let mut ui = Ui {
         toolbar,
-        peel: strip,
+        rail,
+        peel,
         palette,
         buttons,
         sections,
@@ -3048,14 +3079,14 @@ impl Ui {
     }
 
     pub fn assign_shown(&mut self, v: bool, palette: bool) {
-        self.toolbar.set_visible(v);
+        self.rail.set_visible(v);
         self.peel.set_visible(v);
         self.palette.set_visible(v && palette);
     }
 
     pub fn controls(&self) -> (Gd<Control>, Gd<Control>, Gd<Control>) {
         (
-            self.toolbar.clone().upcast(),
+            self.rail.clone().upcast(),
             self.peel.clone().upcast(),
             self.palette.clone().upcast(),
         )

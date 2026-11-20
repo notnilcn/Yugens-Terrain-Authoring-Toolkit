@@ -14,7 +14,9 @@ pub const WIND_TEXTURE: &str =
     "res://addons/MarchingSquaresTerrain/textures/wind_noise_texture.tres";
 
 fn sprite_image(t: &Gd<Texture2D>) -> Option<Gd<Image>> {
-    let mut img = t.get_image()?;
+    // A copy: `get_image()` may return the texture's shared editor image cache (see
+    // `MarchingSquaresTexturePreset::layer_image`), and the layers are converted / resized.
+    let mut img = t.get_image()?.duplicate_resource();
     if img.is_compressed() {
         img.decompress();
     }

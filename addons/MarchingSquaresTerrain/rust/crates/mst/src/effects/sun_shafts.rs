@@ -17,6 +17,7 @@
 //!   the height above the node (`fade_height`).
 
 use godot::classes::geometry_instance_3d::ShadowCastingSetting;
+use godot::classes::light_3d::Param;
 use godot::classes::multi_mesh::TransformFormat;
 use godot::classes::{
     DirectionalLight3D, INode3D, MultiMesh, MultiMeshInstance3D, Node, Node3D, QuadMesh,
@@ -224,6 +225,10 @@ impl PixelSunShafts {
             return;
         };
         let basis = sun.get_global_basis().orthonormalized();
+        let reach = sun.get_param(Param::SHADOW_MAX_DISTANCE);
+        if let Some(m) = &mut self.mat {
+            m.param("shadow_reach", &reach.to_variant());
+        }
         let key = (basis, self.count, self.depth);
         if self.built != Some(key) {
             self.built = Some(key);

@@ -1,18 +1,22 @@
-//! `MstDemoHint` — the demo's one-line control hint: shown when the game starts, fades out after
+//! `MstDemoHint` — the demo's control help: shown when the game starts, fades out after
 //! `show_seconds`, comes back on `toggle_key` (F1).
 //!
-//! A plain `Label` (put it under a `CanvasLayer` so the pixel renderer's viewports do not cover
-//! it). The fade is a `Tween` started from `ready` / the key press, so nothing runs per frame
+//! A `Label` (put it under a `CanvasLayer` so the pixel renderer's viewports do not cover it) on
+//! a translucent dark panel (its `normal` stylebox, unless the scene overrides it) so the text
+//! stays readable over bright terrain or sky. Anchor it bottom-centre with zero offsets and
+//! `grow_horizontal = both`, `grow_vertical = begin`: it then sizes itself to the text. The fade is a `Tween` started from `ready` / the key press, so nothing runs per frame
 //! while the hint is idle; the key is read in `unhandled_input`.
 
-use godot::classes::{ILabel, InputEvent, InputEventKey, Label, Tween};
+use godot::classes::{ILabel, InputEvent, InputEventKey, Label, StyleBoxFlat, Tween};
+use godot::builtin::Side;
 use godot::global::Key;
 use godot::prelude::*;
 
 /// The demo's real bindings (`player.rs` `ACTION_KEYS`, mouse orbit / zoom, the
 /// `PixelDiagnostics` F3 toggle). Keep in sync when a binding changes.
-pub const CONTROLS: &str =
-    "WASD move · Shift walk · Space jump · drag / arrows orbit · wheel zoom · F3 tuner · F1 help";
+pub const CONTROLS: &str = "WASD move  ·  Shift walk  ·  Space jump\n\
+     Drag or arrow keys orbit the camera  ·  Wheel zoom\n\
+     F3 pixel tuner  ·  F1 show this help";
 
 #[derive(GodotClass)]
 #[class(base = Label)]
@@ -45,6 +49,19 @@ impl ILabel for MstDemoHint {
     fn ready(&mut self) {
         if self.base().get_text().is_empty() {
             self.base_mut().set_text(CONTROLS);
+        }
+        if !self.base().has_theme_stylebox_override("normal") {
+            let mut panel = StyleBoxFlat::new_gd();
+            panel.set_bg_color(Color::from_rgba(0.05, 0.06, 0.09, 0.78));
+            panel.set_border_color(Color::from_rgba(1.0, 1.0, 1.0, 0.18));
+            panel.set_border_width_all(1);
+            panel.set_corner_radius_all(6);
+            panel.set_content_margin(Side::LEFT, 16.0);
+            panel.set_content_margin(Side::RIGHT, 16.0);
+            panel.set_content_margin(Side::TOP, 8.0);
+            panel.set_content_margin(Side::BOTTOM, 8.0);
+            self.base_mut()
+                .add_theme_stylebox_override("normal", &panel);
         }
         self.show_hint();
     }

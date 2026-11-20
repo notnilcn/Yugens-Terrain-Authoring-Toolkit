@@ -197,7 +197,7 @@ pub fn is_terrain_child(class: &str) -> bool {
 
 /// "Wire refs" action, shared by the Pixel World panel and the toolbar "Pixel World" menu.
 pub const WIRE_LABEL: &str = "Wire Sun / Env Refs";
-pub const WIRE_TOOLTIP: &str = "Fill empty sun / environment references of Sky and Day/Night with the scene's first\nDirectionalLight3D / WorldEnvironment (undoable).";
+pub const WIRE_TOOLTIP: &str = "Fill empty sun / environment references of Sky, Day/Night, Weather and Sun Shafts with the\nscene's first DirectionalLight3D / WorldEnvironment (undoable).";
 /// Labels of the "Pixel World" toolbar menu / panel sections.
 pub const PRESET_HEADER: &str = "Lighting Preset";
 /// Strip pages of the sections with many attributes: (page name, tooltip, index of its first

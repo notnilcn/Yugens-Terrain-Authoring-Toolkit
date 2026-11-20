@@ -78,7 +78,9 @@ impl IResource for PixelPalette {
 impl PixelPalette {
     fn palette_rgb(&self) -> Vec<[f32; 3]> {
         if let Some(tex) = &self.source_image
-            && let Some(mut img) = tex.get_image()
+            // A copy: `get_image()` may return the texture's shared editor image cache, which
+            // the decompress / convert below would otherwise change for everyone using it.
+            && let Some(mut img) = tex.get_image().map(|i| i.duplicate_resource())
         {
             if img.is_compressed() {
                 img.decompress();
@@ -130,7 +132,8 @@ impl PixelPalette {
     /// The loaded `lut_image` converted to this addon's layout.
     fn imported(&self) -> Option<Gd<Image>> {
         let tex = self.lut_image.as_ref()?;
-        let mut img = tex.get_image()?;
+        // A copy (see `palette_rgb`): never convert the texture's shared cached image in place.
+        let mut img = tex.get_image()?.duplicate_resource();
         if img.is_compressed() {
             img.decompress();
         }

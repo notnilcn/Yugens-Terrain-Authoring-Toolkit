@@ -671,7 +671,16 @@ impl IEditorPlugin for PixelBuilderPlugin {
             return if r { stop } else { pass };
         }
         if let Ok(key) = event.clone().try_cast::<InputEventKey>() {
-            return if self.on_key(&key) { stop } else { pass };
+            if !self.on_key(&key) {
+                return pass;
+            }
+            // STOP alone does not end a key event's propagation: the editor's own shortcuts
+            // (`shortcut_input`) still ran, so `H` (cycle mode) also ran Godot's
+            // "Toggle Selected Node(s) Visibility" and hid the mesh being edited every other press.
+            if let Some(mut vp) = self.base().get_viewport() {
+                vp.set_input_as_handled();
+            }
+            return stop;
         }
         if self.tool == Tool::Shape
             && let Some(r) = self.shape_event(&camera, &event)
@@ -2014,6 +2023,14 @@ impl PixelBuilderPlugin {
         ur.add_undo_method(&parent, "remove_child", &[node.to_variant()]);
         ur.commit_action();
         self.message = format!("Created {name}");
+        // The new sibling becomes the edited mesh (Scene tree, Inspector and builder target), so
+        // the next W / B acts on it. Deferred: the selection change re-enters this plugin
+        // (`handles` / `edit`) and this runs inside `forward_3d_gui_input`.
+        if let Some(sel) = EditorInterface::singleton().get_selection() {
+            let mut sel = sel.upcast::<Object>();
+            sel.call_deferred("clear", &[]);
+            sel.call_deferred("add_node", &[node.to_variant()]);
+        }
     }
 
     fn place_target(&mut self) {
@@ -2382,13 +2399,13 @@ impl PixelBuilderPlugin {
         }
     }
 
-    /// H: Object → Vertex → Edge → Face → Object.
+    /// H: Object → Face → Edge → Vertex → Object (the documented 1→2→3→4 order).
     fn cycle_mode(&mut self) {
         let next = match self.mode {
-            Mode::Object => Mode::Vertex,
-            Mode::Vertex => Mode::Edge,
-            Mode::Edge => Mode::Face,
-            Mode::Face => Mode::Object,
+            Mode::Object => Mode::Face,
+            Mode::Face => Mode::Edge,
+            Mode::Edge => Mode::Vertex,
+            Mode::Vertex => Mode::Object,
         };
         self.assign_setting(next);
     }
@@ -2650,6 +2667,9 @@ impl PixelBuilderPlugin {
         if !key.is_pressed() || key.is_echo() {
             return false;
         }
+        // Top-row digits arrive as KP_1.. (the viewport's numpad emulation): match the mode
+        // keys 1–4 (and 5) against the key the user pressed.
+        let key = &crate::util::undo_numpad_emulation(key);
         let k = key.get_keycode();
         let ctrl = key.is_ctrl_pressed() || key.is_meta_pressed();
         // Adjust panel: Enter keeps the result, Esc restores; Ctrl+Z first commits the adjusted
@@ -3232,7 +3252,7 @@ impl PixelBuilderPlugin {
         let p = self.prefs;
         if let Some(panel) = &mut self.prefs_panel {
             prefs::sync_panel(panel, &p);
-            panel.popup.popup_centered();
+            panel.unveil();
         }
     }
 

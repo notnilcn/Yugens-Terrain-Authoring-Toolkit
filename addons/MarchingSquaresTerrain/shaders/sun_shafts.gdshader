@@ -39,6 +39,13 @@ uniform float fade_height = 12.0;
 /// Fade the sheets out this close (metres) in front of the surface behind them, so a sheet
 /// cutting into the ground leaves no hard line (0 = off).
 uniform float surface_fade = 1.5;
+/// Distance from the camera where the sun's shadow map ends (set by PixelSunShafts from the
+/// light's `directional_shadow_max_distance`; 0 = off). Past it ATTENUATION is 1 everywhere.
+/// The sheets fade out where they, or the surface behind them, lie beyond about half of it:
+/// in front of the open sky (or far terrain) every unshadowed sheet glows, so the sky turns
+/// into a flat warm haze and the only shape left is the dark shadow of a tree or wall cutting
+/// through it (a dark wedge instead of shafts). Shafts then only show against the scene.
+uniform float shadow_reach = 0.0;
 
 uniform sampler2D depth_tex : hint_depth_texture, repeat_disable, filter_nearest;
 
@@ -76,7 +83,7 @@ void light() {
 		if (fade_height > 0.0) {
 			a *= 1.0 - smoothstep(fade_height * 0.4, fade_height, world_y - base_height);
 		}
-		if (surface_fade > 0.0) {
+		if (surface_fade > 0.0 || shadow_reach > 0.0) {
 			vec2 suv = FRAGCOORD.xy / VIEWPORT_SIZE;
 			float depth = textureLod(depth_tex, suv, 0.0).r;
 #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
@@ -86,7 +93,14 @@ void light() {
 #endif
 			vec4 sv = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 			float scene_z = -sv.z / sv.w;
-			a *= clamp((scene_z - (-view_pos.z)) / surface_fade, 0.0, 1.0);
+			if (surface_fade > 0.0) {
+				a *= clamp((scene_z - (-view_pos.z)) / surface_fade, 0.0, 1.0);
+			}
+			if (shadow_reach > 0.0) {
+				// Godot fades the shadow out over the last 20% of its range: be gone well before.
+				float reach = max(length(view_pos), scene_z);
+				a *= 1.0 - smoothstep(shadow_reach * 0.35, shadow_reach * 0.6, reach);
+			}
 		}
 		a *= clamp(pt_sun_light, 0.0, 1.0) * (1.0 - clamp(pt_night, 0.0, 1.0));
 		if (shaft_steps > 0) {
