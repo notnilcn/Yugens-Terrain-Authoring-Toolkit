@@ -26,7 +26,7 @@ lives under `$MST_QA_STATE` (default `/tmp/opencode/qa`) and is rebuilt from the
 | Path | Kind |
 |---|---|
 | `qa/harness/` (plugin + `harness.gd`) | source, committed |
-| `qa/drive.py`, `qa/session.sh`, `qa/setup.sh`, `qa/resource-monitor.sh` | source, committed |
+| `qa/drive.py`, `qa/session.sh`, `qa/runtime.sh`, `qa/setup.sh`, `qa/resource-monitor.sh` | source, committed |
 | `qa/README.md`, `qa/FEATURE-MAP.md` | source, committed |
 | `$MST_QA_STATE/project_base` | generated from the working tree (excludes `.git`,
   `rust/target`, `qa/screenshots`, `qa/findings`) |
@@ -65,6 +65,23 @@ at once.
 removes the generated state; `--check` validates the prerequisites and the built template.
 Set `MST_QA_STATE` to move the generated state out of `/tmp` (for example on a machine where
 `/tmp` is cleaned aggressively).
+
+## Runtime (non-editor) sessions
+
+The demo/tutorial scenes run as a plain game, without the harness:
+
+```bash
+qa/runtime.sh start play --display :44 --scene res://demo/hex_island.tscn
+source /tmp/opencode/qa/runtime/<play>/env.sh   # or: qa/runtime.sh env play
+python3 qa/drive.py shot qa/screenshots/runtime/01-hex.png
+python3 qa/drive.py key F1
+qa/runtime.sh stop play
+```
+
+`qa/runtime.sh` uses a disposable copy of the template, isolated XDG dirs, and its own
+Xvfb display; `MST_WINDOW_MATCH` makes `qa/drive.py` target the game window (the editor
+and game titles differ). Use `--width/--height` to test the pixel renderer at different
+window sizes, and a separate display from any running editor.
 
 ## Commands (the ones you need)
 
