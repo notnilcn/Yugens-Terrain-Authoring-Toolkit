@@ -92,6 +92,10 @@ uniform vec4 horizon_color : source_color = vec4(0.52, 0.66, 0.86, 1.0);
 uniform float rim_fade : hint_range(0.0, 1.0) = 0.0;
 // Plane centre (xy) and half size (zw) in world XZ, set by PixelWater.
 uniform vec4 plane_rect = vec4(0.0, 0.0, 0.0, 0.0);
+// Camera far distance (set by PixelWater with `follow_camera`; 0 = off): the sea fades into the
+// horizon colour over the last stretch before the far plane, so a low orbit never shows the
+// straight line where the far plane clips the water.
+uniform float view_far = 0.0;
 group_uniforms;
 
 group_uniforms Lighting;
@@ -257,8 +261,14 @@ void fragment() {
 
 	ALBEDO = col;
 	// Horizon: unlit background colour in dithered steps (ALBEDO -> 0, EMISSION -> sky).
+	float hf = 0.0;
 	if (horizon_end > horizon_start && horizon_start > 0.0) {
-		float hf = clamp((length(world_pos.xz - CAMERA_POSITION_WORLD.xz) - horizon_start) / (horizon_end - horizon_start), 0.0, 1.0);
+		hf = clamp((length(world_pos.xz - CAMERA_POSITION_WORLD.xz) - horizon_start) / (horizon_end - horizon_start), 0.0, 1.0);
+	}
+	if (view_far > 0.0) {
+		hf = max(hf, clamp((-VERTEX.z - view_far * 0.7) / (view_far * 0.22), 0.0, 1.0));
+	}
+	if (hf > 0.0) {
 		hf = clamp(floor(hf * 4.0 + bayer4(FRAGCOORD.xy)) / 4.0, 0.0, 1.0);
 		vec3 sky_lin = pt_horizon.a > 0.5 ? pt_horizon.rgb : horizon_color.rgb;
 		ALBEDO *= 1.0 - hf;
