@@ -168,17 +168,8 @@ impl PixelPreviewPlugin {
         let id = token_id as usize;
         if id < MENU_PRESET {
             if let Some((class, _, _)) = sections::ADDABLE.get(id) {
-                // Adding an effect is opting in to it: turn its project feature on.
-                if let Some(f) = features::for_category(class)
-                    && !features::active(f)
-                {
-                    features::assign_active(f, true);
-                    godot_print!(
-                        "Pixel World: turned the \"{}\" feature on for this project.",
-                        features::info_of(f).label
-                    );
-                }
-                actions::add_effect(ur, class);
+                // Also turns the effect's project feature on (`actions::add_effect`).
+                actions::add_effect(ur, class, true);
             }
         } else if id < MENU_WIRE {
             actions::apply_preset(ur, id - MENU_PRESET);
@@ -195,9 +186,26 @@ impl PixelPreviewPlugin {
         let Some(mut popup) = m.get_popup() else {
             return;
         };
-        for (i, (class, _, unique)) in sections::ADDABLE.iter().enumerate() {
+        for (i, (class, label, unique)) in sections::ADDABLE.iter().enumerate() {
             let idx = popup.get_item_index(i as i32);
-            popup.set_item_disabled(idx, *unique && actions::find_in_scene(class).is_some());
+            let present = *unique && actions::find_in_scene(class).is_some();
+            popup.set_item_disabled(idx, present);
+            // The theme's disabled grey is subtle next to the bright entries: also say why the
+            // entry does nothing (#34).
+            let text = if present {
+                format!("{label}  (in scene)")
+            } else {
+                label.to_string()
+            };
+            popup.set_item_text(idx, &text);
+            popup.set_item_tooltip(
+                idx,
+                &if present {
+                    format!("The scene already has its {class} (only one is used): select it in the Pixel World panel.")
+                } else {
+                    format!("Add a {class} to the edited scene (references wired, undoable).")
+                },
+            );
         }
     }
 }

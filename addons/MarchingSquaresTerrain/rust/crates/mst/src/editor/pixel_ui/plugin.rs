@@ -401,8 +401,13 @@ impl PixelizerEditorPlugin {
 
     #[func]
     fn on_add(&mut self, class: GString) {
+        let class = class.to_string();
+        // Select the new node only when this UI edits it (the toolbar, strip and Pixel World
+        // panel follow the selection); otherwise keep the current selection so the panel stays
+        // open for the next "+ Add" (#31). The row turns into "Select" for the new node.
+        let select = HANDLED.contains(&class.as_str());
         if let Some(ur) = self.undo() {
-            actions::add_effect(ur, &class.to_string());
+            actions::add_effect(ur, &class, select);
         }
     }
 
