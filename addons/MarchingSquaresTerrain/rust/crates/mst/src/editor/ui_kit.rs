@@ -293,7 +293,10 @@ pub fn toolbar_rail(flow: &Gd<VFlowContainer>) -> Gd<ScrollContainer> {
     rail.set_name(&format!("{}Rail", flow.get_name()));
     rail.add_theme_stylebox_override("focus", &StyleBoxEmpty::new_gd());
     rail.set_horizontal_scroll_mode(ScrollMode::DISABLED);
-    rail.set_vertical_scroll_mode(ScrollMode::AUTO);
+    // Wheel / drag scrolling without a scrollbar: a scrollbar that appears only on short
+    // windows widened the rail by its own width (the rail's width must not depend on the
+    // editor height, and a compact rail stays [`TOOL_RAIL_COMPACT`] px).
+    rail.set_vertical_scroll_mode(ScrollMode::SHOW_NEVER);
     rail.set_vertical_custom_step(sz(0.0, TOOL_ROW).y);
     rail.add_child(flow);
     fit_rail(flow);
@@ -325,24 +328,32 @@ impl godot::classes::IScrollContainer for MstRail {
     }
 }
 
+/// Width of a compact (icon-only) [`toolbar_rail`]: 32 px buttons + 2 px on each side.
+pub const TOOL_RAIL_COMPACT: f32 = 36.0;
+
 /// Single column for a flow inside a [`toolbar_rail`]: its minimum height is the sum of its
-/// visible children, so it never wraps (the rail scrolls instead). Call again after showing /
-/// hiding / resizing buttons ([`set_toolbar_compact`] does).
+/// visible children, so it never wraps (the rail scrolls instead), and the rail is exactly as
+/// wide as the widest button + 4 px ([`TOOL_RAIL_COMPACT`] when compact), whatever the editor
+/// height. Call again after showing / hiding / resizing buttons ([`set_toolbar_compact`] does).
 pub fn fit_rail(flow: &Gd<VFlowContainer>) {
-    if flow
+    let Some(mut rail) = flow
         .get_parent()
         .and_then(|p| p.try_cast::<ScrollContainer>().ok())
-        .is_none()
-    {
+    else {
         return;
-    }
+    };
     let sep = flow.get_theme_constant("v_separation") as f32;
-    let (mut h, mut n) = (0.0f32, 0);
+    let (mut h, mut w, mut n) = (0.0f32, 0.0f32, 0);
     for c in flow.get_children().iter_shared() {
         if let Ok(c) = c.try_cast::<Control>()
             && c.is_visible()
         {
-            h += c.get_combined_minimum_size().y;
+            let m = c.get_combined_minimum_size();
+            h += m.y;
+            // Separators have no width of their own.
+            if !c.is_class("Separator") {
+                w = w.max(m.x);
+            }
             n += 1;
         }
     }
@@ -351,6 +362,11 @@ pub fn fit_rail(flow: &Gd<VFlowContainer>) {
     let cur = f.get_custom_minimum_size();
     if (cur.y - h.ceil()).abs() > 0.5 {
         f.set_custom_minimum_size(Vector2::new(cur.x, h.ceil()));
+    }
+    let want = (w + px(4.0) as f32).ceil();
+    let rc = rail.get_custom_minimum_size();
+    if w > 0.0 && (rc.x - want).abs() > 0.5 {
+        rail.set_custom_minimum_size(Vector2::new(want, rc.y));
     }
 }
 
@@ -450,10 +466,13 @@ pub struct Strip {
     last: Option<CtlKind>,
 }
 
-/// Tallest a bottom strip gets before it scrolls (7 rows), before [`editor_scale`].
-pub const STRIP_MAX_HEIGHT: f32 = 245.0;
+/// Tallest a bottom strip gets before it scrolls (5 rows), before [`editor_scale`].
+pub const STRIP_MAX_HEIGHT: f32 = 175.0;
 /// Largest share of the 3D area (viewport + strip) a bottom strip may take.
 pub const STRIP_MAX_SHARE: f32 = 0.35;
+/// Height the 3D viewport keeps above a bottom strip whenever the area allows it (before
+/// [`editor_scale`]): the strip scrolls instead of squeezing the view to a 39 px slice.
+pub const VIEW_MIN_HEIGHT: f32 = 300.0;
 
 /// Root of the bottom strip (created once; [`Strip::reassemble`] replaces its content).
 ///
@@ -481,25 +500,30 @@ pub fn strip_root(name: &str) -> Gd<ScrollContainer> {
 }
 
 /// Height cap of a bottom strip whose root is `root`: [`STRIP_MAX_HEIGHT`], at most
-/// [`STRIP_MAX_SHARE`] of the area it shares with the 3D viewport (the root's parent), and at
-/// least one row.
+/// [`STRIP_MAX_SHARE`] of the area it shares with the 3D viewport (the root's parent), never
+/// so tall that the viewport drops below [`VIEW_MIN_HEIGHT`], and at least one row.
 pub fn strip_cap(root: &Gd<Control>) -> f32 {
     let max = sz(0.0, STRIP_MAX_HEIGHT).y;
     let row = sz(0.0, ROW_HEIGHT).y;
+    let floor = sz(0.0, VIEW_MIN_HEIGHT).y;
     let area = root
         .get_parent()
         .and_then(|p| p.try_cast::<Control>().ok())
         .map(|c| c.get_size().y)
         .unwrap_or(0.0);
-    strip_cap_for(area, max, row)
+    strip_cap_for(area, max, row, floor)
 }
 
-/// [`strip_cap`] for an area height (0 = unknown).
-pub fn strip_cap_for(area: f32, max: f32, row: f32) -> f32 {
+/// [`strip_cap`] for an area height (0 = unknown) and a viewport floor.
+pub fn strip_cap_for(area: f32, max: f32, row: f32, view_floor: f32) -> f32 {
     if area <= 0.0 {
         return max;
     }
-    (area * STRIP_MAX_SHARE).min(max).max(row).floor()
+    (area * STRIP_MAX_SHARE)
+        .min(max)
+        .min(area - view_floor)
+        .max(row)
+        .floor()
 }
 
 impl Strip {
@@ -968,30 +992,303 @@ pub fn assign_active(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
     }
 }
 
-/// Right side panel: `ScrollContainer` ([`PANEL_WIDTH`] wide, vertical scrolling only) →
-/// `VBoxContainer`. Horizontal scrolling is disabled so nothing can hide past the right edge:
-/// rows must fit (use [`form_row`] / [`compact_option`]).
+/// Narrowest / widest a resized side panel gets (before [`editor_scale`]).
+pub const PANEL_MIN_WIDTH: f32 = 220.0;
+pub const PANEL_MAX_WIDTH: f32 = 420.0;
+/// Width of a collapsed side panel (its expand tab), before [`editor_scale`].
+pub const PANEL_TAB_WIDTH: f32 = 24.0;
+/// Resize / collapse grip along a side panel's left edge, before [`editor_scale`].
+pub const PANEL_GRIP_WIDTH: f32 = 10.0;
+/// Below this window width a side panel the user never toggled starts collapsed (an expanded
+/// 220+ px panel pushed the editor past the screen edge at 1024×600).
+pub const PANEL_AUTO_COLLAPSE_BELOW: f32 = 1100.0;
+/// Largest share of the editor window an expanded side panel may take.
+pub const PANEL_MAX_SHARE: f32 = 0.3;
+
+/// Right side panel: an [`MstSidePanel`] `ScrollContainer` (vertical scrolling only, visible
+/// scrollbar) → `MarginContainer` → `VBoxContainer`. Horizontal scrolling is disabled so nothing
+/// can hide past the right edge: rows must fit (use [`form_row`] / [`compact_option`]).
+///
+/// The panel is resizable and collapsible: drag its left edge (the grip, [`PANEL_MIN_WIDTH`] to
+/// [`PANEL_MAX_WIDTH`]), click the grip's chevron to collapse it to a [`PANEL_TAB_WIDTH`] tab,
+/// click the tab to expand it again. Width and collapse state are remembered per panel `name`
+/// and project. The panel also never claims more than [`PANEL_MAX_SHARE`] of the window.
 pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
-    let mut root = ScrollContainer::new_alloc();
-    root.set_name(name);
+    let mut panel = MstSidePanel::new_alloc();
+    panel.set_name(name);
+    let mut root = panel.clone().upcast::<ScrollContainer>();
     root.set_custom_minimum_size(sz(PANEL_WIDTH, 0.0));
     root.add_theme_stylebox_override("focus", &StyleBoxEmpty::new_gd());
     root.set_horizontal_scroll_mode(ScrollMode::DISABLED);
-    // Always show the scrollbar (the panels are long: 16 texture slots), and scroll three rows
-    // per wheel notch instead of the default 1/8 page.
+    // Always show the scrollbar (the panels are long: 16 texture slots), and scroll several
+    // rows per wheel notch instead of the default 1/8 page.
     root.set_vertical_scroll_mode(ScrollMode::SHOW_ALWAYS);
-    root.set_vertical_custom_step(sz(0.0, ROW_HEIGHT * 3.0).y);
+    root.set_vertical_custom_step(sz(0.0, ROW_HEIGHT * 4.0).y);
     let mut vbox = VBoxContainer::new_alloc();
     vbox.set_h_size_flags(SizeFlags::EXPAND_FILL);
     vbox.add_theme_constant_override("separation", px(4.0));
     let mut m = MarginContainer::new_alloc();
+    m.set_name("Content");
     m.set_h_size_flags(SizeFlags::EXPAND_FILL);
-    // Room for the vertical scrollbar so controls never sit under it.
-    m.add_theme_constant_override("margin_left", px(4.0));
+    // The left margin is the resize / collapse grip (drawn and handled by the panel); the right
+    // one leaves room for the vertical scrollbar so controls never sit under it.
+    m.add_theme_constant_override("margin_left", px(PANEL_GRIP_WIDTH));
     m.add_theme_constant_override("margin_right", px(8.0));
     m.add_child(&vbox);
     root.add_child(&m);
+    // Collapsed: this tab is the whole panel (the content is hidden).
+    let mut tab = Button::new_alloc();
+    tab.set_name("ExpandTab");
+    tab.set_text("\u{2039}");
+    tab.set_tooltip_text("Show the panel.");
+    tab.set_focus_mode(FocusMode::ALL);
+    tab.set_visible(false);
+    tab.connect("pressed", &panel.callable("_mst_expand"));
+    root.add_child(&tab);
+    {
+        let mut p = panel.bind_mut();
+        p.key = name.to_string();
+        p.tab = Some(tab);
+        p.content = Some(m.upcast());
+    }
     (root, vbox)
+}
+
+/// Section of the editor project metadata holding the side panel sizes.
+const PANEL_META_SECTION: &str = "marching_squares_terrain";
+
+fn panel_meta(key: &str) -> Option<Variant> {
+    let es = EditorInterface::singleton().get_editor_settings()?;
+    let v = es
+        .get_project_metadata_ex(PANEL_META_SECTION, key)
+        .default(&Variant::nil())
+        .done();
+    (!v.is_nil()).then_some(v)
+}
+
+fn set_panel_meta(key: &str, v: &Variant) {
+    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
+        es.set_project_metadata(PANEL_META_SECTION, key, v);
+    }
+}
+
+/// Width of an expanded side panel (unscaled px) for a stored `width` and the editor `window`
+/// width (scaled px, 0 = unknown): [`PANEL_MIN_WIDTH`]..[`PANEL_MAX_WIDTH`], and at most
+/// [`PANEL_MAX_SHARE`] of the window (never below the minimum).
+pub fn panel_width_for(width: f32, window: f32, scale: f32) -> f32 {
+    let share = if window > 0.0 {
+        (window * PANEL_MAX_SHARE / scale.max(0.01)).max(PANEL_MIN_WIDTH)
+    } else {
+        PANEL_MAX_WIDTH
+    };
+    width.clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH.min(share))
+}
+
+/// Root of a [`side_panel`]: a `ScrollContainer` with a resize / collapse grip on its left edge.
+#[derive(GodotClass)]
+#[class(tool, init, base = ScrollContainer, internal)]
+pub struct MstSidePanel {
+    /// Metadata key prefix (the panel's name).
+    key: String,
+    /// Expanded width (unscaled px); 0 = not loaded yet.
+    width: f32,
+    /// User choice (None = never toggled: collapsed only on small windows).
+    collapsed: Option<bool>,
+    /// Grip drag: (mouse x at the press, width at the press, moved).
+    drag: Option<(f32, f32, bool)>,
+    tab: Option<Gd<Button>>,
+    content: Option<Gd<Control>>,
+    base: Base<ScrollContainer>,
+}
+
+#[godot_api]
+impl godot::classes::IScrollContainer for MstSidePanel {
+    fn on_notification(&mut self, what: godot::classes::notify::ContainerNotification) {
+        use godot::classes::notify::ContainerNotification as N;
+        match what {
+            N::ENTER_TREE => {
+                if self.width <= 0.0 {
+                    self.width = panel_meta(&format!("panel_{}_width", self.key))
+                        .and_then(|v| v.try_to::<f64>().ok())
+                        .map(|w| w as f32)
+                        .unwrap_or(PANEL_WIDTH);
+                    self.collapsed = panel_meta(&format!("panel_{}_collapsed", self.key))
+                        .and_then(|v| v.try_to::<bool>().ok());
+                }
+                let cb = self.base().callable("_mst_apply");
+                if let Some(mut vp) = self.base().get_viewport()
+                    && !vp.is_connected("size_changed", &cb)
+                {
+                    vp.connect_flags(
+                        "size_changed",
+                        &cb,
+                        godot::classes::object::ConnectFlags::DEFERRED,
+                    );
+                }
+                self.apply();
+            }
+            N::EXIT_TREE => {
+                let cb = self.base().callable("_mst_apply");
+                if let Some(mut vp) = self.base().get_viewport()
+                    && vp.is_connected("size_changed", &cb)
+                {
+                    vp.disconnect("size_changed", &cb);
+                }
+                self.drag = None;
+            }
+            _ => {}
+        }
+    }
+
+    fn draw(&mut self) {
+        if self.is_collapsed() {
+            return;
+        }
+        // Grip: a thin line along the left edge and a "collapse" chevron at its top.
+        let g = px(PANEL_GRIP_WIDTH) as f32;
+        let h = self.base().get_size().y;
+        let line = Color::from_rgba(1.0, 1.0, 1.0, if self.drag.is_some() { 0.5 } else { 0.18 });
+        let x = (g * 0.5).floor() + 0.5;
+        self.base_mut()
+            .draw_line(Vector2::new(x, px(30.0) as f32), Vector2::new(x, h), line);
+        let c = Color::from_rgba(1.0, 1.0, 1.0, 0.7);
+        let (cx, cy, r) = (g * 0.5, px(14.0) as f32, px(4.0) as f32);
+        for (a, b) in [
+            (Vector2::new(cx - r * 0.5, cy - r), Vector2::new(cx + r * 0.5, cy)),
+            (Vector2::new(cx + r * 0.5, cy), Vector2::new(cx - r * 0.5, cy + r)),
+        ] {
+            self.base_mut()
+                .draw_line_ex(a, b, c)
+                .width(px(1.5) as f32)
+                .antialiased(true)
+                .done();
+        }
+    }
+
+    fn gui_input(&mut self, event: Gd<godot::classes::InputEvent>) {
+        use godot::classes::control::CursorShape;
+        use godot::classes::{InputEventMouseButton, InputEventMouseMotion};
+        if self.is_collapsed() {
+            return;
+        }
+        let grip = px(PANEL_GRIP_WIDTH) as f32;
+        if let Ok(mb) = event.clone().try_cast::<InputEventMouseButton>() {
+            if mb.get_button_index() != godot::global::MouseButton::LEFT {
+                return;
+            }
+            if mb.is_pressed() && mb.get_position().x < grip {
+                self.drag = Some((mb.get_global_position().x, self.width, false));
+                self.base_mut().accept_event();
+                self.base_mut().queue_redraw();
+            } else if !mb.is_pressed()
+                && let Some((_, _, moved)) = self.drag.take()
+            {
+                self.base_mut().accept_event();
+                if moved {
+                    set_panel_meta(
+                        &format!("panel_{}_width", self.key),
+                        &(self.width as f64).to_variant(),
+                    );
+                } else {
+                    // A click on the grip (no drag): collapse to the tab.
+                    self.assign_collapsed(true);
+                }
+                self.base_mut().queue_redraw();
+            }
+            return;
+        }
+        if let Ok(mm) = event.try_cast::<InputEventMouseMotion>() {
+            if let Some((x0, w0, moved)) = self.drag {
+                let dx = (x0 - mm.get_global_position().x) / editor_scale();
+                let moved = moved || dx.abs() > 3.0;
+                // The panel is on the right: dragging its left edge left widens it.
+                self.width = (w0 + dx).clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+                self.drag = Some((x0, w0, moved));
+                self.apply();
+                self.base_mut().accept_event();
+                return;
+            }
+            let shape = if mm.get_position().x < grip {
+                CursorShape::HSIZE
+            } else {
+                CursorShape::ARROW
+            };
+            if self.base().get_default_cursor_shape() != shape {
+                self.base_mut().set_default_cursor_shape(shape);
+            }
+        }
+    }
+}
+
+#[godot_api]
+impl MstSidePanel {
+    /// The window was resized (and after any change): re-applies the width / collapse state.
+    #[func]
+    fn _mst_apply(&mut self) {
+        self.apply();
+    }
+
+    /// The collapsed tab was pressed.
+    #[func]
+    fn _mst_expand(&mut self) {
+        self.assign_collapsed(false);
+    }
+}
+
+impl MstSidePanel {
+    fn window_width(&self) -> f32 {
+        self.base()
+            .get_viewport()
+            .map(|v| v.get_visible_rect().size.x)
+            .unwrap_or(0.0)
+    }
+
+    fn is_collapsed(&self) -> bool {
+        self.collapsed.unwrap_or_else(|| {
+            let w = self.window_width();
+            w > 0.0 && w < PANEL_AUTO_COLLAPSE_BELOW * editor_scale()
+        })
+    }
+
+    fn assign_collapsed(&mut self, on: bool) {
+        self.collapsed = Some(on);
+        set_panel_meta(&format!("panel_{}_collapsed", self.key), &on.to_variant());
+        self.apply();
+    }
+
+    /// Sets the panel's minimum width from its state and shows the content or the tab.
+    fn apply(&mut self) {
+        let collapsed = self.is_collapsed();
+        let scale = editor_scale();
+        let w = if collapsed {
+            PANEL_TAB_WIDTH
+        } else {
+            panel_width_for(self.width.max(1.0), self.window_width(), scale)
+        };
+        let want = (w * scale).round();
+        let cur = self.base().get_custom_minimum_size();
+        if (cur.x - want).abs() > 0.5 {
+            self.base_mut()
+                .set_custom_minimum_size(Vector2::new(want, cur.y));
+        }
+        if let Some(c) = self.content.as_mut().filter(|c| c.is_instance_valid())
+            && c.is_visible() == collapsed
+        {
+            c.set_visible(!collapsed);
+        }
+        if let Some(t) = self.tab.as_mut().filter(|t| t.is_instance_valid())
+            && t.is_visible() != collapsed
+        {
+            t.set_visible(collapsed);
+        }
+        if collapsed {
+            self.base_mut().set_vertical_scroll_mode(ScrollMode::DISABLED);
+            self.base_mut().set_default_cursor_shape(godot::classes::control::CursorShape::ARROW);
+        } else {
+            self.base_mut().set_vertical_scroll_mode(ScrollMode::SHOW_ALWAYS);
+        }
+        self.base_mut().queue_redraw();
+    }
 }
 
 /// Section header of a side panel (icon + bold-ish name), optionally with a tooltip.
@@ -1258,12 +1555,32 @@ mod tests {
 
     #[test]
     fn strip_cap() {
+        let cap = |area| super::strip_cap_for(area, 175.0, 35.0, 300.0);
         // Unknown area: the fixed maximum.
-        assert_eq!(super::strip_cap_for(0.0, 245.0, 35.0), 245.0);
-        // Big area: the fixed maximum; small area: its share; tiny area: one row.
-        assert_eq!(super::strip_cap_for(1000.0, 245.0, 35.0), 245.0);
-        assert_eq!(super::strip_cap_for(400.0, 245.0, 35.0), 140.0);
-        assert_eq!(super::strip_cap_for(60.0, 245.0, 35.0), 35.0);
+        assert_eq!(cap(0.0), 175.0);
+        // Big area: the fixed maximum (1600x900 / 1920x1080 editors).
+        assert_eq!(cap(1000.0), 175.0);
+        assert_eq!(cap(640.0), 175.0);
+        // 1280x800-ish area: its share; the view keeps >= 300.
+        assert_eq!(cap(500.0), 175.0);
+        assert_eq!(cap(460.0), 160.0);
+        // 1024x600-ish area: the viewport floor wins (view stays 300).
+        assert_eq!(cap(400.0), 100.0);
+        // Too small for the floor: one row.
+        assert_eq!(cap(320.0), 35.0);
+        assert_eq!(cap(60.0), 35.0);
+    }
+
+    #[test]
+    fn panel_width() {
+        // Stored width within range on a big window.
+        assert_eq!(super::panel_width_for(300.0, 1920.0, 1.0), 300.0);
+        // Clamped to 220..420.
+        assert_eq!(super::panel_width_for(100.0, 1920.0, 1.0), 220.0);
+        assert_eq!(super::panel_width_for(900.0, 1920.0, 1.0), 420.0);
+        // At most 30 % of a 1024 px window, never below the minimum.
+        assert!((super::panel_width_for(400.0, 1024.0, 1.0) - 307.2).abs() < 0.01);
+        assert_eq!(super::panel_width_for(400.0, 600.0, 1.0), 220.0);
     }
 
     #[test]

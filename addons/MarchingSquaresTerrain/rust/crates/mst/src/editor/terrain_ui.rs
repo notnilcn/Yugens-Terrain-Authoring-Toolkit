@@ -1165,8 +1165,8 @@ impl MarchingSquaresTerrainPlugin {
                 sb.upcast()
             }
             TKind::Float(min, max, step) => {
+                // Clamped to the documented range (typed values too).
                 let mut sb = spin(min, max, step, v.try_to::<f64>().unwrap_or(0.0));
-                sb.set_allow_greater(true);
                 sb.connect("value_changed", &on(0));
                 sb.upcast()
             }
@@ -1204,7 +1204,6 @@ impl MarchingSquaresTerrainPlugin {
                 let mut hb = HBoxContainer::new_alloc();
                 for (k, c) in [val.x, val.y].into_iter().enumerate() {
                     let mut sb = spin(min, max, step, c as f64);
-                    sb.set_allow_greater(true);
                     sb.set_prefix(if k == 0 { "x" } else { "y" });
                     sb.connect("value_changed", &on(k as i64));
                     hb.add_child(&sb);
@@ -1298,7 +1297,12 @@ impl MarchingSquaresTerrainPlugin {
             if old.try_to::<f64>().is_ok_and(|o| o as f32 == new) {
                 return;
             }
-            ur.create_action("terrain grass animation fps");
+            // The grass material is a Resource: without the terrain as context the action went
+            // to the Global history, so the scene's Ctrl+Z skipped it and undid an older
+            // terrain edit instead.
+            ur.create_action_ex("terrain grass animation fps")
+                .custom_context(&obj)
+                .done();
             let m = mat.upcast::<Object>();
             ur.add_do_method(
                 &m,
@@ -1373,6 +1377,36 @@ impl MarchingSquaresTerrainPlugin {
         if new == old {
             return;
         }
+        if t.prop == "grid_type" {
+            let n = terrain.bind().store().chunk_coords().len();
+            if n > 0 {
+                // Each grid type keeps its own chunks: switching shows the other grid's
+                // (often none), which looked like the island being deleted. Ask first; the
+                // dropdown shows the current type again until confirmed.
+                self.confirm_grid_type(index, new, n);
+                self.rebuild_strip_deferred();
+                return;
+            }
+        }
+        self.commit_terrain_setting(index, new);
+    }
+
+    /// Writes Terrain Settings row `index` = `new` through the undo manager (one step).
+    fn commit_terrain_setting(&mut self, index: usize, new: Variant) {
+        let Some(t) = TERRAIN_SETTINGS.get(index) else {
+            return;
+        };
+        let Some(terrain) = self.terrain.clone() else {
+            return;
+        };
+        let Some(mut ur) = self.base().get_undo_redo() else {
+            return;
+        };
+        let obj = terrain.clone().upcast::<Object>();
+        let old = terrain.get(t.prop);
+        if new == old {
+            return;
+        }
         ur.create_action(&format!("terrain setting {}", t.label.to_lowercase()));
         ur.add_do_property(&obj, t.prop, &new);
         ur.add_undo_property(&obj, t.prop, &old);
@@ -1394,6 +1428,47 @@ impl MarchingSquaresTerrainPlugin {
             self.rebuild_strip_deferred();
         }
         self.redraw();
+    }
+}
+
+// ---------------------------------------------------------------------- grid type confirmation
+
+const GRID_NAMES: [&str; 4] = ["Square", "Triangle", "Hex", "Hex Rings"];
+
+impl MarchingSquaresTerrainPlugin {
+    fn confirm_grid_type(&mut self, index: usize, new: Variant, chunks: usize) {
+        let Some(mut base) = EditorInterface::singleton().get_base_control() else {
+            return;
+        };
+        let name = |v: i64| GRID_NAMES.get(v as usize).copied().unwrap_or("?");
+        let cur = self.terrain_prop("grid_type").try_to::<i64>().unwrap_or(0);
+        let to = setting_num(&new) as i64;
+        let mut d = ConfirmationDialog::new_alloc();
+        d.set_title("Change Grid Type?");
+        d.set_text(&format!(
+            "This terrain has {chunks} chunk{} on the {} grid.\n\nEach grid type keeps its own chunks: \
+             switching to {} shows that grid's chunks (none if it was never used), so the \
+             current terrain disappears from the view.\nThe {} chunks are kept and come back \
+             when you switch back or press Ctrl+Z.",
+            if chunks == 1 { "" } else { "s" },
+            name(cur),
+            name(to),
+            name(cur),
+        ));
+        d.set_ok_button_text(&format!("Switch to {}", name(to)));
+        d.set_autowrap(true);
+        d.set_size(Vector2i::new(
+            (440.0 * ui_kit::editor_scale()) as i32,
+            (180.0 * ui_kit::editor_scale()) as i32,
+        ));
+        let on_ok = self
+            .cb("on_grid_type_confirmed")
+            .bind(&[new, (index as i64).to_variant(), d.to_variant()]);
+        d.connect("confirmed", &on_ok);
+        let free = Callable::from_object_method(&d, "queue_free");
+        d.connect("canceled", &free);
+        base.add_child(&d);
+        d.popup_centered();
     }
 }
 
@@ -1476,6 +1551,10 @@ impl MarchingSquaresTerrainPlugin {
         d.set_access(Access::FILESYSTEM);
         d.add_filter("*.tscn ; Original scene (reads grid settings + data_directory)");
         d.add_filter("*.res ; MSTChunkData (metadata.res)");
+        // The dialog's real minimum (its path bar and file list need ~500 px): reported as its
+        // min_size instead of silently clamping a smaller request.
+        let k = ui_kit::editor_scale();
+        d.set_min_size(Vector2i::new((500.0 * k) as i32, (300.0 * k) as i32));
         let on = self.cb("on_import_mst_path").bind(&[d.to_variant()]);
         d.connect("file_selected", &on);
         d.connect("dir_selected", &on);
@@ -1490,6 +1569,13 @@ impl MarchingSquaresTerrainPlugin {
 
 #[godot_api(secondary)]
 impl MarchingSquaresTerrainPlugin {
+    /// "Change Grid Type?" confirmed.
+    #[func]
+    fn on_grid_type_confirmed(&mut self, new: Variant, index: i64, mut dialog: Gd<Node>) {
+        dialog.queue_free();
+        self.commit_terrain_setting(index.max(0) as usize, new);
+    }
+
     /// Import dialog result: one undoable action (`import_mst` / restore the old data + grid settings).
     #[func]
     fn on_import_mst_path(&mut self, path: GString, mut dialog: Gd<godot::classes::Node>) {
@@ -1776,6 +1862,9 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         let obj = slot.upcast::<Object>();
+        // Slots are resources: the terrain as context keeps their edits in the scene's history
+        // (in order with the strokes), not the Global one.
+        let ctx = self.terrain.clone().map(|t| t.upcast::<Object>());
         if let Some(mut ur) = self.base().get_undo_redo() {
             // History names follow the panel's labels, not the resource property names.
             let what = match prop {
@@ -1788,6 +1877,7 @@ impl MarchingSquaresTerrainPlugin {
             };
             ur.create_action_ex(&format!("terrain texture {} {}", i + 1, what))
                 .merge_mode(godot::classes::undo_redo::MergeMode::ENDS)
+                .custom_context(ctx.as_ref())
                 .done();
             ur.add_do_property(&obj, prop, &value);
             ur.add_undo_property(&obj, prop, &old);
@@ -1805,8 +1895,11 @@ impl MarchingSquaresTerrainPlugin {
         let (old_p, old_t) = (slot.get("pattern"), slot.get("texture"));
         let tex = crate::terrain::textures::pattern_texture(pattern);
         let obj = slot.upcast::<Object>();
+        let ctx = self.terrain.clone().map(|t| t.upcast::<Object>());
         if let Some(mut ur) = self.base().get_undo_redo() {
-            ur.create_action(&format!("terrain texture {} pattern", i + 1));
+            ur.create_action_ex(&format!("terrain texture {} pattern", i + 1))
+                .custom_context(ctx.as_ref())
+                .done();
             ur.add_do_property(&obj, "pattern", &pattern.to_variant());
             ur.add_do_property(&obj, "texture", &tex.to_variant());
             ur.add_undo_property(&obj, "pattern", &old_p);
@@ -2024,9 +2117,14 @@ impl MarchingSquaresTerrainPlugin {
         dlg.set_title("Save Preset");
         // The dialog closes itself only after a valid name was saved (`on_export_confirmed`).
         dlg.set_hide_on_ok(false);
-        dlg.set_size(Vector2i::new(
-            (420.0 * ui_kit::editor_scale()) as i32,
-            (170.0 * ui_kit::editor_scale()) as i32,
+        dlg.set_cancel_button_text("Cancel");
+        // An honest minimum (what the name field and the two-line target path need), and the
+        // size the dialog had when it was last closed.
+        let k = ui_kit::editor_scale();
+        dlg.set_min_size(Vector2i::new((340.0 * k) as i32, (140.0 * k) as i32));
+        dlg.set_size(remembered_size(
+            SAVE_PRESET_SIZE_META,
+            Vector2i::new((420.0 * k) as i32, (150.0 * k) as i32),
         ));
         let mut v = VBoxContainer::new_alloc();
         let mut l = Label::new_alloc();
@@ -2040,8 +2138,11 @@ impl MarchingSquaresTerrainPlugin {
         le.set_text(current.as_deref().unwrap_or("new_texture_preset"));
         le.select_all();
         v.add_child(&le);
-        // Target file on two short lines (the full path on one line made the dialog 558 px wide).
+        // Target file on two short lines (the full path on one line made the dialog 558 px wide);
+        // clipped rather than widening the dialog's minimum.
         let mut file = Label::new_alloc();
+        file.set_clip_text(true);
+        file.set_text_overrun_behavior(godot::classes::text_server::OverrunBehavior::TRIM_ELLIPSIS);
         file.set_modulate(ui_kit::DIM_MODULATE);
         v.add_child(&file);
         dlg.add_child(&v);
@@ -2054,11 +2155,14 @@ impl MarchingSquaresTerrainPlugin {
         let (on_ok, on_cancel) = (
             self.cb("on_export_confirmed")
                 .bind(&[le.to_variant(), dlg.to_variant()]),
-            Callable::from_object_method(&dlg, "queue_free"),
+            self.cb("on_export_closed").bind(&[dlg.to_variant()]),
         );
         dlg.connect("confirmed", &on_ok);
+        // Cancel, Esc and the title bar's X.
         dlg.connect("canceled", &on_cancel);
         base.add_child(&dlg);
+        // Centered at the stored size (`popup_centered` keeps the current size unless the
+        // content needs more).
         dlg.popup_centered();
         le.grab_focus();
     }
@@ -2158,6 +2262,31 @@ pub(super) struct SlotUi {
     pub has_grass: Option<Gd<CheckBox>>,
     pub grass_tint: Option<Gd<ColorPickerButton>>,
     pub sprite: Option<Gd<EditorResourcePicker>>,
+}
+
+/// Editor project metadata key remembering the Save Preset dialog size.
+pub(super) const SAVE_PRESET_SIZE_META: &str = "save_preset_dialog_size";
+
+/// Size stored under `key` (editor project metadata), else `fallback`.
+pub(super) fn remembered_size(key: &str, fallback: Vector2i) -> Vector2i {
+    EditorInterface::singleton()
+        .get_editor_settings()
+        .and_then(|es| {
+            es.get_project_metadata_ex(TOOLBAR_META.0, key)
+                .default(&Variant::nil())
+                .done()
+                .try_to::<Vector2i>()
+                .ok()
+        })
+        .filter(|s| s.x > 0 && s.y > 0)
+        .unwrap_or(fallback)
+}
+
+/// Stores a dialog size for [`remembered_size`].
+pub(super) fn remember_size(key: &str, size: Vector2i) {
+    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
+        es.set_project_metadata(TOOLBAR_META.0, key, &size.to_variant());
+    }
 }
 
 fn snake_case(s: &str) -> String {

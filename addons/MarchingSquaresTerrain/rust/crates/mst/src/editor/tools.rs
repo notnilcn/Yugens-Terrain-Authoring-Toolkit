@@ -871,7 +871,8 @@ impl State {
             Height => self.level = v as f32,
             Floor => self.floor = v as f32,
             Strength if self.tool == Tool::RaiseLower => {
-                self.raise_strength = (v as f32).clamp(0.0505, 200.0)
+                // The Strength slider's range (Ctrl+wheel stops at its ends too).
+                self.raise_strength = (v as f32).clamp(0.2505, 30.0)
             }
             Strength if self.tool == Tool::Gradient => {
                 self.gradient_strength = (v as f32).clamp(0.0055, 1.0)
