@@ -706,8 +706,10 @@ func _cmd_undo_state() -> Dictionary:
 	}
 
 func _cmd_resize(req: Dictionary) -> Dictionary:
-	var w := int(req.get("width", 1600))
-	var h := int(req.get("height", 900))
+	# Godot's editor layout is not stable below ~1024x600; forcing it can crash
+	# the editor while the harness is awaiting frames.
+	var w := clampi(int(req.get("width", 1600)), 1024, 3840)
+	var h := clampi(int(req.get("height", 600)), 600, 2160)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(Vector2i(w, h))
 	_editor_window().size = Vector2i(w, h)
