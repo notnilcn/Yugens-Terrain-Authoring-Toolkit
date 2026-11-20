@@ -84,7 +84,7 @@ One page, no explanations. Bookmark this.
 | `1` `2` `3` `4` | Object / Face / Edge / Vertex |
 | `H` | Cycle modes |
 | `W` | Select / Move tool |
-| `C` | Draw shape (`Shift` + draw appends to the selected mesh) |
+| `C` | Draw shape (hold `Shift` when you click to finish, or stamp, a shape to append it to the selected mesh; `Shift+C` is the Bezier tool) |
 | `B` | Paint |
 | `5` | Vertex paint |
 | `E` / `I` / `Ctrl+B` | Extrude / Inset / Bevel |

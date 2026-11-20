@@ -125,6 +125,7 @@ This is destructive: it replaces the original mesh with an editable copy. It als
 | `1` `2` `3` `4` | Object / Face / Edge / Vertex mode |
 | `W` | Select / Move tool |
 | `C` | Draw shape |
+| `Shift+C` | Bezier tool (append = hold Shift while finishing a shape) |
 | `B` | Paint material/colour |
 | `5` | Vertex paint |
 | `E` | Extrude |
@@ -133,7 +134,7 @@ This is destructive: it replaces the original mesh with an editable copy. It als
 | `Ctrl+R` | Insert edge loop |
 | `M` | Merge |
 | `J` | Connect |
-| `F` | Fill hole |
+| `F` | Fill hole (Edge/Vertex mode with a selection; otherwise frames) |
 | `Ctrl+T` | Triangulate |
 | `Ctrl+D` | Duplicate faces |
 | `Delete` | Delete selection |

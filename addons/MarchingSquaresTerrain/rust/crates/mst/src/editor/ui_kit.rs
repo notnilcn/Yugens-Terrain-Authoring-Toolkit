@@ -1057,13 +1057,21 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
 /// Section of the editor project metadata holding the side panel sizes.
 const PANEL_META_SECTION: &str = "marching_squares_terrain";
 
+/// Sentinel returned for an absent panel key; no stored panel value is ever this string.
+const PANEL_META_ABSENT: &str = "__mst_panel_meta_absent__";
+
 fn panel_meta(key: &str) -> Option<Variant> {
     let es = EditorInterface::singleton().get_editor_settings()?;
+    // `EditorSettings` has no `has_project_metadata`, and `ConfigFile::get_value` logs
+    // "Couldn't find the given section ... and no default was given" whenever the key is
+    // missing and the default is nil (every fresh project). A non-nil sentinel default is
+    // the existence probe: Godot returns it silently for an absent key.
+    let absent = PANEL_META_ABSENT.to_variant();
     let v = es
         .get_project_metadata_ex(PANEL_META_SECTION, key)
-        .default(&Variant::nil())
+        .default(&absent)
         .done();
-    (!v.is_nil()).then_some(v)
+    (!v.is_nil() && v != absent).then_some(v)
 }
 
 fn set_panel_meta(key: &str, v: &Variant) {
