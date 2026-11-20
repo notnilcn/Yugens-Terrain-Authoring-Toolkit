@@ -780,7 +780,10 @@ impl MarchingSquaresTerrainPlugin {
 
     /// Slope range filter of the paint / grass tools (Terrain3D "slope range").
     pub(super) fn paint_filtered(&mut self, at: Vector3, addressee: PaintTarget, value: u8) {
-        let (lo, hi) = (self.state.slope_min, self.state.slope_max);
+        // Min above Max would filter every sample out (a stroke that silently paints nothing):
+        // treat the pair as a range whichever way round it was typed.
+        let (a, b) = (self.state.slope_min, self.state.slope_max);
+        let (lo, hi) = (a.min(b), a.max(b));
         let fp = self.footprint(at);
         self.apply_footprint(&fp, |st, fp| {
             let fp = brush::filter_slope(st, fp, lo, hi);

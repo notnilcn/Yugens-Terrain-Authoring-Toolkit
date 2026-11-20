@@ -1165,8 +1165,8 @@ impl MarchingSquaresTerrainPlugin {
                 sb.upcast()
             }
             TKind::Float(min, max, step) => {
+                // Clamped to the documented range (typed values too).
                 let mut sb = spin(min, max, step, v.try_to::<f64>().unwrap_or(0.0));
-                sb.set_allow_greater(true);
                 sb.connect("value_changed", &on(0));
                 sb.upcast()
             }
@@ -1204,7 +1204,6 @@ impl MarchingSquaresTerrainPlugin {
                 let mut hb = HBoxContainer::new_alloc();
                 for (k, c) in [val.x, val.y].into_iter().enumerate() {
                     let mut sb = spin(min, max, step, c as f64);
-                    sb.set_allow_greater(true);
                     sb.set_prefix(if k == 0 { "x" } else { "y" });
                     sb.connect("value_changed", &on(k as i64));
                     hb.add_child(&sb);
@@ -1298,7 +1297,12 @@ impl MarchingSquaresTerrainPlugin {
             if old.try_to::<f64>().is_ok_and(|o| o as f32 == new) {
                 return;
             }
-            ur.create_action("terrain grass animation fps");
+            // The grass material is a Resource: without the terrain as context the action went
+            // to the Global history, so the scene's Ctrl+Z skipped it and undid an older
+            // terrain edit instead.
+            ur.create_action_ex("terrain grass animation fps")
+                .custom_context(&obj)
+                .done();
             let m = mat.upcast::<Object>();
             ur.add_do_method(
                 &m,
@@ -1776,6 +1780,9 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         let obj = slot.upcast::<Object>();
+        // Slots are resources: the terrain as context keeps their edits in the scene's history
+        // (in order with the strokes), not the Global one.
+        let ctx = self.terrain.clone().map(|t| t.upcast::<Object>());
         if let Some(mut ur) = self.base().get_undo_redo() {
             // History names follow the panel's labels, not the resource property names.
             let what = match prop {
@@ -1788,6 +1795,7 @@ impl MarchingSquaresTerrainPlugin {
             };
             ur.create_action_ex(&format!("terrain texture {} {}", i + 1, what))
                 .merge_mode(godot::classes::undo_redo::MergeMode::ENDS)
+                .custom_context(ctx.as_ref())
                 .done();
             ur.add_do_property(&obj, prop, &value);
             ur.add_undo_property(&obj, prop, &old);
@@ -1805,8 +1813,11 @@ impl MarchingSquaresTerrainPlugin {
         let (old_p, old_t) = (slot.get("pattern"), slot.get("texture"));
         let tex = crate::terrain::textures::pattern_texture(pattern);
         let obj = slot.upcast::<Object>();
+        let ctx = self.terrain.clone().map(|t| t.upcast::<Object>());
         if let Some(mut ur) = self.base().get_undo_redo() {
-            ur.create_action(&format!("terrain texture {} pattern", i + 1));
+            ur.create_action_ex(&format!("terrain texture {} pattern", i + 1))
+                .custom_context(ctx.as_ref())
+                .done();
             ur.add_do_property(&obj, "pattern", &pattern.to_variant());
             ur.add_do_property(&obj, "texture", &tex.to_variant());
             ur.add_undo_property(&obj, "pattern", &old_p);
