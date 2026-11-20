@@ -2,6 +2,5 @@
 *.translation
 rust/target/
 addons/MarchingSquaresTerrain/rust/target/
-addons/MarchingSquaresTerrain/bin/
 tests/captures/
 *.tmp
