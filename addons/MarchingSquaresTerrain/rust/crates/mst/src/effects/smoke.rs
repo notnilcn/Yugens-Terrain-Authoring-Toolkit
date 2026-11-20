@@ -116,6 +116,8 @@ pub struct PixelSmoke {
     /// Last values pushed to `light` (visible, energy, range, flicker, glow, color).
     light_state: Option<(bool, f32, f32, f32, f32, Color)>,
     rng: Rng,
+    /// Settings the frozen editor plume was prewarmed for (see `settle_paused`).
+    prewarmed: Option<u64>,
     base: Base<Node3D>,
 }
 
@@ -128,8 +130,10 @@ impl INode3D for PixelSmoke {
             lifetime: 9.0,
             rise_speed: 1.1005,
             spread: 0.1205,
-            start_size: 0.1605,
-            end_size: 1.1005,
+            // Readable at the overview camera (~40-60 m): 0.16 m / 1.1 m puffs were
+            // sub-pixel there and the default plume looked absent.
+            start_size: 0.3505,
+            end_size: 2.0,
             use_sky_wind: true,
             wind: Vector2::new(0.4005, 0.1505),
             wind_strength: 1.0,
@@ -152,6 +156,7 @@ impl INode3D for PixelSmoke {
             light: None,
             light_state: None,
             rng: Rng(0x5_30CE),
+            prewarmed: None,
             base,
         }
     }
@@ -176,10 +181,14 @@ impl INode3D for PixelSmoke {
 
     fn process(&mut self, delta: f64) {
         let dt = (crate::clock::step(delta) as f32).min(0.1005);
-        // Paused editor clock: the plume holds still (nothing is uploaded).
         if dt > 0.0 {
+            self.prewarmed = None;
             self.simulate(dt);
             self.upload();
+        } else {
+            // Paused editor clock: the plume holds still, but is shown (prewarmed) instead of
+            // staying empty until "Animate Effects" is turned on.
+            self.settle_paused();
         }
         self.update_light();
     }
@@ -357,6 +366,57 @@ impl PixelSmoke {
             p.pos += p.vel * dt;
         }
         self.puffs.retain(|p| p.age < p.life);
+    }
+
+    /// Key of the settings a frozen plume depends on.
+    fn plume_key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let o = self.base().get_global_position();
+        for f in [
+            self.rate,
+            self.lifetime,
+            self.rise_speed,
+            self.spread,
+            self.start_size,
+            self.end_size,
+            self.wind_strength,
+            self.wind.x,
+            self.wind.y,
+            o.x,
+            o.y,
+            o.z,
+        ] {
+            f.to_bits().hash(&mut h);
+        }
+        (self.emitting, self.fire, self.use_sky_wind, self.max_puffs).hash(&mut h);
+        h.finish()
+    }
+
+    /// Paused clock: (re)builds a still, fully grown plume whenever its settings or position
+    /// change, so the editor shows the column without animating.
+    fn settle_paused(&mut self) {
+        let key = self.plume_key();
+        if self.prewarmed == Some(key) {
+            return;
+        }
+        self.prewarmed = Some(key);
+        self.puffs.clear();
+        self.emit_acc = 0.0;
+        self.flame_acc = 0.0;
+        // Same plume every time for the same settings (no flicker while editing).
+        let saved = std::mem::replace(&mut self.rng, Rng(0x5_30CE));
+        if self.emitting && self.rate > 0.0 {
+            let span = self.lifetime.clamp(0.2005, 30.0) * 1.2005;
+            let step = 1.0 / 15.0;
+            let mut t = 0.0;
+            while t < span {
+                self.simulate(step);
+                t += step;
+            }
+        }
+        self.rng = saved;
+        self.upload();
     }
 
     fn upload(&mut self) {
