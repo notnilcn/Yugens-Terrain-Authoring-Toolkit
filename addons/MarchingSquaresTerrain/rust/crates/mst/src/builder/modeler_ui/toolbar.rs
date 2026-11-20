@@ -11,8 +11,9 @@
 
 use godot::classes::control::{FocusMode, SizeFlags};
 use godot::classes::{
-    Button, ButtonGroup, Control, EditorInterface, GridContainer, HBoxContainer, HSeparator, Label,
-    LinkButton, MenuButton, PopupMenu, PopupPanel, Texture2D, VBoxContainer, VSeparator,
+    Button, ButtonGroup, Control, EditorInterface, GridContainer, HBoxContainer, HFlowContainer,
+    HSeparator, Label, LinkButton, MenuButton, PopupMenu, PopupPanel, Texture2D, VBoxContainer,
+    VSeparator,
 };
 use godot::global::{HorizontalAlignment, VerticalAlignment};
 use godot::prelude::*;
@@ -139,7 +140,8 @@ pub fn handles_row_visible(r: &Row, v: &Values, st: &SyncState) -> bool {
 
 /// The toolbar widgets.
 pub struct Toolbar {
-    pub hbox: Gd<HBoxContainer>,
+    /// The toolbar row ([`MenuFlow`]: wraps onto a second row when the 3D menu bar is narrow).
+    pub hbox: Gd<MenuFlow>,
     pub modes: Vec<(Mode, Gd<Button>)>,
     pub add_mesh: Gd<Button>,
     pub make_editable: Gd<Button>,
@@ -170,10 +172,144 @@ fn flat_button(name: &str, caption: &str, icon: Option<Gd<Texture2D>>, tip: &str
     b
 }
 
+/// The toolbar row. The 3D editor puts plugin menu controls in one `HBoxContainer` (inside a
+/// panel in the menu bar's flow), so a plain `HBoxContainer` toolbar could never wrap: at
+/// 1024 px its 494 px minimum widened the editor's main screen past the window (the Inspector
+/// dock and the end of the toolbar went off-screen). This flow takes the width the menu bar has
+/// left for it (its custom minimum width) and wraps the rest of its buttons onto a second row.
+///
+/// The width never exceeds what the bar has, so the toolbar never widens the bar. When the
+/// editor window shrinks, the bar can only shrink once the toolbar does: the flow first drops
+/// to its narrowest (`_mst_shrink`), lets the editor lay out for a frame, then takes the
+/// bar's new width (`_mst_refit`).
+#[derive(GodotClass)]
+#[class(tool, init, base = HFlowContainer, internal)]
+pub struct MenuFlow {
+    base: Base<HFlowContainer>,
+}
+
+#[godot_api]
+impl godot::classes::IHFlowContainer for MenuFlow {
+    fn on_notification(&mut self, what: godot::classes::notify::ContainerNotification) {
+        use godot::classes::notify::ContainerNotification as N;
+        if !matches!(what, N::ENTER_TREE | N::EXIT_TREE) {
+            return;
+        }
+        let cb = self.base().callable("_mst_shrink");
+        if let Some(mut vp) = self.base().get_viewport() {
+            let connected = vp.is_connected("size_changed", &cb);
+            if what == N::ENTER_TREE && !connected {
+                vp.connect_flags(
+                    "size_changed",
+                    &cb,
+                    godot::classes::object::ConnectFlags::DEFERRED,
+                );
+            } else if what == N::EXIT_TREE && connected {
+                vp.disconnect("size_changed", &cb);
+            }
+        }
+        if what == N::ENTER_TREE {
+            self.base_mut().call_deferred("_mst_shrink", &[]);
+        }
+    }
+}
+
+#[godot_api]
+impl MenuFlow {
+    /// The window resized: narrowest first, then refit after a frame of layout.
+    #[func]
+    fn _mst_shrink(&mut self) {
+        let widest = self.widths().into_iter().fold(0.0, f32::max).ceil();
+        let cur = self.base().get_custom_minimum_size();
+        self.base_mut()
+            .set_custom_minimum_size(Vector2::new(widest, cur.y));
+        let cb = self.base().callable("_mst_refit");
+        if !self.base().is_inside_tree() {
+            return;
+        }
+        let mut tree = self.base().get_tree();
+        if !tree.is_connected("process_frame", &cb) {
+            tree.connect_flags(
+                "process_frame",
+                &cb,
+                godot::classes::object::ConnectFlags::ONE_SHOT,
+            );
+        }
+    }
+
+    /// Re-applies the width (after a shrink, or buttons were shown / hidden).
+    #[func]
+    fn _mst_refit(&mut self) {
+        self.refit();
+    }
+}
+
+impl MenuFlow {
+    /// The menu bar the toolbar lives in: the first ancestor flow container (the 3D editor's
+    /// menu `HFlowContainer`), whose width is what the menu rows can use.
+    fn menu_bar(&self) -> Option<Gd<Control>> {
+        let mut n = self.base().get_parent();
+        while let Some(p) = n {
+            if p.is_class("FlowContainer") {
+                return p.try_cast::<Control>().ok();
+            }
+            n = p.get_parent();
+        }
+        None
+    }
+
+    /// Minimum widths of the visible buttons.
+    fn widths(&self) -> Vec<f32> {
+        self.base()
+            .get_children()
+            .iter_shared()
+            .filter_map(|c| c.try_cast::<Control>().ok())
+            .filter(|c| c.is_visible() && !c.is_set_as_top_level())
+            .map(|c| c.get_combined_minimum_size().x)
+            .collect()
+    }
+
+    /// Sets the custom minimum width to what the menu bar leaves for the toolbar
+    /// ([`menu_width`]).
+    pub fn refit(&mut self) {
+        let Some(bar) = self.menu_bar() else { return };
+        let sep = self.base().get_theme_constant("h_separation") as f32;
+        let widths = self.widths();
+        // What the other controls of the toolbar's row (the panel holding every plugin's menu
+        // controls) need besides this flow.
+        let row = self
+            .base()
+            .get_parent()
+            .and_then(|p| p.get_parent())
+            .and_then(|p| p.try_cast::<Control>().ok());
+        let own = self.base().get_combined_minimum_size().x;
+        let others = row
+            .map(|r| (r.get_combined_minimum_size().x - own).max(0.0))
+            .unwrap_or(0.0);
+        let w = menu_width(&widths, sep, bar.get_size().x - others);
+        let cur = self.base().get_custom_minimum_size();
+        if (cur.x - w).abs() > 0.5 {
+            self.base_mut()
+                .set_custom_minimum_size(Vector2::new(w, cur.y));
+        }
+    }
+}
+
+/// Width of a wrapping toolbar row with buttons `widths` and gap `sep` given `avail` px: all of
+/// them on one row when they fit, else `avail`, never narrower than the widest button.
+pub fn menu_width(widths: &[f32], sep: f32, avail: f32) -> f32 {
+    if widths.is_empty() {
+        return 0.0;
+    }
+    let natural = widths.iter().sum::<f32>() + sep * (widths.len().saturating_sub(1)) as f32;
+    let widest = widths.iter().copied().fold(0.0, f32::max);
+    natural.min(avail).max(widest).ceil()
+}
+
 /// Builds the toolbar; its buttons call `target`'s `#[func]`s.
 pub fn assemble(addressee: &Gd<Object>, v: &Values, st: &SyncState) -> Toolbar {
     let s = ui_kit::editor_scale();
-    let mut hbox = HBoxContainer::new_alloc();
+    let mut hbox = MenuFlow::new_alloc();
     hbox.set_name("ModelerCoreToolbar");
     hbox.add_child(&VSeparator::new_alloc());
     let group = ButtonGroup::new_gd();
@@ -378,6 +514,8 @@ impl Toolbar {
         if self.handles_popup.is_visible() {
             self.renew_grips(addressee, v, st);
         }
+        // Buttons shown / hidden: the row's natural width changed.
+        self.hbox.call_deferred("_mst_refit", &[]);
     }
 
     /// Rebuilds the handles form when the mode changed, else refreshes it.
@@ -503,5 +641,20 @@ impl Toolbar {
                 fill(&mut menu, &sec.entries);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn menu_width_wraps_only_when_needed() {
+        let w = [30.0, 100.0, 40.0];
+        // Fits: the natural single-row width.
+        assert_eq!(super::menu_width(&w, 4.0, 1000.0), 178.0);
+        // Too narrow: the available width (the rest wraps).
+        assert_eq!(super::menu_width(&w, 4.0, 150.0), 150.0);
+        // Never narrower than the widest button.
+        assert_eq!(super::menu_width(&w, 4.0, 20.0), 100.0);
+        assert_eq!(super::menu_width(&[], 4.0, 20.0), 0.0);
     }
 }
