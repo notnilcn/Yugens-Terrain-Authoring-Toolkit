@@ -85,7 +85,10 @@ fn field_tooltip(class: &str, fd: &sections::Field) -> String {
             min,
             max,
             greater: true,
-        } => format!("\nRange {min} to {max}+ (drag, or click to type a larger value)."),
+        } => format!(
+            "\nRange {min} to {max} (drag), or click to type up to {}.",
+            max * GREATER_SPAN
+        ),
         _ => String::new(),
     };
     let hint = sections::field_hint(fd.prop)
@@ -113,6 +116,34 @@ fn with_axis(cur: &Variant, a: u8, x: f32) -> Option<Variant> {
     } else {
         None
     }
+}
+
+/// Typed values of an open-ended int field (`Kind::Int { greater: true }`, the pixel sizes) stop
+/// at `max * GREATER_SPAN`: larger than the drag range, but never absurd (QA typed 39087).
+const GREATER_SPAN: f64 = 4.0;
+
+/// `value` clamped to the range of field `fd` (a typed or scripted value cannot leave it).
+fn clamp_to_field(fd: &sections::Field, value: f64) -> f64 {
+    if !value.is_finite() {
+        return match fd.sort {
+            Kind::Float { min, .. } | Kind::Int { min, .. } => min,
+            _ => 0.0,
+        };
+    }
+    match fd.sort {
+        Kind::Float { min, max, .. } => value.clamp(min, max),
+        Kind::Int {
+            min,
+            max,
+            greater,
+        } => value.clamp(min, if greater { max * GREATER_SPAN } else { max }),
+        _ => value,
+    }
+}
+
+/// True while the left mouse button is held (a spin-slider drag is still going on).
+fn mouse_held() -> bool {
+    godot::classes::Input::singleton().is_mouse_button_pressed(godot::global::MouseButton::LEFT)
 }
 
 fn num(v: &Variant) -> f64 {
@@ -217,14 +248,23 @@ impl IEditorPlugin for PixelizerEditorPlugin {
         if let Some(t) = self.refresh_timer.as_mut() {
             if shown { t.start() } else { t.stop() }
         }
-        if let Some(t) = &mut self.toolbar {
-            t.set_visible(shown);
-        }
-        if let Some(s) = &mut self.peel {
-            s.set_visible(shown);
-        }
-        if let Some(wp) = &mut self.world {
-            wp.set_visible(shown);
+        // Hiding a panel whose spin slider is being typed into makes the slider apply its text on
+        // focus loss: `value_changed` -> `on_float` while this method still holds the plugin
+        // (re-entrant `bind_mut` panic, #4). Nothing a panel emits while it is shown / hidden
+        // here is a user edit, so its signals are blocked for the switch.
+        let panels: Vec<Gd<Control>> = [
+            self.toolbar.clone().map(|c| c.upcast::<Control>()),
+            self.peel.clone().map(|c| c.upcast::<Control>()),
+            self.world.clone().map(|c| c.upcast::<Control>()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        for mut p in panels {
+            let node = p.clone().upcast::<Node>();
+            ui_kit::set_block_signals_tree(&node, true);
+            p.set_visible(shown);
+            ui_kit::set_block_signals_tree(&node, false);
         }
         if shown {
             self.rebuild_strip();
@@ -282,6 +322,12 @@ impl PixelizerEditorPlugin {
     #[func]
     fn on_float(&mut self, value: f64, field: i64) {
         let Some(fd) = self.field(field) else { return };
+        // Only a control of the strip as it is now (never a stale signal of a replaced page).
+        if !self.controls.iter().any(|(i, _)| *i as i64 == field) {
+            return;
+        }
+        // Defensive: the slider's range already stops a drag; a typed value is clamped too.
+        let value = clamp_to_field(fd, value);
         let v = match fd.sort {
             Kind::Int { .. } => (value.round() as i64).to_variant(),
             _ => value.to_variant(),
@@ -294,6 +340,12 @@ impl PixelizerEditorPlugin {
     /// drags (an expensive Pixel Size change takes longer than the 800 ms merge window).
     #[func]
     fn on_grab(&mut self, field: i64) {
+        // A previous grab whose `ungrabbed` never came (a click that opened the text input):
+        // record it now so it is not merged into this drag.
+        if let Some((f, _)) = &self.drag {
+            let f = *f as i64;
+            self.on_ungrab(f);
+        }
         let Some(fd) = self.field(field) else { return };
         let s = self.current();
         if let Some(target) = self.target(s) {
@@ -570,10 +622,18 @@ impl PixelizerEditorPlugin {
     fn clear_strip(&mut self) -> Option<Strip> {
         let mut root = self.peel.clone()?;
         for mut c in root.get_children().iter_shared() {
+            // Removing a spin slider that is being typed into applies its text on focus loss
+            // (`value_changed` -> `on_float` while this rebuild holds the plugin, #4); a dragged
+            // one emits `ungrabbed`. The old controls are going away: silence them first.
+            ui_kit::set_block_signals_tree(&c, true);
             root.remove_child(&c);
             c.queue_free();
         }
         self.controls.clear();
+        // A new section / page starts at the top-left (no stale offset from the previous one,
+        // which would also move the header row, #18).
+        root.set_v_scroll(0);
+        root.set_h_scroll(0);
         Some(Strip::reassemble(root))
     }
 
@@ -590,10 +650,14 @@ impl PixelizerEditorPlugin {
         let s = self.current();
         // The node's title (its toolbar entry); its sections / pages are the tabs below.
         let h = sections::slice_ui(sections::head(s.sec));
-        let mut title = strip.heading(h.label, w::glyph(h.glyph), h.tooltip);
-        title.set_name("SectionTitle");
-
         let target = self.target(s);
+        let tabs = sections::class_tabs(s.sec);
+        let paged = target.is_some() && tabs.len() > 1;
+        if !paged {
+            let mut title = strip.heading(h.label, w::glyph(h.glyph), h.tooltip);
+            title.set_name("SectionTitle");
+        }
+
         self.shown_target = target.as_ref().map(|t| t.instance_id());
         let class = s.class.unwrap_or(sections::RENDERER);
         let Some(target) = target else {
@@ -626,18 +690,33 @@ impl PixelizerEditorPlugin {
             return;
         };
 
-        let tabs = sections::class_tabs(s.sec);
-        if tabs.len() > 1 {
+        if paged {
             let page = self.page.min(sections::pages(s.sec).len().max(1) - 1);
             let cur = tabs
                 .iter()
                 .position(|t| t.sec == s.sec && t.page == page)
                 .unwrap_or(0);
             let names: Vec<(&str, &str)> = tabs.iter().map(|t| (t.label, t.tooltip)).collect();
-            let tabs = ui_kit::page_tabs("SectionPages", &names, cur, |k| {
+            let grid = w::page_grid("SectionPages", &names, cur, |k| {
                 Callable::from_object_method(&gd, "on_page").bind(&[(k as i64).to_variant()])
             });
-            strip.custom("", &tabs);
+            // Title and page tabs are ONE tile, always the strip's first: the flow puts it at the
+            // top-left of row 1 whatever the page holds, so the tabs never move between pages
+            // (#18: they used to land on row 1 or 2 and centre in rows of different heights).
+            let mut header = HBoxContainer::new_alloc();
+            header.set_name("StripHeader");
+            header.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
+            header.add_theme_constant_override("separation", ui_kit::px(6.0));
+            let mut title = ui_kit::title_button(h.label, w::glyph(h.glyph));
+            title.set_name("SectionTitle");
+            title.set_tooltip_text(h.tooltip);
+            title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
+            title.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
+            header.add_child(&title);
+            let mut grid = grid;
+            grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
+            header.add_child(&grid);
+            strip.flow.add_child(&header);
             strip.separator();
             // The strip is bottom-anchored: a page with more rows would grow it upward and move
             // the tab row under the pointer (#33). Keep paged sections at the strip's height cap
@@ -916,8 +995,13 @@ impl PixelizerEditorPlugin {
         if let Some((f, _)) = &self.drag
             && *f == field
         {
-            self.apply_live(field, &value);
-            return;
+            if mouse_held() {
+                self.apply_live(field, &value);
+                return;
+            }
+            // The button is up: a typed value after a click (no drag happened). Close the
+            // pending gesture (its own step if it changed anything), then record this value.
+            self.on_ungrab(field as i64);
         }
         self.record_worth(field, value, None, merge, true);
     }
@@ -1027,8 +1111,13 @@ impl PixelizerEditorPlugin {
             return;
         };
         for mut c in col.get_children().iter_shared() {
+            ui_kit::set_block_signals_tree(&c, true);
             col.remove_child(&c);
             c.queue_free();
+        }
+        // The rows changed: start at the top (presets first) instead of a stale offset.
+        if let Some(mut sc) = self.world.clone() {
+            sc.set_v_scroll(0);
         }
         self.world_sig = self.world_signature();
         let gd = self.to_gd();
@@ -1055,6 +1144,7 @@ impl PixelizerEditorPlugin {
                 p.moniker
             );
             let mut b = w::push_button(p.moniker, None, &tip);
+            w::clip(&mut b);
             b.set_focus_mode(FocusMode::NONE);
             b.set_h_size_flags(SizeFlags::EXPAND_FILL);
             b.connect(
@@ -1066,6 +1156,7 @@ impl PixelizerEditorPlugin {
         col.add_child(&grid);
         col.add_child(&HSeparator::new_alloc());
         let mut wire = w::push_button(WIRE_LABEL, Some("world"), WIRE_TOOLTIP);
+        w::clip(&mut wire);
         wire.set_focus_mode(FocusMode::NONE);
         wire.connect("pressed", &Callable::from_object_method(&gd, "on_wire"));
         col.add_child(&wire);
@@ -1108,6 +1199,7 @@ impl PixelizerEditorPlugin {
             };
             let mut sel = w::push_button(&text, Some(icon_for(class)), &tip);
             sel.set_name("Name");
+            w::clip(&mut sel);
             sel.set_flat(true);
             sel.set_focus_mode(FocusMode::NONE);
             sel.set_h_size_flags(SizeFlags::EXPAND_FILL);

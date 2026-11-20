@@ -649,7 +649,8 @@ pub static SECTIONS: &[Section] = &[
         class: Some("PixelFireflies"),
         group_start: false,
         fields: &[
-            i("Count", "count", 0.0, 4096.0),
+            // The node accepts more (typed in the Inspector); the strip stays in a sane range (#10).
+            i("Count", "count", 0.0, 1024.0),
             axle(f("Area X", "extents", 0.1005, 500.0, 0.1005), 0),
             axle(f("Area Y", "extents", 0.1005, 100.0, 0.1005), 1),
             axle(f("Area Z", "extents", 0.1005, 500.0, 0.1005), 2),

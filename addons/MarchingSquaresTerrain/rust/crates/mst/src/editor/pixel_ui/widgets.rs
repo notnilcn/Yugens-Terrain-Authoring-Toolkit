@@ -1,8 +1,8 @@
 //! Pixel-UI specific control builders. The shared layout (toolbar, wrapping attribute strip,
 //! side panel) comes from `editor::ui_kit`, so the Pixel* panels match the terrain tools.
 
-use godot::classes::control::SizeFlags;
-use godot::classes::{Button, OptionButton, Texture2D};
+use godot::classes::control::{FocusMode, SizeFlags};
+use godot::classes::{Button, ButtonGroup, GridContainer, OptionButton, Texture2D};
 use godot::prelude::*;
 
 use crate::editor::ui_kit;
@@ -46,4 +46,51 @@ pub fn push_button(caption: &str, icon_name: Option<&str>, tooltip: &str) -> Gd<
     b.set_v_size_flags(SizeFlags::SHRINK_CENTER);
     b.add_theme_constant_override("icon_max_width", (16.0 * ui_kit::editor_scale()) as i32);
     b
+}
+
+/// Most page tabs per row of [`page_grid`]: the widest node (PixelWater, 7 pages) takes two
+/// rows, so the tab block stays narrow (about 4 tab widths) whatever the section.
+pub const PAGE_TAB_COLUMNS: i32 = 4;
+
+/// Page tabs of a strip as a fixed grid of toggle buttons (one per `(name, tooltip)`, at most
+/// [`PAGE_TAB_COLUMNS`] per row); `on_page(k)` is connected to button `k`'s `pressed`. Buttons
+/// are named after their page (scripts can press them).
+///
+/// A grid, not one `HBoxContainer` row: the row of every Renderer tab was ~670 px wide, wider
+/// than the 3D view at 1280×720. The grid's size depends only on its labels (never on the
+/// available width), so it cannot take part in a layout feedback loop either.
+pub fn page_grid(
+    name: &str,
+    pages: &[(&str, &str)],
+    current: usize,
+    on_page: impl Fn(usize) -> Callable,
+) -> Gd<GridContainer> {
+    let mut grid = GridContainer::new_alloc();
+    grid.set_name(name);
+    grid.set_columns(PAGE_TAB_COLUMNS.min(pages.len().max(1) as i32));
+    grid.add_theme_constant_override("h_separation", 0);
+    grid.add_theme_constant_override("v_separation", 0);
+    let group = ButtonGroup::new_gd();
+    for (k, (page, tip)) in pages.iter().enumerate() {
+        let mut b = Button::new_alloc();
+        b.set_name(*page);
+        b.set_text(*page);
+        b.set_tooltip_text(*tip);
+        b.set_toggle_mode(true);
+        // Not flat: the current page must stand out from the others.
+        b.set_button_group(&group);
+        b.set_focus_mode(FocusMode::NONE);
+        b.set_pressed_no_signal(k == current);
+        b.set_h_size_flags(SizeFlags::FILL);
+        b.connect("pressed", &on_page(k));
+        grid.add_child(&b);
+    }
+    grid
+}
+
+/// Button whose text never sets its minimum width (long names are shortened with an ellipsis,
+/// the full text stays in the tooltip): side-panel rows must fit the fixed panel width.
+pub fn clip(b: &mut Gd<Button>) {
+    b.set_clip_text(true);
+    b.set_text_overrun_behavior(godot::classes::text_server::OverrunBehavior::TRIM_ELLIPSIS);
 }
