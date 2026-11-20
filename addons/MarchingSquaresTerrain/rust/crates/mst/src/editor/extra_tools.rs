@@ -260,6 +260,7 @@ impl MarchingSquaresTerrainPlugin {
                     .map(|t| t.bind().get_painted_tints_data().to_vec());
                 let mut st = self.new_stroke(lens, mb, Tool::Tint, h, is_l, is_r);
                 st.tint_before = before;
+                st.tint_erase = is_r && !is_l;
                 self.sweep = Some(st);
                 self.tint_at_hover();
                 true

@@ -325,3 +325,25 @@ mod tests {
         );
     }
 }
+
+/// Undoes the 3D viewport's numpad emulation on a key event (Editor Settings › 3D › Navigation ›
+/// Emulate Numpad, on by default): `Node3DEditorViewport` rewrites the top-row digits `0`–`9`
+/// to `KP_0`–`KP_9` *before* forwarding the event to `forward_3d_gui_input`, so a plugin
+/// matching `KEY_1` never saw its digit shortcuts and the view shortcut (Front/Top orthogonal)
+/// ran instead. Returns a copy with the top-row keycode back when the physical key is a top-row
+/// digit; real numpad keys (physical `KP_n`) are left alone for Godot's view shortcuts.
+pub fn undo_numpad_emulation(
+    key: &Gd<godot::classes::InputEventKey>,
+) -> Gd<godot::classes::InputEventKey> {
+    use godot::global::Key;
+    let code = key.get_keycode();
+    let phys = key.get_physical_keycode();
+    let kp = code.ord() - Key::KP_0.ord();
+    let top = phys.ord() - Key::KEY_0.ord();
+    if (0..=9).contains(&kp) && kp == top {
+        let mut c = key.duplicate_resource();
+        c.set_keycode(phys);
+        return c;
+    }
+    key.clone()
+}

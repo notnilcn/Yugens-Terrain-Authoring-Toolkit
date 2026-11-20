@@ -2650,6 +2650,9 @@ impl PixelBuilderPlugin {
         if !key.is_pressed() || key.is_echo() {
             return false;
         }
+        // Top-row digits arrive as KP_1.. (the viewport's numpad emulation): match the mode
+        // keys 1–4 (and 5) against the key the user pressed.
+        let key = &crate::util::undo_numpad_emulation(key);
         let k = key.get_keycode();
         let ctrl = key.is_ctrl_pressed() || key.is_meta_pressed();
         // Adjust panel: Enter keeps the result, Esc restores; Ctrl+Z first commits the adjusted

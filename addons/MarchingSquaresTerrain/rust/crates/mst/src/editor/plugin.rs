@@ -43,6 +43,8 @@ pub(super) struct Stroke {
     pub scatter_before: Option<Vec<u8>>,
     /// Tint strokes: the painted tint blob before the stroke (undo).
     pub tint_before: Option<Vec<u8>>,
+    /// Tint stroke started with RMB alone: an erase (History name).
+    pub tint_erase: bool,
     /// Selection stroke (tool = Debug) removes cells instead of adding them (Ctrl).
     pub deselect: bool,
     /// Brush selection drag: offset applied last (`drag_select`).
@@ -333,6 +335,40 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
                 self.quick_paint_at_hover();
             }
             _ => {}
+        }
+    }
+
+    /// Tool keys 1–9 and Esc (clear the selection) when the 3D viewport does not have the
+    /// keyboard focus (a toolbar button, a strip control or another dock took it): keys no
+    /// focused control used. With the focus in the viewport `forward_3d_gui_input` handles
+    /// them first. Text fields keep their keys (they consume them before this runs).
+    fn shortcut_input(&mut self, happening: Gd<InputEvent>) {
+        if self.terrain.is_none()
+            || !self.visible
+            || !self
+                .toolbar
+                .as_ref()
+                .is_some_and(|t| t.is_instance_valid() && t.is_visible_in_tree())
+        {
+            return;
+        }
+        let Ok(key) = happening.try_cast::<InputEventKey>() else {
+            return;
+        };
+        if !key.is_pressed() || key.is_echo() {
+            return;
+        }
+        let k = crate::util::undo_numpad_emulation(&key).get_keycode();
+        let digit = (Key::KEY_1.ord()..=Key::KEY_9.ord()).contains(&k.ord());
+        // Esc only when there is something to clear: it stays free for Godot otherwise.
+        let esc = k == Key::ESCAPE && (!self.selection.is_empty() || self.sweep.is_some());
+        if !(digit || esc) {
+            return;
+        }
+        if self.on_key(&key)
+            && let Some(mut vp) = self.base().get_viewport()
+        {
+            vp.set_input_as_handled();
         }
     }
 
@@ -716,6 +752,9 @@ impl MarchingSquaresTerrainPlugin {
         if !key.is_pressed() || key.is_echo() {
             return false;
         }
+        // The 3D viewport turns the top-row digits into KP_1.. (numpad emulation) before
+        // forwarding them; without this the tool keys 1–9 ran Godot's view shortcuts instead.
+        let key = &crate::util::undo_numpad_emulation(key);
         if self.extra_key(key) {
             return true;
         }
@@ -730,6 +769,8 @@ impl MarchingSquaresTerrainPlugin {
                 self.cancel_stroke(s);
             }
             self.redraw();
+            // The status line ("N selected") is drawn over the viewport.
+            self.base().update_overlays();
             return had || k == Key::ESCAPE;
         }
         if key.is_ctrl_pressed()
@@ -927,6 +968,7 @@ impl MarchingSquaresTerrainPlugin {
             rmb: r,
             scatter_before: None,
             tint_before: None,
+            tint_erase: false,
             deselect: false,
             drag_offset: None,
         }
@@ -1226,7 +1268,13 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         if let Some(before) = stroke.tint_before {
-            self.commit_tint_undo(stroke.tool.undo_name(), before);
+            // RMB alone erases the painted tint (`tint_at_hover`).
+            let name = if stroke.tint_erase {
+                "terrain tint erase"
+            } else {
+                stroke.tool.undo_name()
+            };
+            self.commit_tint_undo(name, before);
             return;
         }
         let Some(mut terrain) = self.terrain.clone() else {
@@ -1256,18 +1304,19 @@ impl MarchingSquaresTerrainPlugin {
             return;
         }
         terrain.bind_mut().write_chunks(&coords);
+        // Quick Paint names the sculpt tool too ("terrain level with quick paint").
         let name = if self.state.quick_paint != 0
             && matches!(
                 stroke.tool,
                 Tool::Brush | Tool::Level | Tool::Smooth | Tool::Bridge | Tool::RaiseLower
             ) {
-            "terrain brush with quick paint"
+            format!("{} with quick paint", stroke.tool.undo_name())
         } else if stroke.tool == Tool::VertexPaint && self.state.paint_walls {
-            "terrain wall paint"
+            "terrain wall paint".to_string()
         } else {
-            stroke.tool.undo_name()
+            stroke.tool.undo_name().to_string()
         };
-        self.commit_undo(name, before, after);
+        self.commit_undo(&name, before, after);
     }
 
     /// Esc during a stroke: restore the snapshot without recording an undo action.
