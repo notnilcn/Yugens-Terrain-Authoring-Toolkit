@@ -5,3 +5,7 @@ addons/MarchingSquaresTerrain/rust/target/
 tests/captures/
 *.tmp
 build/
+__pycache__/
+*.pyc
+# QA screenshots are local evidence (~800 MB); commit selected shots explicitly with -f.
+qa/screenshots/
