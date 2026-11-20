@@ -36,7 +36,10 @@ pub struct PixelizerEditorPlugin {
     sec: Option<Sec>,
     /// Strip page of the current section (`sections::pages`).
     page: usize,
-    toolbar: Option<Gd<VFlowContainer>>,
+    /// The section toolbar's scrolling single-column rail (`ui_kit::toolbar_rail`): what the
+    /// editor container holds, so a short window scrolls the toolbar instead of wrapping it into
+    /// columns that take width from the viewport and the Pixel World panel (#44).
+    toolbar: Option<Gd<ScrollContainer>>,
     peel: Option<Gd<ScrollContainer>>,
     world: Option<Gd<ScrollContainer>>,
     world_box: Option<Gd<VBoxContainer>>,
@@ -122,7 +125,7 @@ fn num(v: &Variant) -> f64 {
 #[godot_api]
 impl IEditorPlugin for PixelizerEditorPlugin {
     fn enter_tree(&mut self) {
-        let toolbar = self.build_toolbar();
+        let toolbar = ui_kit::toolbar_rail(&self.build_toolbar());
         let strip = self.build_strip();
         let world = self.build_world_panel();
         self.base_mut()
@@ -636,6 +639,10 @@ impl PixelizerEditorPlugin {
             });
             strip.custom("", &tabs);
             strip.separator();
+            // The strip is bottom-anchored: a page with more rows would grow it upward and move
+            // the tab row under the pointer (#33). Keep paged sections at the strip's height cap
+            // so the tabs stay put (the content scrolls when it needs more).
+            strip.pin_height();
         }
         let range = sections::page_range(s.sec, self.page, s.fields.len());
         for (i, fd) in s
@@ -1032,6 +1039,37 @@ impl PixelizerEditorPlugin {
             "Every pixel node of the edited scene: Select (or click the name) selects it, again to cycle; \"+ Add\" adds a missing one. More instances: the Pixel World menu in the 3D toolbar.",
         ));
         col.add_child(&HSeparator::new_alloc());
+        // Lighting presets first: a primary action that must be visible without scrolling (the
+        // node list below is long and used to push the presets under the editor's bottom bar
+        // at 1600x900, #37).
+        col.add_child(&ui_kit::panel_title(
+            sections::PRESET_HEADER,
+            w::glyph("presets"),
+            "Time of day / weather presets for Day/Night, Sky, Weather and the renderer's god rays.",
+        ));
+        let mut grid = GridContainer::new_alloc();
+        grid.set_columns(3);
+        for (i, p) in PRESETS.iter().enumerate() {
+            let tip = format!(
+                "Apply the {} preset to the scene's Day/Night, Sky, Weather and renderer god rays (undoable).",
+                p.moniker
+            );
+            let mut b = w::push_button(p.moniker, None, &tip);
+            b.set_focus_mode(FocusMode::NONE);
+            b.set_h_size_flags(SizeFlags::EXPAND_FILL);
+            b.connect(
+                "pressed",
+                &Callable::from_object_method(&gd, "on_preset").bind(&[(i as i64).to_variant()]),
+            );
+            grid.add_child(&b);
+        }
+        col.add_child(&grid);
+        col.add_child(&HSeparator::new_alloc());
+        let mut wire = w::push_button(WIRE_LABEL, Some("world"), WIRE_TOOLTIP);
+        wire.set_focus_mode(FocusMode::NONE);
+        wire.connect("pressed", &Callable::from_object_method(&gd, "on_wire"));
+        col.add_child(&wire);
+        col.add_child(&HSeparator::new_alloc());
         let has_terrain = self.world_sig.last().copied().unwrap_or(0) > 0;
         for (k, &(class, label, unique)) in ADDABLE.iter().enumerate() {
             let count = self.world_sig[k];
@@ -1107,33 +1145,6 @@ impl PixelizerEditorPlugin {
             col.add_child(&row);
         }
         col.add_child(&HSeparator::new_alloc());
-        col.add_child(&ui_kit::panel_title(
-            sections::PRESET_HEADER,
-            w::glyph("presets"),
-            "Time of day / weather presets for Day/Night, Sky, Weather and the renderer's god rays.",
-        ));
-        let mut grid = GridContainer::new_alloc();
-        grid.set_columns(3);
-        for (i, p) in PRESETS.iter().enumerate() {
-            let tip = format!(
-                "Apply the {} preset to the scene's Day/Night, Sky, Weather and renderer god rays (undoable).",
-                p.moniker
-            );
-            let mut b = w::push_button(p.moniker, None, &tip);
-            b.set_focus_mode(FocusMode::NONE);
-            b.set_h_size_flags(SizeFlags::EXPAND_FILL);
-            b.connect(
-                "pressed",
-                &Callable::from_object_method(&gd, "on_preset").bind(&[(i as i64).to_variant()]),
-            );
-            grid.add_child(&b);
-        }
-        col.add_child(&grid);
-        col.add_child(&HSeparator::new_alloc());
-        let mut wire = w::push_button(WIRE_LABEL, Some("world"), WIRE_TOOLTIP);
-        wire.set_focus_mode(FocusMode::NONE);
-        wire.connect("pressed", &Callable::from_object_method(&gd, "on_wire"));
-        col.add_child(&wire);
         let mut hint = Label::new_alloc();
         hint.set_name("PreviewHint");
         hint.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
