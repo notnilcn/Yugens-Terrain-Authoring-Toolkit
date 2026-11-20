@@ -888,6 +888,44 @@ pub fn assign_active(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
     } else {
         MouseFilter::IGNORE
     });
+    // Really disabled, not only dimmed: no toggle / drag by keyboard or script, and
+    // accessibility / UI dumps report the state.
+    if let Ok(mut b) = c.clone().try_cast::<godot::classes::BaseButton>() {
+        b.set_disabled(!enabled);
+    } else if let Ok(mut s) = c.clone().try_cast::<godot::classes::Slider>() {
+        s.set_editable(enabled);
+    } else if let Ok(mut s) = c.clone().try_cast::<godot::classes::SpinBox>() {
+        s.set_editable(enabled);
+    } else if let Ok(mut s) = c.clone().try_cast::<godot::classes::EditorSpinSlider>() {
+        s.set_read_only(!enabled);
+    }
+    // A strip cell (`Strip::commence`): dim its caption and value read-out with the control.
+    let cell = c
+        .get_parent()
+        .filter(|p| p.is_class("Container"))
+        .and_then(|p| p.get_parent())
+        .and_then(|g| g.try_cast::<HBoxContainer>().ok());
+    if let Some(cell) = cell {
+        for k in cell.get_children().iter_shared() {
+            let Ok(mut k) = k.try_cast::<Control>() else {
+                continue;
+            };
+            let tone = if enabled {
+                Color::WHITE
+            } else {
+                DISABLED_MODULATE
+            };
+            if k.is_class("Label") {
+                // Value read-out: keeps its own dim `modulate`.
+                k.set_self_modulate(tone);
+            } else if k.is_class("CenterContainer")
+                && k.get_child_count() == 1
+                && k.get_child(0).is_some_and(|l| l.is_class("Label"))
+            {
+                k.set_modulate(tone);
+            }
+        }
+    }
 }
 
 /// Right side panel: `ScrollContainer` ([`PANEL_WIDTH`] wide, vertical scrolling only) →
