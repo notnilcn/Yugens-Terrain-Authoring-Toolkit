@@ -49,13 +49,22 @@ pub fn sheet_transforms(sun_basis: Basis, count: i32, depth: f32) -> Vec<Transfo
         .collect()
 }
 
+/// First DirectionalLight3D in the scene `owner` belongs to (fallback for an empty `sun` slot).
+fn scene_sun(owner: &Gd<Node>) -> Option<Gd<DirectionalLight3D>> {
+    super::find_in_scene(owner, "DirectionalLight3D")
+        .and_then(|n| n.try_cast::<DirectionalLight3D>().ok())
+        .filter(|s| s.is_inside_tree())
+}
+
 /// A stack of sun-aligned light sheets lit through the directional light's shadows: visible
 /// shafts of light between pillars, tree trunks and canopies. Needs a shadow-casting
-/// `DirectionalLight3D` (the `sun` slot, else the first sibling DirectionalLight3D).
+/// `DirectionalLight3D` (the `sun` slot, else the first sibling DirectionalLight3D, else the
+/// first one in the scene).
 #[derive(GodotClass)]
 #[class(tool, base = Node3D)]
 pub struct PixelSunShafts {
-    /// The sun (a DirectionalLight3D with shadows on). Empty = the first sibling DirectionalLight3D.
+    /// The sun (a DirectionalLight3D with shadows on). Empty = the first sibling
+    /// DirectionalLight3D, else the first DirectionalLight3D in the scene.
     #[export]
     #[var(get = get_sun, set = set_sun)]
     sun: Option<Gd<DirectionalLight3D>>,
@@ -113,6 +122,8 @@ pub struct PixelSunShafts {
     surface_fade: f32,
 
     sun_ref: SiblingFallback<DirectionalLight3D>,
+    /// The sun `sync` last resolved (detects a fallback appearing or changing).
+    resolved_sun: Option<InstanceId>,
     sheets: Option<Gd<MultiMeshInstance3D>>,
     multimesh: Option<Gd<MultiMesh>>,
     quad: Option<Gd<QuadMesh>>,
@@ -143,6 +154,7 @@ impl INode3D for PixelSunShafts {
             fade_height: 12.0,
             surface_fade: 1.5005,
             sun_ref: SiblingFallback::default(),
+            resolved_sun: None,
             sheets: None,
             multimesh: None,
             quad: None,
@@ -182,6 +194,7 @@ impl INode3D for PixelSunShafts {
 
     fn exit_tree(&mut self) {
         self.sun_ref.revert();
+        self.resolved_sun = None;
     }
 
     fn process(&mut self, delta: f64) {
@@ -193,15 +206,19 @@ impl INode3D for PixelSunShafts {
     fn get_configuration_warnings(&self) -> PackedStringArray {
         let mut w = super::gate_warnings(Feature::SunShafts);
         let owner: Gd<Node> = self.to_gd().upcast();
-        let sun = live(&self.sun).or_else(|| {
-            owner.get_parent().and_then(|p| {
-                p.get_children()
-                    .iter_shared()
-                    .find_map(|n| n.try_cast::<DirectionalLight3D>().ok())
+        let sun = live(&self.sun)
+            .or_else(|| {
+                owner.get_parent().and_then(|p| {
+                    p.get_children()
+                        .iter_shared()
+                        .find_map(|n| n.try_cast::<DirectionalLight3D>().ok())
+                })
             })
-        });
+            .or_else(|| scene_sun(&owner));
         match sun {
-            None => w.push("Assign a DirectionalLight3D to `sun` (or add one as a sibling)."),
+            None => w.push(
+                "No DirectionalLight3D found: assign one to `sun` (or add one to the scene).",
+            ),
             Some(s) if !s.has_shadow() => {
                 w.push("Turn on shadows on the sun: the shafts are cut by its shadow map.")
             }
@@ -212,16 +229,36 @@ impl INode3D for PixelSunShafts {
 }
 
 impl PixelSunShafts {
+    /// The explicit `sun`, else the first sibling DirectionalLight3D, else the first
+    /// DirectionalLight3D anywhere in the scene (a node added under Pixel World is not a sibling
+    /// of the scene's sun; an empty slot must still produce shafts).
     fn resolve_sun(&mut self) -> Option<Gd<DirectionalLight3D>> {
         let owner: Gd<Node> = self.to_gd().upcast();
-        self.sun_ref
+        let found = self
+            .sun_ref
             .settle(&owner, &self.sun)
             .filter(|s| s.is_inside_tree())
+            .or_else(|| scene_sun(&owner));
+        let had = self.resolved_sun.take();
+        let changed = had.map(|i| Some(i) != found.as_ref().map(|s| s.instance_id()));
+        self.resolved_sun = found.as_ref().map(|s| s.instance_id());
+        if changed.unwrap_or(found.is_some()) {
+            // The fallback appeared, vanished or changed: rebuild and refresh the warning.
+            self.built = None;
+            self.base_mut().update_configuration_warnings();
+        }
+        found
     }
 
     /// Rebuilds the sheet stack when the sun turned, and keeps it centred.
     fn sync(&mut self) {
         let Some(sun) = self.resolve_sun() else {
+            // No sun anywhere: draw nothing rather than sheets for a stale direction.
+            if let Some(mm) = &mut self.multimesh
+                && mm.get_instance_count() != 0
+            {
+                mm.set_instance_count(0);
+            }
             return;
         };
         let basis = sun.get_global_basis().orthonormalized();
