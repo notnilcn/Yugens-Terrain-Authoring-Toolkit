@@ -135,7 +135,9 @@ pub fn icon_px(name: &str, size: f32) -> Option<Gd<Texture2D>> {
         }
         img
     } else {
-        let mut img = glyph(name)?.get_image()?;
+        // A copy: `get_image()` may return the icon texture's shared cached image, which the
+        // resize below would otherwise shrink for every other user of the icon.
+        let mut img = glyph(name)?.get_image()?.duplicate_resource();
         if img.is_compressed() {
             img.decompress();
         }
