@@ -232,7 +232,7 @@ const BUTTONS: &[(Action, &str, &str, u8, u8)] = &[
     (
         Action::ToolShape,
         "shape",
-        "Draw shape [C]: drag the footprint on the grid / terrain cells, move up for the height, click to finish\nA plain click stamps the shape at its current size; Shift appends to the selected mesh\nRight-click / Esc cancels",
+        "Draw shape [C]: drag the footprint on the grid / terrain cells, move up for the height, click to finish\nA plain click stamps the shape at its current size\nHold Shift while you click to finish (or stamp) to append the shape to the selected mesh instead of adding a new one\n(Shift+C is the Bezier tool, not append)\nRight-click / Esc cancels",
         2,
         ALL,
     ),
@@ -449,7 +449,7 @@ const BUTTONS: &[(Action, &str, &str, u8, u8)] = &[
     (
         Action::Fill,
         "fill",
-        "Fill hole [F]: close open boundaries through the selection\nEntire hole off (strip): only the selected run of border vertices, closed by its chord",
+        "Fill hole [F]: close open boundaries through the selection\nEntire hole off (strip): only the selected run of border vertices, closed by its chord\nThe key fills only in Edge / Vertex mode with a selection; otherwise F frames the selection (Godot)",
         0,
         E | V,
     ),

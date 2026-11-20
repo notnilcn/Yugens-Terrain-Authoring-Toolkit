@@ -2775,7 +2775,13 @@ impl PixelBuilderPlugin {
                     Action::Connect
                 },
             ),
-            "fill" => run(et, Action::Fill),
+            // Only where a fill can run (Edge / Vertex mode with a selection); otherwise `F`
+            // goes to Godot and frames the selection (r4 #9: F never framed in an element mode).
+            "fill" => run(
+                has && matches!(self.mode, Mode::Edge | Mode::Vertex)
+                    && !(self.sel_edges.is_empty() && self.sel_verts.is_empty()),
+                Action::Fill,
+            ),
             "triangulate" => run(
                 has && matches!(self.mode, Mode::Object | Mode::Face),
                 Action::Triangulate,
