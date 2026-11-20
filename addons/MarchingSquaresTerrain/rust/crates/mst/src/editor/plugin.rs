@@ -169,9 +169,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         let toolbar = self.build_toolbar();
         let rail = super::ui_kit::toolbar_rail(&toolbar);
         let strip = super::ui_kit::strip_root("MarchingSquaresToolAttributes");
-        let (mut panel, vbox) = super::ui_kit::side_panel("MarchingSquaresTextureSettings");
-        // Wider than the original 195 px: rows also hold pattern, color and grass sprite pickers.
-        panel.set_custom_minimum_size(super::ui_kit::sz(250.0, 0.0));
+        // Resizable 220–420 px (default 250: rows also hold pattern, color and grass sprite
+        // pickers) and collapsible; the width is remembered per project (`ui_kit::side_panel`).
+        let (panel, vbox) = super::ui_kit::side_panel("MarchingSquaresTextureSettings");
         for (c, ctl) in [
             (LEFT, rail.clone().upcast::<Control>()),
             (BOTTOM, strip.clone().upcast()),
@@ -1752,6 +1752,11 @@ impl MarchingSquaresTerrainPlugin {
     #[func]
     fn on_settings_page(&mut self, page: i64) {
         self.settings_page = page.max(0) as usize;
+        // The page tabs sit on the strip's first row: a strip still scrolled down from the
+        // previous page would hide them (the tab row "jumped").
+        if let Some(p) = &mut self.peel {
+            p.set_v_scroll(0);
+        }
         self.rebuild_strip_deferred();
     }
 
