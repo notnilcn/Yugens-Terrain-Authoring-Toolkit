@@ -3252,7 +3252,7 @@ impl PixelBuilderPlugin {
         let p = self.prefs;
         if let Some(panel) = &mut self.prefs_panel {
             prefs::sync_panel(panel, &p);
-            panel.popup.popup_centered();
+            panel.unveil();
         }
     }
 

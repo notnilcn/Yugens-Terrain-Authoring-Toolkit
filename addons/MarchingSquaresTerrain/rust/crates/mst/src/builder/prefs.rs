@@ -451,6 +451,36 @@ pub struct Panel {
     pub keys: Gd<RichTextLabel>,
     /// UI layout choice (MST / modeler).
     pub layout: Gd<OptionButton>,
+    /// The scrolling body; its height is fitted to the editor window on each `unveil`.
+    scroll: Gd<ScrollContainer>,
+}
+
+/// Preferred size of the scrolling body (unscaled); the height shrinks to fit small windows.
+const BODY: Vector2 = Vector2::new(460.0, 640.0);
+
+/// Body height that keeps the popup (body + panel margins) inside a `window_h` tall editor:
+/// the preferred height, else what fits, never below a few rows (the body scrolls).
+pub fn body_height(window_h: f32, scale: f32) -> f32 {
+    let want = BODY.y * scale;
+    let margin = 64.0 * scale;
+    want.min(window_h - margin).max(160.0 * scale)
+}
+
+impl Panel {
+    /// Pops the panel up centred, with the body height fitted to the editor window so the whole
+    /// popup stays on screen; the rest scrolls.
+    pub fn unveil(&mut self) {
+        let s = crate::editor::ui_kit::editor_scale();
+        let window_h = EditorInterface::singleton()
+            .get_base_control()
+            .map(|c| c.get_size().y)
+            .filter(|h| *h > 0.0)
+            .unwrap_or(BODY.y * s + 64.0 * s);
+        self.scroll
+            .set_custom_minimum_size(Vector2::new(BODY.x * s, body_height(window_h, s)));
+        self.popup.reset_size();
+        self.popup.popup_centered();
+    }
 }
 
 /// Builds the preferences popup; controls call `on_pref(value, key)` and `on_prefs_reset()` on
@@ -461,7 +491,7 @@ pub fn build_panel(addressee: &Gd<Object>, p: &Prefs) -> Panel {
     popup.set_name("PixelBuilderPreferences");
     popup.set_title("Pixel Builder Preferences");
     let mut scroll = ScrollContainer::new_alloc();
-    scroll.set_custom_minimum_size(Vector2::new(460.0, 640.0) * s);
+    scroll.set_custom_minimum_size(BODY * s);
     scroll.set_horizontal_scroll_mode(godot::classes::scroll_container::ScrollMode::DISABLED);
     let mut col = VBoxContainer::new_alloc();
     col.set_h_size_flags(SizeFlags::EXPAND_FILL);
@@ -536,6 +566,7 @@ pub fn build_panel(addressee: &Gd<Object>, p: &Prefs) -> Panel {
         controls,
         keys: rt,
         layout,
+        scroll,
     }
 }
 
@@ -616,5 +647,19 @@ pub fn sync_panel(panel: &mut Panel, p: &Prefs) {
     }
     if panel.keys.is_instance_valid() {
         panel.keys.set_text(&shortcut_text());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn body_fits_small_windows() {
+        // Tall window: the preferred 640 px.
+        assert_eq!(super::body_height(900.0, 1.0), 640.0);
+        // 600 px window: the popup (body + margins) stays inside it.
+        assert_eq!(super::body_height(600.0, 1.0), 536.0);
+        // Tiny window: a few rows, the rest scrolls.
+        assert_eq!(super::body_height(100.0, 1.0), 160.0);
+        assert_eq!(super::body_height(1500.0, 2.0), 1280.0);
     }
 }
