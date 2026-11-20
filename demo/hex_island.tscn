@@ -503,13 +503,13 @@ land_interval = 45.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.5, 5, 7.5)
 
 [node name="Smoke" type="PixelSmoke" parent="." unique_id=1500700003]
-rate = 2.5
-lifetime = 4.0
+rate = 3.0
+lifetime = 5.0
 rise_speed = 0.8
 spread = 0.08
-start_size = 0.1
-end_size = 0.45
-max_puffs = 24
+start_size = 0.18
+end_size = 0.9
+max_puffs = 32
 fire = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 5, -2)
 
