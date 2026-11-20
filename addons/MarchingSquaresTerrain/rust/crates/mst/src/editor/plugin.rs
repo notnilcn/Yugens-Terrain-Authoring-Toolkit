@@ -67,6 +67,9 @@ pub struct MarchingSquaresTerrainPlugin {
     pub(super) settings_page: usize,
     /// Strip width the Terrain Settings columns were laid out for (rebuilt when it changes).
     pub(super) settings_strip_w: f32,
+    /// Undo version right after a Terrain Settings control committed its own action: that
+    /// `version_changed` needs no strip refresh (the control already shows the value).
+    pub(super) settings_version: Option<u64>,
     pub(super) slot_buttons: Vec<Gd<Button>>,
     pub(super) slot_previews: Vec<Gd<godot::classes::TextureRect>>,
     /// Ground texture picker per slot (index = slot), updated when the pattern changes.
@@ -182,6 +185,15 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             let mut st = strip.clone();
             st.connect_flags(
                 "resized",
+                &cb,
+                godot::classes::object::ConnectFlags::DEFERRED,
+            );
+        }
+        if let Some(mut ur) = self.base().get_undo_redo() {
+            // Undo / redo / Inspector edits: the Terrain Settings strip shows the new values.
+            let cb = self.base().callable("_mst_on_undo_version");
+            ur.connect_flags(
+                "version_changed",
                 &cb,
                 godot::classes::object::ConnectFlags::DEFERRED,
             );
@@ -439,6 +451,9 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
             if let Some(e) = self.extra_status() {
                 l.push_str(&e);
             }
+            if let Some(e) = self.chunk_status() {
+                l.push_str(&e);
+            }
             l
         });
         let mut overlay = overlay;
@@ -494,6 +509,8 @@ impl IEditorPlugin for MarchingSquaresTerrainPlugin {
         }
         let hint = if self.state.tool == Tool::Scatter {
             self.foliage_hint()
+        } else if self.vertex_handles_shown() {
+            "LMB-drag a vertex handle: move that sample up / down  ·  RMB: cancel the drag  ·  Ctrl+LMB: select chunk".to_string()
         } else {
             self.state.tool.hint().to_string()
         };
@@ -1293,6 +1310,11 @@ impl MarchingSquaresTerrainPlugin {
     }
 
     fn chunk_click(&mut self) {
+        if self.vertex_handles_shown() {
+            // Handle mode: a press that misses every handle must not add / remove a chunk
+            // (the handles sit on chunk borders; `handle_press` took the hits).
+            return;
+        }
         if let Some(c) = self.hover_chunk {
             self.toggle_chunk(c);
         }
@@ -1314,17 +1336,8 @@ impl MarchingSquaresTerrainPlugin {
                 self.selected_chunk = None;
             }
         } else {
-            let can_add = {
-                let t = terrain.bind();
-                t.store().chunks.is_empty()
-                    || t.store()
-                        .config
-                        .chunk_neighbors(c)
-                        .iter()
-                        .any(|n| t.store().has_chunk(*n))
-            };
-            if !can_add {
-                godot_warn!("Marching Squares Terrain: new chunks must touch an existing chunk.");
+            if !self.chunk_addable(c) {
+                // No "+" is drawn there; the viewport status line says why (`chunk_status`).
                 return;
             }
             before.set(from_iv(c), &PackedByteArray::new());
@@ -1533,6 +1546,7 @@ impl MarchingSquaresTerrainPlugin {
             },
             chunk_mode: tool == Tool::ChunkManager,
             hover_chunk: self.hover_chunk,
+            chunk_adds: !self.vertex_handles_shown(),
             selected_chunk: self.selected_chunk,
             show_chunk_lines: true,
             bridge_from: self
@@ -1636,6 +1650,17 @@ impl MarchingSquaresTerrainPlugin {
     #[func]
     fn rebuild_strip_now(&mut self) {
         self.rebuild_strip();
+    }
+
+    #[func]
+    fn _mst_on_undo_version(&mut self) {
+        let own = self.settings_version.take();
+        if own.is_some() && own == self.terrain_undo_version() {
+            return;
+        }
+        if self.visible && self.state.tool == Tool::TerrainSettings {
+            self.rebuild_strip();
+        }
     }
 
     #[func]
@@ -1745,6 +1770,12 @@ impl MarchingSquaresTerrainPlugin {
         if let Some(t) = self.terrain.as_mut() {
             t.set("chunk_handles", &on.to_variant());
         }
+        // Hint and viewport glyphs depend on the mode.
+        if self.state.tool == Tool::ChunkManager {
+            self.rebuild_strip_deferred();
+        }
+        self.redraw();
+        self.base().update_overlays();
     }
 
     #[func]

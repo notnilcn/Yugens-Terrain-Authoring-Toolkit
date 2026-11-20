@@ -677,6 +677,12 @@ impl MarchingSquaresTerrain {
         &self.store
     }
 
+    /// Chunk layout (`chunk_size`, `ring_radius`) can no longer change: chunks exist for the
+    /// current grid type (`set_chunk_size` / `set_ring_radius` refuse new values).
+    pub fn layout_fixed(&self) -> bool {
+        self.loaded && !self.store.chunks.is_empty()
+    }
+
     fn edge_params(&self) -> pt_core::cells::EdgeParams {
         pt_core::cells::EdgeParams {
             style: pt_core::cells::EdgeStyle::from_i32(self.hex_edge_style),
@@ -1850,7 +1856,7 @@ impl MarchingSquaresTerrain {
     }
     #[func]
     fn set_chunk_size(&mut self, v: i32) {
-        if self.loaded && !self.store.chunks.is_empty() && v != self.chunk_size {
+        if self.layout_fixed() && v != self.chunk_size {
             godot_warn!(
                 "MarchingSquaresTerrain: chunk_size is fixed once chunks exist for this grid type (clear the data or switch grid type first)."
             );
@@ -1867,8 +1873,7 @@ impl MarchingSquaresTerrain {
     }
     #[func]
     fn set_ring_radius(&mut self, v: i32) {
-        if self.loaded
-            && !self.store.chunks.is_empty()
+        if self.layout_fixed()
             && self.grid() == GridType::HexRings
             && v != self.ring_radius
         {

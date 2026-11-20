@@ -25,6 +25,16 @@ use crate::terrain::textures::{
 pub const PRESET_DIR: &str = "res://addons/MarchingSquaresTerrain/texture_presets/";
 /// Metadata on a terrain's (duplicated) preset remembering which file it came from.
 const PRESET_META: &str = "mst_preset_path";
+/// Number carried by a control's signal: `item_selected` sends an int, `value_changed` a
+/// float, `toggled` a bool. `Variant::try_to::<f64>` is strict (an int variant fails), so read
+/// whichever it is.
+pub(super) fn setting_num(v: &Variant) -> f64 {
+    v.try_to::<f64>()
+        .or_else(|_| v.try_to::<i64>().map(|i| i as f64))
+        .or_else(|_| v.try_to::<bool>().map(|b| b as i32 as f64))
+        .unwrap_or(0.0)
+}
+
 /// Name of the toolbar's compact-mode switch.
 const COMPACT_BUTTON: &str = "ToolbarCompact";
 /// Editor project metadata (section, key) remembering the toolbar's compact mode.
@@ -451,9 +461,59 @@ impl MarchingSquaresTerrainPlugin {
             .as_ref()
             .is_some_and(|t| t.get("chunk_handles").to::<bool>());
         let mut h = strip.checkbox("Vertex Handles", handles, &self.cb("on_chunk_handles"));
-        h.set_tooltip_text("Drag handles on every sample of the selected chunk (the original's chunk gizmo; one undo step per drag).");
+        h.set_tooltip_text("Drag handles on every sample of the selected chunk (the original's chunk gizmo; one undo step per drag). While on, clicks do not add or remove chunks.");
         strip.separator();
-        strip.hint("LMB +: add chunk  ·  LMB chunk: remove  ·  Ctrl+LMB: select");
+        strip.hint(if self.vertex_handles_shown() {
+            "LMB-drag handle: move sample  ·  Ctrl+LMB: select"
+        } else {
+            "LMB +: add chunk  ·  LMB chunk: remove  ·  Ctrl+LMB: select"
+        });
+    }
+
+    /// A click can add chunk `c`: it is empty and touches an existing chunk (or the terrain
+    /// has none yet). Only these slots get a "+" handle.
+    pub(super) fn chunk_addable(&self, c: pt_core::math::IVec2) -> bool {
+        self.terrain.as_ref().is_some_and(|t| {
+            let t = t.bind();
+            let st = t.store();
+            !st.has_chunk(c)
+                && (st.chunks.is_empty()
+                    || st.config.chunk_neighbors(c).iter().any(|n| st.has_chunk(*n)))
+        })
+    }
+
+    /// Chunk Manager with Vertex Handles on and a chunk to show them on: clicks only drag
+    /// handles (no chunk add / remove).
+    pub(super) fn vertex_handles_shown(&self) -> bool {
+        self.state.tool == Tool::ChunkManager
+            && self.terrain.as_ref().is_some_and(|t| {
+                t.get("chunk_handles").try_to::<bool>().unwrap_or(false)
+                    && t.bind().store().has_chunk(crate::util::to_iv(
+                        t.get("handle_chunk").try_to::<Vector2i>().unwrap_or_default(),
+                    ))
+            })
+    }
+
+    /// Chunk Manager part of the viewport status line: what a click on the hovered slot does.
+    pub(super) fn chunk_status(&self) -> Option<String> {
+        if self.state.tool != Tool::ChunkManager {
+            return None;
+        }
+        if self.vertex_handles_shown() {
+            return Some("  |  Vertex Handles: LMB-drag a handle (chunk add / remove off)".into());
+        }
+        let c = self.hover_chunk?;
+        let exists = self.terrain.as_ref()?.bind().store().has_chunk(c);
+        Some(if exists {
+            format!("  |  LMB: remove chunk ({}, {})", c.x, c.y)
+        } else if self.chunk_addable(c) {
+            format!("  |  LMB: add chunk ({}, {})", c.x, c.y)
+        } else {
+            format!(
+                "  |  chunk ({}, {}) cannot be added: new chunks must touch an existing chunk",
+                c.x, c.y
+            )
+        })
     }
 
     pub(super) fn refresh_chunk_list(&mut self) {
@@ -887,6 +947,14 @@ fn settings_page_of(t: &TSetting) -> usize {
     }
 }
 
+/// Settings fixed once chunks exist (see `MarchingSquaresTerrain::layout_fixed`).
+fn layout_prop(prop: &str) -> bool {
+    matches!(prop, "chunk_size" | "ring_radius")
+}
+
+const LAYOUT_FIXED_TIP: &str =
+    "Locked: chunks already exist for this grid type. Clear the terrain data or switch the grid type to change it.";
+
 fn spin(min: f64, max: f64, step: f64, value: f64) -> Gd<SpinBox> {
     let mut sb = SpinBox::new_alloc();
     sb.set_min(min);
@@ -907,8 +975,20 @@ impl MarchingSquaresTerrainPlugin {
             .unwrap_or_default()
     }
 
+    /// Version of the undo history that holds the terrain's actions.
+    pub(super) fn terrain_undo_version(&self) -> Option<u64> {
+        let t = self.terrain.as_ref()?;
+        let ur = self.base().get_undo_redo()?;
+        let id = ur.get_object_history_id(t);
+        Some(ur.get_history_undo_redo(id)?.get_version())
+    }
+
+    fn layout_fixed(&self) -> bool {
+        self.terrain.as_ref().is_some_and(|t| t.bind().layout_fixed())
+    }
+
     fn turf_stuff(&self) -> Option<Gd<godot::classes::ShaderMaterial>> {
-        self.terrain_prop("grass_material")
+        self.terrain_prop("turf_stuff")
             .try_to::<Gd<godot::classes::ShaderMaterial>>()
             .ok()
     }
@@ -941,13 +1021,19 @@ impl MarchingSquaresTerrainPlugin {
                 _ => !matches!(t.sort, TKind::Action("save")) || storage != 0,
             })
             .collect();
+        let fixed = self.layout_fixed();
         let built: Vec<Gd<HBoxContainer>> = rows
             .iter()
             .map(|(i, t)| {
                 let mut c = self.build_terrain_setting(*i, t);
-                c.set_tooltip_text(t.tip);
+                let tip = if layout_prop(t.prop) && fixed {
+                    format!("{}\n{LAYOUT_FIXED_TIP}", t.tip)
+                } else {
+                    t.tip.to_string()
+                };
+                c.set_tooltip_text(&tip);
                 let mut row = ui_kit::settings_row(t.label, &c);
-                row.set_tooltip_text(t.tip);
+                row.set_tooltip_text(&tip);
                 row
             })
             .collect();
@@ -1060,6 +1146,12 @@ impl MarchingSquaresTerrainPlugin {
                 );
                 // Pixel sizes are unbounded; the range is only the arrows' / drag's span.
                 sb.set_allow_greater(t.prop.ends_with("pixel_size"));
+                if layout_prop(t.prop) && self.layout_fixed() {
+                    // The terrain refuses a new chunk layout once chunks exist: show the field
+                    // read-only with the reason instead of a value that snaps back.
+                    sb.set_editable(false);
+                    sb.set_modulate(ui_kit::DISABLED_MODULATE);
+                }
                 sb.connect("value_changed", &on(0));
                 sb.upcast()
             }
@@ -1193,7 +1285,10 @@ impl MarchingSquaresTerrainPlugin {
         if let TKind::GrassFps = t.sort {
             let Some(mat) = self.turf_stuff() else { return };
             let old = mat.get_shader_parameter("animation_fps");
-            let new = value.try_to::<f64>().unwrap_or(0.0) as f32;
+            let new = setting_num(&value) as f32;
+            if old.try_to::<f64>().is_ok_and(|o| o as f32 == new) {
+                return;
+            }
             ur.create_action("terrain grass animation fps");
             let m = mat.upcast::<Object>();
             ur.add_do_method(
@@ -1207,10 +1302,16 @@ impl MarchingSquaresTerrainPlugin {
                 &["animation_fps".to_variant(), old],
             );
             ur.commit_action();
+            self.settings_version = self.terrain_undo_version();
             return;
         }
         if let TKind::Action(a) = t.sort {
             self.terrain_action(a);
+            return;
+        }
+        if layout_prop(t.prop) && self.layout_fixed() {
+            // Refused by the terrain: no (no-op) undo step; put the field back.
+            self.rebuild_strip_deferred();
             return;
         }
         let old = terrain.get(t.prop);
@@ -1226,12 +1327,12 @@ impl MarchingSquaresTerrainPlugin {
             TKind::Noise => value.clone(),
             TKind::Action(_) => unreachable!(),
             TKind::Enum(_) | TKind::Slot | TKind::Int(..) => {
-                (value.try_to::<f64>().unwrap_or(0.0).round() as i64).to_variant()
+                (setting_num(&value).round() as i64).to_variant()
             }
-            TKind::Float(..) | TKind::Unit => value.try_to::<f64>().unwrap_or(0.0).to_variant(),
+            TKind::Float(..) | TKind::Unit => setting_num(&value).to_variant(),
             TKind::Bool => value.try_to::<bool>().unwrap_or(false).to_variant(),
             TKind::ExtraLayer => {
-                let sel = value.try_to::<i64>().unwrap_or(0);
+                let sel = setting_num(&value).round() as i64;
                 let mut mask = old.try_to::<i64>().unwrap_or(1) as u32 & 0xff;
                 if sel > 0 {
                     mask |= 1 << (sel + 8 - 1);
@@ -1240,7 +1341,7 @@ impl MarchingSquaresTerrainPlugin {
             }
             TKind::Vec2(..) => {
                 let mut v = old.try_to::<Vector2>().unwrap_or(Vector2::ONE);
-                let x = value.try_to::<f64>().unwrap_or(0.0) as f32;
+                let x = setting_num(&value) as f32;
                 if comp == 0 {
                     v.x = x
                 } else {
@@ -1250,7 +1351,7 @@ impl MarchingSquaresTerrainPlugin {
             }
             TKind::Vec2i(..) => {
                 let mut v = old.try_to::<Vector2i>().unwrap_or(Vector2i::ZERO);
-                let x = value.try_to::<f64>().unwrap_or(0.0).round() as i32;
+                let x = setting_num(&value).round() as i32;
                 if comp == 0 {
                     v.x = x
                 } else {
@@ -1267,6 +1368,7 @@ impl MarchingSquaresTerrainPlugin {
         ur.add_do_property(&obj, t.prop, &new);
         ur.add_undo_property(&obj, t.prop, &old);
         ur.commit_action();
+        self.settings_version = self.terrain_undo_version();
         if t.prop == "show_grid_in_editor" {
             self.sync_grid_toggle();
         }
@@ -1274,7 +1376,11 @@ impl MarchingSquaresTerrainPlugin {
             t.prop,
             "grid_type" | "chunk_size" | "cell_size" | "ring_radius" | "storage_mode"
         ) {
-            // Layout / brush ranges depend on these: rebuild after the signal returns.
+            // Layout / brush ranges depend on these: rebuild after the signal returns. Reload
+            // now so the rebuilt strip sees the new grid's chunks (Chunk Size lock).
+            if let Some(mut t) = self.terrain.clone() {
+                t.bind_mut().update();
+            }
             self.selection.clear();
             self.rebuild_strip_deferred();
         }

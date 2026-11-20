@@ -242,7 +242,8 @@ impl MarchingSquaresTerrainPlugin {
         };
         let obj = rules.upcast::<Object>();
         let old = obj.get(prop);
-        let n = value.try_to::<f64>().unwrap_or(0.0);
+        // `item_selected` sends an int, `value_changed` a float.
+        let n = super::terrain_ui::setting_num(&value);
         let new = match kind {
             RKind::Bool => value.try_to::<bool>().unwrap_or(false).to_variant(),
             RKind::Slot => (n.round() as i64 - 1).to_variant(),

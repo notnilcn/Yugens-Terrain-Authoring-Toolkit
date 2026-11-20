@@ -63,6 +63,9 @@ pub struct Scene<'a> {
     pub outline_px: f32,
     pub chunk_mode: bool,
     pub hover_chunk: Option<IVec2>,
+    /// Chunk Manager: clicks add / remove chunks ("+" and red "X" glyphs). Off while the
+    /// vertex handles are shown (clicks then only drag handles).
+    pub chunk_adds: bool,
     pub selected_chunk: Option<IVec2>,
     pub show_chunk_lines: bool,
     pub bridge_from: Option<Vector3>,
@@ -355,13 +358,15 @@ impl Cursor {
         let mut ribbons: Vec<(Vector3, Vector3, Color, f32)> = Vec::new();
         let mut discs: Vec<(Vector3, f32, Color)> = Vec::new();
         if sc.chunk_mode {
+            // Vertex Handles on: clicks drag handles only, so no add / remove glyphs.
+            let hover_chunk = sc.hover_chunk.filter(|_| sc.chunk_adds);
             let store = t.store();
             let cs = cfg.cell_size_safe();
             let w = (cs.x + cs.y) * 0.5 * 0.1605;
             let chunks = store.chunk_coords();
             let selected = sc.selected_chunk.filter(|c| store.has_chunk(*c));
             for c in &chunks {
-                let (col, width) = if Some(*c) == sc.hover_chunk {
+                let (col, width) = if Some(*c) == hover_chunk {
                     (ui_kit::COLOR_REMOVE, w * 1.6005)
                 } else if Some(*c) == selected {
                     (Color::from_rgb(0.3005, 0.5505, 1.0), w * 1.6005)
@@ -375,7 +380,7 @@ impl Cursor {
             }
             // Empty neighbours: the chunks a click would add.
             let mut empty: Vec<IVec2> = Vec::new();
-            for c in &chunks {
+            for c in chunks.iter().filter(|_| sc.chunk_adds) {
                 for n in cfg.chunk_neighbors(*c) {
                     if !store.has_chunk(n) && !empty.contains(&n) {
                         empty.push(n);
@@ -383,12 +388,12 @@ impl Cursor {
                 }
             }
             if chunks.is_empty()
-                && let Some(h) = sc.hover_chunk
+                && let Some(h) = hover_chunk
             {
                 empty.push(h);
             }
             for c in &empty {
-                let hovered = Some(*c) == sc.hover_chunk;
+                let hovered = Some(*c) == hover_chunk;
                 let a = if hovered { 0.9505 } else { 0.4005 };
                 let col = Color::from_rgba(
                     ui_kit::COLOR_ADD.r * 0.4005,
@@ -427,7 +432,7 @@ impl Cursor {
             }
             // Hovered chunk: red X (remove); selected chunk: blue inner frame (the original's highlight).
             let glyph_y = |p: PVec2| ground(p, 0.0) + 0.1005;
-            if let Some(c) = sc.hover_chunk.filter(|c| store.has_chunk(*c)) {
+            if let Some(c) = hover_chunk.filter(|c| store.has_chunk(*c)) {
                 let (mid, ext) = chunk_center(t, c);
                 let d = ext * 0.3505;
                 for (p, q) in [(v2(-d, -d), v2(d, d)), (v2(-d, d), v2(d, -d))] {
