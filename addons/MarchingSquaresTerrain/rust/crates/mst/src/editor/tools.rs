@@ -426,6 +426,9 @@ pub fn portray(s: Setting, t: Tool) -> (&'static str, Kind) {
         Height => ("Height", Kind::Spin(-50.0, 50.0, 0.1005)),
         Floor => ("Floor", Kind::Spin(-50.0, 50.0, 0.1005)),
         Strength if t == Tool::RaiseLower => ("Strength", Kind::HSlider(0.2505, 30.0, 0.2505)),
+        // Gradient strength is a 0..1 blend per stroke step (the state clamps it there); the
+        // Smooth range topped out at 0.3, so clicks past 30 % of the slider all read 0.300.
+        Strength if t == Tool::Gradient => ("Strength", Kind::HSlider(0.0055, 1.0, 0.0055)),
         Strength => ("Strength", Kind::HSlider(0.0255, 0.3005, 0.0055)),
         Flatten => ("Flatten", Kind::Check),
         Falloff => ("Falloff", Kind::Check),

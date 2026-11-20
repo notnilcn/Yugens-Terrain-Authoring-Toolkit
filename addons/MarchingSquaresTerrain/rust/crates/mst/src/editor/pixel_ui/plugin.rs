@@ -52,6 +52,8 @@ pub struct PixelizerEditorPlugin {
     visible: bool,
     /// Refreshes the strip / world panel values while the panels are shown.
     refresh_timer: Option<Gd<godot::classes::Timer>>,
+    /// Spin-slider drag in progress: (field index, value before the drag).
+    drag: Option<(usize, Variant)>,
     base: Base<EditorPlugin>,
 }
 
@@ -87,6 +89,27 @@ fn field_tooltip(class: &str, fd: &sections::Field) -> String {
         .map(|h| format!("\n{h}"))
         .unwrap_or_default();
     format!("{}{hint}\n{place}{range}", fd.label)
+}
+
+/// `cur` (a Vector3 / Vector2) with component `a` set to `x`.
+fn with_axis(cur: &Variant, a: u8, x: f32) -> Option<Variant> {
+    if let Ok(mut v3) = cur.try_to::<Vector3>() {
+        match a {
+            0 => v3.x = x,
+            1 => v3.y = x,
+            _ => v3.z = x,
+        }
+        Some(v3.to_variant())
+    } else if let Ok(mut v2) = cur.try_to::<Vector2>() {
+        if a == 0 {
+            v2.x = x
+        } else {
+            v2.y = x
+        }
+        Some(v2.to_variant())
+    } else {
+        None
+    }
 }
 
 fn num(v: &Variant) -> f64 {
@@ -263,6 +286,35 @@ impl PixelizerEditorPlugin {
         self.assign_worth(field as usize, v, true);
     }
 
+    /// Spin-slider drag start: later changes are applied live and recorded as one undo action
+    /// on release (`on_ungrab`), however long the drag takes. Undo merging alone split slow
+    /// drags (an expensive Pixel Size change takes longer than the 800 ms merge window).
+    #[func]
+    fn on_grab(&mut self, field: i64) {
+        let Some(fd) = self.field(field) else { return };
+        let s = self.current();
+        if let Some(target) = self.target(s) {
+            self.drag = Some((field as usize, Self::scan_in(&target, fd)));
+        }
+    }
+
+    #[func]
+    fn on_ungrab(&mut self, field: i64) {
+        let Some((f, old)) = self.drag.take() else {
+            return;
+        };
+        if f != field as usize {
+            return;
+        }
+        let Some(fd) = self.field(field) else { return };
+        let s = self.current();
+        let Some(target) = self.target(s) else { return };
+        let new = Self::scan_in(&target, fd);
+        if new != old {
+            self.record_worth(f, new, Some(old), false, false);
+        }
+    }
+
     #[func]
     fn on_bool(&mut self, on: bool, field: i64) {
         self.assign_worth(field as usize, on.to_variant(), false);
@@ -435,6 +487,18 @@ impl PixelizerEditorPlugin {
         sections::slice_ui(self.sec.unwrap_or(Sec::Renderer))
     }
 
+    /// Connects a strip spin slider's drag start / end to `on_grab` / `on_ungrab`.
+    fn track_drag(gd: &Gd<Self>, sl: &mut Gd<EditorSpinSlider>, id: &Variant) {
+        sl.connect(
+            "grabbed",
+            &Callable::from_object_method(gd, "on_grab").bind(std::slice::from_ref(id)),
+        );
+        sl.connect(
+            "ungrabbed",
+            &Callable::from_object_method(gd, "on_ungrab").bind(std::slice::from_ref(id)),
+        );
+    }
+
     fn field(&self, idx: i64) -> Option<&'static sections::Field> {
         self.current().fields.get(idx as usize)
     }
@@ -506,6 +570,11 @@ impl PixelizerEditorPlugin {
     }
 
     fn rebuild_strip(&mut self) {
+        // The dragged slider is about to be freed: record its drag now (no `ungrabbed` follows).
+        if let Some((f, _)) = &self.drag {
+            let f = *f as i64;
+            self.on_ungrab(f);
+        }
         let Some(mut strip) = self.clear_strip() else {
             return;
         };
@@ -619,16 +688,18 @@ impl PixelizerEditorPlugin {
             let value = Self::scan_in(&target, fd);
             let tip = field_tooltip(class, fd);
             let control: Gd<Control> = match fd.sort {
-                Kind::Float { min, max, step } => strip
-                    .spin_slider(
+                Kind::Float { min, max, step } => {
+                    let mut sl = strip.spin_slider(
                         fd.label,
                         min,
                         max,
                         step,
                         num(&value),
-                        &Callable::from_object_method(&gd, "on_float").bind(&[id]),
-                    )
-                    .upcast(),
+                        &Callable::from_object_method(&gd, "on_float").bind(&[id.clone()]),
+                    );
+                    Self::track_drag(&gd, &mut sl, &id);
+                    sl.upcast()
+                }
                 Kind::Int { min, max, greater } => {
                     let mut sl = strip.spin_slider(
                         fd.label,
@@ -636,9 +707,11 @@ impl PixelizerEditorPlugin {
                         max,
                         1.0,
                         num(&value),
-                        &Callable::from_object_method(&gd, "on_float").bind(&[id]),
+                        &Callable::from_object_method(&gd, "on_float").bind(&[id.clone()]),
                     );
-                    sl.set_allow_greater(greater);
+                    // Typing may exceed `max` (greater); a drag stays inside the range.
+                    ui_kit::open_range(&mut sl, greater, false);
+                    Self::track_drag(&gd, &mut sl, &id);
                     // Wide ranges (droplet counts, seeds) need room for 7+ digits.
                     let w = if max.abs().max(min.abs()) >= 100_000.0 {
                         95.0
@@ -827,12 +900,32 @@ impl PixelizerEditorPlugin {
     }
 
     fn assign_worth(&mut self, field: usize, value: Variant, merge: bool) {
+        // Inside a spin-slider drag the value is applied live and recorded once on release.
+        if let Some((f, _)) = &self.drag
+            && *f == field
+        {
+            self.apply_live(field, &value);
+            return;
+        }
+        self.record_worth(field, value, None, merge, true);
+    }
+
+    /// Records one undo action that sets `field` to `value`. `old` is the value to undo to (the
+    /// current value when `None`); `execute` false when the value is already applied (drag end).
+    fn record_worth(
+        &mut self,
+        field: usize,
+        value: Variant,
+        old: Option<Variant>,
+        merge: bool,
+        execute: bool,
+    ) {
         let s = self.current();
         let Some(fd) = s.fields.get(field) else {
             return;
         };
         let Some(target) = self.target(s) else { return };
-        let old = Self::scan_in(&target, fd);
+        let old = old.unwrap_or_else(|| Self::scan_in(&target, fd));
         let Some(mut ur) = self.undo() else { return };
         let mode = if merge {
             MergeMode::ENDS
@@ -850,24 +943,10 @@ impl PixelizerEditorPlugin {
             }
             Store::Axis(a) => {
                 let cur = target.get(fd.prop);
-                let x = num(&value) as f32;
-                let (new, prev) = if let Ok(mut v3) = cur.try_to::<Vector3>() {
-                    let prev = v3;
-                    match a {
-                        0 => v3.x = x,
-                        1 => v3.y = x,
-                        _ => v3.z = x,
-                    }
-                    (v3.to_variant(), prev.to_variant())
-                } else if let Ok(mut v2) = cur.try_to::<Vector2>() {
-                    let prev = v2;
-                    if a == 0 {
-                        v2.x = x
-                    } else {
-                        v2.y = x
-                    }
-                    (v2.to_variant(), prev.to_variant())
-                } else {
+                let (Some(new), Some(prev)) = (
+                    with_axis(&cur, a, num(&value) as f32),
+                    with_axis(&cur, a, num(&old) as f32),
+                ) else {
                     return;
                 };
                 ur.add_do_property(&target, fd.prop, &new);
@@ -882,7 +961,31 @@ impl PixelizerEditorPlugin {
                 ur.add_undo_method(&mat, "set_shader_parameter", &[name, old]);
             }
         }
-        ur.commit_action();
+        ur.commit_action_ex().execute(execute).done();
+    }
+
+    /// Writes `value` to `field` without an undo action (live preview during a drag).
+    fn apply_live(&mut self, field: usize, value: &Variant) {
+        let s = self.current();
+        let Some(fd) = s.fields.get(field) else {
+            return;
+        };
+        let Some(mut target) = self.target(s) else {
+            return;
+        };
+        match fd.store {
+            Store::Prop => target.set(fd.prop, value),
+            Store::Axis(a) => {
+                if let Some(v) = with_axis(&target.get(fd.prop), a, num(value) as f32) {
+                    target.set(fd.prop, &v);
+                }
+            }
+            Store::Shader(m) => {
+                if let Some(mut mat) = Self::shader_material(&target, m) {
+                    mat.set_shader_parameter(fd.prop, value);
+                }
+            }
+        }
     }
 
     // ---- Pixel World panel (right) -------------------------------------------------------

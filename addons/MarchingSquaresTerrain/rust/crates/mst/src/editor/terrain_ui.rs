@@ -252,9 +252,18 @@ impl MarchingSquaresTerrainPlugin {
                     .hslider(label, min, max, step, v, &self.cb1("on_float", id))
                     .upcast()
             }
-            Kind::Spin(min, max, step) => strip
-                .spin_slider(label, min, max, step, v, &self.cb1("on_float", id))
-                .upcast(),
+            Kind::Spin(min, max, step) => {
+                let mut sl = strip.spin_slider(label, min, max, step, v, &self.cb1("on_float", id));
+                // Heights may be typed beyond the drag range (terrains taller than ±50); angles,
+                // ease and rotations stay inside their declared range.
+                if matches!(
+                    s,
+                    Setting::Ceiling | Setting::Height | Setting::Floor | Setting::StampHeight
+                ) {
+                    ui_kit::open_range(&mut sl, true, true);
+                }
+                sl.upcast()
+            }
             Kind::Check => strip
                 .checkbox(label, v != 0.0, &self.cb1("on_bool", id))
                 .upcast(),
@@ -351,7 +360,7 @@ impl MarchingSquaresTerrainPlugin {
                 continue;
             }
             if let Ok(mut r) = c.clone().try_cast::<godot::classes::Range>() {
-                r.set_value_no_signal(v);
+                ui_kit::show_value(&mut r, v);
             } else if let Ok(mut cb) = c.clone().try_cast::<CheckBox>() {
                 cb.set_pressed_no_signal(v != 0.0);
             } else if let Ok(mut ob) = c.clone().try_cast::<OptionButton>() {
@@ -1742,7 +1751,16 @@ impl MarchingSquaresTerrainPlugin {
         }
         let obj = slot.upcast::<Object>();
         if let Some(mut ur) = self.base().get_undo_redo() {
-            ur.create_action_ex(&format!("terrain texture {} {}", i + 1, prop))
+            // History names follow the panel's labels, not the resource property names.
+            let what = match prop {
+                "magnify" => "scale",
+                "display_name" => "name",
+                "has_grass" => "grass",
+                "grass_tint" => "grass tint",
+                "grass_sprite" => "grass sprite",
+                p => p,
+            };
+            ur.create_action_ex(&format!("terrain texture {} {}", i + 1, what))
                 .merge_mode(godot::classes::undo_redo::MergeMode::ENDS)
                 .done();
             ur.add_do_property(&obj, prop, &value);

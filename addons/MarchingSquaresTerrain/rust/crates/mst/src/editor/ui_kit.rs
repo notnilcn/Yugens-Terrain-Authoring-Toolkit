@@ -604,7 +604,8 @@ impl Strip {
         cb
     }
 
-    /// `EditorSpinSlider` (original: height and ease value), unbounded both ways.
+    /// `EditorSpinSlider` (original: height and ease value), clamped to `min..=max`. A field
+    /// whose range is only the drag span opts into typed values beyond it with [`open_range`].
     pub fn spin_slider(
         &mut self,
         label: &str,
@@ -620,8 +621,6 @@ impl Strip {
         s.set_min(min);
         s.set_max(max);
         s.set_step(step);
-        s.set_allow_greater(true);
-        s.set_allow_lesser(true);
         s.set_value_no_signal(value);
         s.set_custom_minimum_size(sz(80.0, 0.0));
         s.set_v_size_flags(SizeFlags::SHRINK_CENTER);
@@ -658,6 +657,7 @@ impl Strip {
         self.splice(&m);
         let v = value_label(value, step, 34.0);
         s.connect("value_changed", &value_label_updater(v.clone(), step));
+        s.set_meta(READOUT_META, &v.to_variant());
         self.splice(&v);
         s
     }
@@ -775,6 +775,44 @@ pub fn page_tabs(
         tabs.add_child(&b);
     }
     tabs
+}
+
+/// Meta key on an [`Strip::hslider`] that holds its value read-out label.
+const READOUT_META: &str = "_mst_readout";
+
+/// Shows `value` in a strip range control without emitting `value_changed` (a value changed from
+/// the viewport: modifier+wheel, drag-stamp), including the read-out label of an
+/// [`Strip::hslider`], which otherwise only follows the signal.
+pub fn show_value(range: &mut Gd<godot::classes::Range>, value: f64) {
+    range.set_value_no_signal(value);
+    if range.has_meta(READOUT_META)
+        && let Ok(mut l) = range.get_meta(READOUT_META).try_to::<Gd<Label>>()
+    {
+        // The true value even past the slider's end (Stamp Shift+wheel beyond 200): the handle
+        // pins at the end, the read-out shows what the next stroke uses.
+        l.call("_mst_assign_worth", &[value.to_variant()]);
+    }
+}
+
+/// Lets an [`EditorSpinSlider`] accept typed values beyond its range (`greater` / `lesser`)
+/// while a mouse drag still stops at `min..=max`: the allow flags are switched off for the
+/// duration of the drag (`grabbed` / `ungrabbed`). Without that an open slider drags thousands
+/// of units in a few pixels (QA: Slope Min 8287.5, Pixel Size 44243).
+pub fn open_range(s: &mut Gd<EditorSpinSlider>, greater: bool, lesser: bool) {
+    s.set_allow_greater(greater);
+    s.set_allow_lesser(lesser);
+    let obj = s.clone().upcast::<Object>();
+    let flag = |method: &str, on: bool| {
+        Callable::from_object_method(&obj, method).bind(&[on.to_variant()])
+    };
+    if greater {
+        s.connect("grabbed", &flag("set_allow_greater", false));
+        s.connect("ungrabbed", &flag("set_allow_greater", true));
+    }
+    if lesser {
+        s.connect("grabbed", &flag("set_allow_lesser", false));
+        s.connect("ungrabbed", &flag("set_allow_lesser", true));
+    }
 }
 
 /// Number of decimals that shows `step` exactly (0.2505 → 2, 1 → 0).
