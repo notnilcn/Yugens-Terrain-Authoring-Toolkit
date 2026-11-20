@@ -2014,6 +2014,14 @@ impl PixelBuilderPlugin {
         ur.add_undo_method(&parent, "remove_child", &[node.to_variant()]);
         ur.commit_action();
         self.message = format!("Created {name}");
+        // The new sibling becomes the edited mesh (Scene tree, Inspector and builder target), so
+        // the next W / B acts on it. Deferred: the selection change re-enters this plugin
+        // (`handles` / `edit`) and this runs inside `forward_3d_gui_input`.
+        if let Some(sel) = EditorInterface::singleton().get_selection() {
+            let mut sel = sel.upcast::<Object>();
+            sel.call_deferred("clear", &[]);
+            sel.call_deferred("add_node", &[node.to_variant()]);
+        }
     }
 
     fn place_target(&mut self) {
