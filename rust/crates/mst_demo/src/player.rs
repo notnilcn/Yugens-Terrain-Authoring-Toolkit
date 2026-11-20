@@ -167,6 +167,11 @@ pub struct MstDemoPlayer {
     /// Spring-length factor per wheel step.
     #[export]
     zoom_factor: f32,
+    /// Lowest height (metres) the camera may sit above the terrain surface under it. Orbiting
+    /// below the horizon or zooming across a slope raises the pitch just enough to keep the
+    /// camera above the ground (the requested pitch comes back when the ground allows it).
+    #[export]
+    ground_clearance: f32,
 
     #[export_group(name = "X-Ray")]
     /// Show the x-ray silhouette of the hidden parts of the player.
@@ -194,6 +199,9 @@ pub struct MstDemoPlayer {
     xray_rim_color: Color,
 
     dragging: bool,
+    /// Pitch (degrees below the horizon) the orbit input asked for; the applied pitch can be
+    /// higher where the ground would swallow the camera. `None` until the first orbit.
+    user_pitch: Option<f32>,
     /// Action state, refreshed by `input` on every action event (never polled per frame):
     /// movement (x right, y back), camera orbit keys, walk and jump held.
     move_input: Vector2,
@@ -247,6 +255,7 @@ impl ICharacterBody3D for MstDemoPlayer {
             keyboard_orbit_speed: 120.0,
             mouse_orbit_sensitivity: 0.4005,
             zoom_factor: 1.1505,
+            ground_clearance: 1.5005,
             xray: true,
             xray_trigger_points: 2,
             xray_min_height: 0.6005,
@@ -256,6 +265,7 @@ impl ICharacterBody3D for MstDemoPlayer {
             xray_color: Color::from_rgb(0.2705, 0.5605, 1.0),
             xray_rim_color: Color::from_rgb(0.8005, 0.9305, 1.0),
             dragging: false,
+            user_pitch: None,
             move_input: Vector2::ZERO,
             orbit_input: Vector2::ZERO,
             walk_held: false,
@@ -441,6 +451,7 @@ impl ICharacterBody3D for MstDemoPlayer {
             let step = self.keyboard_orbit_speed * dt;
             self.orbit_degrees(-orbit.x * step, -orbit.y * step);
         }
+        self.keep_camera_above_ground();
         self.update_xray(dt);
     }
 }
@@ -510,6 +521,8 @@ impl MstDemoPlayer {
             );
             pcam.call("set_spring_length", vslice![distance as f64]);
         }
+        self.user_pitch = Some(pitch);
+        self.keep_camera_above_ground();
         self.sync_snap_distance();
     }
 
@@ -543,7 +556,7 @@ impl MstDemoPlayer {
     /// Turns the pcam's spring arm by `yaw` / `pitch` degrees (pitch positive = looking further
     /// down), like Phantom Camera's third-person example.
     fn orbit_degrees(&mut self, yaw: f32, pitch: f32) {
-        let Some(pcam) = self.phantom_camera.as_mut() else {
+        let Some(mut pcam) = self.phantom_camera.clone() else {
             return;
         };
         let rot = pcam
@@ -552,11 +565,94 @@ impl MstDemoPlayer {
             .unwrap_or(Vector3::ZERO);
         let lo = self.pitch_min_deg.min(self.pitch_max_deg);
         let hi = self.pitch_max_deg.max(self.pitch_min_deg);
-        let down = (-rot.x + pitch).clamp(lo, hi);
+        let down = (self.user_pitch.unwrap_or(-rot.x) + pitch).clamp(lo, hi);
+        self.user_pitch = Some(down);
+        let applied = down.max(self.ground_pitch(rot.y + yaw, down).unwrap_or(down));
         pcam.call(
             "set_third_person_rotation_degrees",
-            vslice![Vector3::new(-down, wrap_deg(rot.y + yaw), rot.z)],
+            vslice![Vector3::new(-applied, wrap_deg(rot.y + yaw), rot.z)],
         );
+    }
+
+    /// Lowest pitch (degrees below the horizon, at least `start`) at `yaw_deg` and the current
+    /// spring length that keeps the camera and the outer part of its arm at least
+    /// `ground_clearance` above the terrain surface. `None` without a pcam, a follow target or
+    /// a terrain answering `get_height_at`.
+    fn ground_pitch(&self, yaw_deg: f32, start: f32) -> Option<f32> {
+        let mut pcam = self.phantom_camera.clone()?;
+        let len = self.spring_length()?;
+        let follow = pcam
+            .call("get_follow_target", &[])
+            .try_to::<Gd<Node3D>>()
+            .ok()?;
+        let offset = pcam
+            .call("get_follow_offset", &[])
+            .try_to::<Vector3>()
+            .unwrap_or(Vector3::ZERO);
+        let target = follow.get_global_position() + offset;
+        let mut terrain = self
+            .terrain
+            .clone()
+            .filter(|t| t.is_instance_valid() && t.has_method("get_height_at"))?;
+        let yaw = yaw_deg.to_radians();
+        let hi = self.pitch_max_deg.max(self.pitch_min_deg);
+        let mut down = start;
+        // The ground height depends on where the arm ends, which depends on the pitch: a few
+        // fixed-point rounds settle it (each round only ever raises the camera).
+        for _ in 0..4 {
+            let p = down.to_radians();
+            let back = Vector3::new(yaw.sin() * p.cos(), p.sin(), yaw.cos() * p.cos());
+            let mut need = down;
+            // The camera and two points on the outer half of the arm: a ridge just in front of
+            // the camera would otherwise fill the view.
+            for f in [1.0f32, 0.75, 0.5] {
+                let at = target + back * (len * f);
+                let h = terrain
+                    .call("get_height_at", vslice![at, f32::NAN])
+                    .try_to::<f32>()
+                    .unwrap_or(f32::NAN);
+                if !h.is_finite() {
+                    continue;
+                }
+                let rise = (h + self.ground_clearance - target.y) / (len * f);
+                if rise > -1.0 {
+                    need = need.max(rise.min(1.0).asin().to_degrees());
+                }
+            }
+            if need <= down + 0.01 {
+                break;
+            }
+            down = need.min(hi);
+        }
+        Some(down)
+    }
+
+    /// Re-applies the orbit pitch each frame, raised where the terrain under the camera (it
+    /// moves with the player and the zoom) would otherwise swallow it.
+    fn keep_camera_above_ground(&mut self) {
+        if self.ground_clearance <= 0.0 || (self.spawn_on_terrain && !self.spawned) {
+            return;
+        }
+        let Some(mut pcam) = self.phantom_camera.clone() else {
+            return;
+        };
+        if self.terrain.is_none() {
+            self.find_terrain();
+        }
+        let rot = pcam
+            .call("get_third_person_rotation_degrees", &[])
+            .try_to::<Vector3>()
+            .unwrap_or(Vector3::ZERO);
+        let want = *self.user_pitch.get_or_insert(-rot.x);
+        let Some(applied) = self.ground_pitch(rot.y, want) else {
+            return;
+        };
+        if (applied - -rot.x).abs() > 0.01 {
+            pcam.call(
+                "set_third_person_rotation_degrees",
+                vslice![Vector3::new(-applied, rot.y, rot.z)],
+            );
+        }
     }
 
     fn spring_length(&self) -> Option<f32> {
