@@ -14,7 +14,8 @@
 
 use godot::classes::editor_plugin::CustomControlContainer;
 use godot::classes::{
-    Button, EditorInterface, EditorPlugin, IEditorPlugin, MenuButton, Node, PopupMenu, Texture2D,
+    Button, EditorInterface, EditorPlugin, IEditorPlugin, MenuButton, Node, PopupMenu,
+    ProjectSettings, Texture2D,
 };
 use godot::prelude::*;
 
@@ -28,6 +29,9 @@ const ICON: &str = "res://addons/MarchingSquaresTerrain/editor/icons/pixel/pixel
 const POLL_SECONDS: f64 = 0.2505;
 /// Editor setting (per user, not per project) that keeps the Animate toggle across sessions.
 const ANIMATE_SETTING: &str = "marching_squares_terrain/animate_effects_in_editor";
+
+/// Theme variation of the 3D toolbar's own toggles (Local, Snap, ...): flat, with a pressed look.
+const TOOLBAR_TOGGLE: &str = "FlatButton";
 
 /// State of the Pixel Preview toggle (read by the Pixel World panel's hint).
 static PREVIEW_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -57,7 +61,9 @@ impl IEditorPlugin for PixelPreviewPlugin {
         let mut b = Button::new_alloc();
         b.set_name("PixelPreviewButton");
         b.set_toggle_mode(true);
-        b.set_flat(true);
+        // Not `set_flat`: a flat button draws no pressed state at all. The editor's toolbar
+        // variation is flat-looking but keeps the toggled highlight (#32).
+        b.set_theme_type_variation(TOOLBAR_TOGGLE);
         b.set_focus_mode(godot::classes::control::FocusMode::NONE);
         b.set_tooltip_text(&format!(
             "{PREVIEW_LABEL}\nShow the editor viewport through the pixel renderer (the scene's PixelRenderer, or a default one).\nThe editor grid and origin axes are hidden while it is on; the move / rotate / scale gizmo and node gizmos still draw on top."
@@ -146,13 +152,67 @@ impl PixelPreviewPlugin {
         features::reingest();
     }
 
-    /// Features submenu: toggles the project setting of feature `id` (index into `features::ALL`).
+    /// Features submenu: toggles the project setting of feature `id` (index into `features::ALL`),
+    /// as one step of the editor's global (project) undo history (#19).
     #[func]
     fn on_feature(&mut self, token_id: i64) {
-        if let Some(i) = features::ALL.get(token_id as usize) {
-            features::assign_active(i.feature, !features::active(i.feature));
+        let Some(i) = features::ALL.get(token_id as usize) else {
+            return;
+        };
+        let on = !features::active(i.feature);
+        // Applied here, then recorded without executing: committing with execute would call
+        // `apply_feature` on this (already bound) plugin.
+        features::assign_active(i.feature, on);
+        let ur = self.base_mut().get_undo_redo();
+        if let Some(mut ur) = ur {
+            let gd = self.to_gd();
+            // ProjectSettings as the context: the action goes to the global history, which
+            // Ctrl+Z reaches from any scene.
+            ur.create_action_ex(&format!(
+                "Turn {} feature {}",
+                i.label,
+                if on { "on" } else { "off" }
+            ))
+            .custom_context(&ProjectSettings::singleton())
+            .done();
+            let id = token_id.to_variant();
+            ur.add_do_method(&gd, "apply_feature", &[id.clone(), on.to_variant()]);
+            ur.add_undo_method(&gd, "apply_feature", &[id, (!on).to_variant()]);
+            ur.commit_action_ex().execute(false).done();
         }
         self.sync_feature_checks();
+    }
+
+    /// Undo / redo of a Features switch (`on_feature`).
+    #[func]
+    fn apply_feature(&mut self, token_id: i64, on: bool) {
+        if let Some(i) = features::ALL.get(token_id as usize) {
+            features::assign_active(i.feature, on);
+        }
+        self.sync_feature_checks();
+    }
+
+    /// A Pixel World popup closed: give the keyboard focus back to the editor window, so the
+    /// next Ctrl+Z reaches the editor instead of waiting for a click in the viewport (#19).
+    #[func]
+    fn on_popup_hidden(&mut self) {
+        // Only once the whole menu is closed: taking the focus while the main popup is still
+        // open (only the Features submenu closed) would close it.
+        let main_open = self
+            .menu
+            .as_ref()
+            .and_then(|m| m.get_popup())
+            .is_some_and(|p| p.is_visible());
+        let sub_open = self.features_menu.as_ref().is_some_and(|f| f.is_visible());
+        if main_open || sub_open {
+            return;
+        }
+        if let Some(mut win) = EditorInterface::singleton()
+            .get_base_control()
+            .and_then(|b| b.get_window())
+        {
+            win.grab_focus();
+        }
     }
 
     #[func]
@@ -168,8 +228,11 @@ impl PixelPreviewPlugin {
         let id = token_id as usize;
         if id < MENU_PRESET {
             if let Some((class, _, _)) = sections::ADDABLE.get(id) {
-                // Also turns the effect's project feature on (`actions::add_effect`).
-                actions::add_effect(ur, class, true);
+                // Also turns the effect's project feature on (`actions::add_effect`). Select the
+                // new node unless that would close the open pixel editor UI (a pixel node is
+                // selected and the new class has no pixel UI, e.g. Sun Shafts): #33.
+                let select = sections::HANDLED.contains(class) || !pixel_node_selected();
+                actions::add_effect(ur, class, select);
             }
         } else if id < MENU_WIRE {
             actions::apply_preset(ur, id - MENU_PRESET);
@@ -218,7 +281,7 @@ impl PixelPreviewPlugin {
         let mut a = Button::new_alloc();
         a.set_name("PixelAnimateButton");
         a.set_toggle_mode(true);
-        a.set_flat(true);
+        a.set_theme_type_variation(TOOLBAR_TOGGLE);
         a.set_focus_mode(godot::classes::control::FocusMode::NONE);
         a.set_text("Animate");
         a.set_tooltip_text(
@@ -250,6 +313,11 @@ impl PixelPreviewPlugin {
         let gd = self.to_gd();
         f.connect("id_pressed", &gd.callable("on_feature"));
         f.connect("about_to_popup", &gd.callable("on_features_about_to_popup"));
+        f.connect_flags(
+            "popup_hide",
+            &gd.callable("on_popup_hidden"),
+            godot::classes::object::ConnectFlags::DEFERRED,
+        );
         f
     }
 
@@ -312,6 +380,11 @@ impl PixelPreviewPlugin {
         self.features_menu = Some(features_menu);
         let gd = self.to_gd();
         popup.connect("id_pressed", &gd.callable("on_menu"));
+        popup.connect_flags(
+            "popup_hide",
+            &gd.callable("on_popup_hidden"),
+            godot::classes::object::ConnectFlags::DEFERRED,
+        );
         m.connect("about_to_popup", &gd.callable("on_menu_about_to_popup"));
         m
     }
@@ -344,6 +417,16 @@ impl PixelPreviewPlugin {
     fn drop_temp(&mut self) {
         free_node(self.temp.take());
     }
+}
+
+/// True when a node edited by the pixel editor UI (`sections::HANDLED`) is selected.
+fn pixel_node_selected() -> bool {
+    EditorInterface::singleton()
+        .get_selection()
+        .map(|s| s.get_selected_nodes())
+        .unwrap_or_default()
+        .iter_shared()
+        .any(|n| sections::HANDLED.iter().any(|c| n.is_class(*c)))
 }
 
 /// First `PixelRenderer` in the edited scene (including the root itself).
