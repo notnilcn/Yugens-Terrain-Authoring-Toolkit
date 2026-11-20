@@ -503,7 +503,7 @@ impl PixelDayNight {
         let mut sun_extra = 0.0;
         if let Some(m) = weather {
             key.sun_energy *= m.p.sun_scale;
-            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * 2.5005;
+            key.ambient_energy = key.ambient_energy * m.p.ambient_scale + m.flash * m.flash_energy;
             key.sky_top = super::weather::overcast(key.sky_top, m.p.sky_darken);
             key.sky_horizon = super::weather::overcast(key.sky_horizon, m.p.sky_darken);
             let flash = Color::from_rgb(0.8005, 0.8505, 1.0);

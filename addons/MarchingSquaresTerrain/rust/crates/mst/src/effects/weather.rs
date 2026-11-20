@@ -229,6 +229,8 @@ pub struct Mix {
     pub p: Params,
     /// Lightning flash 0..1.
     pub flash: f32,
+    /// Extra ambient energy at the peak of a flash (`PixelWeather.flash_energy`).
+    pub flash_energy: f32,
 }
 
 thread_local! {
@@ -760,7 +762,14 @@ impl INode3D for PixelWeather {
         self.publish_wind(&eff);
 
         let flash = self.update_lightning(dt, &eff);
-        MIX.with(|m| m.set(Some(Mix { p: eff, flash })));
+        let flash_energy = self.flash_energy;
+        MIX.with(|m| {
+            m.set(Some(Mix {
+                p: eff,
+                flash,
+                flash_energy,
+            }))
+        });
         self.update_precipitation(&eff);
         if DAY_NIGHTS.load(Ordering::Relaxed) <= 0 && !is_editor() {
             self.grade_without_day_night(&eff, flash);
