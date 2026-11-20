@@ -59,7 +59,7 @@ pub const BRUSH_MODES: [&str; 2] = ["Drag", "Raise / Lower"];
 const BRUSH_SHORTCUTS: &str = "[SHORTCUTS]
 • Shift+LMB+Drag: Add cells to the current draw selection.
 • Shift+MWU/MWD: Increase or decrease the brush size.
-• Ctrl+MWU/MWD: Increase or decrease the strength.
+• Ctrl+MWU/MWD: Increase or decrease the strength (Raise / Lower, Smooth, Gradient).
 • Alt/RMB/Esc: Reset the current draw selection.
 • 1-9: Switch tools.
 These shortcuts apply to all brush related tools.";
@@ -113,13 +113,13 @@ impl Tool {
                 "LMB: paint a selection  ·  LMB-drag selected cells: raise / lower  ·  Shift: add  ·  Ctrl: remove  ·  Alt: one cell  ·  RMB / Esc: clear"
             }
             Tool::RaiseLower => {
-                "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size"
+                "Hold LMB: raise  ·  RMB: lower  ·  LMB+RMB: flatten  ·  Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Level => {
-                "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
+                "LMB-drag: level to Height  ·  Ctrl+LMB: pick the hovered height  ·  Shift+wheel: size"
             }
             Tool::Smooth => {
-                "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size"
+                "LMB-drag: smooth  ·  Smooth Mode: Terraced keeps flat steps, Sloped makes ramps  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Bridge => {
                 "LMB-drag from the start to the end point: build a ramp  ·  Shift+wheel: width"
@@ -139,7 +139,7 @@ impl Tool {
                 "LMB: stamp  ·  LMB-drag: size + rotation  ·  Shift / Ctrl / Alt+wheel: size / height / rotate"
             }
             Tool::Gradient => {
-                "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp"
+                "Ctrl+LMB: start point  ·  Ctrl+RMB: end point  ·  LMB-drag: paint the ramp  ·  Shift+wheel: size  ·  Ctrl+wheel: strength"
             }
             Tool::Select => {
                 "LMB-drag: select  ·  C: copy  ·  V: paste (Z / X rotate, M mirror)  ·  Alt / Esc: clear"
