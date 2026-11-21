@@ -355,7 +355,16 @@ impl MarchingSquaresTerrainPlugin {
                 continue;
             }
             if let Ok(mut r) = c.clone().try_cast::<godot::classes::Range>() {
-                ui_kit::show_value(&mut r, v);
+                // Inside the control's range the value snaps to its step, and the setting keeps
+                // the snapped value: label, handle and the next stroke agree after wheel edits
+                // (label 18.9 vs value 19.0, N29). Past the range (open Stamp range) it stays raw.
+                let inside = v >= r.get_min() && v <= r.get_max();
+                r.set_value_no_signal(v);
+                let shown = if inside { r.get_value() } else { v };
+                if inside && (shown - v).abs() > 1e-9 {
+                    self.state.assign(s, shown);
+                }
+                ui_kit::show_value(&mut r, shown);
             } else if let Ok(mut cb) = c.clone().try_cast::<CheckBox>() {
                 cb.set_pressed_no_signal(v != 0.0);
             } else if let Ok(mut ob) = c.clone().try_cast::<OptionButton>() {
@@ -384,7 +393,14 @@ impl MarchingSquaresTerrainPlugin {
                         "Grid Aligned needs a Triangle/Hexagon/Hex Rings grid and Falloff off."
                     });
                 }
-                Setting::GridSize => ui_kit::assign_active(c, aligned),
+                Setting::GridSize => {
+                    ui_kit::assign_active(c, aligned);
+                    c.set_tooltip_text(if aligned {
+                        tools::tooltip(Setting::GridSize)
+                    } else {
+                        "Grid Size applies only with Grid Aligned on."
+                    });
+                }
                 Setting::Falloff if self.state.tool == Tool::Bridge => {
                     ui_kit::assign_active(c, false)
                 }
@@ -904,7 +920,8 @@ pub(super) fn terrain_setting_label(prop: &str) -> Option<&'static str> {
 /// Pages of the Terrain Settings strip: (name, tooltip).
 pub(super) const SETTINGS_PAGES: [(&str, &str); 6] = [
     (
-        "Grid",
+        // Not "Grid": the toolbar's Grid overlay toggle has that label (N30).
+        "Layout",
         "Grid type, chunk and cell size, blending, merge mode, collision.",
     ),
     (
