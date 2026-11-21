@@ -1069,30 +1069,72 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
     (root, vbox)
 }
 
-/// Section of the editor project metadata holding the side panel sizes.
-const PANEL_META_SECTION: &str = "marching_squares_terrain";
+/// Per-project editor UI state (side-panel widths / collapse, toolbar mode, dialog sizes).
+///
+/// Not `EditorSettings` project metadata: Godot only writes that to disk on focus-out or a
+/// clean exit, so a killed / crashed editor forgot every panel width (N4), and reading an
+/// absent key with a nil default logs an `ERROR` (N5). This file is written through on every
+/// change (changes are rare: a grip release, a toggle, a dialog close).
+pub const EDITOR_STATE_PATH: &str = "res://.godot/editor/mst_editor_state.cfg";
+const EDITOR_STATE_SECTION: &str = "marching_squares_terrain";
 
-/// Sentinel returned for an absent panel key; no stored panel value is ever this string.
+fn editor_state_file() -> Gd<godot::classes::ConfigFile> {
+    let mut cfg = godot::classes::ConfigFile::new_gd();
+    // Absent on first use: an empty file is the right answer.
+    let _ = cfg.load(EDITOR_STATE_PATH);
+    cfg
+}
+
+/// Stored editor UI value for `key`, if any (never logs for an absent key).
+pub fn editor_state(key: &str) -> Option<Variant> {
+    let cfg = editor_state_file();
+    if !cfg.has_section_key(EDITOR_STATE_SECTION, key) {
+        // One-time migration from the old project-metadata store.
+        return legacy_meta(key);
+    }
+    Some(cfg.get_value(EDITOR_STATE_SECTION, key)).filter(|v| !v.is_nil())
+}
+
+/// Stores `v` under `key` and writes the file immediately.
+pub fn set_editor_state(key: &str, v: &Variant) {
+    let mut cfg = editor_state_file();
+    cfg.set_value(EDITOR_STATE_SECTION, key, v);
+    if let Some(dir) = std::path::Path::new(EDITOR_STATE_PATH.trim_start_matches("res://")).parent()
+    {
+        let abs = godot::classes::ProjectSettings::singleton()
+            .globalize_path(&format!("res://{}", dir.display()));
+        let _ = godot::classes::DirAccess::make_dir_recursive_absolute(&abs);
+    }
+    let err = cfg.save(EDITOR_STATE_PATH);
+    if err != godot::global::Error::OK {
+        godot_warn!("MarchingSquaresTerrain: could not save {EDITOR_STATE_PATH}: {err:?}");
+    }
+}
+
+/// Sentinel returned for an absent metadata key; no stored value is ever this string.
 const PANEL_META_ABSENT: &str = "__mst_panel_meta_absent__";
 
-fn panel_meta(key: &str) -> Option<Variant> {
+fn legacy_meta(key: &str) -> Option<Variant> {
+    if !godot::classes::Engine::singleton().is_editor_hint() {
+        return None;
+    }
     let es = EditorInterface::singleton().get_editor_settings()?;
-    // `EditorSettings` has no `has_project_metadata`, and `ConfigFile::get_value` logs
-    // "Couldn't find the given section ... and no default was given" whenever the key is
-    // missing and the default is nil (every fresh project). A non-nil sentinel default is
-    // the existence probe: Godot returns it silently for an absent key.
+    // A non-nil sentinel default: Godot returns it silently for an absent key (a nil default
+    // logs "Couldn't find the given section ... and no default was given").
     let absent = PANEL_META_ABSENT.to_variant();
     let v = es
-        .get_project_metadata_ex(PANEL_META_SECTION, key)
+        .get_project_metadata_ex(EDITOR_STATE_SECTION, key)
         .default(&absent)
         .done();
     (!v.is_nil() && v != absent).then_some(v)
 }
 
+fn panel_meta(key: &str) -> Option<Variant> {
+    editor_state(key)
+}
+
 fn set_panel_meta(key: &str, v: &Variant) {
-    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-        es.set_project_metadata(PANEL_META_SECTION, key, v);
-    }
+    set_editor_state(key, v);
 }
 
 /// Width of an expanded side panel (unscaled px) for a stored `width` and the editor `window`

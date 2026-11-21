@@ -41,14 +41,8 @@ const COMPACT_BUTTON: &str = "ToolbarCompact";
 const TOOLBAR_META: (&str, &str) = ("marching_squares_terrain", "toolbar_compact");
 
 fn toolbar_compact() -> bool {
-    EditorInterface::singleton()
-        .get_editor_settings()
-        .map(|es| {
-            es.get_project_metadata_ex(TOOLBAR_META.0, TOOLBAR_META.1)
-                .default(&false.to_variant())
-                .done()
-                .booleanize()
-        })
+    ui_kit::editor_state(TOOLBAR_META.1)
+        .map(|v| v.booleanize())
         .unwrap_or(false)
 }
 
@@ -129,9 +123,7 @@ impl MarchingSquaresTerrainPlugin {
     /// project (editor project metadata).
     pub(super) fn toggle_toolbar_compact(&mut self) {
         let compact = !toolbar_compact();
-        if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-            es.set_project_metadata(TOOLBAR_META.0, TOOLBAR_META.1, &compact.to_variant());
-        }
+        ui_kit::set_editor_state(TOOLBAR_META.1, &compact.to_variant());
         let Some(tb) = self.toolbar.clone() else {
             return;
         };
@@ -2161,8 +2153,15 @@ impl MarchingSquaresTerrainPlugin {
         // Cancel, Esc and the title bar's X.
         dlg.connect("canceled", &on_cancel);
         base.add_child(&dlg);
-        // Centered at the stored size (`popup_centered` keeps the current size unless the
-        // content needs more).
+        // In the tree (themed) now: make the advertised minimum the content's real one, so a
+        // requested size is either honoured exactly or refused at the same minimum Godot
+        // enforces (it opened 400x179 for a 400x150 request while reporting min 140, N9).
+        let need = dlg.get_contents_minimum_size();
+        let min = dlg.get_min_size();
+        let min = Vector2i::new(min.x.max(need.x.ceil() as i32), min.y.max(need.y.ceil() as i32));
+        dlg.set_min_size(min);
+        let cur = dlg.get_size();
+        dlg.set_size(Vector2i::new(cur.x.max(min.x), cur.y.max(min.y)));
         dlg.popup_centered();
         le.grab_focus();
     }
@@ -2269,24 +2268,15 @@ pub(super) const SAVE_PRESET_SIZE_META: &str = "save_preset_dialog_size";
 
 /// Size stored under `key` (editor project metadata), else `fallback`.
 pub(super) fn remembered_size(key: &str, fallback: Vector2i) -> Vector2i {
-    EditorInterface::singleton()
-        .get_editor_settings()
-        .and_then(|es| {
-            es.get_project_metadata_ex(TOOLBAR_META.0, key)
-                .default(&Variant::nil())
-                .done()
-                .try_to::<Vector2i>()
-                .ok()
-        })
+    ui_kit::editor_state(key)
+        .and_then(|v| v.try_to::<Vector2i>().ok())
         .filter(|s| s.x > 0 && s.y > 0)
         .unwrap_or(fallback)
 }
 
 /// Stores a dialog size for [`remembered_size`].
 pub(super) fn remember_size(key: &str, size: Vector2i) {
-    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-        es.set_project_metadata(TOOLBAR_META.0, key, &size.to_variant());
-    }
+    ui_kit::set_editor_state(key, &size.to_variant());
 }
 
 fn snake_case(s: &str) -> String {
