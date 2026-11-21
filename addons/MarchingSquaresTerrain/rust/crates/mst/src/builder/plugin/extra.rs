@@ -819,6 +819,7 @@ impl PixelBuilderPlugin {
             Some(d) => d,
             None => {
                 let mut d = EditorFileDialog::new_alloc();
+                crate::builder::fit_file_dialog(&mut d);
                 d.set_file_mode(FileMode::SAVE_FILE);
                 d.set_access(Access::FILESYSTEM);
                 d.connect("file_selected", &self.to_gd().callable("on_export_file"));

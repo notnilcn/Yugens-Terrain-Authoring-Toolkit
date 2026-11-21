@@ -213,6 +213,7 @@ impl ModelerUi {
         use godot::classes::file_dialog::{Access, FileMode};
         if self.files.as_ref().is_none_or(|f| !f.is_instance_valid()) {
             let mut d = EditorFileDialog::new_alloc();
+            crate::builder::fit_file_dialog(&mut d);
             d.set_name("ModelerCoreFiles");
             d.set_access(Access::RESOURCES);
             d.connect(

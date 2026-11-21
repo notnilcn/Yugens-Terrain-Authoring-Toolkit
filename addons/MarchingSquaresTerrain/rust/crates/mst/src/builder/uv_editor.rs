@@ -2042,6 +2042,7 @@ pub fn build_panel() -> (Gd<PanelContainer>, Gd<PixelBuilderUvCanvas>) {
         TPL_TRANSPARENT,
     );
     let mut dlg = EditorFileDialog::new_alloc();
+    crate::builder::fit_file_dialog(&mut dlg);
     dlg.set_name("TemplateDialog");
     dlg.set_file_mode(godot::classes::file_dialog::FileMode::SAVE_FILE);
     dlg.set_access(godot::classes::file_dialog::Access::FILESYSTEM);
