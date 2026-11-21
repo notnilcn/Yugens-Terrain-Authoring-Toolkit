@@ -1037,6 +1037,16 @@ impl IEditorPlugin for PixelBuilderPlugin {
     /// of dropping it. The main screen is left alone: its viewports hold the adjust panel and end
     /// the session themselves, and the builder's strip / palette / toolbar there drive it.
     fn input(&mut self, happening: Gd<InputEvent>) {
+        // N12: builder keys Godot's editor shortcuts shadow (Ctrl+D = Duplicate Node(s)) are
+        // claimed here, before any dock or menu sees them, while the 3D main screen has the focus.
+        if let Ok(k) = happening.clone().try_cast::<InputEventKey>()
+            && self.claim_early_key(&k)
+        {
+            if let Some(mut vp) = self.base().get_viewport() {
+                vp.set_input_as_handled();
+            }
+            return;
+        }
         if self.adjust.is_none() {
             return;
         }
@@ -2749,6 +2759,44 @@ impl PixelBuilderPlugin {
         }
     }
 
+    /// `_input` claim of a builder shortcut Godot shadows ([`super::shortcuts::EARLY`]): runs it
+    /// when the builder edits a mesh and the 3D main screen has the focus (or, with no focus
+    /// owner, the pointer). In an element mode the key is always taken, so the documented
+    /// builder key never turns into the editor's node action; a refused guard leaves a HUD
+    /// hint instead. In Object mode, or with the focus elsewhere (Scene dock), it reaches Godot.
+    fn claim_early_key(&mut self, key: &Gd<InputEventKey>) -> bool {
+        if !self.visible
+            || self.target.is_none()
+            || self.mode == Mode::Object
+            || !key.is_pressed()
+            || key.is_echo()
+        {
+            return false;
+        }
+        let Some(i) = super::shortcuts::EARLY.iter().find_map(|id| {
+            super::shortcuts::ordinal(id)
+                .filter(|&i| super::shortcuts::fits(&self.shortcut_table, i, key))
+        }) else {
+            return false;
+        };
+        if !main_screen_has_focus(self.base().get_viewport()) {
+            return false;
+        }
+        let id = super::shortcuts::ENTRIES[i].id;
+        match self.shortcut_command(id) {
+            Some(cmd) => self.run_key_command(cmd),
+            None => {
+                self.message = match id {
+                    "duplicate" => "Duplicate: select faces (Face mode)".into(),
+                    _ => format!("{}: nothing to do here", super::shortcuts::ENTRIES[i].moniker),
+                };
+                self.sync_ui();
+                self.redraw();
+            }
+        }
+        true
+    }
+
     /// The command shortcut `id` runs now, or `None` when its context guard refuses (the
     /// builder's former hard-coded conditions).
     fn shortcut_command(&self, id: &str) -> Option<KeyCmd> {
@@ -3306,6 +3354,25 @@ fn in_main_screen(pos: Vector2) -> bool {
     EditorInterface::singleton()
         .get_editor_main_screen()
         .is_some_and(|m| m.get_global_rect().contains_point(pos))
+}
+
+/// Whether the editor's GUI focus is inside the main screen (3D view, builder strip / palette)
+/// and not in a text field; with no focus owner, whether the pointer is over it.
+fn main_screen_has_focus(vp: Option<Gd<godot::classes::Viewport>>) -> bool {
+    let Some(vp) = vp else {
+        return false;
+    };
+    let Some(main) = EditorInterface::singleton().get_editor_main_screen() else {
+        return false;
+    };
+    match vp.gui_get_focus_owner() {
+        Some(f) => {
+            let typing = f.clone().try_cast::<godot::classes::LineEdit>().is_ok()
+                || f.clone().try_cast::<godot::classes::TextEdit>().is_ok();
+            !typing && main.is_ancestor_of(&f)
+        }
+        None => main.get_global_rect().contains_point(vp.get_mouse_position()),
+    }
 }
 
 fn is_undo_redo_key(k: &Gd<InputEventKey>) -> bool {
