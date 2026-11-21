@@ -448,6 +448,11 @@ impl PixelWater {
             .get_viewport()
             .map(|vp| vp.get_visible_rect().size)
             .unwrap_or(Vector2::new(1920.0, 1080.0));
+        if size.x < 2.0 || size.y < 2.0 {
+            // A viewport not laid out yet (editor start-up): projecting rays through a 0x0
+            // view builds a non-finite projection. Keep the plane's size for now.
+            return 0.0;
+        }
         let far = if ortho {
             cam.get_far().max(1.0)
         } else {
