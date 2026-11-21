@@ -833,6 +833,22 @@ impl Strip {
     }
 }
 
+/// Width of `c`, or of its nearest ancestor that has one (a control built while hidden has no
+/// size until its first layout; the ancestor is the best estimate of the width it will get).
+pub fn laid_out_width(c: &Gd<Control>) -> f32 {
+    let mut n: Option<Gd<Node>> = Some(c.clone().upcast());
+    while let Some(node) = n {
+        if let Ok(ctl) = node.clone().try_cast::<Control>() {
+            let w = ctl.get_size().x;
+            if w >= 1.0 {
+                return w;
+            }
+        }
+        n = node.get_parent();
+    }
+    0.0
+}
+
 /// Page tabs at the start of a strip whose attributes are split into pages (Terrain Settings,
 /// large Pixel* sections): one toggle button per `(name, tooltip)`, `on_page(k)` is connected to
 /// button `k`'s `pressed`. Buttons are named after their page (scripts/tests can press them).
@@ -1219,6 +1235,13 @@ pub struct MstSidePanel {
     force_open: bool,
     /// The 3D viewport beside the panel (watched for `resized`).
     view: Option<Gd<Control>>,
+    /// The editor `SplitContainer` the panel sits in (`right_panel_split`), once connected.
+    /// Its own dragger is routed through the panel's limits (R6-7/R6-8): a drag sets
+    /// [`Self::width`] (220–420 px, view floor) and the split offset is kept at 0 so the
+    /// panel's minimum width is the whole allocation (collapse gives the space back).
+    split: Option<Gd<godot::classes::SplitContainer>>,
+    /// The split dragger is being dragged (its drag sets the width like the grip).
+    split_drag: bool,
     base: Base<ScrollContainer>,
 }
 
@@ -1260,7 +1283,16 @@ impl godot::classes::IScrollContainer for MstSidePanel {
                 {
                     v.disconnect("resized", &cb);
                 }
+                if let Some(mut sp) = self.split.take().filter(|s| s.is_instance_valid()) {
+                    for (sig, m) in SPLIT_SIGNALS {
+                        let c = self.base().callable(m);
+                        if sp.is_connected(sig, &c) {
+                            sp.disconnect(sig, &c);
+                        }
+                    }
+                }
                 self.drag = None;
+                self.split_drag = false;
             }
             _ => {}
         }
@@ -1354,6 +1386,41 @@ impl MstSidePanel {
         self.apply();
     }
 
+    /// The editor split's own dragger moved: `offset` is the split offset it asks for. For the
+    /// split's last child beside an expanding view that is minus the panel's width; it becomes
+    /// the panel width (clamped like the grip) and the offset goes back to 0.
+    #[func]
+    fn _mst_split_dragged(&mut self, offset: i64) {
+        if !self.base().is_visible_in_tree() {
+            return;
+        }
+        self.split_drag = true;
+        if !self.is_collapsed() {
+            let scale = editor_scale();
+            let mut w = ((-offset) as f32 / scale).clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+            if let Some(b) = self.view_budget() {
+                w = w.min(b / scale).max(PANEL_MIN_WIDTH);
+            }
+            self.width = w;
+        }
+        self.reset_split_offset();
+        self.apply();
+    }
+
+    #[func]
+    fn _mst_split_drag_ended(&mut self) {
+        if !std::mem::take(&mut self.split_drag) {
+            return;
+        }
+        if !self.is_collapsed() {
+            set_panel_meta(
+                &format!("panel_{}_width", self.key),
+                &(self.width as f64).to_variant(),
+            );
+        }
+        self.apply();
+    }
+
     /// The collapsed tab was pressed.
     #[func]
     fn _mst_expand(&mut self) {
@@ -1363,7 +1430,48 @@ impl MstSidePanel {
     }
 }
 
+/// Editor split signals the side panel follows (signal, handler).
+const SPLIT_SIGNALS: [(&str, &str); 2] =
+    [("dragged", "_mst_split_dragged"), ("drag_ended", "_mst_split_drag_ended")];
+
 impl MstSidePanel {
+    /// The parent `SplitContainer` (connected once).
+    fn find_split(&mut self) -> Option<Gd<godot::classes::SplitContainer>> {
+        if let Some(s) = self.split.clone().filter(|s| s.is_instance_valid()) {
+            return Some(s);
+        }
+        let mut sp = self
+            .base()
+            .get_parent()?
+            .try_cast::<godot::classes::SplitContainer>()
+            .ok()?;
+        for (sig, m) in SPLIT_SIGNALS {
+            let c = self.base().callable(m);
+            if !sp.is_connected(sig, &c) {
+                sp.connect(sig, &c);
+            }
+        }
+        self.split = Some(sp.clone());
+        Some(sp)
+    }
+
+    /// Puts every offset of the parent split back to 0, so the split gives the panel exactly
+    /// its minimum width (a non-zero offset left by the dragger, or restored by the editor,
+    /// overrides the panel: a collapsed panel kept its 527 px allocation).
+    fn reset_split_offset(&mut self) {
+        if !self.base().is_visible_in_tree() {
+            return;
+        }
+        let Some(mut sp) = self.find_split() else {
+            return;
+        };
+        let offs = sp.get_split_offsets();
+        if offs.as_slice().iter().any(|&o| o != 0) {
+            let zeros: Vec<i32> = vec![0; offs.len()];
+            sp.set_split_offsets(&PackedInt32Array::from(zeros.as_slice()));
+        }
+    }
+
     fn window_width(&self) -> f32 {
         self.base()
             .get_viewport()
@@ -1428,6 +1536,7 @@ impl MstSidePanel {
     /// Sets the panel's minimum width from its state and shows the content or the tab.
     fn apply(&mut self) {
         let scale = editor_scale();
+        self.reset_split_offset();
         let budget = self.view_budget();
         // Horizontal viewport floor (N7): shrink the panel first, then fall back to the tab
         // (the user's stored choice is kept: the panel re-expands once there is room).

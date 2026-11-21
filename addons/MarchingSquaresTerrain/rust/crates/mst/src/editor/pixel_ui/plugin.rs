@@ -717,7 +717,22 @@ impl PixelizerEditorPlugin {
             // As few tab rows as fit beside the title in the strip's current width (one row,
             // then halves, then thirds; at least [`w::PAGE_TAB_COLUMNS`] per row otherwise).
             // Fixed at build time, so the header height never follows the width it gets.
-            let avail = strip.base.get_size().x - ui_kit::sz(140.0, 0.0).x;
+            // The first build runs before the strip was ever laid out (width 0): use the
+            // nearest laid-out ancestor's width and rebuild once the strip has its real width
+            // (R6-2: one 670 px row past a 731 px strip until the next rebuild).
+            let mut width = strip.base.get_size().x;
+            if width < 1.0 {
+                width = ui_kit::laid_out_width(&strip.base.clone().upcast());
+                let cb = Callable::from_object_method(&gd, "rebuild_strip_now");
+                if !strip.base.is_connected("resized", &cb) {
+                    strip.base.connect_flags(
+                        "resized",
+                        &cb,
+                        ConnectFlags::DEFERRED | ConnectFlags::ONE_SHOT,
+                    );
+                }
+            }
+            let avail = width - ui_kit::sz(140.0, 0.0).x;
             let n = names.len().max(1);
             let mut grid = w::page_grid("SectionPages", &names, cur, n, on_page);
             for cols in [n.div_ceil(2), n.div_ceil(3)] {

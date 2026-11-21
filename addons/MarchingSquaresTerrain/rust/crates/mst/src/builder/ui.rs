@@ -2761,6 +2761,10 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     col.add_child(&chips);
     let mut chip_hint = label("No smoothing groups in this mesh.");
     chip_hint.set_modulate(Color::from_rgba(1.0, 1.0, 1.0, 0.6005));
+    // Wrapped: unwrapped, this one line set the palette's minimum to 277 px, so the 220 px
+    // grip minimum could never apply (R6-7).
+    chip_hint.set_autowrap_mode(godot::classes::text_server::AutowrapMode::WORD_SMART);
+    chip_hint.set_h_size_flags(SizeFlags::EXPAND_FILL);
     col.add_child(&chip_hint);
     let mut chip_menu = PopupMenu::new_alloc();
     chip_menu.set_name("ChipMenu");
