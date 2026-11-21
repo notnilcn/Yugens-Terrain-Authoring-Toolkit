@@ -7,7 +7,8 @@
 //! stays readable over bright terrain or sky. It lays itself out in code, so the scene's anchors
 //! do not matter: bottom-left corner, `margin` px from the window edges, growing right and up.
 //! That keeps it clear of the `PixelDiagnostics` (F3) tuner, which docks on the right, at any
-//! window size; on small windows (below `compact_width`) the font steps down so the widest
+//! window size, and it joins the `pixel_diagnostics_keep_clear` group so the F3 docks (the
+//! object inspector on the left included) end above it; on small windows (below `compact_width`) the font steps down so the widest
 //! line stays within about half the window. The fade is a `Tween`, so nothing runs per frame
 //! while the hint is idle; the key is read in `unhandled_input`, the window size from the
 //! viewport's `size_changed` signal.
@@ -17,6 +18,10 @@ use godot::classes::control::{GrowDirection, LayoutPreset};
 use godot::classes::{ILabel, InputEvent, InputEventKey, Label, StyleBoxFlat, Tween};
 use godot::global::{HorizontalAlignment, Key, VerticalAlignment};
 use godot::prelude::*;
+
+/// `PixelDiagnostics::KEEP_CLEAR_GROUP` (mst crate; this crate does not link it): the F3 docks
+/// end above controls in this group, so the tuner never draws over the help.
+const KEEP_CLEAR_GROUP: &str = "pixel_diagnostics_keep_clear";
 
 /// The demo's real bindings (`player.rs` `ACTION_KEYS`, mouse orbit / zoom, the
 /// `PixelDiagnostics` F3 toggle). Keep in sync when a binding changes.
@@ -68,6 +73,7 @@ impl ILabel for MstDemoHint {
     }
 
     fn ready(&mut self) {
+        self.base_mut().add_to_group(KEEP_CLEAR_GROUP);
         if self.base().get_text().is_empty() {
             self.base_mut().set_text(CONTROLS);
         }
