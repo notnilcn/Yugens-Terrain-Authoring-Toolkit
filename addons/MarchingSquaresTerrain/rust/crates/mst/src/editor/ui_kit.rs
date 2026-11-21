@@ -82,6 +82,21 @@ pub fn set_block_signals_tree(node: &Gd<Node>, on: bool) {
     }
 }
 
+/// Makes the container holding `c` lay `c` out again: re-reads its minimum size and queues a
+/// sort of its parent. Needed after showing a control whose parent may not have seen the
+/// change (e.g. signals were blocked, or the parent had no size when the control was added).
+pub fn queue_relayout(c: &Gd<impl Inherits<Control>>) {
+    let mut c = c.clone().upcast::<Control>();
+    c.update_minimum_size();
+    if let Some(mut p) = c
+        .get_parent()
+        .and_then(|p| p.try_cast::<godot::classes::Container>().ok())
+    {
+        p.queue_sort();
+        p.update_minimum_size();
+    }
+}
+
 pub fn editor_scale() -> f32 {
     if godot::classes::Engine::singleton().is_editor_hint() {
         EditorInterface::singleton().get_editor_scale()
@@ -473,6 +488,9 @@ pub const STRIP_MAX_SHARE: f32 = 0.35;
 /// Height the 3D viewport keeps above a bottom strip whenever the area allows it (before
 /// [`editor_scale`]): the strip scrolls instead of squeezing the view to a 39 px slice.
 pub const VIEW_MIN_HEIGHT: f32 = 300.0;
+/// Narrowest the 3D viewport may get beside an expanded side panel (before [`editor_scale`]):
+/// the panel shrinks first, then auto-collapses to its tab (N7).
+pub const VIEW_MIN_WIDTH: f32 = 480.0;
 
 /// Root of the bottom strip (created once; [`Strip::reassemble`] replaces its content).
 ///
@@ -550,10 +568,52 @@ impl Strip {
         }
     }
 
-    /// Keeps the strip at its full height cap ([`strip_cap`]) whatever its content needs, so
-    /// controls at the top (page tabs) stay at the same place when the content changes height.
-    pub fn pin_height(&mut self) {
+    /// Keeps the strip's height stable across rebuilds that share `key` (e.g. the pages of one
+    /// tool), so controls at the top (page tabs) stay under the pointer: the strip takes the
+    /// tallest content seen for `key` (a high-water mark), never more than [`strip_cap`]. A
+    /// short page no longer reserves the whole cap (N10).
+    pub fn pin_height(&mut self, key: &str) {
+        let mut root = self.base.clone();
+        if root.get_meta_ex(PIN_KEY_META).default(&"".to_variant()).done().to_string() != key {
+            root.set_meta(PIN_KEY_META, &key.to_variant());
+            root.set_meta(PIN_HW_META, &0.0f32.to_variant());
+        }
         self.flow.bind_mut().pinned = true;
+    }
+
+    /// Pins `header` (title + page tabs) to the top of the strip, outside the scrolling body:
+    /// it gets its own full-width first row and stays visible however far the page body is
+    /// scrolled (N16, N23). Call once per rebuild; the header is drawn over the body.
+    pub fn pin_header(&mut self, header: &Gd<impl Inherits<Control>>) {
+        let mut panel = godot::classes::PanelContainer::new_alloc();
+        panel.set_name("PinnedHeader");
+        let mut bg = godot::classes::StyleBoxFlat::new_gd();
+        let base = EditorInterface::singleton()
+            .get_editor_theme()
+            .map(|t| t.get_color("base_color", "Editor"))
+            .unwrap_or(Color::from_rgb(0.13, 0.14, 0.16));
+        bg.set_bg_color(base);
+        bg.set_content_margin(godot::builtin::Side::BOTTOM, px(2.0) as f32);
+        panel.add_theme_stylebox_override("panel", &bg);
+        panel.add_child(&header.clone().upcast::<Control>());
+        self.flow.add_child(&panel);
+        self.flow.bind_mut().sticky = Some(panel.upcast());
+        // Follow the scroll offsets (the header is laid out at the visible top-left).
+        let sort = self.flow.callable("queue_sort");
+        for bar in [
+            self.base.get_v_scroll_bar().map(|b| b.upcast::<godot::classes::Range>()),
+            self.base.get_h_scroll_bar().map(|b| b.upcast::<godot::classes::Range>()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let mut bar = bar;
+            if !bar.is_connected("value_changed", &sort) {
+                bar.connect("value_changed", &sort.unbind(1));
+            }
+        }
+        self.cell = None;
+        self.last = None;
     }
 
     /// Starts a new cell for a control of `kind`: separator on type change, then the `"label:"`.
@@ -780,11 +840,16 @@ pub fn page_tabs(
     name: &str,
     pages: &[(&str, &str)],
     current: usize,
+    columns: usize,
     on_page: impl Fn(usize) -> Callable,
-) -> Gd<HBoxContainer> {
-    let mut tabs = HBoxContainer::new_alloc();
+) -> Gd<godot::classes::GridContainer> {
+    // A grid with a column count fixed by the caller (from the strip width at build time):
+    // its size never depends on the width it gets, so it cannot feed a layout loop.
+    let mut tabs = godot::classes::GridContainer::new_alloc();
     tabs.set_name(name);
-    tabs.add_theme_constant_override("separation", 0);
+    tabs.set_columns(columns.clamp(1, pages.len().max(1)) as i32);
+    tabs.add_theme_constant_override("h_separation", 0);
+    tabs.add_theme_constant_override("v_separation", 0);
     let group = ButtonGroup::new_gd();
     for (k, (page, tip)) in pages.iter().enumerate() {
         let mut b = Button::new_alloc();
@@ -796,7 +861,7 @@ pub fn page_tabs(
         b.set_button_group(&group);
         b.set_focus_mode(FocusMode::NONE);
         b.set_pressed_no_signal(k == current);
-        b.set_v_size_flags(SizeFlags::SHRINK_CENTER);
+        b.set_h_size_flags(SizeFlags::FILL);
         b.connect("pressed", &on_page(k));
         tabs.add_child(&b);
     }
@@ -996,7 +1061,7 @@ pub fn assign_active(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
 pub const PANEL_MIN_WIDTH: f32 = 220.0;
 pub const PANEL_MAX_WIDTH: f32 = 420.0;
 /// Width of a collapsed side panel (its expand tab), before [`editor_scale`].
-pub const PANEL_TAB_WIDTH: f32 = 24.0;
+pub const PANEL_TAB_WIDTH: f32 = 32.0;
 /// Resize / collapse grip along a side panel's left edge, before [`editor_scale`].
 pub const PANEL_GRIP_WIDTH: f32 = 10.0;
 /// Below this window width a side panel the user never toggled starts collapsed (an expanded
@@ -1043,6 +1108,7 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
     tab.set_tooltip_text("Show the panel.");
     tab.set_focus_mode(FocusMode::ALL);
     tab.set_visible(false);
+    tab.set_h_size_flags(SizeFlags::EXPAND_FILL);
     tab.connect("pressed", &panel.callable("_mst_expand"));
     root.add_child(&tab);
     {
@@ -1054,30 +1120,72 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
     (root, vbox)
 }
 
-/// Section of the editor project metadata holding the side panel sizes.
-const PANEL_META_SECTION: &str = "marching_squares_terrain";
+/// Per-project editor UI state (side-panel widths / collapse, toolbar mode, dialog sizes).
+///
+/// Not `EditorSettings` project metadata: Godot only writes that to disk on focus-out or a
+/// clean exit, so a killed / crashed editor forgot every panel width (N4), and reading an
+/// absent key with a nil default logs an `ERROR` (N5). This file is written through on every
+/// change (changes are rare: a grip release, a toggle, a dialog close).
+pub const EDITOR_STATE_PATH: &str = "res://.godot/editor/mst_editor_state.cfg";
+const EDITOR_STATE_SECTION: &str = "marching_squares_terrain";
 
-/// Sentinel returned for an absent panel key; no stored panel value is ever this string.
+fn editor_state_file() -> Gd<godot::classes::ConfigFile> {
+    let mut cfg = godot::classes::ConfigFile::new_gd();
+    // Absent on first use: an empty file is the right answer.
+    let _ = cfg.load(EDITOR_STATE_PATH);
+    cfg
+}
+
+/// Stored editor UI value for `key`, if any (never logs for an absent key).
+pub fn editor_state(key: &str) -> Option<Variant> {
+    let cfg = editor_state_file();
+    if !cfg.has_section_key(EDITOR_STATE_SECTION, key) {
+        // One-time migration from the old project-metadata store.
+        return legacy_meta(key);
+    }
+    Some(cfg.get_value(EDITOR_STATE_SECTION, key)).filter(|v| !v.is_nil())
+}
+
+/// Stores `v` under `key` and writes the file immediately.
+pub fn set_editor_state(key: &str, v: &Variant) {
+    let mut cfg = editor_state_file();
+    cfg.set_value(EDITOR_STATE_SECTION, key, v);
+    if let Some(dir) = std::path::Path::new(EDITOR_STATE_PATH.trim_start_matches("res://")).parent()
+    {
+        let abs = godot::classes::ProjectSettings::singleton()
+            .globalize_path(&format!("res://{}", dir.display()));
+        let _ = godot::classes::DirAccess::make_dir_recursive_absolute(&abs);
+    }
+    let err = cfg.save(EDITOR_STATE_PATH);
+    if err != godot::global::Error::OK {
+        godot_warn!("MarchingSquaresTerrain: could not save {EDITOR_STATE_PATH}: {err:?}");
+    }
+}
+
+/// Sentinel returned for an absent metadata key; no stored value is ever this string.
 const PANEL_META_ABSENT: &str = "__mst_panel_meta_absent__";
 
-fn panel_meta(key: &str) -> Option<Variant> {
+fn legacy_meta(key: &str) -> Option<Variant> {
+    if !godot::classes::Engine::singleton().is_editor_hint() {
+        return None;
+    }
     let es = EditorInterface::singleton().get_editor_settings()?;
-    // `EditorSettings` has no `has_project_metadata`, and `ConfigFile::get_value` logs
-    // "Couldn't find the given section ... and no default was given" whenever the key is
-    // missing and the default is nil (every fresh project). A non-nil sentinel default is
-    // the existence probe: Godot returns it silently for an absent key.
+    // A non-nil sentinel default: Godot returns it silently for an absent key (a nil default
+    // logs "Couldn't find the given section ... and no default was given").
     let absent = PANEL_META_ABSENT.to_variant();
     let v = es
-        .get_project_metadata_ex(PANEL_META_SECTION, key)
+        .get_project_metadata_ex(EDITOR_STATE_SECTION, key)
         .default(&absent)
         .done();
     (!v.is_nil() && v != absent).then_some(v)
 }
 
+fn panel_meta(key: &str) -> Option<Variant> {
+    editor_state(key)
+}
+
 fn set_panel_meta(key: &str, v: &Variant) {
-    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-        es.set_project_metadata(PANEL_META_SECTION, key, v);
-    }
+    set_editor_state(key, v);
 }
 
 /// Width of an expanded side panel (unscaled px) for a stored `width` and the editor `window`
@@ -1106,6 +1214,11 @@ pub struct MstSidePanel {
     drag: Option<(f32, f32, bool)>,
     tab: Option<Gd<Button>>,
     content: Option<Gd<Control>>,
+    /// The user expanded the panel although the 3D view is under [`VIEW_MIN_WIDTH`]: keep it
+    /// open (at its minimum width) until they collapse it again. Session only.
+    force_open: bool,
+    /// The 3D viewport beside the panel (watched for `resized`).
+    view: Option<Gd<Control>>,
     base: Base<ScrollContainer>,
 }
 
@@ -1141,6 +1254,11 @@ impl godot::classes::IScrollContainer for MstSidePanel {
                     && vp.is_connected("size_changed", &cb)
                 {
                     vp.disconnect("size_changed", &cb);
+                }
+                if let Some(mut v) = self.view.take().filter(|v| v.is_instance_valid())
+                    && v.is_connected("resized", &cb)
+                {
+                    v.disconnect("resized", &cb);
                 }
                 self.drag = None;
             }
@@ -1239,6 +1357,8 @@ impl MstSidePanel {
     /// The collapsed tab was pressed.
     #[func]
     fn _mst_expand(&mut self) {
+        // Expanding while the view is under its floor is an explicit override.
+        self.force_open = self.view_budget().is_some_and(|b| b < PANEL_MIN_WIDTH * editor_scale());
         self.assign_collapsed(false);
     }
 }
@@ -1251,6 +1371,44 @@ impl MstSidePanel {
             .unwrap_or(0.0)
     }
 
+    /// The 3D viewport sharing the panel's split (Node3DEditor's `right_panel_split`: the
+    /// viewport / bottom-strip VSplit first, then the side panels), connected for `resized`
+    /// once found.
+    fn find_view(&mut self) -> Option<Gd<Control>> {
+        if let Some(v) = self.view.clone().filter(|v| v.is_instance_valid()) {
+            return Some(v);
+        }
+        let parent = self.base().get_parent()?;
+        // A sibling or inside one (the VSplit it shares with the bottom strip).
+        let mut v = parent
+            .find_children_ex("*")
+            .type_("Node3DEditorViewportContainer")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .next()?
+            .try_cast::<Control>()
+            .ok()?;
+        let cb = self.base().callable("_mst_apply");
+        if !v.is_connected("resized", &cb) {
+            v.connect_flags("resized", &cb, godot::classes::object::ConnectFlags::DEFERRED);
+        }
+        self.view = Some(v.clone());
+        Some(v)
+    }
+
+    /// Widest the panel may be (scaled px) so the 3D view keeps [`VIEW_MIN_WIDTH`]: the view's
+    /// width plus the panel's current width minus the floor. Invariant under the panel's own
+    /// width change, so collapsing / expanding cannot oscillate. None = not laid out yet / no
+    /// 3D view beside the panel.
+    fn view_budget(&mut self) -> Option<f32> {
+        let view = self.find_view()?;
+        let (vw, pw) = (view.get_size().x, self.base().get_size().x);
+        (vw > 0.0 && self.base().is_visible_in_tree())
+            .then(|| vw + pw - VIEW_MIN_WIDTH * editor_scale())
+    }
+
     fn is_collapsed(&self) -> bool {
         self.collapsed.unwrap_or_else(|| {
             let w = self.window_width();
@@ -1259,6 +1417,9 @@ impl MstSidePanel {
     }
 
     fn assign_collapsed(&mut self, on: bool) {
+        if on {
+            self.force_open = false;
+        }
         self.collapsed = Some(on);
         set_panel_meta(&format!("panel_{}_collapsed", self.key), &on.to_variant());
         self.apply();
@@ -1266,12 +1427,22 @@ impl MstSidePanel {
 
     /// Sets the panel's minimum width from its state and shows the content or the tab.
     fn apply(&mut self) {
-        let collapsed = self.is_collapsed();
         let scale = editor_scale();
+        let budget = self.view_budget();
+        // Horizontal viewport floor (N7): shrink the panel first, then fall back to the tab
+        // (the user's stored choice is kept: the panel re-expands once there is room).
+        let starved = !self.force_open
+            && self.drag.is_none()
+            && budget.is_some_and(|b| b < PANEL_MIN_WIDTH * scale);
+        let collapsed = self.is_collapsed() || starved;
         let w = if collapsed {
             PANEL_TAB_WIDTH
         } else {
-            panel_width_for(self.width.max(1.0), self.window_width(), scale)
+            let w = panel_width_for(self.width.max(1.0), self.window_width(), scale);
+            match budget {
+                Some(b) if self.drag.is_none() => w.min(b / scale).max(PANEL_MIN_WIDTH),
+                _ => w,
+            }
         };
         let want = (w * scale).round();
         let cur = self.base().get_custom_minimum_size();
@@ -1397,6 +1568,10 @@ pub fn balanced_rows(widths: &[f32], gap: f32, avail: f32) -> Vec<usize> {
     greedy(hi)
 }
 
+/// Strip root meta: key of the current [`Strip::pin_height`] group, and its tallest content.
+const PIN_KEY_META: &str = "_mst_pin_key";
+const PIN_HW_META: &str = "_mst_pin_hw";
+
 /// Flow container of the bottom strips: like `HFlowContainer`, but the rows are balanced
 /// ([`balanced_rows`]) so a strip that needs two rows splits evenly instead of leaving one
 /// or two cells alone on a half-empty second row.
@@ -1407,8 +1582,10 @@ pub struct MstFlow {
     pub h_gap: f32,
     /// Height of the last layout (reported as the minimum height).
     min_height: f32,
-    /// Strip root height pinned to the cap ([`Strip::pin_height`]).
+    /// Strip root height kept stable ([`Strip::pin_height`]).
     pub pinned: bool,
+    /// Header pinned to the visible top of the strip ([`Strip::pin_header`]).
+    sticky: Option<Gd<Control>>,
     base: Base<godot::classes::Container>,
 }
 
@@ -1464,10 +1641,36 @@ impl MstFlow {
             .iter_shared()
             .filter_map(|c| c.try_cast::<Control>().ok())
             .filter(|c| c.is_visible() && !c.is_set_as_top_level())
+            .filter(|c| self.sticky.as_ref() != Some(c))
             .collect()
     }
 
+    /// Lays out the pinned header at the visible top-left; returns its height.
+    fn layout_sticky(&mut self) -> f32 {
+        let Some(h) = self.sticky.clone().filter(|h| h.is_instance_valid()) else {
+            return 0.0;
+        };
+        // Last child: drawn over the scrolled body and first to get the mouse.
+        let n = self.base().get_child_count();
+        if h.get_index() != n - 1 {
+            self.base_mut().move_child(&h, n - 1);
+        }
+        let (sx, sy, vw) = self
+            .strip_root()
+            .map(|r| (r.get_h_scroll() as f32, r.get_v_scroll() as f32, r.get_size().x))
+            .unwrap_or((0.0, 0.0, self.base().get_size().x));
+        let min = h.get_combined_minimum_size();
+        // A header taller than half the strip would cover the whole body (1024x600: 99 px
+        // strip): lay it out as a plain first row that scrolls with the page instead.
+        let view_h = self.strip_root().map(|r| r.get_size().y).unwrap_or(0.0);
+        let (sx, sy) = if min.y > view_h * 0.5 { (0.0, 0.0) } else { (sx, sy) };
+        let rect = Rect2::new(Vector2::new(sx, sy), Vector2::new(vw.max(min.x), min.y));
+        self.base_mut().fit_child_in_rect(&h, rect);
+        min.y
+    }
+
     fn layout(&mut self) {
+        let top = self.layout_sticky();
         let cells = self.tiles();
         let sizes: Vec<Vector2> = cells
             .iter()
@@ -1479,7 +1682,7 @@ impl MstFlow {
             self.h_gap,
             avail,
         );
-        let mut y = 0.0;
+        let mut y = top;
         for (r, &s) in starts.iter().enumerate() {
             let e = starts.get(r + 1).copied().unwrap_or(cells.len());
             let h = sizes[s..e].iter().map(|v| v.y).fold(0.0, f32::max);
@@ -1523,8 +1726,21 @@ impl MstFlow {
         let cap = strip_cap(&root.clone().upcast());
         let row = sz(0.0, ROW_HEIGHT).y;
         let want = if self.pinned {
-            cap
+            let hw = root
+                .get_meta_ex(PIN_HW_META)
+                .default(&0.0f32.to_variant())
+                .done()
+                .try_to::<f32>()
+                .unwrap_or(0.0)
+                .max(self.min_height);
+            root.set_meta(PIN_HW_META, &hw.to_variant());
+            hw.min(cap)
         } else {
+            // Leaving the pinned group (another tool): the next visit starts from its page.
+            if root.has_meta(PIN_KEY_META) {
+                root.remove_meta(PIN_KEY_META);
+                root.remove_meta(PIN_HW_META);
+            }
             self.min_height.min(cap)
         }
         .max(row)

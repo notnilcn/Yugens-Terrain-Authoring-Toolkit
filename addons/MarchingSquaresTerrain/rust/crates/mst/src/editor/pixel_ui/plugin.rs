@@ -261,10 +261,24 @@ impl IEditorPlugin for PixelizerEditorPlugin {
         .flatten()
         .collect();
         for mut p in panels {
-            let node = p.clone().upcast::<Node>();
-            ui_kit::set_block_signals_tree(&node, true);
+            // Block the panel's *descendants* only: the panel root must still emit
+            // `visibility_changed`, which is how its parent split / box container learns to
+            // re-sort. Blocking the root left every panel at its minimum size at the
+            // container's origin until an unrelated relayout (N1).
+            let kids: Vec<Gd<Node>> = p
+                .get_children_ex()
+                .include_internal(true)
+                .done()
+                .iter_shared()
+                .collect();
+            for k in &kids {
+                ui_kit::set_block_signals_tree(k, true);
+            }
             p.set_visible(shown);
-            ui_kit::set_block_signals_tree(&node, false);
+            for k in &kids {
+                ui_kit::set_block_signals_tree(k, false);
+            }
+            ui_kit::queue_relayout(&p);
         }
         if shown {
             self.rebuild_strip();
@@ -697,9 +711,32 @@ impl PixelizerEditorPlugin {
                 .position(|t| t.sec == s.sec && t.page == page)
                 .unwrap_or(0);
             let names: Vec<(&str, &str)> = tabs.iter().map(|t| (t.label, t.tooltip)).collect();
-            let grid = w::page_grid("SectionPages", &names, cur, |k| {
+            let on_page = |k: usize| {
                 Callable::from_object_method(&gd, "on_page").bind(&[(k as i64).to_variant()])
-            });
+            };
+            // As few tab rows as fit beside the title in the strip's current width (one row,
+            // then halves, then thirds; at least [`w::PAGE_TAB_COLUMNS`] per row otherwise).
+            // Fixed at build time, so the header height never follows the width it gets.
+            let avail = strip.base.get_size().x - ui_kit::sz(140.0, 0.0).x;
+            let n = names.len().max(1);
+            let mut grid = w::page_grid("SectionPages", &names, cur, n, on_page);
+            for cols in [n.div_ceil(2), n.div_ceil(3)] {
+                if avail <= 0.0 || grid.get_combined_minimum_size().x <= avail {
+                    break;
+                }
+                grid.free();
+                grid = w::page_grid("SectionPages", &names, cur, cols, on_page);
+            }
+            if avail > 0.0 && grid.get_combined_minimum_size().x > avail {
+                grid.free();
+                grid = w::page_grid(
+                    "SectionPages",
+                    &names,
+                    cur,
+                    w::PAGE_TAB_COLUMNS as usize,
+                    on_page,
+                );
+            }
             // Title and page tabs are ONE tile, always the strip's first: the flow puts it at the
             // top-left of row 1 whatever the page holds, so the tabs never move between pages
             // (#18: they used to land on row 1 or 2 and centre in rows of different heights).
@@ -713,15 +750,15 @@ impl PixelizerEditorPlugin {
             title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
             title.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&title);
-            let mut grid = grid;
             grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&grid);
-            strip.flow.add_child(&header);
-            strip.separator();
+            // Pinned above the scrolling page body: scrolling a long page never hides or
+            // slides the tabs (N23).
+            strip.pin_header(&header);
             // The strip is bottom-anchored: a page with more rows would grow it upward and move
-            // the tab row under the pointer (#33). Keep paged sections at the strip's height cap
-            // so the tabs stay put (the content scrolls when it needs more).
-            strip.pin_height();
+            // the tab row under the pointer (#33). Keep the strip's height stable across this
+            // node's pages (the content scrolls when it needs more).
+            strip.pin_height(&format!("pixel:{:?}", sections::head(s.sec)));
         }
         let range = sections::page_range(s.sec, self.page, s.fields.len());
         for (i, fd) in s

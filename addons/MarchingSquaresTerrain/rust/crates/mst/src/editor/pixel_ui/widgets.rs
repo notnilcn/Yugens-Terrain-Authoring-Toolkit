@@ -48,12 +48,11 @@ pub fn push_button(caption: &str, icon_name: Option<&str>, tooltip: &str) -> Gd<
     b
 }
 
-/// Most page tabs per row of [`page_grid`]: the widest node (PixelWater, 7 pages) takes two
-/// rows, so the tab block stays narrow (about 4 tab widths) whatever the section.
-pub const PAGE_TAB_COLUMNS: i32 = 4;
+/// Page tabs per row of [`page_grid`] when the strip is too narrow for fewer rows.
+pub const PAGE_TAB_COLUMNS: i32 = 3;
 
-/// Page tabs of a strip as a fixed grid of toggle buttons (one per `(name, tooltip)`, at most
-/// [`PAGE_TAB_COLUMNS`] per row); `on_page(k)` is connected to button `k`'s `pressed`. Buttons
+/// Page tabs of a strip as a fixed grid of toggle buttons (one per `(name, tooltip)`,
+/// `columns` per row); `on_page(k)` is connected to button `k`'s `pressed`. Buttons
 /// are named after their page (scripts can press them).
 ///
 /// A grid, not one `HBoxContainer` row: the row of every Renderer tab was ~670 px wide, wider
@@ -63,11 +62,12 @@ pub fn page_grid(
     name: &str,
     pages: &[(&str, &str)],
     current: usize,
+    columns: usize,
     on_page: impl Fn(usize) -> Callable,
 ) -> Gd<GridContainer> {
     let mut grid = GridContainer::new_alloc();
     grid.set_name(name);
-    grid.set_columns(PAGE_TAB_COLUMNS.min(pages.len().max(1) as i32));
+    grid.set_columns(columns.clamp(1, pages.len().max(1)) as i32);
     grid.add_theme_constant_override("h_separation", 0);
     grid.add_theme_constant_override("v_separation", 0);
     let group = ButtonGroup::new_gd();

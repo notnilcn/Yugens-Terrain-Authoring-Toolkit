@@ -41,14 +41,8 @@ const COMPACT_BUTTON: &str = "ToolbarCompact";
 const TOOLBAR_META: (&str, &str) = ("marching_squares_terrain", "toolbar_compact");
 
 fn toolbar_compact() -> bool {
-    EditorInterface::singleton()
-        .get_editor_settings()
-        .map(|es| {
-            es.get_project_metadata_ex(TOOLBAR_META.0, TOOLBAR_META.1)
-                .default(&false.to_variant())
-                .done()
-                .booleanize()
-        })
+    ui_kit::editor_state(TOOLBAR_META.1)
+        .map(|v| v.booleanize())
         .unwrap_or(false)
 }
 
@@ -129,9 +123,7 @@ impl MarchingSquaresTerrainPlugin {
     /// project (editor project metadata).
     pub(super) fn toggle_toolbar_compact(&mut self) {
         let compact = !toolbar_compact();
-        if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-            es.set_project_metadata(TOOLBAR_META.0, TOOLBAR_META.1, &compact.to_variant());
-        }
+        ui_kit::set_editor_state(TOOLBAR_META.1, &compact.to_variant());
         let Some(tb) = self.toolbar.clone() else {
             return;
         };
@@ -214,13 +206,16 @@ impl MarchingSquaresTerrainPlugin {
         }
         self.chunk_list = None;
         let tool = self.state.tool;
-        let mut title = strip.heading(tool.moniker(), ui_kit::glyph(tool.glyph()), &tool.tooltip());
-        title.set_name("ToolTitle");
+        if tool != Tool::TerrainSettings {
+            let mut title =
+                strip.heading(tool.moniker(), ui_kit::glyph(tool.glyph()), &tool.tooltip());
+            title.set_name("ToolTitle");
+        }
         match self.state.tool {
             Tool::ChunkManager => self.build_chunk_strip(&mut strip),
             Tool::TerrainSettings => {
-                // Same strip height on every page: the page tabs stay under the pointer.
-                strip.pin_height();
+                // Stable strip height across pages: the page tabs stay under the pointer.
+                strip.pin_height("terrain_settings");
                 self.build_settings_strip(&mut strip)
             }
             t => {
@@ -360,7 +355,16 @@ impl MarchingSquaresTerrainPlugin {
                 continue;
             }
             if let Ok(mut r) = c.clone().try_cast::<godot::classes::Range>() {
-                ui_kit::show_value(&mut r, v);
+                // Inside the control's range the value snaps to its step, and the setting keeps
+                // the snapped value: label, handle and the next stroke agree after wheel edits
+                // (label 18.9 vs value 19.0, N29). Past the range (open Stamp range) it stays raw.
+                let inside = v >= r.get_min() && v <= r.get_max();
+                r.set_value_no_signal(v);
+                let shown = if inside { r.get_value() } else { v };
+                if inside && (shown - v).abs() > 1e-9 {
+                    self.state.assign(s, shown);
+                }
+                ui_kit::show_value(&mut r, shown);
             } else if let Ok(mut cb) = c.clone().try_cast::<CheckBox>() {
                 cb.set_pressed_no_signal(v != 0.0);
             } else if let Ok(mut ob) = c.clone().try_cast::<OptionButton>() {
@@ -389,7 +393,14 @@ impl MarchingSquaresTerrainPlugin {
                         "Grid Aligned needs a Triangle/Hexagon/Hex Rings grid and Falloff off."
                     });
                 }
-                Setting::GridSize => ui_kit::assign_active(c, aligned),
+                Setting::GridSize => {
+                    ui_kit::assign_active(c, aligned);
+                    c.set_tooltip_text(if aligned {
+                        tools::tooltip(Setting::GridSize)
+                    } else {
+                        "Grid Size applies only with Grid Aligned on."
+                    });
+                }
                 Setting::Falloff if self.state.tool == Tool::Bridge => {
                     ui_kit::assign_active(c, false)
                 }
@@ -909,7 +920,8 @@ pub(super) fn terrain_setting_label(prop: &str) -> Option<&'static str> {
 /// Pages of the Terrain Settings strip: (name, tooltip).
 pub(super) const SETTINGS_PAGES: [(&str, &str); 6] = [
     (
-        "Grid",
+        // Not "Grid": the toolbar's Grid overlay toggle has that label (N30).
+        "Layout",
         "Grid type, chunk and cell size, blending, merge mode, collision.",
     ),
     (
@@ -1012,10 +1024,50 @@ impl MarchingSquaresTerrainPlugin {
         let page = self.settings_page.min(SETTINGS_PAGES.len() - 1);
         // Page tabs on the first row, the page's fields in columns directly under them (one
         // block next to the tool title, no empty space beside the tabs).
-        let mut tabs = ui_kit::page_tabs("SettingsPages", &SETTINGS_PAGES, page, |k| {
-            self.cb1("on_settings_page", k as i64)
-        });
+        let avail = {
+            let w = strip.base.get_size().x;
+            if w > 1.0 {
+                w
+            } else {
+                EditorInterface::singleton()
+                    .get_editor_viewport_3d_ex()
+                    .idx(0)
+                    .done()
+                    .map(|v| v.get_visible_rect().size.x)
+                    .unwrap_or(1200.0)
+            }
+        };
+        let tool = Tool::TerrainSettings;
+        let mut title = ui_kit::title_button(tool.moniker(), ui_kit::glyph(tool.glyph()));
+        // Tabs on one row when title + tabs fit the strip, else on two rows (the header is
+        // pinned, so it must not be clipped).
+        let tabs_in = |columns: usize| {
+            ui_kit::page_tabs("SettingsPages", &SETTINGS_PAGES, page, columns, |k| {
+                self.cb1("on_settings_page", k as i64)
+            })
+        };
+        let one_row = tabs_in(SETTINGS_PAGES.len());
+        let need = title.get_combined_minimum_size().x
+            + one_row.get_combined_minimum_size().x
+            + sz(24.0, 0.0).x;
+        let mut tabs = if need <= avail {
+            one_row
+        } else {
+            one_row.free();
+            tabs_in(SETTINGS_PAGES.len().div_ceil(2))
+        };
         tabs.set_h_size_flags(SizeFlags::SHRINK_BEGIN);
+        // Title + page tabs: one header pinned above the scrolling page body (N16).
+        let mut header = HBoxContainer::new_alloc();
+        header.set_name("SettingsHeader");
+        header.add_theme_constant_override("separation", ui_kit::px(6.0));
+        title.set_name("ToolTitle");
+        title.set_tooltip_text(&tool.tooltip());
+        title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
+        header.add_child(&title);
+        header.add_child(&godot::classes::VSeparator::new_alloc());
+        header.add_child(&tabs);
+        strip.pin_header(&header);
         let rows: Vec<(usize, &TSetting)> = TERRAIN_SETTINGS
             .iter()
             .enumerate()
@@ -1052,27 +1104,8 @@ impl MarchingSquaresTerrainPlugin {
             .iter()
             .map(|r| r.get_combined_minimum_size().x)
             .collect();
-        let lead = strip
-            .flow
-            .get_children()
-            .iter_shared()
-            .filter_map(|c| c.try_cast::<Control>().ok())
-            .map(|c| c.get_combined_minimum_size().x)
-            .sum::<f32>()
-            + sz(64.0, 0.0).x;
-        let avail = {
-            let w = strip.base.get_size().x;
-            if w > 1.0 {
-                w
-            } else {
-                EditorInterface::singleton()
-                    .get_editor_viewport_3d_ex()
-                    .idx(0)
-                    .done()
-                    .map(|v| v.get_visible_rect().size.x)
-                    .unwrap_or(1200.0)
-            }
-        };
+        // The header has its own row now: the columns get the full strip width.
+        let lead = sz(16.0, 0.0).x;
         self.settings_strip_w = avail;
         // Per column: its widest row, the separator and the box separation on both sides of it.
         let gap = sz(ui_kit::CELL_GAP * 2.0 + 8.0, 0.0).x;
@@ -1103,7 +1136,6 @@ impl MarchingSquaresTerrainPlugin {
         let mut block = VBoxContainer::new_alloc();
         block.set_name("SettingsPage");
         block.add_theme_constant_override("separation", ui_kit::px(2.0));
-        block.add_child(&tabs);
         block.add_child(&cols);
         strip.custom("", &block);
     }
@@ -2161,8 +2193,15 @@ impl MarchingSquaresTerrainPlugin {
         // Cancel, Esc and the title bar's X.
         dlg.connect("canceled", &on_cancel);
         base.add_child(&dlg);
-        // Centered at the stored size (`popup_centered` keeps the current size unless the
-        // content needs more).
+        // In the tree (themed) now: make the advertised minimum the content's real one, so a
+        // requested size is either honoured exactly or refused at the same minimum Godot
+        // enforces (it opened 400x179 for a 400x150 request while reporting min 140, N9).
+        let need = dlg.get_contents_minimum_size();
+        let min = dlg.get_min_size();
+        let min = Vector2i::new(min.x.max(need.x.ceil() as i32), min.y.max(need.y.ceil() as i32));
+        dlg.set_min_size(min);
+        let cur = dlg.get_size();
+        dlg.set_size(Vector2i::new(cur.x.max(min.x), cur.y.max(min.y)));
         dlg.popup_centered();
         le.grab_focus();
     }
@@ -2269,24 +2308,15 @@ pub(super) const SAVE_PRESET_SIZE_META: &str = "save_preset_dialog_size";
 
 /// Size stored under `key` (editor project metadata), else `fallback`.
 pub(super) fn remembered_size(key: &str, fallback: Vector2i) -> Vector2i {
-    EditorInterface::singleton()
-        .get_editor_settings()
-        .and_then(|es| {
-            es.get_project_metadata_ex(TOOLBAR_META.0, key)
-                .default(&Variant::nil())
-                .done()
-                .try_to::<Vector2i>()
-                .ok()
-        })
+    ui_kit::editor_state(key)
+        .and_then(|v| v.try_to::<Vector2i>().ok())
         .filter(|s| s.x > 0 && s.y > 0)
         .unwrap_or(fallback)
 }
 
 /// Stores a dialog size for [`remembered_size`].
 pub(super) fn remember_size(key: &str, size: Vector2i) {
-    if let Some(mut es) = EditorInterface::singleton().get_editor_settings() {
-        es.set_project_metadata(TOOLBAR_META.0, key, &size.to_variant());
-    }
+    ui_kit::set_editor_state(key, &size.to_variant());
 }
 
 fn snake_case(s: &str) -> String {
