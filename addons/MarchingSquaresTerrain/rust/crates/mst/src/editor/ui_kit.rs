@@ -488,6 +488,9 @@ pub const STRIP_MAX_SHARE: f32 = 0.35;
 /// Height the 3D viewport keeps above a bottom strip whenever the area allows it (before
 /// [`editor_scale`]): the strip scrolls instead of squeezing the view to a 39 px slice.
 pub const VIEW_MIN_HEIGHT: f32 = 300.0;
+/// Narrowest the 3D viewport may get beside an expanded side panel (before [`editor_scale`]):
+/// the panel shrinks first, then auto-collapses to its tab (N7).
+pub const VIEW_MIN_WIDTH: f32 = 480.0;
 
 /// Root of the bottom strip (created once; [`Strip::reassemble`] replaces its content).
 ///
@@ -1011,7 +1014,7 @@ pub fn assign_active(c: &mut Gd<impl Inherits<Control>>, enabled: bool) {
 pub const PANEL_MIN_WIDTH: f32 = 220.0;
 pub const PANEL_MAX_WIDTH: f32 = 420.0;
 /// Width of a collapsed side panel (its expand tab), before [`editor_scale`].
-pub const PANEL_TAB_WIDTH: f32 = 24.0;
+pub const PANEL_TAB_WIDTH: f32 = 32.0;
 /// Resize / collapse grip along a side panel's left edge, before [`editor_scale`].
 pub const PANEL_GRIP_WIDTH: f32 = 10.0;
 /// Below this window width a side panel the user never toggled starts collapsed (an expanded
@@ -1163,6 +1166,11 @@ pub struct MstSidePanel {
     drag: Option<(f32, f32, bool)>,
     tab: Option<Gd<Button>>,
     content: Option<Gd<Control>>,
+    /// The user expanded the panel although the 3D view is under [`VIEW_MIN_WIDTH`]: keep it
+    /// open (at its minimum width) until they collapse it again. Session only.
+    force_open: bool,
+    /// The 3D viewport beside the panel (watched for `resized`).
+    view: Option<Gd<Control>>,
     base: Base<ScrollContainer>,
 }
 
@@ -1198,6 +1206,11 @@ impl godot::classes::IScrollContainer for MstSidePanel {
                     && vp.is_connected("size_changed", &cb)
                 {
                     vp.disconnect("size_changed", &cb);
+                }
+                if let Some(mut v) = self.view.take().filter(|v| v.is_instance_valid())
+                    && v.is_connected("resized", &cb)
+                {
+                    v.disconnect("resized", &cb);
                 }
                 self.drag = None;
             }
@@ -1296,6 +1309,8 @@ impl MstSidePanel {
     /// The collapsed tab was pressed.
     #[func]
     fn _mst_expand(&mut self) {
+        // Expanding while the view is under its floor is an explicit override.
+        self.force_open = self.view_budget().is_some_and(|b| b < PANEL_MIN_WIDTH * editor_scale());
         self.assign_collapsed(false);
     }
 }
@@ -1308,6 +1323,38 @@ impl MstSidePanel {
             .unwrap_or(0.0)
     }
 
+    /// The 3D viewport sharing the panel's split (Node3DEditor's `right_panel_split`: the
+    /// viewport container first, then the side panels), connected for `resized` once found.
+    fn find_view(&mut self) -> Option<Gd<Control>> {
+        if let Some(v) = self.view.clone().filter(|v| v.is_instance_valid()) {
+            return Some(v);
+        }
+        let parent = self.base().get_parent()?;
+        let mut v = parent
+            .get_children()
+            .iter_shared()
+            .find(|c| c.is_class("Node3DEditorViewportContainer"))?
+            .try_cast::<Control>()
+            .ok()?;
+        let cb = self.base().callable("_mst_apply");
+        if !v.is_connected("resized", &cb) {
+            v.connect_flags("resized", &cb, godot::classes::object::ConnectFlags::DEFERRED);
+        }
+        self.view = Some(v.clone());
+        Some(v)
+    }
+
+    /// Widest the panel may be (scaled px) so the 3D view keeps [`VIEW_MIN_WIDTH`]: the view's
+    /// width plus the panel's current width minus the floor. Invariant under the panel's own
+    /// width change, so collapsing / expanding cannot oscillate. None = not laid out yet / no
+    /// 3D view beside the panel.
+    fn view_budget(&mut self) -> Option<f32> {
+        let view = self.find_view()?;
+        let (vw, pw) = (view.get_size().x, self.base().get_size().x);
+        (vw > 0.0 && self.base().is_visible_in_tree())
+            .then(|| vw + pw - VIEW_MIN_WIDTH * editor_scale())
+    }
+
     fn is_collapsed(&self) -> bool {
         self.collapsed.unwrap_or_else(|| {
             let w = self.window_width();
@@ -1316,6 +1363,9 @@ impl MstSidePanel {
     }
 
     fn assign_collapsed(&mut self, on: bool) {
+        if on {
+            self.force_open = false;
+        }
         self.collapsed = Some(on);
         set_panel_meta(&format!("panel_{}_collapsed", self.key), &on.to_variant());
         self.apply();
@@ -1323,12 +1373,22 @@ impl MstSidePanel {
 
     /// Sets the panel's minimum width from its state and shows the content or the tab.
     fn apply(&mut self) {
-        let collapsed = self.is_collapsed();
         let scale = editor_scale();
+        let budget = self.view_budget();
+        // Horizontal viewport floor (N7): shrink the panel first, then fall back to the tab
+        // (the user's stored choice is kept: the panel re-expands once there is room).
+        let starved = !self.force_open
+            && self.drag.is_none()
+            && budget.is_some_and(|b| b < PANEL_MIN_WIDTH * scale);
+        let collapsed = self.is_collapsed() || starved;
         let w = if collapsed {
             PANEL_TAB_WIDTH
         } else {
-            panel_width_for(self.width.max(1.0), self.window_width(), scale)
+            let w = panel_width_for(self.width.max(1.0), self.window_width(), scale);
+            match budget {
+                Some(b) if self.drag.is_none() => w.min(b / scale).max(PANEL_MIN_WIDTH),
+                _ => w,
+            }
         };
         let want = (w * scale).round();
         let cur = self.base().get_custom_minimum_size();
