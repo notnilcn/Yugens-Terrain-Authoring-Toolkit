@@ -161,6 +161,10 @@ float bayer4(vec2 p) {
 	return (float(m[idx]) + 0.5) / 16.0;
 }
 
+vec3 wt_to_srgb(vec3 c) {
+	return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	float ground = terrain_height(wp.xz);
@@ -177,10 +181,20 @@ void vertex() {
 }
 
 void fragment() {
+	// Rim: the sea first turns into the background colour (the same horizon colour the far fade
+	// uses, which PixelDayNight publishes as the colour it paints the background with), then the
+	// last stretch dissolves. A dither-only rim left a light-blue sea with a ragged but straight
+	// edge over the darker background: a floating rectangle at low orbit / zoom-out.
+	float rim_tint = 0.0;
 	if (rim_fade > 0.0 && plane_rect.z > 0.0 && plane_rect.w > 0.0) {
 		vec2 rr = abs(world_pos.xz - plane_rect.xy) / plane_rect.zw;
-		float rim = smoothstep(1.0 - rim_fade, 0.96, max(rr.x, rr.y));
-		if (rim > bayer4(FRAGCOORD.xy)) {
+		// Radial (the disc inscribed in the plane): a square rim still drew the plane's straight
+		// edges and corner from a high zoom-out, even fading into the sky colour.
+		float m = length(rr);
+		float a = 1.0 - rim_fade;
+		float b = a < 0.94 ? mix(a, 0.96, 0.6) : a;
+		rim_tint = b > a ? smoothstep(a, b, m) : 0.0;
+		if (smoothstep(b, 0.96, m) > bayer4(FRAGCOORD.xy)) {
 			discard;
 		}
 	}
@@ -268,9 +282,18 @@ void fragment() {
 	if (view_far > 0.0) {
 		hf = max(hf, clamp((-VERTEX.z - view_far * 0.7) / (view_far * 0.22), 0.0, 1.0));
 	}
+	hf = max(hf, rim_tint);
 	if (hf > 0.0) {
 		hf = clamp(floor(hf * 4.0 + bayer4(FRAGCOORD.xy)) / 4.0, 0.0, 1.0);
+		// pt_horizon (and horizon_color) hold the background colour in linear. Ordinary cameras
+		// convert EMISSION to sRGB, so that matches the sky; the PixelRenderer's colour pass (its
+		// camera leaves out the meta layer) shows EMISSION unconverted, so it needs the painted
+		// sRGB value (measured: the linear one drew the rim at 0.45x the sky's brightness, a dark
+		// band outlining the plane at zoom-out).
 		vec3 sky_lin = pt_horizon.a > 0.5 ? pt_horizon.rgb : horizon_color.rgb;
+		if ((CAMERA_VISIBLE_LAYERS & pt_meta_mask) == 0u) {
+			sky_lin = wt_to_srgb(sky_lin);
+		}
 		ALBEDO *= 1.0 - hf;
 		EMISSION = sky_lin * hf;
 	}
