@@ -6,6 +6,7 @@ tests/captures/
 *.tmp
 build/
 !addons/MarchingSquaresTerrain/rust/crates/pt_core/src/build/*
+!addons/MarchingSquaresTerrain/rust/crates/pt_core/src/build/**
 __pycache__/
 *.pyc
 # QA screenshots are local evidence (~800 MB); commit selected shots explicitly with -f.
