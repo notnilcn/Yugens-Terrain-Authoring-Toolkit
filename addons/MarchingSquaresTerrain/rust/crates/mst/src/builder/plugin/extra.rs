@@ -579,6 +579,22 @@ impl PixelBuilderPlugin {
         self.sync_ui();
     }
 
+    /// Undo / redo path of the palette (N13): when the data's slot list differs from the rows
+    /// shown, the current slot is clamped to the slots that exist and the rows are rebuilt.
+    pub(super) fn sync_palette_to_data(&mut self) {
+        let n = self
+            .contents()
+            .map(|d| d.bind().stuff_pockets().len() as i64)
+            .unwrap_or(0);
+        if self.palette_slots.as_ref().map(|v| v.len() as i64) != Some(n) {
+            self.palette_slots = None;
+        }
+        if self.pocket >= n {
+            self.pocket = (n - 1).max(0);
+        }
+        self.refresh_palette();
+    }
+
     /// Rebuilds the palette rows when the slot list changed.
     pub(super) fn refresh_palette(&mut self) {
         // Smoothing chips (MST palette): rebuilt when the groups or the current group change,
@@ -803,6 +819,7 @@ impl PixelBuilderPlugin {
             Some(d) => d,
             None => {
                 let mut d = EditorFileDialog::new_alloc();
+                crate::builder::fit_file_dialog(&mut d);
                 d.set_file_mode(FileMode::SAVE_FILE);
                 d.set_access(Access::FILESYSTEM);
                 d.connect("file_selected", &self.to_gd().callable("on_export_file"));

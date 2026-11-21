@@ -291,6 +291,7 @@ impl PixelBuilderPlugin {
             .is_none_or(|d| !d.is_instance_valid())
         {
             let mut d = EditorFileDialog::new_alloc();
+            crate::builder::fit_file_dialog(&mut d);
             d.set_file_mode(FileMode::SAVE_FILE);
             d.set_access(Access::RESOURCES);
             d.set_title("Create reusable part");

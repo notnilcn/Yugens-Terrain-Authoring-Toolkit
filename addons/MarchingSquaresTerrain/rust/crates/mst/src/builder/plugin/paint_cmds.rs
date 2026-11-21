@@ -459,6 +459,7 @@ impl PixelBuilderPlugin {
             .is_none_or(|d| !d.is_instance_valid())
         {
             let mut d = EditorFileDialog::new_alloc();
+            crate::builder::fit_file_dialog(&mut d);
             d.set_name("PixelBuilderPaletteFiles");
             d.set_access(Access::RESOURCES);
             d.connect("file_selected", &self.to_gd().callable("on_palette_file"));

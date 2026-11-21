@@ -588,6 +588,10 @@ impl PixelBuilderPlugin {
         }
         // Undo / redo changed the mesh: the smoothing overlay follows (cheap when unchanged).
         self.refresh_attr_overlay();
+        // N13: a materials-only undo / redo (`+ Slot`, `+ Preset`, slot removal) leaves the
+        // topology stamp alone, so the palette is re-synced from the data on every revision
+        // (cheap when the slot list is unchanged): it never keeps a row the mesh lacks.
+        self.sync_palette_to_data();
         // r4 #13: the HUD counters and the selection follow an undo / redo in the same action.
         // A revision the builder did not commit itself whose topology differs from the last one
         // seen came from undo / redo (or another editor action): the selected indices no longer

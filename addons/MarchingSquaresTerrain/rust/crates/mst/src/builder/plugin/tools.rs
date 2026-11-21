@@ -1166,6 +1166,7 @@ impl PixelBuilderPlugin {
     pub(super) fn toggle_reshape(&mut self) {
         if self.reshape {
             self.reshape = false;
+            self.drop_recipe_hint();
             return;
         }
         // Bezier meshes reopen their recipe in the Bezier tool.
