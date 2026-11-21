@@ -552,6 +552,9 @@ impl IEditorPlugin for PixelBuilderPlugin {
         self.vp.sweep = None;
         self.knife = Knife::default();
         self.reshape = false;
+        // N14: a recipe-edit hint ("Editing the Box recipe…") belongs to the mesh it was shown
+        // for; it never carries over to the next selected node.
+        self.drop_recipe_hint();
         self.bz.revert();
         self.poly_outline = None;
         self.poly_holes.clear();
@@ -1015,7 +1018,10 @@ impl IEditorPlugin for PixelBuilderPlugin {
             lines.push(self.message.clone());
         }
         for (i, l) in lines.iter().enumerate() {
-            let pos = Vector2::new(14.0, 64.0 + 18.0 * i as f32);
+            // N14: the first line sits one row below the viewport's own top-left badges
+            // (Godot's `Following <node>` / preview-camera labels end near y = 66), so the
+            // follow badge never paints over "Pixel Builder - … mode".
+            let pos = Vector2::new(14.0, HUD_TOP + 18.0 * i as f32);
             overlay
                 .draw_string_ex(&font, pos + Vector2::new(1.0, 1.0), l.as_str())
                 .modulate(Color::from_rgba(0.0, 0.0, 0.0, 0.8005))
@@ -2455,6 +2461,9 @@ impl PixelBuilderPlugin {
             return;
         }
         self.adjust_commit();
+        if !self.reshape {
+            self.drop_recipe_hint();
+        }
         self.hover_face = None;
         self.hover_edge = None;
         self.hover_vert = None;
@@ -2499,6 +2508,14 @@ impl PixelBuilderPlugin {
         self.hover_handle = None;
         if self.tool != Tool::Select {
             self.assign_instrument(Tool::Select);
+        }
+    }
+
+    /// Clears a mesh-bound recipe hint (shape / Bezier re-edit) from the HUD status line.
+    pub(super) fn drop_recipe_hint(&mut self) {
+        if self.message.starts_with("Editing the ") || self.message.starts_with("Shape parameters:")
+        {
+            self.message.clear();
         }
     }
 
@@ -3374,6 +3391,9 @@ fn main_screen_has_focus(vp: Option<Gd<godot::classes::Viewport>>) -> bool {
         None => main.get_global_rect().contains_point(vp.get_mouse_position()),
     }
 }
+
+/// Baseline of the builder HUD's first line in the 3D viewport overlay (px).
+const HUD_TOP: f32 = 90.0;
 
 fn is_undo_redo_key(k: &Gd<InputEventKey>) -> bool {
     k.is_pressed()
