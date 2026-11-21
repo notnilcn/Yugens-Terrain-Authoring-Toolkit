@@ -32,6 +32,8 @@ use crate::editor::ui_kit::{self, CtlKind, Strip};
 #[derive(GodotClass)]
 #[class(tool, init, base = EditorPlugin)]
 pub struct PixelizerEditorPlugin {
+    /// Strip width the page tabs were laid out for (0 = no page tabs).
+    tabs_built_w: f32,
     selected: Option<Gd<Node>>,
     sec: Option<Sec>,
     /// Strip page of the current section (`sections::pages`).
@@ -167,6 +169,11 @@ impl IEditorPlugin for PixelizerEditorPlugin {
             .add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_SIDE_RIGHT, &world);
         toolbar.clone().set_visible(false);
         strip.clone().set_visible(false);
+        strip.clone().connect_flags(
+            "resized",
+            &Callable::from_object_method(&self.to_gd(), "on_strip_resized"),
+            ConnectFlags::DEFERRED,
+        );
         world.clone().set_visible(false);
         self.toolbar = Some(toolbar);
         self.peel = Some(strip);
@@ -324,6 +331,19 @@ impl PixelizerEditorPlugin {
     #[func]
     fn rebuild_strip_now(&mut self) {
         self.rebuild_strip();
+    }
+
+    /// The strip's width changed: page tabs chosen for another width (the first build runs
+    /// before the strip is laid out, R6-2; a window resize) are rebuilt for this one.
+    #[func]
+    fn on_strip_resized(&mut self) {
+        let Some(w) = self.peel.as_ref().map(|p| p.get_size().x) else {
+            return;
+        };
+        if self.visible && self.tabs_built_w > 0.0 && w >= 1.0 && (w - self.tabs_built_w).abs() > 1.0
+        {
+            self.rebuild_strip();
+        }
     }
 
     #[func]
@@ -660,6 +680,7 @@ impl PixelizerEditorPlugin {
         let Some(mut strip) = self.clear_strip() else {
             return;
         };
+        self.tabs_built_w = 0.0;
         let gd = self.to_gd();
         let s = self.current();
         // The node's title (its toolbar entry); its sections / pages are the tabs below.
@@ -723,15 +744,9 @@ impl PixelizerEditorPlugin {
             let mut width = strip.base.get_size().x;
             if width < 1.0 {
                 width = ui_kit::laid_out_width(&strip.base.clone().upcast());
-                let cb = Callable::from_object_method(&gd, "rebuild_strip_now");
-                if !strip.base.is_connected("resized", &cb) {
-                    strip.base.connect_flags(
-                        "resized",
-                        &cb,
-                        ConnectFlags::DEFERRED | ConnectFlags::ONE_SHOT,
-                    );
-                }
             }
+            // `on_strip_resized` rebuilds when the strip ends up at another width.
+            self.tabs_built_w = width;
             let avail = width - ui_kit::sz(140.0, 0.0).x;
             let n = names.len().max(1);
             let mut grid = w::page_grid("SectionPages", &names, cur, n, on_page);

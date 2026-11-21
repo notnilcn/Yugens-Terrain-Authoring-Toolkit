@@ -168,6 +168,14 @@ impl MstDemoHint {
         };
         self.base_mut()
             .add_theme_font_size_override("font_size", size);
+        // Compact windows: one binding per line. The three wide lines reached x 400 at 800x480,
+        // over the player the third-person camera keeps at the centre (R6-14).
+        let text = self.base().get_text().to_string();
+        let narrow = CONTROLS.replace("  ·  ", "\n");
+        let want = if vw >= self.compact_width { CONTROLS.to_string() } else { narrow.clone() };
+        if (text == CONTROLS || text == narrow) && text != want {
+            self.base_mut().set_text(&want);
+        }
         self.place_hint();
         // The Label's minimum size only follows the new font once the theme change has been
         // processed, so shrink to the text again next frame (else a 1024 -> 800 resize keeps

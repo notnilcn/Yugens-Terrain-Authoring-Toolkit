@@ -1442,7 +1442,13 @@ impl MstSidePanel {
         self.split_drag = true;
         if !self.is_collapsed() {
             let scale = editor_scale();
-            let mut w = ((-offset) as f32 / scale).clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+            // The split clamps the offset against the panel's current minimum before it emits
+            // it, so the offset can only ever widen the panel: the pointer gives the new left
+            // edge in both directions (the offset is the fallback).
+            let right = self.base().get_global_rect().end().x;
+            let mx = self.base().get_global_mouse_position().x;
+            let px_w = if mx.is_finite() && mx < right { right - mx } else { (-offset) as f32 };
+            let mut w = (px_w / scale).clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
             if let Some(b) = self.view_budget() {
                 w = w.min(b / scale).max(PANEL_MIN_WIDTH);
             }
