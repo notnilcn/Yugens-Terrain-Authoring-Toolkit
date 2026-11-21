@@ -2896,7 +2896,8 @@ impl Ui {
             .filter_map(|n| n.try_cast::<Button>().ok())
             .collect();
         let mut cur = tabs.iter().position(|b| b.is_pressed()).unwrap_or(0);
-        if !filled.get(cur).copied().unwrap_or(false) {
+        // The user's page is kept outside element modes (Object mode fills other pages).
+        if paged && !filled.get(cur).copied().unwrap_or(false) {
             cur = filled.iter().position(|x| *x).unwrap_or(0);
         }
         for (k, b) in tabs.iter_mut().enumerate() {
@@ -2904,7 +2905,7 @@ impl Ui {
             if b.is_visible() != on {
                 b.set_visible(on);
             }
-            if b.is_pressed() != (k == cur) {
+            if paged && b.is_pressed() != (k == cur) {
                 b.set_pressed_no_signal(k == cur);
             }
         }
