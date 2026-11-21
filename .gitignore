@@ -5,6 +5,7 @@ addons/MarchingSquaresTerrain/rust/target/
 tests/captures/
 *.tmp
 build/
+!addons/MarchingSquaresTerrain/rust/crates/pt_core/src/build/
 !addons/MarchingSquaresTerrain/rust/crates/pt_core/src/build/*
 !addons/MarchingSquaresTerrain/rust/crates/pt_core/src/build/**
 __pycache__/
