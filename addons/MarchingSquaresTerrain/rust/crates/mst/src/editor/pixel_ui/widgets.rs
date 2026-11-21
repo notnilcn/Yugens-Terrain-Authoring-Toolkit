@@ -50,7 +50,7 @@ pub fn push_button(caption: &str, icon_name: Option<&str>, tooltip: &str) -> Gd<
 
 /// Most page tabs per row of [`page_grid`]: the widest node (PixelWater, 7 pages) takes two
 /// rows, so the tab block stays narrow (about 4 tab widths) whatever the section.
-pub const PAGE_TAB_COLUMNS: i32 = 4;
+pub const PAGE_TAB_COLUMNS: i32 = 3;
 
 /// Page tabs of a strip as a fixed grid of toggle buttons (one per `(name, tooltip)`, at most
 /// [`PAGE_TAB_COLUMNS`] per row); `on_page(k)` is connected to button `k`'s `pressed`. Buttons

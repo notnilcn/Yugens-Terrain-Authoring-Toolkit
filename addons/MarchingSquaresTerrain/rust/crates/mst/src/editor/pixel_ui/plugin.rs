@@ -730,12 +730,13 @@ impl PixelizerEditorPlugin {
             let mut grid = grid;
             grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&grid);
-            strip.flow.add_child(&header);
-            strip.separator();
+            // Pinned above the scrolling page body: scrolling a long page never hides or
+            // slides the tabs (N23).
+            strip.pin_header(&header);
             // The strip is bottom-anchored: a page with more rows would grow it upward and move
-            // the tab row under the pointer (#33). Keep paged sections at the strip's height cap
-            // so the tabs stay put (the content scrolls when it needs more).
-            strip.pin_height();
+            // the tab row under the pointer (#33). Keep the strip's height stable across this
+            // node's pages (the content scrolls when it needs more).
+            strip.pin_height(&format!("pixel:{:?}", sections::head(s.sec)));
         }
         let range = sections::page_range(s.sec, self.page, s.fields.len());
         for (i, fd) in s

@@ -206,13 +206,16 @@ impl MarchingSquaresTerrainPlugin {
         }
         self.chunk_list = None;
         let tool = self.state.tool;
-        let mut title = strip.heading(tool.moniker(), ui_kit::glyph(tool.glyph()), &tool.tooltip());
-        title.set_name("ToolTitle");
+        if tool != Tool::TerrainSettings {
+            let mut title =
+                strip.heading(tool.moniker(), ui_kit::glyph(tool.glyph()), &tool.tooltip());
+            title.set_name("ToolTitle");
+        }
         match self.state.tool {
             Tool::ChunkManager => self.build_chunk_strip(&mut strip),
             Tool::TerrainSettings => {
-                // Same strip height on every page: the page tabs stay under the pointer.
-                strip.pin_height();
+                // Stable strip height across pages: the page tabs stay under the pointer.
+                strip.pin_height("terrain_settings");
                 self.build_settings_strip(&mut strip)
             }
             t => {
@@ -1008,6 +1011,19 @@ impl MarchingSquaresTerrainPlugin {
             self.cb1("on_settings_page", k as i64)
         });
         tabs.set_h_size_flags(SizeFlags::SHRINK_BEGIN);
+        // Title + page tabs: one header pinned above the scrolling page body (N16).
+        let tool = Tool::TerrainSettings;
+        let mut header = HBoxContainer::new_alloc();
+        header.set_name("SettingsHeader");
+        header.add_theme_constant_override("separation", ui_kit::px(6.0));
+        let mut title = ui_kit::title_button(tool.moniker(), ui_kit::glyph(tool.glyph()));
+        title.set_name("ToolTitle");
+        title.set_tooltip_text(&tool.tooltip());
+        title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
+        header.add_child(&title);
+        header.add_child(&godot::classes::VSeparator::new_alloc());
+        header.add_child(&tabs);
+        strip.pin_header(&header);
         let rows: Vec<(usize, &TSetting)> = TERRAIN_SETTINGS
             .iter()
             .enumerate()
@@ -1044,14 +1060,8 @@ impl MarchingSquaresTerrainPlugin {
             .iter()
             .map(|r| r.get_combined_minimum_size().x)
             .collect();
-        let lead = strip
-            .flow
-            .get_children()
-            .iter_shared()
-            .filter_map(|c| c.try_cast::<Control>().ok())
-            .map(|c| c.get_combined_minimum_size().x)
-            .sum::<f32>()
-            + sz(64.0, 0.0).x;
+        // The header has its own row now: the columns get the full strip width.
+        let lead = sz(16.0, 0.0).x;
         let avail = {
             let w = strip.base.get_size().x;
             if w > 1.0 {
@@ -1095,7 +1105,6 @@ impl MarchingSquaresTerrainPlugin {
         let mut block = VBoxContainer::new_alloc();
         block.set_name("SettingsPage");
         block.add_theme_constant_override("separation", ui_kit::px(2.0));
-        block.add_child(&tabs);
         block.add_child(&cols);
         strip.custom("", &block);
     }
