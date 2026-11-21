@@ -58,6 +58,9 @@ const MAX_PER_CLASS: usize = 8;
 const MAX_TRIANGLE_CANDIDATES: usize = 24;
 /// Nodes in this group (and their subtrees) are never picked.
 pub const PICK_IGNORE_GROUP: &str = "pixel_diagnostics_ignore";
+/// HUD controls in this group (e.g. the demo's F1 help) are kept clear of: a dock whose column
+/// overlaps one ends above it instead of drawing over it.
+pub const KEEP_CLEAR_GROUP: &str = "pixel_diagnostics_keep_clear";
 const SELECT_HINT: &str = "Press \"Select Object\", then click a mesh in the viewport.";
 const SELECTING_HINT: &str = "Click a mesh to select it (hover highlights, Esc cancels).";
 
@@ -134,6 +137,7 @@ pub struct PixelDiagnostics {
     tuner_body: Vec<Gd<Control>>,
     tuner_collapsed: bool,
     collapse_button: Option<Gd<Button>>,
+    tuner_title: Option<Gd<Button>>,
     sections: Vec<Gd<VBoxContainer>>,
     feature_checks: Vec<(Feature, Gd<CheckBox>)>,
     live: Vec<Live>,
@@ -171,6 +175,7 @@ impl ICanvasLayer for PixelDiagnostics {
             tuner_body: Vec::new(),
             tuner_collapsed: false,
             collapse_button: None,
+            tuner_title: None,
             sections: Vec::new(),
             feature_checks: Vec::new(),
             live: Vec::new(),
@@ -499,7 +504,9 @@ impl PixelDiagnostics {
     fn scroll_with(&self, inner: &Gd<VBoxContainer>) -> Gd<ScrollContainer> {
         let mut scroll = ScrollContainer::new_alloc();
         scroll.set_v_size_flags(SizeFlags::EXPAND_FILL);
-        scroll.set_horizontal_scroll_mode(ScrollMode::DISABLED);
+        // AUTO, not DISABLED: a disabled horizontal mode forwards the content's minimum width to
+        // the dock, which then grows past its width cap. Wider rows scroll instead.
+        scroll.set_horizontal_scroll_mode(ScrollMode::AUTO);
         let mut inner = inner.clone();
         inner.set_h_size_flags(SizeFlags::EXPAND_FILL);
         scroll.add_child(&inner);
@@ -526,8 +533,17 @@ impl PixelDiagnostics {
         let mut tuner = self.dock(true);
         let mut col = VBoxContainer::new_alloc();
         let mut header = HBoxContainer::new_alloc();
-        let mut title = label("Pixel tuner");
+        // The title is the collapse control too (flat, with a chevron).
+        let mut title = button("\u{25BE} Pixel tuner");
+        title.set_flat(true);
+        title.set_text_alignment(godot::global::HorizontalAlignment::LEFT);
+        title.set_clip_text(true);
+        title.set_tooltip_text("Collapse / expand the tuner.");
         title.set_h_size_flags(SizeFlags::EXPAND_FILL);
+        title.connect(
+            "pressed",
+            &Callable::from_object_method(&this, "toggle_tuner_collapsed"),
+        );
         header.add_child(&title);
         let mut rescan = button("Rescan");
         rescan.connect("pressed", &Callable::from_object_method(&this, "rescan"));
@@ -546,6 +562,10 @@ impl PixelDiagnostics {
         dv_label.set_h_size_flags(SizeFlags::EXPAND_FILL);
         dv_row.add_child(&dv_label);
         let mut dv = OptionButton::new_alloc();
+        // Keep the longest debug-view name from setting the dock's minimum width.
+        dv.set_fit_to_longest_item(false);
+        dv.set_clip_text(true);
+        dv.set_h_size_flags(SizeFlags::EXPAND_FILL);
         for (name, id) in debug_views() {
             dv.add_item_ex(name.as_str()).id(id as i32).done();
         }
@@ -559,6 +579,7 @@ impl PixelDiagnostics {
         let mut tabs = TabContainer::new_alloc();
         tabs.set_v_size_flags(SizeFlags::EXPAND_FILL);
         tabs.add_theme_font_size_override("font_size", 12);
+        tabs.set_clip_tabs(true);
         let mut sections = Vec::new();
         for name in TABS {
             let inner = VBoxContainer::new_alloc();
@@ -570,6 +591,7 @@ impl PixelDiagnostics {
         col.add_child(&tabs);
         self.tuner_body = vec![dv_row.clone().upcast(), tabs.clone().upcast()];
         self.collapse_button = Some(collapse);
+        self.tuner_title = Some(title);
         tuner.add_child(&col);
         tuner.set_visible(self.show_tuner);
         root.add_child(&tuner);
@@ -579,6 +601,7 @@ impl PixelDiagnostics {
         let mut ocol = VBoxContainer::new_alloc();
         let mut oheader = HBoxContainer::new_alloc();
         let mut otitle = label("Object inspector");
+        otitle.set_clip_text(true);
         otitle.set_h_size_flags(SizeFlags::EXPAND_FILL);
         oheader.add_child(&otitle);
         let mut select = button("Select Object");
@@ -619,6 +642,34 @@ impl PixelDiagnostics {
         self.object_info = Some(info);
         self.object_sections = Some(osections);
         self.select_button = Some(select);
+    }
+
+    /// Distance (px) from the window bottom at which a dock spanning `[x0, x1]` must end so it
+    /// stays above every visible `KEEP_CLEAR_GROUP` control in that column (8 px otherwise).
+    fn keep_clear_bottom(&self, x0: f32, x1: f32) -> f32 {
+        let mut bottom = 8.0f32;
+        let Some(vp) = self.base().get_viewport() else {
+            return bottom;
+        };
+        let vh = vp.get_visible_rect().size.y;
+        if !self.base().is_inside_tree() {
+            return bottom;
+        }
+        let tree = self.base().get_tree();
+        for n in tree.get_nodes_in_group(KEEP_CLEAR_GROUP).iter_shared() {
+            let Ok(c) = n.try_cast::<Control>() else {
+                continue;
+            };
+            if !c.is_visible_in_tree() {
+                continue;
+            }
+            let r = c.get_global_rect();
+            if r.position.x < x1 && r.position.x + r.size.x > x0 {
+                bottom = bottom.max(vh - r.position.y + 8.0);
+            }
+        }
+        // Never squeeze a dock below ~40% of the window.
+        bottom.min(vh * 0.6)
     }
 
     fn scene_root(&self) -> Option<Gd<Node>> {
@@ -701,18 +752,34 @@ impl PixelDiagnostics {
             .as_ref()
             .is_some_and(|s| s.is_instance_valid());
         let w = self.dock_width();
+        let vw = self
+            .base()
+            .get_viewport()
+            .map(|vp| vp.get_visible_rect().size.x)
+            .unwrap_or(1920.0);
+        // Right dock spans [vw - w - 8, vw - 8], left dock [8, w + 8].
+        let right_bottom = self.keep_clear_bottom(vw - w - 8.0, vw - 8.0);
+        let left_bottom = self.keep_clear_bottom(8.0, w + 8.0);
         let collapsed = self.tuner_collapsed;
         if let Some(t) = &mut self.tuner {
             t.set_visible(show_tuner);
             t.set_offset(Side::TOP, top);
             t.set_offset(Side::LEFT, -w - 8.0);
+            t.set_offset(Side::RIGHT, -8.0);
             // Collapsed: just the header, like the object inspector without a selection.
             if collapsed {
                 t.set_anchor(Side::BOTTOM, 0.0);
                 t.set_offset(Side::BOTTOM, top);
             } else {
                 t.set_anchor(Side::BOTTOM, 1.0);
-                t.set_offset(Side::BOTTOM, -8.0);
+                t.set_offset(Side::BOTTOM, -right_bottom);
+            }
+            // The content's minimum width is kept small (clipped title / debug view, scrolling
+            // tabs); if a scene still forces more, keep the dock right-anchored and grow it
+            // leftwards explicitly, never past half the window.
+            let min_w = t.get_combined_minimum_size().x;
+            if min_w > w + 0.5 {
+                t.set_offset(Side::LEFT, -min_w.min(vw * 0.5) - 8.0);
             }
         }
         if let Some(t) = &mut self.object_panel {
@@ -723,7 +790,7 @@ impl PixelDiagnostics {
             // the left of the screen.
             if has_selection {
                 t.set_anchor(Side::BOTTOM, 1.0);
-                t.set_offset(Side::BOTTOM, -8.0);
+                t.set_offset(Side::BOTTOM, -left_bottom);
             } else {
                 t.set_anchor(Side::BOTTOM, 0.0);
                 t.set_offset(Side::BOTTOM, top);
@@ -1489,6 +1556,13 @@ impl PixelDiagnostics {
         }
         if let Some(b) = &mut self.collapse_button {
             b.set_text(if shown { "Hide" } else { "Show" });
+        }
+        if let Some(t) = &mut self.tuner_title {
+            t.set_text(if shown {
+                "\u{25BE} Pixel tuner"
+            } else {
+                "\u{25B8} Pixel tuner"
+            });
         }
         self.update_status();
     }
