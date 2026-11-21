@@ -130,6 +130,9 @@ pub struct PixelSunShafts {
     mat: Option<Gd<ShaderMaterial>>,
     /// Sun basis + count + depth the MultiMesh was last built for.
     built: Option<(Basis, i32, f32)>,
+    /// Camera-to-focus distance and the sun's shadow distance when the camera is too far for
+    /// the shadow map to reach the scene (no shaft can show); drives a configuration warning.
+    out_of_reach: Option<(f32, f32)>,
     base: Base<Node3D>,
 }
 
@@ -160,6 +163,7 @@ impl INode3D for PixelSunShafts {
             quad: None,
             mat: None,
             built: None,
+            out_of_reach: None,
             base,
         }
     }
@@ -222,13 +226,72 @@ impl INode3D for PixelSunShafts {
             Some(s) if !s.has_shadow() => {
                 w.push("Turn on shadows on the sun: the shafts are cut by its shadow map.")
             }
-            _ => {}
+            Some(_) => {
+                if let Some((dist, reach)) = self.out_of_reach {
+                    w.push(&format!(
+                        "The camera is {dist:.0} m from what it looks at, past the sun's shadows \
+                         (directional_shadow_max_distance {reach:.0} m; shafts fade out from \
+                         {:.0} m): there is no shadow to cut shafts, so nothing shows. Raise the \
+                         sun's directional_shadow_max_distance to at least {:.0} m or move the \
+                         camera closer.",
+                        reach * SHADOW_REACH_END,
+                        dist / SHADOW_REACH_END
+                    ));
+                }
+                if !self.has_occluder() {
+                    w.push(
+                        "No shadow caster stands above the ground near this node: shafts are the \
+                         lit gaps between shadows of pillars, trunks and canopies, so open ground \
+                         shows no shaft. Add tall geometry (trees, walls) inside the stack.",
+                    );
+                }
+            }
         }
         w
     }
 }
 
+/// Fraction of the shadow distance where `sun_shafts.gdshader` has faded the sheets out
+/// (`smoothstep(shadow_reach * 0.35, shadow_reach * 0.6, …)`).
+const SHADOW_REACH_END: f32 = 0.6;
+
 impl PixelSunShafts {
+    /// Whether any visible shadow-casting geometry (other than this node's sheets) rises at
+    /// least a metre above this node within the stack's footprint: shafts need something to
+    /// cast the shadows between them. Walks the scene, so only for the configuration warnings.
+    fn has_occluder(&self) -> bool {
+        let owner: Gd<Node> = self.to_gd().upcast();
+        if !owner.is_inside_tree() {
+            return true;
+        }
+        let root: Option<Gd<Node>> = if is_editor() {
+            godot::classes::EditorInterface::singleton().get_edited_scene_root()
+        } else {
+            owner.get_tree().get_current_scene()
+        };
+        let Some(root) = root else { return true };
+        let centre = self.base().get_global_position();
+        let half = self.size * 0.5;
+        root.find_children_ex("*")
+            .type_("GeometryInstance3D")
+            .recursive(true)
+            .owned(false)
+            .done()
+            .iter_shared()
+            .filter_map(|n| n.try_cast::<godot::classes::GeometryInstance3D>().ok())
+            .filter(|g| !owner.is_ancestor_of(g) && g.is_visible_in_tree())
+            .filter(|g| g.get_cast_shadows_setting() != ShadowCastingSetting::OFF)
+            .any(|g| {
+                let b = g.get_global_transform() * g.get_aabb();
+                let top = b.position.y + b.size.y;
+                let near = |lo: f32, len: f32, c: f32| lo - half <= c && c <= lo + len + half;
+                b.size.y.is_finite()
+                    && top > centre.y + 1.0
+                    && near(b.position.x, b.size.x, centre.x)
+                    && near(b.position.z, b.size.z, centre.z)
+            })
+    }
+
     /// The explicit `sun`, else the first sibling DirectionalLight3D, else the first
     /// DirectionalLight3D anywhere in the scene (a node added under Pixel World is not a sibling
     /// of the scene's sun; an empty slot must still produce shafts).
@@ -263,6 +326,17 @@ impl PixelSunShafts {
         };
         let basis = sun.get_global_basis().orthonormalized();
         let reach = sun.get_param(Param::SHADOW_MAX_DISTANCE);
+        let node: Gd<Node> = self.to_gd().upcast();
+        let base_pos = self.base().get_global_position();
+        let far = super::active_camera(&node).and_then(|cam| {
+            let dist = (super::camera_focus(&cam, base_pos.y) - cam.get_global_position()).length();
+            (sun.has_shadow() && reach > 0.0 && dist > reach * SHADOW_REACH_END)
+                .then_some(((dist / 5.0).round() * 5.0, reach))
+        });
+        if far != self.out_of_reach {
+            self.out_of_reach = far;
+            self.base_mut().update_configuration_warnings();
+        }
         if let Some(m) = &mut self.mat {
             m.param("shadow_reach", &reach.to_variant());
         }
