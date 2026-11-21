@@ -1,0 +1,194 @@
+[gd_scene format=3]
+
+[ext_resource type="MarchingSquaresTerrainData" path="res://tutorial/data/01_flat_playground.res" id="1_n5y5e"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="2_dosm1"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/grass.png" id="3_sgngt"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/meadow.png" id="4_cos86"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/forest_floor.png" id="5_0mgo3"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/sand.png" id="6_c0bap"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/dirt.png" id="7_wk673"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/cliff.png" id="8_hqbh3"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/dark_rock.png" id="9_pyd4e"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="10_tnjy2"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/gravel.png" id="11_ft3cr"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="12_emibu"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/moss.png" id="13_3ejh1"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/path.png" id="14_6hmnu"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/plain.png" id="15_7pd7k"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/textures/ground/void.png" id="16_p1te4"]
+[ext_resource type="Script" path="res://tutorial/orbit_camera.gd" id="17_chnh3"]
+
+[sub_resource type="Environment" id="Environment_ais75"]
+background_mode = 1
+background_color = Color(0.52, 0.67, 0.87, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.6, 0.72, 1)
+ambient_light_energy = 0.6
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_rm3xm"]
+display_name = "Grass"
+texture = ExtResource("3_sgngt")
+pattern = 0
+tint = Color(0.43529412, 0.6039216, 0.2901961, 1)
+has_grass = true
+grass_sprite = ExtResource("2_dosm1")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_k8uil"]
+display_name = "Meadow"
+texture = ExtResource("4_cos86")
+pattern = 1
+tint = Color(0.5764706, 0.69803923, 0.34117648, 1)
+has_grass = true
+grass_tint = Color(1.1205, 1.1005, 0.8805, 1)
+grass_sprite = ExtResource("2_dosm1")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_8v0qr"]
+display_name = "Forest Floor"
+texture = ExtResource("5_0mgo3")
+pattern = 2
+tint = Color(0.29803923, 0.41960785, 0.22745098, 1)
+has_grass = true
+grass_tint = Color(0.9205, 1.0505, 0.9205, 1)
+grass_sprite = ExtResource("2_dosm1")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_rwvql"]
+display_name = "Sand"
+texture = ExtResource("6_c0bap")
+pattern = 3
+tint = Color(0.8509804, 0.76862746, 0.56078434, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_kw7o4"]
+display_name = "Dirt"
+texture = ExtResource("7_wk673")
+pattern = 4
+tint = Color(0.54901963, 0.41568628, 0.28235295, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_004w6"]
+display_name = "Cliff"
+texture = ExtResource("8_hqbh3")
+pattern = 5
+tint = Color(0.627451, 0.54901963, 0.47058824, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_1klvu"]
+display_name = "Dark Rock"
+texture = ExtResource("9_pyd4e")
+pattern = 6
+tint = Color(0.41568628, 0.39215687, 0.3764706, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_o8ea7"]
+display_name = "Snow"
+texture = ExtResource("10_tnjy2")
+pattern = 7
+tint = Color(0.93333334, 0.9490196, 0.95686275, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_gy11p"]
+display_name = "Gravel"
+texture = ExtResource("11_ft3cr")
+pattern = 8
+tint = Color(0.6039216, 0.5803922, 0.5411765, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_e1h7r"]
+display_name = "Clay"
+texture = ExtResource("12_emibu")
+pattern = 9
+tint = Color(0.6901961, 0.43137255, 0.29803923, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_568eb"]
+display_name = "Moss"
+texture = ExtResource("13_3ejh1")
+pattern = 10
+tint = Color(0.37254903, 0.49803922, 0.23529412, 1)
+has_grass = true
+grass_tint = Color(1, 1.0805, 0.8605, 1)
+grass_sprite = ExtResource("2_dosm1")
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_g4i5q"]
+display_name = "Path"
+texture = ExtResource("14_6hmnu")
+pattern = 11
+tint = Color(0.7607843, 0.64705884, 0.4862745, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_ajw4i"]
+display_name = "Stone Tiles"
+texture = ExtResource("15_7pd7k")
+tint = Color(0.65882355, 0.6431373, 0.6039216, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_s1418"]
+display_name = "Ash"
+texture = ExtResource("15_7pd7k")
+tint = Color(0.33333334, 0.32156864, 0.30980393, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_hofoe"]
+display_name = "Ice"
+texture = ExtResource("15_7pd7k")
+tint = Color(0.7254902, 0.8509804, 0.9019608, 1)
+
+[sub_resource type="MarchingSquaresTextureSlot" id="MarchingSquaresTextureSlot_2c5si"]
+display_name = "Void"
+texture = ExtResource("16_p1te4")
+pattern = 13
+tint = Color(1, 1, 1, 1)
+
+[sub_resource type="MarchingSquaresTexturePreset" id="MarchingSquaresTexturePreset_iuywf"]
+preset_name = "Tutorial"
+slots = Array[MarchingSquaresTextureSlot]([SubResource("MarchingSquaresTextureSlot_rm3xm"), SubResource("MarchingSquaresTextureSlot_k8uil"), SubResource("MarchingSquaresTextureSlot_8v0qr"), SubResource("MarchingSquaresTextureSlot_rwvql"), SubResource("MarchingSquaresTextureSlot_kw7o4"), SubResource("MarchingSquaresTextureSlot_004w6"), SubResource("MarchingSquaresTextureSlot_1klvu"), SubResource("MarchingSquaresTextureSlot_o8ea7"), SubResource("MarchingSquaresTextureSlot_gy11p"), SubResource("MarchingSquaresTextureSlot_e1h7r"), SubResource("MarchingSquaresTextureSlot_568eb"), SubResource("MarchingSquaresTextureSlot_g4i5q"), SubResource("MarchingSquaresTextureSlot_ajw4i"), SubResource("MarchingSquaresTextureSlot_s1418"), SubResource("MarchingSquaresTextureSlot_hofoe"), SubResource("MarchingSquaresTextureSlot_2c5si")])
+
+[sub_resource type="PixelPalette" id="PixelPalette_kua7j"]
+resource_name = "Tutorial"
+
+[node name="Playground" type="Node3D" unique_id=1030070981]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1610428001]
+environment = SubResource("Environment_ais75")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=963643580]
+transform = Transform3D(0.7880108, 0.4575257, -0.41195792, 0, 0.66913056, 0.74314487, 0.6156615, -0.58560616, 0.5272821, 0, 0, 0)
+light_color = Color(1, 0.96, 0.88, 1)
+light_energy = 1.1
+shadow_enabled = true
+directional_shadow_max_distance = 120.0
+
+[node name="MarchingSquaresTerrain" type="MarchingSquaresTerrain" parent="." unique_id=1142998426 node_paths=PackedStringArray("waters")]
+contents = ExtResource("1_n5y5e")
+chunk_size = 16
+tex_assign = SubResource("MarchingSquaresTexturePreset_iuywf")
+grass_size = Vector2(0.55, 0.65)
+grass_min_height = -1.0
+waters = [NodePath("../PixelWater")]
+
+[node name="PixelWater" type="PixelWater" parent="." unique_id=1043367046]
+size = Vector2(400, 400)
+subdivisions = 128
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, -1.2, 48)
+
+[node name="Camera" type="Camera3D" parent="." unique_id=1637397869]
+transform = Transform3D(0.80901706, -0.2938926, 0.5090369, 0, 0.8660254, 0.5, -0.5877852, -0.40450853, 0.7006293, 139.62665, 93, 174.11328)
+projection = 1
+current = true
+size = 135.0
+script = ExtResource("17_chnh3")
+target = Vector3(48, 3, 48)
+distance = 180.0
+yaw_deg = 36.0
+pitch_deg = 30.0
+
+[node name="PixelRenderer" type="PixelRenderer" parent="." unique_id=1859881915]
+pixel_size = 2
+studio_prelook = true
+palette = SubResource("PixelPalette_kua7j")
+
+[node name="PixelSky" type="PixelSky" parent="." unique_id=80314860 node_paths=PackedStringArray("sun")]
+sun = NodePath("../Sun")
+coverage = 0.45
+softness = 0.12
+cloud_scale = 0.02
+cloud_height = 300.0
+deck_enabled = true
+deck_size = 500.0
+deck_opacity = 0.85
+
+[node name="PixelDayNight" type="PixelDayNight" parent="." unique_id=1495069751 node_paths=PackedStringArray("sun", "environment")]
+time_of_day = 0.42
+day_length_seconds = 600.0
+sun = NodePath("../Sun")
+environment = NodePath("../WorldEnvironment")

@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[node name="SavePresetDialog" type="AcceptDialog"]
+title = "Save Preset"
+
+[node name="Body" type="VBoxContainer" parent="."]
+
+[node name="Prompt" type="Label" parent="Body"]
+layout_mode = 2
+
+[node name="PresetName" type="LineEdit" parent="Body"]
+layout_mode = 2

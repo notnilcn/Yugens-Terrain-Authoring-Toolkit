@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[node name="BuilderExportOptions" type="AcceptDialog"]
+title = "Builder export options"
+
+[node name="Rows" type="VBoxContainer" parent="."]
+
+[node name="Heading" type="Label" parent="Rows"]
+layout_mode = 2
+text = "Used by Export OBJ / STL / PLY; Godot Mesh uses world transforms and combine
+(glTF exports the whole mesh)"
+
+[node name="SelectedOnly" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Only the faces selected in Face mode (the export buttons show in Face mode too)"
+text = "Selected faces only"
+
+[node name="ApplyTransforms" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Write world-space positions (the node's position, rotation and scale baked in)"
+text = "Apply world transforms"
+
+[node name="VertexColours" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Write face / vertex-paint colours (OBJ: after the position, PLY: red green blue alpha)"
+text = "Vertex colours"
+
+[node name="RightHanded" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Off mirrors X for left-handed tools"
+text = "Right-handed (Godot axes)"
+
+[node name="Combine" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "One file with every builder mesh selected in the Scene dock (Ctrl+click them)"
+text = "Combine selected builder meshes"
+
+[node name="StlBinary" type="CheckBox" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Off writes ASCII STL"
+text = "STL binary"

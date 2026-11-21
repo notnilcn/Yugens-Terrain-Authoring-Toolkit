@@ -1,0 +1,178 @@
+[gd_scene format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6cidk"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.0605, 0.0705, 0.0905, 0.8205)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4vicw"]
+transparency = 1
+cull_mode = 2
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(1, 0.9005, 0.2005, 0.2205)
+
+[sub_resource type="BoxMesh" id="BoxMesh_kn0ka"]
+
+[node name="PixelDiagnosticsOverlay" type="Node" unique_id=1047039597]
+
+[node name="Overlay" type="Control" parent="." unique_id=1050636739]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="StatusPanel" type="PanelContainer" parent="Overlay" unique_id=128535246]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 8.0
+offset_bottom = 8.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_6cidk")
+
+[node name="Status" type="Label" parent="Overlay/StatusPanel" unique_id=1413381362]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "..."
+
+[node name="Tuner" type="PanelContainer" parent="Overlay" unique_id=1552541594]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 72.0
+offset_bottom = -8.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6cidk")
+
+[node name="Column" type="VBoxContainer" parent="Overlay/Tuner" unique_id=483426936]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Overlay/Tuner/Column" unique_id=269933040]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Overlay/Tuner/Column/Header" unique_id=1973932881]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Pixel tuner"
+
+[node name="Rescan" type="Button" parent="Overlay/Tuner/Column/Header" unique_id=1910180707]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Rescan"
+
+[node name="DebugViewRow" type="HBoxContainer" parent="Overlay/Tuner/Column" unique_id=107195063]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Overlay/Tuner/Column/DebugViewRow" unique_id=517434447]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Debug view"
+
+[node name="DebugView" type="OptionButton" parent="Overlay/Tuner/Column/DebugViewRow" unique_id=1552573554]
+layout_mode = 2
+
+[node name="Tabs" type="TabContainer" parent="Overlay/Tuner/Column" unique_id=1451941153]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 12
+current_tab = 0
+
+[node name="Effects" type="ScrollContainer" parent="Overlay/Tuner/Column/Tabs" unique_id=1579035035]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+metadata/_tab_index = 0
+
+[node name="Sections" type="VBoxContainer" parent="Overlay/Tuner/Column/Tabs/Effects" unique_id=424487745]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Render" type="ScrollContainer" parent="Overlay/Tuner/Column/Tabs" unique_id=1552005833]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+metadata/_tab_index = 1
+
+[node name="Sections" type="VBoxContainer" parent="Overlay/Tuner/Column/Tabs/Render" unique_id=1118772208]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Scene" type="ScrollContainer" parent="Overlay/Tuner/Column/Tabs" unique_id=1809989220]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+metadata/_tab_index = 2
+
+[node name="Sections" type="VBoxContainer" parent="Overlay/Tuner/Column/Tabs/Scene" unique_id=1302940052]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ObjectPanel" type="PanelContainer" parent="Overlay" unique_id=718220465]
+layout_mode = 0
+anchor_bottom = 1.0
+offset_top = 72.0
+offset_bottom = -8.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_6cidk")
+
+[node name="Column" type="VBoxContainer" parent="Overlay/ObjectPanel" unique_id=755487021]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Overlay/ObjectPanel/Column" unique_id=1250932277]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Overlay/ObjectPanel/Column/Header" unique_id=1445716578]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Object inspector"
+
+[node name="Select" type="Button" parent="Overlay/ObjectPanel/Column/Header" unique_id=931120104]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+toggle_mode = true
+text = "Select Object"
+
+[node name="Clear" type="Button" parent="Overlay/ObjectPanel/Column/Header" unique_id=1846924266]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Clear"
+
+[node name="Hint" type="Label" parent="Overlay/ObjectPanel/Column" unique_id=1442592606]
+modulate = Color(1, 1, 1, 0.7005)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Press \"Select Object\", then click a mesh in the viewport."
+autowrap_mode = 3
+
+[node name="Info" type="Label" parent="Overlay/ObjectPanel/Column" unique_id=7235001]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 3
+
+[node name="Scroll" type="ScrollContainer" parent="Overlay/ObjectPanel/Column" unique_id=1363776271]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Sections" type="VBoxContainer" parent="Overlay/ObjectPanel/Column/Scroll" unique_id=147575286]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SelectionMarker" type="MeshInstance3D" parent="." unique_id=1861848447 groups=["pixel_diagnostics_ignore"]]
+visible = false
+material_override = SubResource("StandardMaterial3D_4vicw")
+cast_shadow = 0
+mesh = SubResource("BoxMesh_kn0ka")

@@ -1,0 +1,131 @@
+[gd_scene format=3]
+
+[node name="ModelerCoreInspectorSection" type="VBoxContainer"]
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+text = "Editable Mesh"
+autowrap_mode = 3
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NotEditable" type="VBoxContainer" parent="Content"]
+layout_mode = 2
+
+[node name="Message" type="Label" parent="Content/NotEditable"]
+layout_mode = 2
+text = "This mesh is not editable yet."
+autowrap_mode = 3
+
+[node name="MakeEditable" type="Button" parent="Content/NotEditable"]
+layout_mode = 2
+tooltip_text = "Convert the selected mesh or CSG shape to an editable mesh."
+text = "Make Editable"
+
+[node name="Mesh" type="FoldableContainer" parent="Content"]
+layout_mode = 2
+title = "Mesh"
+
+[node name="Column" type="VBoxContainer" parent="Content/Mesh"]
+layout_mode = 2
+
+[node name="Stats" type="PixelBuilderInspectorStats" parent="Content/Mesh/Column" node_paths=PackedStringArray("counts_caption", "slots_caption", "uv2_caption", "collision_caption")]
+counts_caption = NodePath("Counts")
+slots_caption = NodePath("Slots")
+uv2_caption = NodePath("../../../UvLightmap/Column/Uv2")
+collision_caption = NodePath("../../../Collision/Column/Current")
+layout_mode = 2
+
+[node name="Counts" type="Label" parent="Content/Mesh/Column/Stats"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Slots" type="Label" parent="Content/Mesh/Column/Stats"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Recipe" type="FoldableContainer" parent="Content"]
+layout_mode = 2
+title = "Shape"
+
+[node name="Column" type="VBoxContainer" parent="Content/Recipe"]
+layout_mode = 2
+
+[node name="Warning" type="Label" parent="Content/Recipe/Column"]
+layout_mode = 2
+text = "Rebuilding replaces the element edits. Undo can restore them."
+autowrap_mode = 3
+
+[node name="EditRecipe" type="Button" parent="Content/Recipe/Column"]
+layout_mode = 2
+tooltip_text = "Reopen the recipe this mesh was drawn from (Object mode): the shape fields rebuild it live"
+text = "Edit Shape"
+
+[node name="UvLightmap" type="FoldableContainer" parent="Content"]
+layout_mode = 2
+title = "UV & Lightmap"
+
+[node name="Column" type="VBoxContainer" parent="Content/UvLightmap"]
+layout_mode = 2
+
+[node name="Uv2" type="Label" parent="Content/UvLightmap/Column"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="OpenUvEditor" type="Button" parent="Content/UvLightmap/Column"]
+layout_mode = 2
+tooltip_text = "Open the builder's UV editor for this mesh"
+text = "Open UV Editor"
+
+[node name="GenerateUv2" type="Button" parent="Content/UvLightmap/Column"]
+layout_mode = 2
+tooltip_text = "Unwrap lightmap UV2 (Live UV2 on, at the Lightmap texel of the preferences)"
+text = "Generate Lightmap UVs"
+
+[node name="Collision" type="FoldableContainer" parent="Content"]
+layout_mode = 2
+title = "Collision"
+
+[node name="Column" type="VBoxContainer" parent="Content/Collision"]
+layout_mode = 2
+
+[node name="Current" type="Label" parent="Content/Collision/Column"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="SetCollider" type="Button" parent="Content/Collision/Column"]
+layout_mode = 2
+tooltip_text = "Toggle: an invisible static collider in the game"
+text = "Set Collider"
+
+[node name="SetTrigger" type="Button" parent="Content/Collision/Column"]
+layout_mode = 2
+tooltip_text = "Toggle: an invisible Area3D trigger volume in the game"
+text = "Set Trigger"
+
+[node name="ExportData" type="FoldableContainer" parent="Content"]
+layout_mode = 2
+title = "Export & Data"
+
+[node name="Column" type="VBoxContainer" parent="Content/ExportData"]
+layout_mode = 2
+
+[node name="ExportNative" type="Button" parent="Content/ExportData/Column"]
+layout_mode = 2
+tooltip_text = "Export the compiled mesh with its materials as a Godot mesh resource (.res / .tres)"
+text = "Export Native Mesh…"
+
+[node name="Strip" type="Button" parent="Content/ExportData/Column"]
+layout_mode = 2
+tooltip_text = "Replace the builder mesh by a plain MeshInstance3D (keeps the mesh, drops the editable data; undoable)"
+text = "Strip Editable Data…"
+
+[node name="StripConfirm" type="ConfirmationDialog" parent="Content/ExportData/Column"]
+title = "Strip Editable Data?"
+ok_button_text = "Strip"
+dialog_text = "The mesh stays, the editable builder data is removed (undoable)."
+
+[node name="Separator" type="HSeparator" parent="."]
+layout_mode = 2

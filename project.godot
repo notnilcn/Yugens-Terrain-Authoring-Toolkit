@@ -1,0 +1,49 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Marching Squares Terrain"
+config/description="Marching-squares terrain authoring + 3D pixel-art rendering for Godot 4.7 (Compatibility), written in Rust."
+run/main_scene="res://demo/hex_island.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+PhantomCameraManager="*res://addons/phantom_camera_rust/phantom_camera_manager.tscn"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[filesystem]
+
+import/blender/enabled=false
+
+[marching_squares_terrain]
+
+features/clouds=true
+features/god_rays=true
+features/water=true
+features/weather=true
+features/birds=true
+features/fireflies=true
+features/smoke=true
+features/fire=true
+features/particles=true
+features/light_volumes=true
+features/sun_shafts=true
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

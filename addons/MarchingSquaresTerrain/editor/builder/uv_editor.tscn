@@ -1,0 +1,459 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/mode_face.svg" id="1_t5ey7"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/mode_vertex.svg" id="2_aot0o"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_manual.svg" id="3_sl1kq"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_auto.svg" id="4_0a2g3"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_planar.svg" id="5_ubq5h"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_box.svg" id="6_ui6ks"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/shape_sphere.svg" id="7_d2pfv"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_flip_u.svg" id="8_u5u45"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_flip_v.svg" id="9_imdu7"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_rot90.svg" id="10_a2bht"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_fit.svg" id="11_c83wi"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_fit_u.svg" id="12_dskvu"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_fit_v.svg" id="13_l1ljc"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/weld.svg" id="14_tai6v"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/duplicate.svg" id="15_calx4"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_paste.svg" id="16_7t766"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_texel.svg" id="17_d7tsb"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/grow.svg" id="18_ea6y1"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_frame.svg" id="19_uuwhq"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_frame_sel.svg" id="20_pa87e"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_lock.svg" id="21_hx2n3"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/split.svg" id="22_arbk0"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/snap.svg" id="23_lvtqc"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/uv_tile.svg" id="24_utwhf"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/gizmo_scale.svg" id="25_j57oo"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/builder/export_options.svg" id="26_rx2q6"]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_p03db"]
+
+[node name="PixelBuilderUvEditor" type="Window" unique_id=1009731704]
+title = "Pixel Builder - UV Editor"
+size = Vector2i(820, 620)
+visible = false
+transient = true
+min_size = Vector2i(420, 320)
+
+[node name="PixelBuilderUvPanel" type="PanelContainer" parent="." unique_id=450344423]
+unique_name_in_owner = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Column" type="VBoxContainer" parent="PixelBuilderUvPanel" unique_id=399126459]
+layout_mode = 2
+
+[node name="Bar" type="HFlowContainer" parent="PixelBuilderUvPanel/Column" unique_id=385139955]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Faces" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1985973696]
+layout_mode = 2
+tooltip_text = "UV face mode: click / box-select faces, double-click selects a UV island"
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_p03db")
+text = "Faces"
+icon = ExtResource("1_t5ey7")
+flat = true
+
+[node name="Verts" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=330258938]
+layout_mode = 2
+tooltip_text = "UV vertex mode: click / box-select corners"
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_p03db")
+text = "Verts"
+icon = ExtResource("2_aot0o")
+flat = true
+
+[node name="VSeparator" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1334137260]
+layout_mode = 2
+
+[node name="Manual" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=474435655]
+layout_mode = 2
+tooltip_text = "Bake manual UVs: freeze the automatic projection into per-corner UVs"
+focus_mode = 0
+text = "Manual"
+icon = ExtResource("3_sl1kq")
+flat = true
+
+[node name="Auto" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1151702579]
+layout_mode = 2
+tooltip_text = "Back to the automatic (world / box) projection"
+focus_mode = 0
+text = "Auto"
+icon = ExtResource("4_0a2g3")
+flat = true
+
+[node name="Planar" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1418993492]
+layout_mode = 2
+tooltip_text = "Planar project the faces as one island along their average normal (fit to 0-1)"
+focus_mode = 0
+text = "Planar"
+icon = ExtResource("5_ubq5h")
+flat = true
+
+[node name="Box" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=344061997]
+layout_mode = 2
+tooltip_text = "Box project: every face along its dominant axis (fit to 0-1)"
+focus_mode = 0
+text = "Box"
+icon = ExtResource("6_ui6ks")
+flat = true
+
+[node name="Spherical" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=171104755]
+layout_mode = 2
+tooltip_text = "Spherical project: longitude / latitude around the faces' centre (one repeat around, pole to pole)"
+focus_mode = 0
+text = "Spherical"
+icon = ExtResource("7_d2pfv")
+flat = true
+
+[node name="VSeparator2" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=848578767]
+layout_mode = 2
+
+[node name="Flip U" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=565362512]
+layout_mode = 2
+tooltip_text = "Flip U about the selection centre"
+focus_mode = 0
+text = "Flip U"
+icon = ExtResource("8_u5u45")
+flat = true
+
+[node name="Flip V" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=98175805]
+layout_mode = 2
+tooltip_text = "Flip V about the selection centre"
+focus_mode = 0
+text = "Flip V"
+icon = ExtResource("9_imdu7")
+flat = true
+
+[node name="Rot 90" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=381106216]
+layout_mode = 2
+tooltip_text = "Rotate the UVs 90° about the selection centre"
+focus_mode = 0
+text = "Rot 90"
+icon = ExtResource("10_a2bht")
+flat = true
+
+[node name="Fit" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=575429694]
+layout_mode = 2
+tooltip_text = "Fit to 0-1 (uniform)"
+focus_mode = 0
+text = "Fit"
+icon = ExtResource("11_c83wi")
+flat = true
+
+[node name="Fit U" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1243769656]
+layout_mode = 2
+tooltip_text = "Fit the width to 0-1"
+focus_mode = 0
+text = "Fit U"
+icon = ExtResource("12_dskvu")
+flat = true
+
+[node name="Fit V" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1016417392]
+layout_mode = 2
+tooltip_text = "Fit the height to 0-1"
+focus_mode = 0
+text = "Fit V"
+icon = ExtResource("13_l1ljc")
+flat = true
+
+[node name="VSeparator3" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1992446290]
+layout_mode = 2
+
+[node name="Sew" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=717011038]
+layout_mode = 2
+tooltip_text = "Sew: corners that share a vertex move to their average UV"
+focus_mode = 0
+text = "Sew"
+icon = ExtResource("14_tai6v")
+flat = true
+
+[node name="Copy" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=722794429]
+layout_mode = 2
+tooltip_text = "Copy the UV layout of the first selected face"
+focus_mode = 0
+text = "Copy"
+icon = ExtResource("15_calx4")
+flat = true
+
+[node name="Paste" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=796632420]
+layout_mode = 2
+tooltip_text = "Paste the copied layout onto every selected face with the same corner count"
+focus_mode = 0
+text = "Paste"
+icon = ExtResource("16_7t766")
+flat = true
+
+[node name="Texel" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1374585717]
+layout_mode = 2
+tooltip_text = "Match the texel density of every selected island to the first selected face"
+focus_mode = 0
+text = "Texel"
+icon = ExtResource("17_d7tsb")
+flat = true
+
+[node name="Island" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=757886618]
+layout_mode = 2
+tooltip_text = "Select UV island: every face connected to the selection at the same UVs (also automatic faces)"
+focus_mode = 0
+text = "Island"
+icon = ExtResource("18_ea6y1")
+flat = true
+
+[node name="VSeparator4" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=689931506]
+layout_mode = 2
+
+[node name="Frame" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1615773319]
+layout_mode = 2
+tooltip_text = "Frame the 0-1 square"
+focus_mode = 0
+text = "Frame"
+icon = ExtResource("19_uuwhq")
+flat = true
+
+[node name="Frame Sel" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1754569003]
+layout_mode = 2
+tooltip_text = "Frame the selection"
+focus_mode = 0
+text = "Frame Sel"
+icon = ExtResource("20_pa87e")
+flat = true
+
+[node name="VSeparator5" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1291865708]
+layout_mode = 2
+
+[node name="Lock 0-1" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=817107552]
+layout_mode = 2
+tooltip_text = "Keep moved / scaled islands inside the 0-1 square"
+focus_mode = 0
+toggle_mode = true
+text = "Lock 0-1"
+icon = ExtResource("21_hx2n3")
+flat = true
+
+[node name="Split" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=868641865]
+layout_mode = 2
+tooltip_text = "Split picking: grab one corner, tearing the seam"
+focus_mode = 0
+toggle_mode = true
+text = "Split"
+icon = ExtResource("22_arbk0")
+flat = true
+
+[node name="Snap" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1100320593]
+layout_mode = 2
+tooltip_text = "Snap moves and scales to the Step grid (rotation to 15°)"
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+text = "Snap"
+icon = ExtResource("23_lvtqc")
+flat = true
+
+[node name="Tile" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=39546446]
+layout_mode = 2
+tooltip_text = "Tile the texture preview"
+focus_mode = 0
+toggle_mode = true
+text = "Tile"
+icon = ExtResource("24_utwhf")
+flat = true
+
+[node name="StepLabel" type="Label" parent="PixelBuilderUvPanel/Column/Bar" unique_id=934329456]
+layout_mode = 2
+text = "Step"
+
+[node name="Step" type="SpinBox" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1845657090]
+layout_mode = 2
+tooltip_text = "UV grid / snap step (0.0625 = one texel of a 16 px texture)"
+min_value = 0.0015
+max_value = 1.0
+step = 0.0015
+value = 0.063
+allow_greater = true
+
+[node name="VSeparator6" type="VSeparator" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1174502698]
+layout_mode = 2
+
+[node name="ScaleU" type="SpinBox" parent="PixelBuilderUvPanel/Column/Bar" unique_id=515537427]
+layout_mode = 2
+tooltip_text = "Scale factor U"
+min_value = -64.0
+max_value = 64.0
+step = 0.0105
+value = 0.9950000000000045
+allow_greater = true
+allow_lesser = true
+
+[node name="ScaleV" type="SpinBox" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1654388375]
+layout_mode = 2
+tooltip_text = "Scale factor V"
+min_value = -64.0
+max_value = 64.0
+step = 0.0105
+value = 0.9950000000000045
+allow_greater = true
+allow_lesser = true
+
+[node name="Scale" type="Button" parent="PixelBuilderUvPanel/Column/Bar" unique_id=1755197274]
+layout_mode = 2
+tooltip_text = "Scale the selection by the U / V factors"
+focus_mode = 0
+text = "Scale"
+icon = ExtResource("25_j57oo")
+flat = true
+
+[node name="AutoUvs" type="HFlowContainer" parent="PixelBuilderUvPanel/Column" unique_id=202183422]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="AutoLabel" type="Label" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=1845793788]
+layout_mode = 2
+text = "Auto UVs:"
+
+[node name="AutoFill" type="OptionButton" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=482666785]
+layout_mode = 2
+tooltip_text = "Fill: Tile = world-density repeats; Fit = the longer side spans 0-1; Stretch = both sides span 0-1"
+focus_mode = 0
+selected = 0
+item_count = 3
+popup/item_0/text = "Tile"
+popup/item_0/id = 0
+popup/item_1/text = "Fit"
+popup/item_1/id = 1
+popup/item_2/text = "Stretch"
+popup/item_2/id = 2
+
+[node name="AutoAnchor" type="OptionButton" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=506151343]
+layout_mode = 2
+tooltip_text = "Anchor: which point of the projected UVs sits on the same point of the 0-1 square"
+focus_mode = 0
+selected = 0
+item_count = 10
+popup/item_0/text = "No anchor"
+popup/item_0/id = 0
+popup/item_1/text = "Upper left"
+popup/item_1/id = 1
+popup/item_2/text = "Upper centre"
+popup/item_2/id = 2
+popup/item_3/text = "Upper right"
+popup/item_3/id = 3
+popup/item_4/text = "Middle left"
+popup/item_4/id = 4
+popup/item_5/text = "Centre"
+popup/item_5/id = 5
+popup/item_6/text = "Middle right"
+popup/item_6/id = 6
+popup/item_7/text = "Lower left"
+popup/item_7/id = 7
+popup/item_8/text = "Lower centre"
+popup/item_8/id = 8
+popup/item_9/text = "Lower right"
+popup/item_9/id = 9
+
+[node name="AutoFlipU" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=1246710541]
+layout_mode = 2
+tooltip_text = "Mirror the projection horizontally"
+focus_mode = 0
+text = "Flip U"
+
+[node name="AutoFlipV" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=932859348]
+layout_mode = 2
+tooltip_text = "Mirror the projection vertically"
+focus_mode = 0
+text = "Flip V"
+
+[node name="AutoSwap" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=608012355]
+layout_mode = 2
+tooltip_text = "Swap U and V (a quarter turn with a mirror)"
+focus_mode = 0
+text = "Swap UV"
+
+[node name="AutoGroup" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=375582524]
+layout_mode = 2
+tooltip_text = "Treat the faces as one batch: one projection and one bounds, so the texture runs across them"
+focus_mode = 0
+text = "Group"
+
+[node name="Apply Auto" type="Button" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=1788112104]
+layout_mode = 2
+tooltip_text = "Apply auto settings: re-project the faces (the selection, else all shown) with these settings"
+focus_mode = 0
+text = "Apply Auto"
+icon = ExtResource("4_0a2g3")
+flat = true
+
+[node name="VSeparator" type="VSeparator" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=473805418]
+layout_mode = 2
+
+[node name="TemplateLabel" type="Label" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=6699324]
+layout_mode = 2
+text = "Template:"
+
+[node name="TemplateSize" type="SpinBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=568544879]
+layout_mode = 2
+tooltip_text = "UV template size in pixels (square, 64-4096)"
+min_value = 64.0
+max_value = 4096.0
+step = 64.0
+value = 1024.0
+
+[node name="TemplateGrid" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=628141955]
+layout_mode = 2
+tooltip_text = "Draw the 1/8 grid under the outlines"
+focus_mode = 0
+button_pressed = true
+text = "Grid"
+
+[node name="TemplateTransparent" type="CheckBox" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=1073774387]
+layout_mode = 2
+tooltip_text = "Transparent background (else white)"
+focus_mode = 0
+text = "Transparent"
+
+[node name="Export UV Template…" type="Button" parent="PixelBuilderUvPanel/Column/AutoUvs" unique_id=2135794006]
+layout_mode = 2
+tooltip_text = "Save the UV layout of the shown faces as a PNG to paint over"
+focus_mode = 0
+text = "Export UV Template…"
+icon = ExtResource("26_rx2q6")
+flat = true
+
+[node name="Canvas" type="PixelBuilderUvCanvas" parent="PixelBuilderUvPanel/Column" unique_id=1118141298 node_paths=PackedStringArray("status_label")]
+status_label = NodePath("../Info")
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 160)
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 1
+
+[node name="Info" type="Label" parent="PixelBuilderUvPanel/Column" unique_id=16800834]
+modulate = Color(1, 1, 1, 0.7005)
+layout_mode = 2
+
+[node name="Help" type="Label" parent="PixelBuilderUvPanel/Column" unique_id=340899440]
+modulate = Color(1, 1, 1, 0.5)
+layout_mode = 2
+text = "Drag: move   Ctrl+drag: scale (Shift: per axis)   Alt+drag: rotate   Middle: pan   Wheel: zoom   Double-click: island   Esc: cancel
+Ctrl+click a face: stitch it to the first selected face   Ctrl+Shift+click: copy that face's layout onto it"
+autowrap_mode = 3
+
+[node name="TemplateDialog" type="EditorFileDialog" parent="PixelBuilderUvPanel" unique_id=2057291563]
+unique_name_in_owner = true
+title = "Export UV Template"
+mode_overrides_title = false
+file_mode = 4
+access = 2
+filters = PackedStringArray("*.png ; PNG images")
+
+[connection signal="close_requested" from="." to="." method="hide"]
+[connection signal="pressed" from="PixelBuilderUvPanel/Column/AutoUvs/Export UV Template…" to="PixelBuilderUvPanel/TemplateDialog" method="popup_file_dialog"]

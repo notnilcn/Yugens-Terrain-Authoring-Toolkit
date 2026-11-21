@@ -1,0 +1,121 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/pixel_resolve.gdshader" id="1_j4diq"]
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/pixel_upscale.gdshader" id="2_e5q1c"]
+
+[sub_resource type="Environment" id="Environment_6k1j8"]
+ambient_light_source = 1
+reflected_light_source = 1
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_p6yy6"]
+resource_local_to_scene = true
+shader = ExtResource("1_j4diq")
+shader_parameter/use_id_tex = null
+shader_parameter/source_size = null
+shader_parameter/out_size = null
+shader_parameter/margin = null
+shader_parameter/lattice = null
+shader_parameter/block_sizes = null
+shader_parameter/block_phase_x = null
+shader_parameter/block_phase_y = null
+shader_parameter/block_size_count = null
+shader_parameter/flip_source_y = null
+shader_parameter/low_res_mode = null
+shader_parameter/debug_view = null
+shader_parameter/outlines = null
+shader_parameter/outline_background = null
+shader_parameter/depth_threshold = null
+shader_parameter/normal_threshold = null
+shader_parameter/outline_darken = null
+shader_parameter/highlight = null
+shader_parameter/id_edges = null
+shader_parameter/fold_limit = null
+shader_parameter/ledge_wall = null
+shader_parameter/modulate_rows = null
+shader_parameter/palette_enabled = null
+shader_parameter/palette_mix = null
+shader_parameter/dither_enabled = null
+shader_parameter/dither_spread = null
+shader_parameter/dither_size = null
+shader_parameter/saturation = null
+shader_parameter/contrast = null
+shader_parameter/brightness = null
+shader_parameter/rays_enabled = null
+shader_parameter/ray_color = null
+shader_parameter/ray_alpha = null
+shader_parameter/ray_count = null
+shader_parameter/ray_depth = null
+shader_parameter/ray_reach = null
+shader_parameter/sheet_bands = null
+shader_parameter/sheet_gap = null
+shader_parameter/sheet_energy = null
+shader_parameter/sheet_stack_max = null
+shader_parameter/sheet_falloff = null
+shader_parameter/sheet_depth_fade = null
+shader_parameter/cloud_softness = null
+shader_parameter/cloud_occlusion = null
+shader_parameter/gap_erode = null
+shader_parameter/start_depth = null
+shader_parameter/depth_fade = null
+shader_parameter/depth_fade_power = null
+shader_parameter/sun_follow = null
+shader_parameter/cloud_threshold = null
+shader_parameter/eye_adaptation = null
+shader_parameter/cam_origin = null
+shader_parameter/cam_right = null
+shader_parameter/cam_up = null
+shader_parameter/cam_forward = null
+shader_parameter/cam_ortho = null
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_35sj0"]
+resource_local_to_scene = true
+shader = ExtResource("2_e5q1c")
+shader_parameter/source_size = null
+shader_parameter/view_texels = null
+shader_parameter/shift = null
+shader_parameter/center = null
+shader_parameter/crisp_edges = null
+
+[node name="PixelPipeline" type="Node" unique_id=129991797]
+
+[node name="ResolveViewport" type="SubViewport" parent="." unique_id=1119021177]
+disable_3d = true
+canvas_item_default_texture_filter = 0
+render_target_update_mode = 4
+
+[node name="ColorViewport" type="SubViewport" parent="ResolveViewport" unique_id=1400681468]
+render_target_update_mode = 4
+
+[node name="ColorCamera" type="Camera3D" parent="ResolveViewport/ColorViewport" unique_id=1610830239]
+
+[node name="MetaViewport" type="SubViewport" parent="ResolveViewport" unique_id=581731482]
+transparent_bg = true
+positional_shadow_atlas_size = 0
+render_target_update_mode = 4
+
+[node name="MetaCamera" type="Camera3D" parent="ResolveViewport/MetaViewport" unique_id=1267067479]
+environment = SubResource("Environment_6k1j8")
+
+[node name="IdViewport" type="SubViewport" parent="ResolveViewport" unique_id=386832085]
+transparent_bg = true
+positional_shadow_atlas_size = 0
+render_target_update_mode = 4
+
+[node name="IdCamera" type="Camera3D" parent="ResolveViewport/IdViewport" unique_id=714693727]
+environment = SubResource("Environment_6k1j8")
+
+[node name="Resolve" type="ColorRect" parent="ResolveViewport" unique_id=1436887043]
+material = SubResource("ShaderMaterial_p6yy6")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="PixelDisplay" type="CanvasLayer" parent="." unique_id=315702784]
+layer = -100
+
+[node name="Upscale" type="ColorRect" parent="PixelDisplay" unique_id=1659733066]
+material = SubResource("ShaderMaterial_35sj0")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2

@@ -1,0 +1,44 @@
+[gd_scene format=3]
+
+[node name="FoliagePanel" type="VBoxContainer"]
+size_flags_horizontal = 3
+
+[node name="Hint" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0.6005)
+layout_mode = 2
+text = "1. Click what to paint below (Ctrl/Shift+click: several).
+2. LMB-drag on the terrain to paint it.
+RMB / Shift+LMB: erase  ·  Shift+wheel: brush size"
+autowrap_mode = 3
+
+[node name="FoliagePalette" type="ItemList" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Click to paint it, Ctrl/Shift+click to paint several together. Double-click a prop to edit it in the inspector."
+select_mode = 1
+max_text_lines = 2
+auto_height = true
+max_columns = 0
+same_column_width = true
+icon_mode = 0
+
+[node name="Actions" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Edit" type="Button" parent="Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Shows the selected prop's settings (mesh, scale, placement rules, collision...) in the inspector."
+text = "Edit"
+
+[node name="Remove" type="Button" parent="Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Removes the selected props from this terrain's Scatter Items, with every instance of them (undoable)."
+text = "Remove"
+
+[node name="AddFile" type="Button" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Adds a prop from a mesh (.mesh / .tres / .res / .obj) or a scene / model (.tscn / .glb / .gltf / .blend / .fbx) and selects it."
+text = "Add Mesh / Scene..."
