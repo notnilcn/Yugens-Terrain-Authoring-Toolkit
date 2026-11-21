@@ -1,0 +1,19 @@
+# editor.log excerpt - session r5-t1 (qa/screenshots/r5-sculpt-paint evidence)
+# scene-load noise (hex_island/02_island): 16x plane + 16x vector3 warnings, 2x create_frustum_points
+WARNING: Vector3 cannot be normalized, the elements must be finite. Making (0, 0, 0) as a fallback.
+     at: normalize (./core/math/vector3.h:551)
+ERROR: Condition "!res" is true. Returning: false
+   at: create_frustum_points (servers/rendering/rendering_light_culler.cpp:682)
+WARNING: Plane cannot be normalized, the distance and the normal should be finite.
+...
+# line 62
+     at: normalize (./core/math/vector3.h:551)
+ERROR: Condition "!res" is true. Returning: false
+   at: create_frustum_points (servers/rendering/rendering_light_culler.cpp:682)
+# Save Preset dialog open -> EditorSettings key missing (NEW defect)
+WARNING: Vector3 cannot be normalized, the elements must be finite. Making (0, 0, 0) as a fallback.
+     at: normalize (./core/math/vector3.h:551)
+Marching Squares Terrain: global Vector3 { x: -2.3784142, y: 9.999966, z: -3.7651749 }  sample (0, -2) chunk IVec2 { x: 0, y: 0 } local IVec2 { x: 2, y: 0 }: height 10.000, floor 2 'Meadow', wall 6 'Cliff', grass 255, smooth false
+ERROR: Couldn't find the given section "marching_squares_terrain" and key "save_preset_dialog_size", and no default was given.
+   at: get_value (core/io/config_file.cpp:60)
+Marching Squares Terrain: saved texture preset res://addons/MarchingSquaresTerrain/texture_presets/r5preset.tres

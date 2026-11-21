@@ -1,0 +1,36 @@
+# r5-t2 editor.log excerpt — 88 lines total, captured after the pass
+# ERROR: 2 (both line 28/62, startup rendering_light_culler), SCRIPT ERROR: 0
+
+1:Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+2:WARNING: Failed to create wd.xic as the input method or its xim server may not have started yet.
+3:     at: _create_xic (platform/linuxbsd/x11/display_server_x11.cpp:6347)
+4:WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+5:     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+6:OpenGL API 4.6 (Core Profile) Mesa 26.1.6-1pop0~1787580452~24.04~a5619ea - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+7:
+8:Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards strict)
+9:Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards strict)
+10:Initialize godot-rust (API v4.7.stable.official, runtime v4.7.2.stable.official, safeguards strict)
+11:MST QA harness listening on 127.0.0.1:8852
+12:WARNING: Plane cannot be normalized, the distance and the normal should be finite.
+26:WARNING: Vector3 cannot be normalized, the elements must be finite. Making (0, 0, 0) as a fallback.
+27:     at: normalize (./core/math/vector3.h:551)
+28:ERROR: Condition "!res" is true. Returning: false
+29:   at: create_frustum_points (servers/rendering/rendering_light_culler.cpp:682)
+30:WARNING: Plane cannot be normalized, the distance and the normal should be finite.
+31:     at: normalize (core/math/plane.cpp:43)
+32:WARNING: Vector3 cannot be normalized, the elements must be finite. Making (0, 0, 0) as a fallback.
+60:WARNING: Vector3 cannot be normalized, the elements must be finite. Making (0, 0, 0) as a fallback.
+61:     at: normalize (./core/math/vector3.h:551)
+62:ERROR: Condition "!res" is true. Returning: false
+63:   at: create_frustum_points (servers/rendering/rendering_light_culler.cpp:682)
+64:WARNING: Plane cannot be normalized, the distance and the normal should be finite.
+80:Marching Squares Terrain: global Vector3 { x: 0.4705696, y: 4.9999733, z: 1.4321442 }  sample (0, 1) chunk IVec2 { x: 0, y: 0 } local IVec2 { x: 2, y: 3 }: height 5.000, floor 1 'Grass', wall 6 'Cliff', grass 255, smooth false
+81:Marching Squares Terrain: no sample at (-84, -84)
+82:MarchingSquaresTerrain: saved 295 chunk file(s) to res://qa_tmp/mstdata (Runtime mode): 0 -> 149834 bytes
+83:Marching Squares Terrain: Export GLB to res://qa_tmp/terrain_export.glb -> 0
+84:Marching Squares Terrain: copied 143 cells
+85:Marching Squares Terrain: global Vector3 { x: 1.1672707, y: 4.7429047, z: 2.7901688 }  sample (0, 1) chunk IVec2 { x: 0, y: 0 } local IVec2 { x: 2, y: 3 }: height 5.000, floor 1 'Grass', wall 6 'Cliff', grass 255, smooth false
+86:Marching Squares Terrain: no sample at (-71, -30)
+87:Marching Squares Terrain: no sample at (97, -132)
+88:Marching Squares Terrain: global Vector3 { x: 1.1672707, y: 4.7429047, z: 2.7901688 }  sample (0, 1) chunk IVec2 { x: 0, y: 0 } local IVec2 { x: 2, y: 3 }: height 5.000, floor 1 'Grass', wall 6 'Cliff', grass 255, smooth false

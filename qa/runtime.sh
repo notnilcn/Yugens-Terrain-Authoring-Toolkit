@@ -43,6 +43,12 @@ start() {
       cp -a "$state/project_base" "$project"
     fi
   fi
+  # project_base excludes .godot, so a freshly copied project has no import cache and the
+  # GDExtension classes do not register (the scene loads with no addon). Import once.
+  if [[ ! -d "$project/.godot" ]]; then
+    echo "importing runtime project (no .godot cache) ..."
+    godot --headless --path "$project" --import > "$dir/import.log" 2>&1 || true
+  fi
   if [[ ! -e "/tmp/.X11-unix/X${display#:}" ]]; then
     setsid Xvfb "$display" -screen 0 "1920x1080x24" -nolisten tcp \
       > "$dir/xvfb.log" 2>&1 < /dev/null &

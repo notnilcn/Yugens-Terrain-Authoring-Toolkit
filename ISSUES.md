@@ -1,1204 +1,1074 @@
 # MarchingSquaresTerrain — Issues
 
-Testing was done in a real Godot 4.7.2 editor on Linux (Xvfb virtual display, Mesa llvmpipe,
-editor scale 1.0; primary window 1600×900, plus 1920×1080, 1366×768, 1280×800 and 1024×600),
-driving the actual UI with synthetic mouse and keyboard input. `--headless` (dummy renderer) cannot render or screenshot the editor, so the
-virtual-display setup was the closest headless-capable equivalent that still produces images.
-Screenshots and per-area reproduction notes live in [`qa/`](qa/) (`qa/screenshots/<area>/`,
-`qa/findings/<area>.md`); the orchestrator runbook is
-[`qa/METHODOLOGY.md`](qa/METHODOLOGY.md).
+Round 3 (r4) pass, 2026-11-21. Godot **4.7.2**, Linux, Mesa **llvmpipe** on isolated Xvfb virtual
+displays, editor scale 1.0, real X11 mouse/keyboard input through the repo's QA harness
+(`qa/drive.py`). The editor's `--headless` mode uses the dummy renderer and **cannot render or
+screenshot the UI**, so every pass used Xvfb (headless-capable, real rendering) instead. Nine
+area passes plus a fresh-session verification pass drove 591 PNGs and 60 UI dumps into
+`qa/screenshots/r4-*`; the per-area reports are in `qa/findings/r4-*.md`.
 
-Legend: **Critical** = crash/blocker; **Error** = a documented control does nothing or data is
-lost; **Warning** = a feature works but is misleading, unreachable, or not undoable;
-**Minor** = edge case/polish; **UI** = layout, wording, or discoverability.
+**Undo headline:** `Ctrl+Z` works for **35 of 42** tested action/context rows, including every
+core terrain tool and a 19-chunk stroke. Five rows are broken and two were not exercised. The
+failures are enumerated in [Undo / redo — verified working](#undo--redo--verified-working) and in
+issues 5, 6, 11, 12, 13, 14, 19.
+
+**Coverage:** 9 areas (sculpt, paint, manage, pixel, effects, builder, UI resizability, deep undo,
+runtime) plus verification. Prior-round reports (`qa/findings/*.md`, `r2-*`, `r3-*`) were consulted
+as hints; every current claim below was re-driven unless marked carried over.
+
+Legend: **Critical** = crash/editor exit; **Error** = a documented control does the wrong thing or
+nothing; **Warning** = works but is misleading, destructive, unreachable or not undoable;
+**Minor** = edge case/polish; **UI** = layout, wording, discoverability.
 
 ## Summary
 
-| # | Severity | Area | Issue |
+| # | Sev | Area | Issue |
 |---|---|---|---|
-| 0 | **Critical** | Editor layout | Switching to Level, Smooth or Tint at 1024×600 crashes the editor with a container layout loop (`Container::_sort_children` / "Message queue out of memory"); reproduced 5 times |
-| 1 | Error | Terrain Settings | Every enum/slot dropdown (Grid Type, Blend Mode, Floor/Wall Slot, Debug View, Storage Mode, …) changes only its label — the property is never written, nothing rebuilds, no undo step |
-| 2 | Warning | Terrain Settings | Save Data / Data Directory unreachable because Storage Mode cannot be changed (consequence of #1) |
-| 3 | Warning | Terrain Settings | Grass Animation FPS is not undoable; Ctrl+Z undoes the previous terrain action instead |
-| 4 | Warning | Toolbar/Builder | Number keys 1–9 (tools) and 1–4 (builder modes) do not switch anything; Godot's 3D view shortcuts consume them |
-| 5 | Warning | Brush (Raise/Lower) | The bottom strip clips the tool title and Brush Type row at 1600×900; no scrollbar, wheel does not scroll |
-| 6 | Warning | Brush/Level/Smooth | Shift/Ctrl+wheel change Size/Strength internally but the strip readouts and slider handles stay stale |
-| 7 | Warning | Brush (Drag) | Esc does not clear the draw selection (RMB does); a stale selection causes an accidental height drag |
-| 8 | Warning | Paint | Slope Min spin slider is unbounded (one drag sets 8287.5°); painting then silently no-ops |
-| 9 | Warning | Paint / Textures | Undo of texture-slot/preset edits restores the data but leaves the panel labels stale (Pattern, Color swatch, Grass Sprite, Scale, Material names, preset name) |
-| 10 | Minor | Stamp | Size field stays stale after a drag-stamp or modifier+wheel |
-| 11 | Minor | Settings / Chunks | Changing Chunk Size is refused with only an Output warning but still records a no-op undo step |
-| 12 | Minor | Gradient | Strength slider ignores click position and jumps erratically on drag |
-| 13 | Minor | Brush | Grid Aligned looks enabled on Square grid but silently refuses to toggle |
-| 14 | Minor | Brush | Grid Size stays enabled while Grid Aligned is off |
-| 15 | Minor | Foliage | Fill Terrain is a no-op for the Tree item on 02_island but records an empty undo step |
-| 16 | Minor | Paint | Paint Walls status hint still says "Vertex Painting" and shows a height |
-| 17 | Minor | Chunks | An invalid chunk add is only reported as a raw Output warning; the green + handle invited the click |
-| 18 | Minor | Presets | Saving a preset with an empty name closes the dialog silently and writes nothing |
-| 19 | UI | Presets | The Save Preset dialog has only OK; no Cancel button (Esc/X work) |
-| 20 | UI | Settings | Settings page tabs jump vertically between pages; clicking the old tab position can land in the 3D view and clear the selection |
-| 21 | UI | Paint/Textures | The ground-texture picker thumbnail is solid black for `mst_noise.png` while the slot preview is correct |
-| 22 | UI | Hints | Status/hint lines are clipped at the right edge, and some hints advertise controls that do not exist (Level Strength) or omit working ones (Raise/Lower Ctrl+wheel strength) |
-| 23 | Error | Builder | In Face/Edge/Vertex mode the builder strip is 447 px tall and not scrollable, crushing the 3D viewport to 345×39 px at 1600×900 (face selection impossible) |
-| 24 | Warning | Builder | At 1280×800 the MST builder layout clips toolbar headers, cuts the strip behind the Materials panel, and leaves a ~172×60 px viewport |
-| 25 | Minor | Builder | A newly drawn sibling shape is created but selection/Inspector stay on the previous mesh, so the next paint hits the old mesh |
-| 26 | Minor | Builder | `H` cycles modes in reverse order (Face → Object → Vertex → Edge) |
-| 27 | UI | Builder | The Modeler layout shows a centred "Modeler / Created Box / Dismiss" card over the model until dismissed |
-| 28 | Warning | Pixelizer/Effects | Spin-slider drags leave their field range by orders of magnitude (Pixel Size 44243, Darken 290.19, Sky Coverage 377.4, Water Swell 142.85); same root cause as #8; the Inspector clamps its display while the strip keeps the bad value |
-| 29 | Warning | Pixelizer | One integer spin-slider drag creates two undo steps (2→39497; first undo →4357, second →2) |
-| 30 | Warning | Pixelizer | Undo of the Dawn preset restores every property but the viewport stays salmon until the scene is reloaded |
-| 31 | UI | Pixel World | "+ Add" selects the new node, closing the pixel toolbar/strip/panel; adding a second effect needs a reselection |
-| 32 | Warning | Pixel World | Sun Shafts "+ Add" leaves its Sun reference empty and the node inert (alpha/count do nothing); the visible streaks are the renderer's God Rays, not this node |
-| 33 | UI | Pixelizer/Effects | Strip page-tab rows jump 35–70 px between pages, so fixed-position tab clicks miss (all pixel and effect strips) |
-| 34 | UI | Pixel World | Disabled menu entries look as bright as enabled ones |
-| 35 | UI | Pixel World | The panel keeps a scrolled offset when its rows rebuild, hiding the top rows |
-| 36 | Warning | Effects | `PixelSmoke` shows no visible smoke plume in hex_island at plausible or large settings |
-| 37 | UI | Pixel World | The Lighting Preset row (Dawn/Noon/Dusk/Night/Storm/Snow/Wire) sits under the editor's bottom status bar at 1600×900 until the panel is scrolled |
-| 38 | Minor | Effects | Dawn / time 0.25 renders a saturated magenta sky with dense vertical stripes instead of the documented warm dawn |
-| 39 | Minor | Effects | Fireflies are invisible at their default size/count at a ~30 m editor camera |
-| 40 | Minor | Effects | No lightning flash or bolt was observed in 15 s of Storm frames (could be a long random interval; needs a longer watch) |
-| 41 | Minor | Effects | The Inspector's value desyncs from the strip after a strip edit (e.g. Coverage 0.8 in the strip, 0.0 in the Inspector) |
-| 42 | Error | Strip layout | Terrain attribute strips have no height cap and no usable scroll; the viewport collapses 574→326→159→121→39 px from 1920 to 1024 (the 39 px minimum is what the reflow loop crashes on) |
-| 43 | UI | Paint/Foliage | The side panel is fixed at 250 px with no splitter and no visible scrollbar; only 2.5 of 16 slots are visible at 1600 and Export Texture Preset is ~100 wheel ticks away |
-| 44 | UI | Pixel World | At 1024×600 the panel starts at x=1007 (width 250), leaving only 17 px on screen; all Select/Add buttons are unreachable |
-| 45 | UI | Settings | At 1024×600 the page fields below ~9 rows clip with no visible scrollbar, the hint is cut and overlapped by "Perspective", and the 39 px viewport persists on short pages such as Storage |
-| 46 | UI | Toolbar | The terrain toolbar silently grows to 2–3 columns at 1024, stealing 80–200 px of viewport width; there is no scrollbar or "more" affordance |
-| 47 | Warning | Builder | The Builder Preferences dialog is 484×664 and non-resizable; at 600 px height its action row is 61 px off-screen with no scroll |
-| 48 | UI | Builder | At 1024×600 the Modeler layout drops the bottom strip and Materials palette, leaving only the dense top toolbar and the viewport |
-| 49 | Warning | Runtime | Camera zoom-in in `courtyard` passes through the ground and into the fox (fox becomes a cyan/white wireframe); one wheel-out restores it |
-| 50 | UI | Runtime | F1 help is a single ~10 px grey line over bright terrain with no backing panel |
-| 51 | UI | Runtime | The F3 Pixel tuner is cramped and clipped at 1024×600; weather controls are below the window and need wheel scrolling |
-| 52 | Minor | Runtime | Zooming out exposes the finite water-plane edges; the far sea reads as flat blue with no waves/foam |
-| 53 | Minor | Runtime | `courtyard`'s dusk view shows a straight-edged dark navy wedge instead of visible bright sun shafts |
-| 54 | Warning | Paint / Textures | Ctrl+Z with the Texture Name LineEdit focused does not reach the terrain; the field's own text undo commits a new rename action, and clicking the 3D view does not release focus |
-| 55 | Warning | Chunks | "Vertex Handles" exposes no draggable vertex grip; dragging at a chunk border removes (295→294) or adds (9→10) a chunk instead |
-| 56 | Minor | History | Misleading action names: `terrain texture 1 magnify` for Scale, `terrain tint paint` for RMB erase, and all Quick Paint sculpt strokes named `terrain brush with quick paint` |
-
-The remainder of this file gives reproduction steps and evidence. Per-area logs are in
-`qa/findings/*.md`; screenshots are referenced inline.
+| 1 | **Critical** | Pixelizer | Selecting `PixelRenderer` at 1280×720 crashes the editor with a container layout loop (verified fresh) |
+| 2 | **Critical** | Builder | Selecting `PixelBuilderMesh` at 1366×768 with the pointer over the builder toolbar panics `bind_mut` and exits the editor |
+| 3 | Error | Scene lifecycle | Closing/reopening a scene with a terrain tool active floods 196–287 `Node3D::upcast_ref … after it has been freed` errors |
+| 4 | Error | Pixelizer | `PixelizerEditorPlugin::on_float` panics with a re-entrant borrow during a strip rebuild (editor survives) |
+| 5 | Error | Settings | **Floor Slot** and **Storage Mode** dropdowns change only the label (property stays 0, no undo) — verified fresh |
+| 6 | Error | Settings | **Debug View** dropdown changes only the label (`debug_view` stays 0, no undo) — verified fresh |
+| 7 | Error | Layout | Attribute strips have no height cap: the 3D viewport collapses to 39 px at 1024/1280 (39 px is not practically editable) |
+| 8 | Error | Builder | Face/Edge/Vertex strip is 447 px tall at 1600×900; viewport 345×39 |
+| 9 | Error | Shortcuts | Documented tool/mode keys are dead or hijacked: sculpt `1`–`9`; builder `1`–`4`, `H` hides the node, `E`/`F` go to the 3D editor |
+| 10 | Warning | Sliders | Many sliders/spins accept far out-of-range values (Slope 6702°, Pixel Size 39087, Coverage 325, Swell 108.9, firefly count 4096) |
+| 11 | Warning | Undo | PixelRenderer pixel-size integer drag creates **two** undo steps |
+| 12 | Warning | Undo | Grass Animation FPS is not undoable; the next Ctrl+Z reverts an unrelated terrain edit |
+| 13 | Warning | Undo/UI | Undo restores data but leaves visible UI stale (texture preset/name, Grid Type label, builder HUD counts/selection) |
+| 14 | Warning | Pixel | Undo of a lighting preset restores properties but leaves the preview tinted until the scene/session is rebuilt |
+| 15 | Warning | Settings | Grid Type change silently deletes all 295 chunks (no confirmation; Ctrl+Z recovers) |
+| 16 | Warning/UI | Panels | Side panels are hard-fixed at 250 px, with no splitter/collapse; Paint content is 5,767 px (90 wheel notches) and Foliage is not a Control |
+| 17 | Warning | Toolbar | Terrain toolbar column count changes with height (1/2/3 columns), stealing 116–416 px; compact mode is 76/116 px, not 36 |
+| 18 | Warning | Settings/Pixel | Settings Grid page grows the strip to 350–385 px; Settings and Renderer page-tab rows jump vertically |
+| 19 | Warning | Feature switches | Project feature switches are not undoable; Ctrl+Z stays dead until the viewport is clicked |
+| 20 | Warning | Sun shafts | Added SunShafts has a null Sun; “Wire refs” reports 0 references |
+| 21 | Warning | Fireflies | Fireflies render nothing at night even at Count 400 / Size 0.5 / Night Only 0 |
+| 22 | Warning | Sculpt | Shift/Ctrl-wheel change Size/Strength but the strip labels and slider handles stay stale |
+| 23 | Warning | Runtime | Camera orbit can pass under the island; the terrain underside fills the screen |
+| 24 | UI | Pixel World | Panel is off-screen at 1024×600; the Lighting Preset row sits below the panel viewport |
+| 25 | UI | Settings | Clicking the 3D view while Settings is open deselects the terrain and closes the whole tool |
+| 26 | Minor | Sculpt | Esc clears the selection but the HUD keeps “N selected” until the next mouse move |
+| 27 | Minor | History | Ambiguous undo names: “chunk merge mode” for single and apply-all; tint erase is called “tint paint”; Smooth Terraced/Sloped share a name |
+| 28 | UI | Dialogs | Save Preset has no Cancel, cannot shrink below 558 px, and forgets its size |
+| 29 | Minor | Paint | Paint Walls hint says “Vertex Painting” and reports a floor height |
+| 30 | Minor | Paint | Empty preset name closes the dialog silently and writes nothing |
+| 31 | UI | Paint | `mst_noise.png` ground-texture preview renders solid black |
+| 32 | Minor | Pixel | Pixel Preview / Animate have no visible pressed state |
+| 33 | UI | Pixel World | “+ Add” selects the new node and closes the pixelizer UI |
+| 34 | UI | Builder | Modeler “Created Box” toast covers the viewport at 1280×800 |
+| 35 | Warning | Builder | New `draw_rect() "width" argument has no effect …` warning spam from the builder UI |
+| 36 | Warning | Effects | Rain is invisible at the default overview distance; PixelSmoke’s default plume is invisible; Sky Coverage can change 0 viewport pixels |
+| 37 | Minor | Effects/Runtime | Dawn preset washes water/terrain pink; noon on the sandy plateau is nearly white |
+| 38 | Minor | Runtime | Finite water plane edge is obvious at low orbit/zoom-out |
+| 39 | UI | Runtime | F3 tuner is fixed 420 px and clips at 1024×600; F1 help is one small, unbacked line |
+| 40 | Minor | Dialogs | File dialog reports `min [200,70]` but clamps 400×200 to 498×200 |
+| 41 | Minor | Sculpt | Grid Aligned looks enabled but silently refuses to toggle while Falloff is on |
+| 42 | Minor | Builder | Shift+C opens the Bezier tool instead of the documented “append to selected mesh” |
+| 43 | UI | Sculpt | Status/hint line is clipped at the right edge; the Level hint advertises a Strength control that does not exist |
 
 ---
 
-## 0. Critical: switching to Level/Smooth/Tint at 1024×600 crashes the editor
-
-**Severity: Critical (crash; unsaved work can be lost)** — editor layout.
-
-Steps:
-1. Open `demo/hex_island`, select the terrain, resize the editor to 1024×600.
-2. Click **Level** (also reproduced by selecting Level at 1600×900 and then resizing down, and
-   with **Smooth** and **Tint**).
-3. The harness socket drops and the editor process exits.
-
-Expected: the strip reflows (7 rows at 470 px) and stays interactive; the editor must survive a
-tool switch at its own supported minimum window.
-
-Actual: the first runtime message after the resize is
-`Failed method: Container::_sort_children. Message queue out of memory...`, followed by hundreds
-of thousands of `Object was deleted while awaiting a callback.` lines. This is a **container
-layout loop** (a FlowContainer/ScrollContainer reflow at ~470 px that never converges), not a
-GPU/llvmpipe allocation failure. Reproduced on 5 separate clean launches (Level twice, Smooth
-once, Tint once, Level after a pre-select at 1600). Brush, Paint, Settings, Pixelizer and
-Builder did **not** crash at the same size, so the trigger is in the Level/Smooth/Tint strip
-content.
-
-Aftermath: if the editor saved a layout at 1024×600, the next launch can enter the same queue-OOM
-loop immediately. Reset the editor layout (delete `.godot/editor/editor_layout.cfg`, or the
-editor's layout entry in the user config) or start from a clean editor home. The QA sessions
-removed `home/` before each clean run.
-
-Evidence: `qa/findings/ui-crash.txt` (excerpt of the 105,978-line / 4.7 MB editor log; OOM at
-line 14 after a clean 13-line startup; an earlier crash log grew to 192 MB / 4.1 M lines),
-screenshots `qa/screenshots/uiresize/09-brush-1600x900-clean.png` and
-`10b-level-1600x900.png` before the crash; no screenshot after (the process was gone).
-`qa/findings/ui.md` D1.
-
-Undo: not applicable. Until this is fixed, 1024×600 should be treated as unsupported for
-Level/Smooth/Tint.
-
-## 1. Terrain Settings enum and slot dropdowns never apply
-
-**Severity: Error** — Settings → Grid, New Chunks, Display, Storage.
-
-Affected controls (all `OptionButton`s built from `TKind::Enum` / `TKind::Slot`):
-Grid Type, Blend Mode, Default Floor Slot, Default Wall Slot, Merge Mode, Extra Collision
-Layer, Debug View, Storage Mode, and the other enum rows on the six pages.
-
-Steps:
-1. Select `MarchingSquaresTerrain`, click **Settings**, stay on **Grid**.
-2. Open **Grid Type** and choose **Hex Rings** (click the item in the popup).
-3. The dropdown now reads `Hex Rings`, but:
-   - the terrain stays a square grid (viewport unchanged),
-   - the Inspector's `Grid Type` stays `Square`,
-   - `python3 qa/drive.py prop grid_type` returns `0`,
-   - `undo-state` stays empty (no action, `version` unchanged).
-4. The label snaps back to the real value the next time the strip rebuilds (e.g. change Cell
-   Size or re-select the tool).
-5. Same for Blend Mode (`blend_mode` stays 0), Floor Slot (`default_floor_slot` stays 0),
-   Debug View (`debug_view` stays 0) and Storage Mode (`storage_mode` stays 0).
-
-Expected: the property is written, the terrain rebuilds, and an undo action
-`terrain setting <name>` is recorded (the code path exists for these rows, and numeric/checkbox
-rows do work).
-
-Actual: only the `OptionButton` selection changes. The conversion in
-`editor/terrain_ui.rs::terrain_setting_changed` for enum/slot/int rows uses
-`value.try_to::<f64>()`; the `item_selected` signal supplies an integer, the conversion falls
-back to `0`, and `new == old` returns before any undo action is created. This matches all
-observed cases (changing away from a non-zero value would write 0 instead).
-
-Evidence: `qa/screenshots/manage/20-settings-hex-select.png` (label `Hex`, Inspector `Square`),
-`qa/screenshots/manage/ui/20-settings-hex-select.json`, plus my independent re-test in
-`qa/screenshots/manage/verify-gridtype-clicked.png` / `verify-gridtype.png`:
-after clicking **Hex Rings**, the strip label changed to `Hex Rings`, `grid_type` stayed `0`
-and `undo-state` stayed `version 1 / undo_count 0`.
-
-Undo: no action is created, so Ctrl+Z cannot revert it.
-
-## 2. Save Data / Data Directory are unreachable from Settings
-
-**Severity: Warning** — consequence of #1.
-
-Steps: Settings → Storage with Storage Mode `Resource`; choose `Baked` or `Runtime`. The
-Baked-only rows (Bake Grass, Bake Collision, Data Directory, Save Data) never appear. Setting
-`storage_mode = 1` with the Inspector (`set-prop storage_mode 1`) and reopening Storage shows
-all of them, proving the rows are implemented.
-
-Expected: choosing Baked/Runtime exposes the persistence controls documented in
-`docs/02 Your First Terrain.md` (Settings → Storage → Save Data).
-
-Actual: the mode never changes, so a documented workflow is unreachable. Workaround: change
-`Storage Mode` in the Inspector.
-
-Evidence: `qa/screenshots/manage/38-storage-mode-baked.png` vs
-`qa/screenshots/manage/43-storage-baked-page.png`.
-
-## 3. Grass Animation FPS is not undoable
-
-**Severity: Warning** — Settings → Grass.
-
-Steps: set **Animation FPS** from `0` to `12` (typed) then `13` (arrow). The field and the
-shader update, but no `terrain grass animation fps` action is created; Ctrl+Z leaves the value
-at 13 and does not add a redo entry.
-
-Expected: the special-case branch in `terrain_setting_changed` creates
-`add_do_method`/`add_undo_method` on the turf material and an undo step.
-
-Actual: no undo step; the value cannot be reverted from the UI. Worse, pressing Ctrl+Z after
-the change undoes the **previous terrain action** (history 8→7) while the FPS field keeps 12,
-so the user can lose an unrelated stroke.
-
-Evidence: `qa/screenshots/manage/28-grass-fps.png`,
-`qa/screenshots/undodeep/25-grass-fps.png`; `undo-state` unchanged by the setting.
-
-## 4. Number keys 1–9 do not switch tools
-
-**Severity: Warning** — every tool, documented in `docs/02`, `docs/12` and the tooltips.
-
-Steps: select the terrain, click the 3D view, press `2`, `3`, `4`, `1`, `7`. Repeat with the
-Scene tree focused.
-
-Expected: `1`–`9` select Brush/Level/Smooth/Bridge/Foliage/Paint/Inspect/Chunks/Settings, as
-the tooltips (`Brush Tool [1]`, …) and the cheat sheet say.
-
-Actual: the tool never changes. With the 3D view focused the digits run Godot's view shortcuts
-(`7` → Top Orthogonal, `1` → Front Orthogonal); with the Scene tree focused they do nothing.
-Clicking the toolbar works. `MarchingSquaresTerrainPlugin::on_key` does handle `KEY_1..KEY_9`,
-but the events are consumed by the editor's 3D view before they reach the plugin. The shortcut
-advertisement is therefore incorrect. The builder has the same problem for `1`–`4`
-(Object/Face/Edge/Vertex): its state stays `Object` after the digit sequence, while `H` works
-(and cycles backwards, see #26).
-
-Evidence: `qa/screenshots/sculpt/52-key7-view.png` (header `Top Orthogonal`),
-`qa/screenshots/sculpt/53-key1-view.png` (header `Front Orthogonal`),
-`qa/screenshots/sculpt/ui/11-key1-front-orthogonal.json` (`ToolTitle` = `Level`);
-`qa/screenshots/builder/ui/27-state.json` (`"mode": "Object"` after `2`/`3`/`4`).
-
-## 5. Raise / Lower strip clips the title and Brush Type row at 1600×900
-
-**Severity: Warning** — Brush → Brush Mode `Raise / Lower`.
-
-Steps: select Brush, set Brush Mode to `Raise / Lower`, look at the bottom strip, then wheel
-over the strip.
-
-Expected: every control stays visible, or the strip scrolls with a visible scrollbar.
-
-Actual: the flow needs 5 rows (~175 px) but the strip viewport is 140 px. The title row
-(`Brush (Raise / Lower)` + `Brush Type`) is laid out at y≈448, above the strip viewport
-(y≈483..623). The visible part starts at `Brush Mode`. There is no scrollbar; the strip's
-`ScrollContainer` has both scroll modes disabled, so the wheel does not help. Brush Type is
-unreachable until the user switches back to Drag and returns. Reproduced on Square and
-Hex Rings.
-
-Evidence: `qa/screenshots/sculpt/18-brush-raiselower-strip.png`,
-`qa/screenshots/sculpt/ui/08-hex-raiselower-clip.json` (`ToolTitle`/`Brush Type` rect y=448,
-`Brush Mode` y=483), `qa/screenshots/sculpt/23e-strip-tab-scroll.png`. See #42 for the systemic
-version (the same uncapped strip collapses the viewport at 1280/1024).
-
-## 6. Shift/Ctrl+wheel change values but the strip readouts stay stale
-
-**Severity: Warning** — Brush (Drag and Raise/Lower), Level, Smooth.
-
-Steps: note Size `15.0` / Strength `4.000`; over the 3D view do Shift+wheel up ×3, then
-Ctrl+wheel down ×2, Alt+wheel up ×3 (Raise/Lower).
-
-Expected: the strip's numeric labels and slider handles follow the values (the hints/docs
-advertise Shift+wheel = size, Ctrl+wheel = strength).
-
-Actual: the internal values and the cursor footprint change (UI dump: Size 19.0, Strength
-3.256, Rotation 45), but the strip still displays `15.0` / `4.000` and the handles do not move.
-The labels refresh only when the strip is rebuilt (switching tools then showed Size `18.9`).
-Rotation (a spin slider) does refresh. A separate paint test saw Size stay `15.0` through
-Shift+wheel for the same reason.
-
-Evidence: `qa/screenshots/sculpt/23-lr-wheel-changes.png`,
-`qa/screenshots/sculpt/ui/07-lr-wheel-stale-values.json`,
-`qa/screenshots/sculpt/24-brush-drag-strip-back.png`; `qa/screenshots/paint/42-brush-square-aspect-rot.png`.
-
-## 7. Esc does not clear the Brush/Drag selection
-
-**Severity: Warning** — Brush (Drag mode).
-
-Steps: paint a small selection (status `4 selected`), press Esc twice; then right-click and
-compare.
-
-Expected: Esc clears the selection (docs/03, the cheat sheet and the on-screen hint
-`RMB / Esc: clear`).
-
-Actual: Esc leaves the white selection and the `4 selected` status. RMB clears it. The stale
-selection is not inert: a later LMB-drag starting inside it moves the selected cells (height
-draw) instead of painting a new selection, which happened during testing. The plugin's
-`on_key` does handle Esc, but the event does not reach the 3D plugin (same event-routing
-problem as #4), or the editor consumes it first.
-
-Evidence: `qa/screenshots/sculpt/69-esc-clears-selection.png`,
-`qa/screenshots/sculpt/69c-esc-clean-test.png`, `qa/screenshots/sculpt/14-brush-rmb-clear.png`.
-
-## 8. Slope Min is effectively unbounded
-
-**Severity: Warning** — Paint (and Foliage uses the same control type).
-
-Steps: Paint tool → drag the `Slope Min` spin slider from x=640 to x=665 at y=605, then paint.
-
-Expected: the value stays within the documented 0–90° range (the field is declared
-`Spin(0.0, 90.0, 0.5)`), and painting is limited to that slope range.
-
-Actual: the field becomes `8287.5` (a 25 px drag), because `spin_slider` sets
-`allow_greater/allow_lesser`; painting then silently no-ops because no cell can exceed the
-value. Typing a value works.
-
-Evidence: `qa/screenshots/paint/37-slope-min-8287.png`,
-`qa/screenshots/paint/38-slope-min-blocks-paint.png`.
-
-## 9. Undo of texture-slot/preset edits leaves the panel labels stale
-
-**Severity: Warning** — Paint → Texture slots / Texture Preset.
-
-Steps: set Texture Preset `MST Classic` (Material becomes `1. Texture 1`), then Ctrl+Z.
-Repeat for slot **Pattern** (Grass→Forest), **Scale**, **Color** (#ff3333), **Grass Sprite**
-and the slot **name**.
-
-Expected: the terrain's texture set and every visible control revert to the previous values
-(the data does revert).
-
-Actual: the resource properties revert (`prop tex_assign`, pattern, scale, color and sprite
-are correct; a strip rebuild shows the restored values), but the visible controls keep the
-edited values until the panel is rebuilt. After the preset undo the Material dropdown lists
-`1. Texture 1`, the preset dropdown still says `MST Classic` and the slot names stay
-`Texture 1…`; the Color swatch stays red after the tint action is undone. Exporting the terrain
-writes the real (restored) names, proving only the UI is stale. Saving/refreshing a preset or
-rebuilding the strip corrects the labels.
-
-Evidence: `qa/screenshots/paint/17b-preset-panel.png`,
-`qa/screenshots/paint/19-undo-preset-stale-panel.png`,
-`qa/screenshots/paint/19b-undo-preset-window.png`;
-`qa/screenshots/undodeep/07-pattern-undo.png`, `10-color-undo.png`,
-`30-preset-undo-stale.png`, `ui/07-pattern-after-rebuild.json`;
-`qa/findings/paint.md` (exported `qapainttest.tres` contains `test grass`).
-
-## 10. Stamp Size field stays stale after drag-stamp or modifier+wheel
-
-**Severity: Minor** — Stamp.
-
-Steps: Stamp → Mountain, Size 24; drag in the viewport to pull size/rotation; or use
-Shift+wheel (size), Alt+wheel (rotation). The hint shows `size 63.6` / `size 77.0`, Rotation and
-Height update, but the Size field still reads `24.0`.
-
-Expected: the field reflects the value that was used and will be used next.
-
-Actual: only the transient hint shows the truth. The stamp that was placed used the pulled
-value (digest changed); the next click stamps with the displayed 24 (or the hidden wheel
-value — inconsistent).
-
-Evidence: `qa/screenshots/manage/49-stamp-drag.png`,
-`qa/screenshots/manage/52-stamp-alt-wheel.png`.
-
-## 11. Chunk Size is editable but can never change; it still records a no-op undo step
-
-**Severity: Minor** — Settings → Grid.
-
-Steps: type `24` in Chunk Size. The field snaps back to `32`; Output prints
-`WARNING: MarchingSquaresTerrain: chunk_size is fixed once chunks exist for this grid type
-(clear the data or switch grid type first).` `undo-state` gains `terrain setting chunk size`,
-but Ctrl+Z/Ctrl+Shift+Z change nothing.
-
-Expected: the field is disabled (or an inline hint/confirmation explains the restriction) and
-no undo step is recorded.
-
-Evidence: `qa/screenshots/manage/23-settings-chunksize.png`,
-`qa/screenshots/manage/24-settings-chunksize-redo.png`; editor.log `node.rs:1854`.
-
-## 12. Gradient Strength slider ignores click position and drags oddly
-
-**Severity: Minor** — Gradient strip.
-
-Steps: Strength 0.301; click near the right end of the slider (stays 0.300); drag right
-620→675 (goes 0.301→0.279); click x=615 then x=665 (ends 0.2345).
-
-Expected: a normal HSlider jumps to the clicked position (right end ≈ 1.0) and drags
-monotonically.
-
-Actual: clicks do not map to the cursor; the value drifts slightly. Use the spin value for
-precise strength.
-
-Evidence: `qa/screenshots/manage/70-gradient-strength.png` and the saved UI dumps.
-
-## 13. Grid Aligned looks enabled on Square grid but silently refuses to toggle
-
-**Severity: Minor** — Brush.
-
-Steps: on Square grid, with Falloff off, click Grid Aligned (or focus + Space).
-
-Expected: disabled/greyed out when unsupported (as docs/03 describes), or it toggles.
-
-Actual: the checkbox reports `disabled=false`, looks normal, and clicking does nothing (no
-check, no feedback). Its tooltip says it needs Triangle/Hexagon/Hex Rings. On Hex Rings it
-works, and enabling Falloff auto-unchecks it (correct).
-
-Evidence: `qa/screenshots/sculpt/30b-gridaligned-click2.png`,
-`qa/screenshots/sculpt/ui/09-gridaligned-square.json`.
-
-## 14. Grid Size stays enabled while Grid Aligned is off
-
-**Severity: Minor (UI)** — Brush, Gradient, Tint strips.
-
-Steps: uncheck Grid Aligned; the Grid Size HSlider still reports `disabled=false` and shows 1.
-
-Expected: dependent control disabled, or an explanation that it pre-sets the value for later.
-
-Evidence: `qa/screenshots/manage/ui/70-brush-gridaligned.json`, `qa/screenshots/manage/01-initial.png`.
-
-## 15. Fill Terrain is a no-op for the Tree item on 02_island
-
-**Severity: Minor** — Foliage.
-
-Steps: 02_island, Foliage, Tree selected, Slope Min 0, click Fill Terrain. `get_scatter_count(0)`
-stays 97; the first click adds an empty `terrain foliage fill` undo entry; later clicks add
-none. Rock fill on the same terrain works (766→752, undo/redo verified), so the button is
-wired. Likely the Tree item's ground-slot mask matches no cell; the UI gives no reason.
-
-Evidence: `qa/screenshots/paint/49-fill-terrain-slope0.png`,
-`qa/screenshots/paint/53-fill-rock.png`.
-
-## 16. Paint Walls hint still says "Vertex Painting"
-
-**Severity: Minor** — Paint with Paint Walls ticked.
-
-Expected: the live hint acknowledges wall mode.
-Actual: the action is a distinct `terrain wall paint` undo step (good), but the hint reads
-`Vertex Painting | height 5.00 cell ...`.
-
-Evidence: `qa/screenshots/paint/34-paint-walls-snow.png`.
-
-## 17. Invalid chunk add only reports a raw Output warning
-
-**Severity: Minor** — Chunks.
-
-Steps: click a green `+` that is not adjacent to an existing chunk.
-Expected: invalid handles are not offered, or an in-viewport transient hint explains why.
-Actual: Output prints `WARNING: Marching Squares Terrain: new chunks must touch an existing
-chunk.` and nothing else happens. The handle was drawn, so the user is invited to click it.
-
-Evidence: `qa/screenshots/manage/08-chunks-removed.png`; editor.log `plugin.rs:1244`.
-
-## 18. Empty preset name closes the Save Preset dialog silently
-
-**Severity: Minor** — Paint → Export Texture Preset.
-
-Steps: clear the name field, press Enter. The dialog closes, no `.tres` is written, no message.
-Expected: inline validation or the dialog staying open.
-
-Evidence: `qa/screenshots/paint/22-save-preset-empty-name.png`.
-
-## 19. Save Preset dialog has no Cancel button
-
-**Severity: UI** — Paint → Export Texture Preset.
-
-The dialog shows only `OK`; Esc and the window X cancel. docs/04 describe OK/Cancel. A
-`window-resize 400x150` request is clamped to **558×150** because the one-line path label
-("Preset name (saved to res://addons/.../)") has a 540 px minimum; 800×220 is accepted and
-leaves a large blank area. Add a real Cancel button and a compact label/wrap so the dialog can
-be ~420 px wide.
-
-Evidence: `qa/screenshots/paint/20-save-preset-dialog.png`,
-`qa/screenshots/uiresize/50-save-preset-1024x600.png`,
-`qa/screenshots/uiresize/51-save-preset-narrow-400x150.png`,
-`qa/screenshots/uiresize/52-save-preset-large-800x220.png`.
-
-## 20. Settings page tabs jump vertically between pages
-
-**Severity: UI** — Settings.
-
-Steps: Grid (tabs at y≈378) → New Chunks (≈448) → Grass (≈483) → LOD (≈518) → Storage (≈448).
-Because the strip grows upward from the bottom, the tab row moves under the pointer; clicking
-where the tabs were can land in the 3D view and clear the terrain selection, which hides the
-whole toolbar/strip.
-
-Expected: a stable tab row (top-anchored/fixed height) or a strip that scrolls instead of
-changing height. The page content itself fits at 1600×900.
-
-Evidence: `qa/screenshots/manage/17-settings-grid.png`, `.../25-settings-new-chunks.png`,
-`.../27-settings-grass.png`, `.../35-settings-lod.png`, `.../43-storage-baked-page.png`.
-
-## 21. Ground-texture preview is black for `mst_noise.png`
-
-**Severity: UI** — Paint → slot `Texture:` resource picker.
-
-With Texture Preset `MST Classic`, slots using `textures/ground/mst_noise.png` show a solid
-black picker thumbnail; the slot's small tinted preview on the left is correct, and the tooltip
-names the right file. Other textures preview correctly.
-
-Evidence: `qa/screenshots/paint/17b-preset-panel.png`,
-`qa/screenshots/paint/19-undo-preset-stale-panel.png`.
-
-## 22. Hint/status text is clipped and some hints disagree with the controls
-
-**Severity: UI** — viewport status lines.
-
-- The Brush selection status is cut at the right edge at 1600×900 (`... RMB/Esc: c...`).
-- Raise/Lower lists `Shift+wheel: size` but omits `Ctrl+wheel: strength` (which works).
-- Level says `Ctrl+wheel: strength`, but the Level strip has no Strength field to observe.
-- At 1024×600 the Brush hint is taller than the 39 px viewport; the Settings hint is cut on the
-  left and overlapped by the "Perspective" label.
-
-Evidence: `qa/screenshots/uiresize/04-brush-1024x600.png`,
-`qa/screenshots/uiresize/60-settings-1024x600.png`,
-`qa/screenshots/sculpt/69c-esc-clean-test.png`,
-`qa/screenshots/sculpt/18-brush-raiselower-strip.png`,
-`qa/screenshots/sculpt/31-level-strip.png`.
-
-## 23. Builder Face/Edge/Vertex strip squeezes the 3D viewport to 39 px
-
-**Severity: Error** — PixelBuilderMesh, MST layout, any non-Object mode.
-
-Steps: select `HexIsland/BuilderRuin/Ruin`, stay in the default MST layout, click
-**Mode → Face** (the `2` key is dead, see #4).
-
-Expected: the bottom attribute strip is scrollable/collapsible and leaves a usable 3D view for
-selecting faces/edges/vertices.
-
-Actual: Face mode shows the full operation set (Color, Grid, Dist, Inset, Profile, Inset by,
-Subdiv, Axes, Trim at, T depth/height, Off x/y/z, Space, Grow, Extrude, To new object). The
-strip's minimum size is **238×447** and it is not inside a `ScrollContainer`, so the VSplit
-gives it 447 px and the 3D viewport becomes **345×39 px** (global rect `[706,154,345,39]`) at
-1600×900. The HUD status lines are clipped away; clicks aimed at the model land on the strip.
-Face selection is effectively impossible in this mode without switching to the Modeler layout.
-Reproduced immediately after creating a Box and switching to Face.
-
-At 1280×800 the strip wraps to **238×699** and the viewport is **238×39**; at 1024×600 the
-same strip is **238×699** with its bottom rows clipped by the window.
-
-Evidence: `qa/screenshots/builder/14-box-selected-face-mode.png`,
-`qa/screenshots/builder/15-face-selected.png`,
-`qa/screenshots/builder/ui/27-builder-1600x900.json` (strip min/rect; viewport rect);
-`qa/screenshots/uiresize/21-builder-face-1600x900.png`,
-`22-builder-face-1280x800.png`, `23-builder-face-1024x600.png`.
-
-Undo: not applicable (layout).
-
-## 24. Builder MST layout clips badly at 1280×800
-
-**Severity: Warning** — same surface, smaller editor.
-
-Steps: select the builder mesh at 1280×800, wait for the relayout.
-
-Expected: toolbar labels, strip fields and the viewport stay readable; fields wrap or scroll.
-
-Actual: the viewport shrinks to ~172×60 px; the bottom strip is cut by the Materials panel
-(only Slot, Color, Grid, Subdiv, Weld and the mirror checkboxes are visible; the "Editing
-builder mesh" label is clipped); the toolbar headers collide with the icons (`Combi` for
-Combine); the Materials palette loses its lower content. Restoring 1600×900 restores it.
-
-Evidence: `qa/screenshots/builder/28-builder-1280x800.png`,
-`qa/screenshots/builder/29-builder-restored-1600x900.png`.
-
-## 25. A newly drawn sibling shape is not selected
-
-**Severity: Minor** — Shape draw without Shift.
-
-Steps: select `Ruin`, Shape Box, `C`, drag a footprint, move up, click to finish.
-
-Expected: the new sibling is ready to edit/paint (docs continue with `W`/`B`).
-
-Actual: the new `Box` is added under `BuilderRuin/Box`, but the Scene tree, Inspector and
-builder target remain on `Ruin` (the HUD still reports the 209-vertex Ruin). Pressing `B` right
-after drawing paints the old mesh. Selecting `BuilderRuin/Box` explicitly fixes it.
-
-Evidence: `qa/screenshots/builder/13-shape-created.png`; undo works (`Pixel Builder: Create
-Box`, one Ctrl+Z removes the new Box).
-
-## 26. `H` cycles builder modes in reverse
-
-**Severity: Minor** — Builder.
-
-Steps: start in Face, press `H` four times.
-
-Expected: a predictable cycle in the documented 1→2→3→4 order.
-
-Actual: `Face → Object → Vertex → Edge → Face` (mode − 1). Works, but is surprising next to
-the dead number keys.
-
-Evidence: `qa/screenshots/builder/06-mode-vertex.png`.
-
-## 27. Modeler layout shows a blocking centred card
-
-**Severity: UI** — Builder → Modeler layout.
-
-Steps: switch to Modeler layout and draw a shape; look at the centre of the 3D view.
-
-Expected: status stays in the top-left HUD; the viewport stays clear.
-
-Actual: a centred "Modeler / Created Box / Dismiss" card covers the model and blocks clicks on
-the faces underneath until dismissed. It also appears immediately after toggling the layout.
-
-Evidence: `qa/screenshots/builder/16-modeler-layout-face.png`.
-
-Builder log note: the six `ERROR` lines mentioning `PixelBuilderPlugin::debug_placement` in
-`qa/screenshots/builder/editor.log` were induced by the QA harness passing JSON to a
-`Vector2`-typed test hook; they are not addon defects and are excluded from the findings.
-
-## 28. Spin-slider drags leave their field range by orders of magnitude
-
-**Severity: Warning** — Pixelizer sections; same root cause as #8 (Paint Slope Min).
-
-Steps: select `PixelRenderer`; on the Renderer page drag **Pixel Size** (value 3) 55 px to the
-right over 1.2 s; on the Outlines page drag **Darken** (0.55, range 0–1) 40 px.
-
-Expected: drags clamp to the documented ranges (Pixel Size 1–16, Darken 0–1); typing larger
-values is a separate affordance.
-
-Actual: `pixel_size` became **44243** and `outline_darken` became **290.19**. The viewport
-degrades to 1-px blocks / near-black terrain. `editor/ui_kit.rs::spin_slider` calls
-`set_allow_greater(true)` and `set_allow_lesser(true)` on every field, including Float fields
-that did not ask for it. This is the same defect that lets Paint → Slope Min reach 8287.5°
-(#8); the systemic fix is to reserve `allow_greater/lesser` for fields that explicitly opt in
-and clamp slider drags to the declared range.
-
-The same thing reproduces on effect strips: PixelSky **Coverage** went 0.5 → **377.40** and
-PixelWater **Swell H.** 0.121 → **142.85** in one 20–30 px drag. The node property keeps the
-out-of-range value while the Inspector clamps its own display (Coverage shows 1.0/0.0 while the
-strip holds 377.4), so the two disagree (#41).
-
-Evidence: `qa/screenshots/pixel/20b-pixelsize-44243.png`,
-`qa/screenshots/pixel/21-outlines-darken.png`,
-`qa/screenshots/pixel/20e-pixelsize-restored.png`,
-`qa/screenshots/effects/10-sky-coverage-377.png`,
-`qa/screenshots/effects/46-water-waves-swell.png`.
-
-## 29. One integer spin-slider drag creates two undo steps
-
-**Severity: Warning** — Pixelizer integer fields.
-
-Steps: on the Renderer page record `undo-state` (0 actions), drag **Pixel Size** 55 px,
-`undo-state` → `undo_count: 2`. Ctrl+Z once goes to 17448 (a mid-drag value); a second Ctrl+Z
-goes to 3; one Ctrl+Shift+Z returns to 17448.
-
-Expected: one continuous drag is one undo step, like the Float **Darken** field (verified one
-step).
-
-Actual: two steps, so the first undo lands on an intermediate value. In the deep-undo re-test
-the value went 2 → **39497**, the first undo → **4357** (mid-drag), the second → **2**, and one
-redo returned 4357. This can also interact with the out-of-range drag in #28.
-
-Evidence: `qa/screenshots/pixel/20c-pixelsize-undo1.png`,
-`qa/screenshots/undodeep/51-pixelsize-drag.png`,
-`qa/screenshots/undodeep/ui/51b-pixelsize-undo1.json`,
-`qa/screenshots/undodeep/ui/51c-pixelsize-undo2.json`,
-`qa/screenshots/pixel/20d-pixelsize-undo2.png`,
-`qa/screenshots/pixel/20e-pixelsize-restored.png`; Output shows "Set Renderer Pixel Size"
-twice.
-
-## 30. Undo of the Dawn preset leaves the viewport tinted salmon
-
-**Severity: Warning** — Pixel World lighting presets.
-
-Steps: Pixel World → **Dawn** (sky/cloud deck turns salmon), then Ctrl+Z. `time_of_day`,
-deck colors, god rays, beam tint, ray alpha, day cycle and fog all return to their pre-preset
-values, but the viewport stays salmon; toggling the cloud deck, god rays off, and scrubbing
-time does not clear it. Closing the scene without saving and reopening restores blue.
-
-Expected: undo restores the rendered look, not only the properties.
-
-Actual: the editor preview keeps a cached dawn-tinted sky/global state until the
-scene/viewport is rebuilt. Editor-only (nothing is saved), but the user cannot tell the preset
-was undone.
-
-Evidence: `qa/screenshots/pixel/72-lighting-dawn.png`,
-`qa/screenshots/pixel/83-godrays-off.png`, `qa/screenshots/pixel/84-daynight-time-05.png`,
-`qa/screenshots/pixel/85-fresh-scene.png`.
-
-## 31. Pixel World "+ Add" closes the panel by selecting the new node
-
-**Severity: UI** — Pixel World panel.
-
-Steps: select `PixelRenderer`, click **+ Add** next to `Sun Shafts` (or `Wild Flowers`).
-
-Expected: the panel stays open long enough to add another effect (or focus returns to the
-renderer/terrain).
-
-Actual: the new node is added and selected, and the pixel toolbar, strip and Pixel World panel
-all disappear because the pixelizer UI follows the selection. Adding two effects in a row
-takes two reselections.
-
-Evidence: `qa/screenshots/pixel/68-sunshafts-added.png`,
-`qa/screenshots/pixel/71-wildflowers-added.png`,
-`qa/screenshots/pixel/70-pixel-ui-restored.png`; undo of Add works as one step.
-
-## 32. Sun Shafts "+ Add" leaves the Sun reference empty and the node inert
-
-**Severity: Warning** — Pixel World "+ Add" / "Wire Sun / Env Refs".
-
-Steps: add `Sun Shafts`; inspect the new node (Sun: `Assign...`); click **Wire Sun / Env
-Refs**.
-
-Expected: the `+ Add` tooltip and docs/08 promise wired sun/environment references.
-
-Actual: the Sun stays empty and the wire action prints `Pixel World: wired 0 reference(s).`
-(`wire_references` only covers PixelSky, PixelDayNight and PixelWeather). The node is also
-inert: changing Alpha 0.011 → 0 and Count 12 → 30 leaves the viewport unchanged. The thin
-yellow streaks visible in the scene are the renderer's **God Rays**, not this node. Visible
-shafts need a manual Sun assignment.
-
-Evidence: `qa/screenshots/pixel/68-sunshafts-added.png`,
-`qa/screenshots/pixel/74-wire-refs.png`,
-`qa/screenshots/effects/67-sunshafts-default.png`,
-`qa/screenshots/effects/69-sunshafts-alpha0.png`,
-`qa/screenshots/effects/70-sunshafts-count30.png`; editor.log informational line.
-
-## 33. Strip page-tab rows jump vertically between pages
-
-**Severity: UI** — every pixelizer section and the effect strips.
-
-Steps: Renderer page (tabs at y≈485); click `Rays` (y≈520); click `Sheets` (y≈555); try a tab
-click at the previous y. For effects: PixelWater Surface page (tabs y≈519) → Waves (y≈449) →
-try to click Light at the old y.
-
-Expected: a stable tab bar (the strip is bottom-anchored, but the tab row should not move by a
-whole row).
-
-Actual: the tab bar shifts 35–70 px as the page's field count changes; a fixed-position click
-lands in the content area. This is the same class as #20 (Settings pages) and explains an
-earlier interrupted run whose fixed-position captures were identical.
-
-Evidence: `qa/screenshots/pixel/11-renderer-renderer.png`,
-`qa/screenshots/pixel/13-renderer-rays.png`,
-`qa/screenshots/pixel/15-renderer-sheets.png`; UI dumps in `qa/screenshots/pixel/ui/`;
-`qa/screenshots/effects/ui/45-water-page-*.png` (Waves tab `[535,449]` vs `[535,519]`).
-
-## 34. Disabled Pixel World menu entries look enabled
-
-**Severity: UI** — Pixel World menu.
-
-Steps: open **Pixel World**; compare entries disabled because the node exists (Renderer, Sky &
-Clouds, Day/Night, Weather, Water, Diagnostics) with enabled ones.
-
-Expected: disabled entries are visibly greyed.
-
-Actual: the text brightness is the same; only the tiny leading icon is dimmer. Clicking an
-already-present effect appears to do nothing.
-
-Evidence: `qa/screenshots/pixel/04-pixel-world-menu.png`.
-
-## 35. Pixel World panel keeps a scrolled offset when rows rebuild
-
-**Severity: UI** — Pixel World panel.
-
-Steps: with `PixelRenderer` selected, the panel starts at the top; click a section icon; the
-panel now starts at `Particle Field`, hiding Renderer/Sky/Water; the vertical scrollbar is only
-visible on hover.
-
-Expected: the panel returns to the top after a section switch, or scrolls the selected row into
-view.
-
-Actual: the offset is preserved/re-applied (content y ≈ −104), so the top of the list
-disappears without an obvious cue.
-
-Evidence: `qa/screenshots/pixel/02-pixel-toolbar.png` vs
-`qa/screenshots/pixel/03-sky-section.png`,
-`qa/screenshots/pixel/73-panel-scrolled-bottom.png`.
-
-## 36. PixelSmoke shows no visible plume in hex_island
-
-**Severity: Warning** — Smoke & Fire node.
-
-Steps: select `Smoke` (Emitting on, Fire on, position 14,5,−2, Rate 2.5, Start/End 0.1/0.45),
-watch 4 s with Animate on, then raise Rate to 5 and Start/End to 1.0/2.0.
-
-Expected: a grey plume rising from the fire, with a flickering light.
-
-Actual: only a tiny orange flame pixel near the building base; no smoke puffs at either size and
-no plume above the terrain. No addon error is logged. The authored transform was restored after
-a harness `set-prop` mistake; the result is the same at the authored position. Worth checking
-whether the puff material/emission or the authored position is at fault.
-
-Evidence: `qa/screenshots/effects/58-smoke-a.png`,
-`qa/screenshots/effects/61-smoke-fire-center.png`,
-`qa/screenshots/effects/64-smoke-big.png`,
-`qa/screenshots/effects/66-smoke-restored.png`.
-
-## 37. Lighting Preset row is hidden under the bottom status bar
-
-**Severity: UI** — Pixel World panel.
-
-Steps: select any pixel node so the Pixel World panel opens; look at the **Lighting Preset**
-row (Dawn/Noon/Dusk/Night/Storm/Snow/Wire Sun/Env Refs) without scrolling.
-
-Expected: all preset buttons are visible and clickable at 1600×900.
-
-Actual: the row sits at y = 848–917 in a 900 px window; the editor's bottom status bar covers it.
-Only a 1-px sliver of Night is reachable; Dawn/Noon/Dusk do not respond until the panel is
-scrolled (the panel does scroll, so the block is reachable). The presets are a primary action
-and should be pinned or placed above the fold.
-
-Evidence: `qa/screenshots/effects/07-sky-strip.png`,
-`qa/screenshots/effects/19-daynight-preset-night.png`; UI dump rects `Dawn [1067,848,72,33]`,
-`Night [1067,884,72,33]` at window height 900.
-
-## 38. Dawn / time 0.25 sky is saturated magenta with stripes
-
-**Severity: Minor** — PixelDayNight / PixelSky.
-
-Steps: set **Time** to 0.25, then apply the **Dawn** preset.
-
-Expected: a warm dawn sky (the preset's deck tint is warm white/orange in the docs).
-
-Actual: the whole sky is neon pink/magenta with a dense vertical dither pattern; terrain reads
-bright green/orange. At 0.4 the same sky is grey-blue and foggy. The preset's color values may
-be intended for a different color space/tonemapping, or the deck's dither is too strong.
-
-Evidence: `qa/screenshots/effects/16-daynight-time-0.25.png`,
-`qa/screenshots/effects/20-daynight-preset-dawn.png`.
-
-## 39. Fireflies are invisible at their default size/count
-
-**Severity: Minor** — PixelFireflies.
-
-Steps: set `PixelDayNight.Time = 0.9` (night); select Fireflies (count 48, size 0.12, energy 3,
-night-only 1); then raise size to 0.6 and count to 200.
-
-Expected: a visible blinking swarm at the documented 0.1–0.2 size.
-
-Actual: nothing visible at 0.12/48 even at ~30 m; at 0.6/200 the swarm appears, but the dots
-read white/blue rather than the warm yellow tint at energy 3. Defaults are too small for the
-demo camera, and the tint may be washed out.
-
-Evidence: `qa/screenshots/effects/51-fireflies-night-close.png`,
-`qa/screenshots/effects/54-fireflies-big-night.png`,
-`qa/screenshots/effects/53-fireflies-noon-close.png` (invisible at noon, expected).
-
-## 40. Storm lightning was not observed
-
-**Severity: Minor** — PixelWeather.
-
-Steps: Weather = Storm, Transition 0.2, Strength 1, Lightning enabled, Flash 2.5; capture
-15 frames over ~15 s with Animate on.
-
-Expected: periodic flashes/bolts.
-
-Actual: frame brightness stayed 95.1–96.2; no bolt or flash was captured. This may be a long
-random interval, so it needs a longer watch before being called a defect; the current sample is
-inconclusive.
-
-Evidence: `qa/screenshots/effects/31-storm-shot-1.png` … `31-storm-shot-5.png`.
-
-## 41. Inspector values desync from the strip after strip edits
-
-**Severity: Minor** — effect nodes.
-
-Steps: select `PixelSky`, change **Coverage** in the bottom strip to 0.8, read the Inspector's
-Coverage.
-
-Expected: both show 0.8.
-
-Actual: the strip shows 0.8 and the node property is 0.8, while the Inspector still shows 0.0.
-After an out-of-range drag the Inspector showed 1.0 while the strip held 377.4. The strip's
-`renew()` path updates its own controls but does not notify the Inspector.
-
-Evidence: `qa/screenshots/effects/11-sky-coverage-08.png` (strip 0.8, Inspector 0.0).
-
-## 42. Terrain attribute strips have no height cap; the viewport collapses to 39 px
-
-**Severity: Error** — every terrain tool strip.
-
-Steps: select the terrain, keep Brush active, resize 1920 → 1600 → 1366 → 1280 → 1024.
-
-Expected: the strip keeps a bounded height (or scrolls internally) and the 3D viewport keeps a
-usable size (at least 480×300).
-
-Actual: viewport heights **574 → 326 → 159 → 121 → 39 px**; strips **105 → 140 → 175 → 245 →
-245 px**. At 470 px strip width the MstFlow is 7 rows / 245 px; the `ScrollContainer` reports
-its content minimum, so the VSplit gives the strip 245 px and clamps the viewport to its 39 px
-minimum. There is no visible scrollbar and no height cap. 1280×800 is worse than 1366×768
-because the narrower strip wraps into more rows. At still narrower effective widths the same
-reflow produces the queue-OOM crash in #0.
-
-Expected fix: a fixed max height (e.g. 240 px and ≤35% of the 3D area) with a visible vertical
-scrollbar and a collapse chevron; never let the viewport drop below 480×300, auto-collapsing
-the side panel, then the strip, then the toolbar as needed.
-
-Evidence: `qa/screenshots/uiresize/01-brush-1920x1080.png`,
-`09-brush-1600x900-clean.png`, `02-brush-1366x768.png`, `03-brush-1280x800.png`,
-`04-brush-1024x600.png` and the matching UI dumps.
-
-## 43. Paint/Foliage sidebar is fixed at 250 px with no visible scrollbar
-
-**Severity: UI** — Paint and Foliage side panels.
-
-Steps: Paint at 1600×900; try to resize the right "Textures" panel; wheel over it; look for the
-Export Texture Preset action.
-
-Expected: a draggable splitter (220–420 px), a visible scrollbar, and the export action
-reachable without dozens of wheel turns.
-
-Actual: fixed 250 px, no splitter, no visible scrollbar (it only appears on hover, if at all).
-Only **2.5 of 16** slots are visible at 1600; 40 wheel ticks advanced about 7 slots (~6 ticks
-per slot), so the bottom Export button is ~100 ticks away. At 1024 the panel covers a 39 px
-viewport, the slots are cut at the window bottom, and the Paint strip is clipped after
-Slope Min/Max.
-
-Evidence: `qa/screenshots/uiresize/40-paint-1600x900.png`,
-`41-paint-scrolled-1600x900.png`, `42-paint-bottom-1600x900.png`,
-`43-paint-1024x600.png`.
-
-## 44. Pixel World panel is 17 px on screen at 1024×600
-
-**Severity: UI** — Pixelizer.
-
-Steps: select `PixelRenderer`; resize to 1024×600.
-
-Expected: the Pixel World panel stays fully visible, or collapses to a tab.
-
-Actual: `PixelizerAttributes`/`PixelizerToolbar` consume the width; `PixelWorldPanel` is placed at
-x = **1007** with width 250, so only 17 px is inside the 1024 window. All Select/Add buttons are
-unreachable. The viewport is **670×39**; the nine page tabs just fit (Debug Views ends at
-x=1004).
-
-Evidence: `qa/screenshots/uiresize/31-pixelizer-1024x600.png`,
-`qa/screenshots/uiresize/ui/31-pixelizer-1024x600.json`.
-
-## 45. Settings fields and hint are clipped at 1024×600
-
-**Severity: UI** — Settings pages.
-
-Steps: visit Grid, New Chunks, Grass, Display, LOD & Nature, Storage at 1024×600.
-
-Expected: all six tabs and every field reachable; the strip scrolls; the hint is readable.
-
-Actual: the six tabs fit (x=426..854), but fields below the first ~9 rows are clipped with no
-visible scrollbar; the hint is cut on the left ("…ings: edit them in the strip below") and
-overlapped by the "Perspective" label. The 39 px viewport persists even on Storage, which only
-needs 4 rows, because the split ratio is not returned.
-
-Evidence: `qa/screenshots/uiresize/60-settings-1024x600.png`,
-`61-settings-*.png`, `45-settings-1600x900.png`.
-
-## 46. Terrain toolbar grows to 2–3 columns at 1024 and steals width
-
-**Severity: UI** — terrain toolbar.
-
-Steps: at 1024×600 compare Brush (2 columns, 236 px) with Paint/Settings (3 columns, ~320 px);
-observe where the 3D view starts.
-
-Expected: a fixed 30 px icon rail, optionally scrollable; compact mode explicit.
-
-Actual: the `VFlowContainer` wraps based on available height and expands horizontally to keep
-all 16 tools visible. At 1024 Paint the viewport starts at x≈507 instead of 418. All tools are
-reachable in the Brush layout, but the cost is 80–200 px of viewport width with no scrollbar or
-"more" affordance.
-
-Evidence: `qa/screenshots/uiresize/04-brush-1024x600.png` (2 columns),
-`43-paint-1024x600.png` and `60-settings-1024x600.png` (3 columns),
-`00-terrain-toolbar-1600x900.png`.
-
-## 47. Builder Preferences dialog is taller than a 600 px window and not resizable
-
-**Severity: Warning** — Builder → Preferences.
-
-Steps: select `BuilderRuin/Ruin`, Builder menu → Preferences, resize to 1024×600.
-
-Expected: the dialog fits, scrolls, or is resizable; OK/Close reachable.
-
-Actual: window `Pixel Builder Preferences` is **484×664** at (270,−3), `resizable: false`,
-`min [0,0]`; the bottom 61 px (including the action row) is off-screen and there is no scroll.
-
-Evidence: `qa/screenshots/uiresize/24-preferences-dialog-1024x600.png`.
-
-## 48. Modeler layout loses its strip and Materials palette at 1024
-
-**Severity: UI** — Builder, Modeler layout.
-
-Steps: Builder menu → Modeler layout at 1024×600.
-
-Expected: the larger palette/Add Mesh grid remains usable alongside the viewport.
-
-Actual: only the dense top toolbar (Add Mesh, Actions, icons) and the viewport remain; the
-bottom strip and Materials panel are gone, and the viewport is still halved by the Output panel.
-At 1600 the same layout looks correct.
-
-Evidence: `qa/screenshots/uiresize/24c-builder-modeler-1024x600.png`,
-`25-builder-modeler-1600x900.png`.
-
-## 49. Camera zoom clips through the ground and the character
-
-**Severity: Warning** — runtime camera, `demo/courtyard.tscn`.
-
-Steps: open the scene at 1280×720, wait for the default camera, middle-wheel up twice at the
-centre of the view.
-
-Expected: zoom-in stops before the camera enters the terrain or the fox.
-
-Actual: the camera drops below the grass plane and into the fox; the view becomes a flat
-dark-green plane with trees on the horizon, and the fox is drawn as a cyan/white
-wireframe-like silhouette (backfaces/outline colour). One wheel-out restores the normal view.
-
-Evidence: `qa/screenshots/runtime/39-courtyard-orbit.png` (broken close-up),
-`qa/screenshots/runtime/40-courtyard-restored.png`.
-
-## 50. F1 help is one tiny, low-contrast line
-
-**Severity: UI** — runtime HUD.
-
-Steps: open `demo/hex_island.tscn`, press F1 at 1280×720, 1920×1080 and 1024×600.
-
-Expected: a readable controls hint/overlay (docs/11: "F1 — Show the controls again").
-
-Actual: a single ~10 px line of grey text pinned to the bottom edge
-(`WASD move · Shift walk · Space jump · drag / arrows orbit · Wheel zoom · F3 tuner · F1 help`)
-drawn directly over bright grass. It is readable at 1:1 but small, contrast varies with the
-terrain behind it, and there is no panel/background or multi-line help. It fits at all three
-sizes and toggles cleanly.
-
-Evidence: `qa/screenshots/runtime/02-hex-1280-f1.png`,
-`qa/screenshots/runtime/31-hex-1920-f1.png`,
-`qa/screenshots/runtime/36-hex-1024-f1.png`.
-
-## 51. F3 Pixel tuner is cramped and clipped at 1024×600
-
-**Severity: UI** — runtime diagnostics overlay.
-
-Steps: open `hex_island` at 1024×600, press F3.
-
-Expected: the tuner fits the window, or scrolls with a visible scrollbar / can be collapsed.
-
-Actual: the panel starts at x≈604 (59% of the 1024-wide window) and its content is cut at the
-bottom edge; only the top of the `PixelWeather: Weather` section is visible, and the
-Clear/Cloudy/… buttons and fields are below the window. It requires wheel-scrolling and leaves
-almost no room for the game. At 1280 and 1920 the same panel is fine and scrolls.
-
-Evidence: `qa/screenshots/runtime/35-hex-1024-f3.png` (clipped),
-`qa/screenshots/runtime/03-hex-1280-f3.png` (fine at 720p).
-
-## 52. The water plane's finite edge is exposed when zooming out
-
-**Severity: Minor** — runtime water.
-
-Steps: open `tutorial/02_island.tscn`, wheel down twice and orbit; in `hex_island`, orbit to the
-coast and zoom out five steps.
-
-Expected: water continues to the horizon or fades into the sky; waves/foam stay visible near
-the shoreline.
-
-Actual: tutorial 02 shows hard diagonal edges of the finite water plane with flat light blue
-beyond it. In hex_island the zoomed-out coast is a large uniform blue field with a hard horizon
-and no readable waves or shoreline foam at that distance (foam/caustics are clear at the default
-distance in tutorials 01/02).
-
-Evidence: `qa/screenshots/runtime/44-t02-orbit.png`,
-`qa/screenshots/runtime/33-hex-1920-sea-view.png`.
-
-## 53. Courtyard dusk shows a dark wedge instead of bright sun shafts
-
-**Severity: Minor** — runtime lighting, `demo/courtyard.tscn`.
-
-Steps: open the courtyard and wait for the default dusk view.
-
-Expected: `PixelSunShafts` adds bright shafts through the trees/pillars (docs/11, docs/09).
-
-Actual: the upper-left sky has a large, straight-edged dark navy wedge with no bright shaft
-visible. It may be a cloud shadow or a shaft sheet failing to add light; orbiting/zooming
-changes the wedge, so it is view-dependent.
-
-Evidence: `qa/screenshots/runtime/38-courtyard-1280.png`,
-`qa/screenshots/runtime/40-courtyard-restored.png`.
-
-## 54. Ctrl+Z is trapped in the Texture Name LineEdit and records a new rename
-
-**Severity: Warning** — Paint → Texture Name.
-
-Steps: click the slot **Texture Name** field, type `undotest`, press Enter, then Ctrl+Z while
-the field still has focus; click the 3D view and press Ctrl+Z again.
-
-Expected: Ctrl+Z in the field edits the text (or at least does not touch terrain history);
-clicking the 3D view leaves the field so Ctrl+Z undoes the rename.
-
-Actual: with the field focused, Ctrl+Z does not reach the terrain; the field's text undo changes
-the text, but because the field applies on every change the restored text is committed as a
-**new** `terrain texture 1 display_name` action (history 24→25, redo stack lost). Clicking the
-3D viewport does **not** release the LineEdit focus, so Ctrl+Z remains stuck in the field.
-Clicking a toolbar button (e.g. Brush) frees it and the rename can then be undone normally.
-
-Evidence: `qa/screenshots/undodeep/32-rename.png`,
-`qa/screenshots/undodeep/33-lineedit-ctrlz.png`,
-`qa/screenshots/undodeep/34-lineedit-raw-ctrlz.png` (`undo-state` 23→24→25 while focused,
-then 25→24 after clicking Brush).
-
-## 55. "Vertex Handles" has no draggable grip; chunk-border drags add/remove chunks
-
-**Severity: Warning** — Chunks → Vertex Handles.
-
-Steps: Chunk Manager, tick **Vertex Handles**; drag the green handle/line at the selected chunk
-edge on hex_island; repeat on 02_island with the red circle handle; drag the green vertical line
-endpoint.
-
-Expected: a vertex handle can be dragged to change the chunk-corner height; the History entry
-names a vertex edit.
-
-Actual: no drag produced a vertex edit (`undo-state` unchanged). A drag at the hex chunk border
-**removed** the selected chunk (`remove chunk`, 295→294), and a drag at a red circle in
-02_island **added** a chunk (`add chunk`, 9→10). Both are undoable, but the handles look like
-vertex grips and the hint only says "LMB +: add chunk · LMB on a chunk: remove it", so it is
-easy to remove a chunk while trying to grab a vertex. Whether true vertex grips exist for this
-grid was not proven.
-
-Evidence: `qa/screenshots/undodeep/45-vertex-handles.png`,
-`qa/screenshots/undodeep/46-vertex-drag.png`,
-`qa/screenshots/undodeep/48-02-vertex-handles.png`.
-
-## 56. Misleading History action names
-
-**Severity: Minor** — History dock.
-
-Steps: after a Paint slot **Scale** drag, a Tint **RMB erase**, and any sculpt stroke with
-Quick Paint enabled, read the History dock.
-
-Expected: an entry that names what happened (Scale, tint erase, level with Quick Paint).
-
-Actual: Scale is `terrain texture 1 magnify`; RMB tint erase is `terrain tint paint`; with
-Quick Paint set, Level/Smooth/Bridge strokes are all named `terrain brush with quick paint`, so
-the tool that changed the terrain is not in the name. The order itself is correct.
-
-Evidence: `qa/screenshots/undodeep/53-history-dock.png`,
-`qa/screenshots/undodeep/ui/59-gradient-strip.json`,
-`qa/screenshots/undodeep/ui/41-stamp-strip.json`.
+## Critical
+
+### 1. Selecting PixelRenderer at 1280×720 crashes the editor
+
+- **Severity:** Critical (process exit; unsaved work at risk)
+- **Steps:** 1) Open `res://tutorial/02_island.tscn` or `demo/hex_island.tscn`. 2) Set the editor
+  window to **1280×720**. 3) `select --path PixelRenderer`.
+- **Expected:** the Pixelizer UI opens (it does at 1366, where its strip fits its 670 px minimum).
+- **Actual:** the selection returns once, then the harness socket drops and the editor exits.
+  `editor.log` line 14 is
+  `Failed method: Container::_sort_children. Message queue out of memory. …` followed by a
+  392,253-line flood of `Object was deleted while awaiting a callback.` The Pixelizer strip's hard
+  670 px minimum exceeds the available width at 1280, so the container loop never converges.
+- **Evidence:** fresh-session reproduction in `qa/screenshots/r4-verify/03-pixelizer-crash-excerpt.txt`
+  (saved before the editor died); last working size `qa/screenshots/r4-uiresize/43-1366-pixelizer.png`;
+  `qa/findings/r4-uiresize.md` F2. The same crash class is F1 in that report.
+- **Undo:** not applicable (process died).
+
+### 2. Selecting a PixelBuilderMesh panics the builder plugin and exits the editor
+
+- **Severity:** Critical (process exit)
+- **Steps:** 1) At **1366×768**, leave the pointer at `(345,478)` — the area where the Builder
+  toolbar appears. 2) `select --path BuilderRuins/Ruin`.
+- **Expected:** the Builder UI opens, as it does at 1920.
+- **Actual:** two
+  `Gd<T>::bind_mut() failed, already bound; T = … PixelBuilderPlugin` panics from
+  `PixelBuilderPlugin::on_button_hover` fired by `mouse_exited`, then
+  `Failed method: Container::_sort_children. Message queue out of memory.` and the editor is gone.
+  Moving the pointer into the 3D view before selecting avoided it in the next session.
+- **Evidence:** quoted from `editor.log` in `qa/findings/r4-uiresize.md` F1; the log was overwritten
+  by the automatic restart before it could be copied. Two fresh 1366×768 attempts — including a
+  pointer at `(345,478)` and a terrain→builder→terrain→builder round trip — did **not** reproduce
+  it, so the trigger is hover/timing dependent. It is reported as seen by the UI pass, not as a
+  deterministic crash. The same re-entrant-borrow class is issue 4.
+- **Undo:** not applicable (process died).
+
+---
+
+## Errors
+
+### 3. Closing/reopening a scene floods use-after-free errors
+
+- **Severity:** Error (editor survives; Output and error badge flooded)
+- **Steps:** 1) Open `demo/hex_island.tscn`, select the terrain, use a terrain tool, `Ctrl+S`.
+  2) Scene → **Close Scene**. 3) Reopen the scene. 4) Count
+  `upcast_ref: access to instance` in `editor.log`.
+- **Expected:** the plugin releases the terrain reference cleanly and reattaches on reopen.
+- **Actual:** identical Rust panics:
+  `Node3D::upcast_ref: access to instance with ID … after it has been freed` from `godot-core 0.5.5`.
+  The sculpt pass measured 196 errors (26 on the first close) and the undo pass 287 (73 → 202 on
+  close, 202 → 287 after reopen/close). The first close had 26 errors against a baseline of 0.
+  The editor stays alive and the reopened scene works, but the Output is unusable.
+- **Evidence:** `qa/screenshots/r4-sculpt/50-close-scene-error-spam.png`,
+  `qa/screenshots/r4-undodeep/58-history-dock-pixel.png`, `qa/screenshots/r4-undodeep/61-history-dock.png`;
+  `/tmp/opencode/qa/sessions/r4-sculpt/editor.log` lines 14, 92.
+- **Undo:** not applicable (scene lifecycle); history is correctly empty after reopen.
+
+### 4. `PixelizerEditorPlugin::on_float` re-entrant borrow panic
+
+- **Severity:** Error (5 ERROR lines; editor survives, UI may rebuild incorrectly)
+- **Steps:** 1) Resize the editor and select `PixelRenderer` so the Pixelizer strip rebuilds
+  (intermittent). 2) Read Output.
+- **Expected:** the strip rebuild completes without a Rust panic.
+- **Actual:**
+  `ERROR: [panic … godot-core-0.5.5/src/storage/mod.rs:38]` and
+  `ERROR: Error calling from signal 'value_changed' to callable: 'PixelizerEditorPlugin::on_float': .`
+  (5 occurrences). The UI recovers on the next rebuild, but this is the same re-entrant
+  `bind_mut` family as the two crashes.
+- **Evidence:** `/tmp/opencode/qa/sessions/r4-pixel/editor.log` lines 14–20;
+  `qa/screenshots/r4-pixel/73-resize-1024-renderer.png`.
+- **Undo:** not applicable.
+
+### 5. Floor Slot and Storage Mode dropdowns write nothing
+
+- **Severity:** Error (lost setting; verified fresh)
+- **Steps:** 1) Settings → **New Chunks** → Floor Slot `1. Grass` → `2. Meadow`.
+  2) `prop default_floor_slot`, `undo-state`. 3) Settings → **Storage** → Storage Mode
+  `Resource` → `Baked`; `prop storage_mode`.
+- **Expected:** the property is written through the undo manager and the dependent Storage rows
+  (Data Directory / Save Data) appear.
+- **Actual:** the label reads `2. Meadow` / `Baked`, but `default_floor_slot` stays `0`,
+  `storage_mode` stays `0`, no undo action is created, and Save Data never appears. This is the
+  same integer-item-id conversion failure reported in the 2026-11-20 pass; **not fixed**. Grid Type
+  is the exception — it now writes.
+- **Evidence:** `qa/screenshots/r4-verify/01-floorslot-label-meadow-prop-0.png`;
+  `qa/screenshots/r4-manage/17-newchunks-floorslot-meadow.png`,
+  `qa/screenshots/r4-manage/37-storage-mode-baked-select.png`,
+  `qa/screenshots/r4-undodeep/49-floorslot.png`; UI dumps `ui/17-floorslot.json`,
+  `ui/37-storage-baked.json`.
+- **Undo:** broken — nothing is recorded.
+
+### 6. Debug View dropdown writes nothing
+
+- **Severity:** Error (lost setting; verified fresh)
+- **Steps:** 1) Settings → **Display** → Debug View `Off` → `Slope`. 2) `prop debug_view`,
+  `undo-state`, viewport.
+- **Expected:** `debug_view` becomes `1`, the viewport switches to slope shading, and
+  `terrain setting debug view` appears in history.
+- **Actual:** the field reads `Slope`, but `debug_view` stays `0`, the viewport is unchanged, and
+  no undo action is recorded. The setting is lost on the next strip rebuild. (The prior pass's
+  side effect of toggling the grid overlay did **not** reproduce.)
+- **Evidence:** `qa/screenshots/r4-verify/02-debugview-label-slope-prop-0.png`;
+  `qa/screenshots/r4-manage/30-debugview-popup.png`,
+  `qa/screenshots/r4-manage/31-debugview-slope-result.png`,
+  `qa/screenshots/r4-undodeep/51-debugview-slope.png`.
+- **Undo:** broken — nothing is recorded.
+
+### 7. Attribute strips are uncapped; the 3D view collapses to 39 px
+
+- **Severity:** Error (editing becomes impossible at small sizes)
+- **Steps:** 1) Select the terrain. 2) Resize 1600 → 1366 → 1280 → 1024. 3) Switch
+  Brush/Paint/Settings Grid and measure the viewport/strip.
+- **Expected:** the strip caps at ~3 rows (105 px) or scrolls internally, keeping the 3D view at
+  least 480×300.
+- **Actual:** the strip takes its full flow height and the VSplit gives the remainder to the
+  viewport: Brush 553×124 (1366), 470×41 (1280), 470×39 (1024); Paint 300×39, 292×39, 377×39;
+  Settings Grid 470×39 with a 385 px strip. At 1024 the content is fully visible (no clipped
+  labels), so this is unbounded growth, not wrapping. A Brush drag in the 39 px slice produced no
+  terrain change and `undo_count: 0`.
+- **Evidence:** `qa/screenshots/r4-uiresize/39-1366-brush.png`,
+  `41-1366-paint.png`, `46-1280-brush.png`, `47-1280-paint.png`, `52-1024-brush.png`,
+  `54-1024-paint.png`, `55-1024-settings-grid.png`; measured matrix in
+  `qa/findings/r4-uiresize.md`.
+- **Undo:** n/a (layout); the same drag at 1366 works and undoes.
+
+### 8. Builder Face/Edge/Vertex strip is 447 px tall at 1600×900
+
+- **Severity:** Error (viewport 345×39; face picking impractical)
+- **Steps:** 1) 1600×900, select `BuilderRuins/Ruin`. 2) Click **Face mode**. 3) Measure
+  `Node3DEditorViewportContainer` and `PixelBuilderStrip`.
+- **Expected:** a grouped/scrolling strip ≤240 px, viewport ≥480×300.
+- **Actual:** viewport **345×39**, strip **345×447** (min 238×447, not scrollable), Builder
+  toolbar 416×489. At 1920 the same mode is usable (view 795×502, strip 177). Object mode is
+  421×310; Edge/Vertex are 385×163.
+- **Evidence:** `qa/screenshots/r4-builder/04-mode-face-button.png`,
+  `qa/screenshots/r4-builder/25-mst-layout-face.png`, `…/32-mode-edge.png`,
+  `…/33-mode-vertex.png`, `qa/screenshots/r4-uiresize/37-1600-builder-face.png`;
+  `qa/screenshots/r4-builder/ui/01-builder-controls.json`.
+- **Undo:** n/a.
+
+### 9. Documented tool/mode shortcuts are dead or hijacked
+
+- **Severity:** Error (documented workflows blocked)
+- **Steps:** 1) Terrain selected: press `2`, then `1`; read `ToolTitle`. 2) Builder selected:
+  press `2`, then `H`, then `E`/`F`.
+- **Expected:** digits switch tools/modes; `H` cycles builder modes; `E` extrudes; `F` frames.
+- **Actual:** sculpt digits never change the tool (the 3D view consumes them). Builder `2` leaves
+  Object mode; `H` triggers Godot's *Toggle Selected Node(s) Visibility* and hides the Ruin (undo
+  restores it); `E` is consumed by the built-in rotate mode; `F` does not frame. `Shift+C` opens
+  the Bezier tool instead of appending (issue 42).
+- **Evidence:** `qa/screenshots/r4-sculpt/37-key2-after.png`;
+  `qa/screenshots/r4-builder/02-mode-key2.png`, `…/03-mode-keyH.png`,
+  `…/11-visibility-undone.png`, `…/07-keyF-framing.png`.
+- **Undo:** the accidental H action undoes correctly; the intended actions never happen.
+
+---
+
+## Warnings
+
+### 10. Sliders and spins accept absurd out-of-range values
+
+- **Severity:** Warning (silent no-ops or broken visuals)
+- **Steps / actual:** drag a little in each field:
+  Paint **Slope Min** → `6702.5°` (painting then silently no-ops);
+  PixelRenderer **Pixel Size** → `39087`; **Darken** → `283.3`; **Ray Alpha** → `357.5`;
+  PixelSky **Coverage** → `325.76`; PixelWater **Swell Height** → `108.93` (water mesh spikes);
+  Fireflies **Count** → `4096` (then nothing renders).
+- **Expected:** documented ranges clamp (slope 0–90; coverage/alpha 0–1; sensible counts).
+- **Evidence:** `qa/screenshots/r4-paint/09-slope-min-drag-overflow.png`,
+  `qa/screenshots/r4-pixel/47-pixelsize-drag.png`, `…/51-darken-drag.png`,
+  `qa/screenshots/r4-effects/67-sky-coverage-out-of-range.png`,
+  `…/32-water-swell-drag.png`.
+- **Undo:** the value changes are undoable; the out-of-range value itself is the defect.
+
+### 11. One PixelRenderer pixel-size drag creates two undo steps
+
+- **Severity:** Warning (undo granularity)
+- **Steps:** Select `PixelRenderer`, drag the integer Pixel Size slider once, then Ctrl+Z twice.
+- **Expected:** one drag = one `Set Renderer Pixel Size` step.
+- **Actual:** two `Set Renderer Pixel Size` steps. The first Ctrl+Z lands on an intermediate drag
+  value (12972 in one run, 148 in another), not the pre-drag `3`/`2`; the second returns to the
+  start. One continuous gesture should be one historical action.
+- **Evidence:** `qa/screenshots/r4-pixel/47-pixelsize-drag.png`,
+  `qa/screenshots/r4-pixel/48-pixelsize-undo1.png`,
+  `qa/screenshots/r4-undodeep/57-pixelsize-drag.png`;
+  `qa/findings/r4-undodeep.md` row 42.
+- **Undo:** broken granularity (both steps do undo correctly).
+
+### 12. Grass Animation FPS is not undoable
+
+- **Severity:** Warning (silent history loss; Ctrl+Z hits an unrelated edit)
+- **Steps:** Settings → Grass → Animation FPS `0` → `12`, Enter. `undo-state`, Ctrl+Z.
+- **Expected:** `terrain grass animation fps` restores 0.
+- **Actual:** no action/version change; the field keeps 12; the next Ctrl+Z reverts the previous
+  terrain action instead. This is the only real non-undoable setting found in the deep pass.
+- **Evidence:** `qa/screenshots/r4-manage/22-grass-fps-changed.png`,
+  `…/23-grass-fps-after-undo.png`; `qa/findings/r4-undodeep.md` row 34.
+- **Undo:** broken.
+
+### 13. Undo restores data but leaves visible UI stale
+
+- **Severity:** Warning (data is correct; the UI lies)
+- **Steps / actual:** 1) Apply a texture preset, Ctrl+Z: `tex_assign` is restored, but the
+  Material dropdown still says `2. Texture 2` and slot labels keep the preset name.
+  2) Rename a slot, Ctrl+Z: data reverts, label stays `undotest`. 3) Undo Grid Type: chunks return
+  but the strip still says `Square` while `grid_type = 3`. 4) Builder Extrude/Inset undo: mesh
+  counts revert but the HUD keeps 213/409/214 or 217/417/218 and a stale selected face.
+- **Expected:** undo refreshes the owning panel/HUD in the same action.
+- **Evidence:** `qa/screenshots/r4-paint/54-preset-undo-stale-names.png`,
+  `qa/screenshots/r4-manage/60-gridtype-undo.png` (restored chunks, stale label),
+  `qa/screenshots/r4-builder/17-extrude-undo.png`, `…/22-inset-undo.png`.
+- **Undo:** data works; UI refresh broken.
+
+### 14. Lighting-preset undo leaves the preview tinted
+
+- **Severity:** Warning (visual state survives undo)
+- **Steps:** PixelRenderer → Lighting Preset **Dawn** (or Weather **Storm**), then Ctrl+Z.
+- **Expected:** the tint and sky revert with the properties.
+- **Actual:** properties revert, but the viewport stays salmon/pink (`218,150,153`); toggling
+  Preview off/on does not clear it; only a scene/session restart does. Storm has the same class of
+  stale tint.
+- **Evidence:** `qa/screenshots/r4-pixel/10-lighting-dawn.png`,
+  `…/11-dawn-undone.png`, `…/12-dawn-stale-after-preview-toggle.png`;
+  `qa/screenshots/r4-effects/19-preset-dawn.png`.
+- **Undo:** broken preview restore; property undo itself works.
+
+### 15. Grid Type change silently deletes every chunk
+
+- **Severity:** Warning (destructive, no confirmation; undo recovers)
+- **Steps:** `demo/hex_island.tscn` (295 chunks) → Settings → Grid → Grid Type `Hex Rings` → `Square`.
+- **Expected:** a confirmation that chunk data is incompatible, or a refusal while chunks exist.
+- **Actual:** `grid_type` changes 3→0, `terrain` immediately returns `0 chunks / digest 0`, the
+  island disappears, and the Output has no explanation. One Ctrl+Z restores 295 chunks and digest
+  `3064656926`.
+- **Evidence:** `qa/screenshots/r4-manage/58-settings-grid-page.png`, `…/59-gridtype-square.png`,
+  `…/60-gridtype-undo.png`.
+- **Undo:** works.
+
+### 16. Side panels are fixed at 250 px and mostly unscrollable
+
+- **Severity:** Warning / UI (unreachable actions, wasted space)
+- **Steps:** Paint at 1920×1080; look for a splitter/collapse; wheel to the bottom; repeat for
+  Foliage, Pixel World, Builder Materials.
+- **Expected:** a splitter (220–420 px), a collapse tab, and a scrollbar that reaches the action
+  row in a few notches.
+- **Actual:** Paint panel `250×682`, content **5,767 px**; only ~1.5–2 of 16 slots visible; **90
+  wheel notches** to reach Export Texture Preset. Foliage is 250 px and its palette is not in the
+  editor Control dump at all, so it cannot be tabbed to or scrolled like a normal panel. Pixel
+  World is 250×682 (content 941); Builder Materials 245–259 px (content 659 in 469).
+- **Evidence:** `qa/screenshots/r4-paint/ui/02-paint-panel.json`,
+  `qa/screenshots/r4-paint/02-paint-tool-panel.png`, `…/52-panel-splitter-drag-left.png`,
+  `qa/screenshots/r4-uiresize/06-1920-paint-strip.png`, `…/19-1920-paint-panel-bottom.png`.
+- **Undo:** n/a.
+
+### 17. Toolbar column count jumps with editor height
+
+- **Severity:** Warning (tool positions move while working)
+- **Steps:** compare 1920/1600/1366/1280/1024 expanded and compact.
+- **Expected:** one fixed icon rail (30–36 px) with vertical scrolling.
+- **Actual:** 1920 expanded 116 px (1 column); 1600/1366/1280 236 px (2 columns); 1024 compact
+  started at 76×392 (2 columns) and later became 116×252 (3 columns) as the strip grew. At 1024
+  the compact rail is still 116 px, not 36. At 1600 the expanded toolbar takes 15% of the width,
+  which is why the Paint strip wraps to 534 px / 6 rows.
+- **Evidence:** `qa/screenshots/r4-uiresize/02-1920-toolbar-collapsed.png`,
+  `…/31-1600-brush.png`, `…/52-1024-brush.png`, `…/53-1024-toolbar-collapsed.png`.
+- **Undo:** n/a.
+
+### 18. Settings Grid grows the strip; Settings and Renderer tab rows jump
+
+- **Severity:** Warning (muscle-memory clicks miss; view collapses)
+- **Steps:** Settings → Grid / New Chunks / Grass / Display / LOD & Nature / Storage; record tab y.
+  Then select `PixelRenderer` and switch Renderer → Outlines → Rays; record tab y.
+- **Expected:** stable tab rows; page content scrolls inside a capped strip.
+- **Actual:** Settings tab row at y≈287 (first open) then 448/483/518; settings strip 350 px at
+  1024 and 385 px at 1280 for Grid, leaving a 39 px view. The Renderer page tabs jump y=485
+  (Renderer/Color/Sky), 450 (Outlines), 520 (Rays); clicking the previous position misses. At one
+  point `click-text "Grid"` hit the toolbar Grid overlay button instead of the Settings tab (9
+  matches). The tool title is vertically centered instead of top-left, wasting the top-left cell.
+- **Evidence:** `qa/screenshots/r4-manage/15-settings-open.png` … `…/35-settings-storage.png`;
+  `qa/screenshots/r4-pixel/34-renderer-page.png` (tabs y≈485), plus the Outlines/Rays captures;
+  `qa/screenshots/r4-uiresize/09-1920-settings-grid.png` … `…/56-1024-settings-storage.png`.
+- **Undo:** n/a.
+
+### 19. Feature switches are not undoable; Ctrl+Z stays dead until a viewport click
+
+- **Severity:** Warning (documented toggles leave no history)
+- **Steps:** Pixel World → Features; toggle a project feature off/on; press Ctrl+Z.
+- **Expected:** an undo entry or at least a live shortcut.
+- **Actual:** no undo entry is created; the first Ctrl+Z after closing the Features popup does
+  nothing until the 3D viewport is clicked, then the shortcut works again.
+- **Evidence:** `qa/findings/r4-effects.md` “Feature switches…”; `qa/findings/r4-pixel.md`
+  feature-switch row.
+- **Undo:** not recorded.
+
+### 20. Added SunShafts has a null Sun; Wire refs reports 0
+
+- **Severity:** Warning (node added in a broken state)
+- **Steps:** Pixel World → Add → Sun Shafts. Read Inspector; click “Wire Sun / Env Refs”.
+- **Expected:** the scene's Sun is wired and the node produces shafts.
+- **Actual:** `prop sun → null`, Inspector shows “Assign…” and a warning triangle; Output says
+  `Pixel World: wired 0 reference(s).`
+- **Evidence:** `qa/screenshots/r4-effects/52-sunshafts-added.png`,
+  `qa/screenshots/r4-pixel/14-sunshafts-added.png`.
+- **Undo:** Add-node undo works, but the incorrect wiring remains.
+
+### 21. Fireflies render nothing at night
+
+- **Severity:** Warning (effect absent)
+- **Steps:** `demo/hex_island.tscn`, night time; Fireflies Count 100→400, Size 0.5, Night Only 0.
+- **Expected:** visible points at night.
+- **Actual:** three screenshots (including a 3× brightened crop) show an empty scene; no firefly
+  pixels at any tested count/size. The node exists and the section responds.
+- **Evidence:** `qa/screenshots/r4-effects/39-fireflies-noon.png`,
+  `…/40-fireflies-night.png`, `…/41-fireflies-night-big.png`,
+  `…/42-fireflies-nightonly0.png`, `…/43-fireflies-crop-bright.png`.
+- **Undo:** Count changes undo correctly; the visual output is the defect.
+
+### 22. Wheel size/strength changes leave the strip stale
+
+- **Severity:** Warning (misleading values)
+- **Steps:** Brush → Raise/Lower; strip shows Size 15.0 / Strength 4.000. Over the 3D view:
+  Shift+wheel ×3, Ctrl+wheel ×2, Alt+wheel ×3.
+- **Expected:** labels and slider handles update.
+- **Actual:** internal values become Size 19.0 / Strength 3.2565 / Rotation 45; Rotation refreshes,
+  but Size and Strength labels stay 15.0 / 4.000 and the slider handles do not move until the strip
+  is rebuilt (`18.9 / 3.303` after a tool switch).
+- **Evidence:** `qa/screenshots/r4-sculpt/28-rl-wheel-values.png`,
+  `…/29-rl-wheel-footprint.png`, `ui/28-after-wheel.json`, `…/42-brush-square-footprint.png`.
+- **Undo:** n/a (tool settings).
+
+### 23. Runtime orbit goes under the island
+
+- **Severity:** Warning (view unusable until recovered)
+- **Steps:** `demo/hex_island.tscn` 1280×720; middle-drag `500,300 → 500,470`, then
+  `500,450 → 500,230`.
+- **Expected:** pitch/zoom clamps or camera collision keep the camera above terrain and outside
+  props.
+- **Actual:** the camera passes below the island; two huge gray underside slabs fill the top of the
+  frame, the player shows through a rock as a blue wireframe, and the water is a flat field.
+  Orbiting back recovers.
+- **Evidence:** `qa/screenshots/r4-runtime/37-hex-noon-normal.png`,
+  `…/28-hex-orbit-down.png`, `…/38-hex-noon-recovered.png`.
+- **Undo:** not applicable (runtime has no undo).
+
+---
+
+## UI
+
+### 24. Pixel World panel is off-screen or clipped at small sizes
+
+- **Severity:** UI (controls unreachable)
+- **Steps:** 1024×600, select `PixelRenderer` (or open Pixel World); also inspect the Lighting
+  Preset row at 1600.
+- **Expected:** panel fits the window and the action row is reachable without blind scrolling.
+- **Actual:** at 1024 the 250 px panel is placed at x≈968 (only 56 px visible), and the panel
+  content is taller than its viewport. The Lighting Preset row sits at y=848–917 below the panel
+  viewport and is reachable only by wheel-scrolling. (The 1280 attempt crashed — issue 1.)
+- **Evidence:** `qa/screenshots/r4-pixel/73-resize-1024-renderer.png`,
+  `qa/screenshots/r4-effects/17-pixel-world-scrolled-presets.png`.
+- **Undo:** n/a.
+
+### 25. Clicking the 3D view while Settings is open closes the tool
+
+- **Severity:** UI (workflow trap)
+- **Steps:** terrain selected, Settings open (any page); LMB-click sky or terrain in the 3D view.
+- **Expected:** the tool stays selected (it has no viewport action) or at least the selection is
+  retained.
+- **Actual:** selection becomes empty, Inspector empties, toolbar and Settings strip disappear.
+  Re-selecting lands on the last Settings page. Happened twice.
+- **Evidence:** `qa/screenshots/r4-manage/28-settings-current.png`; `info.selection: []`.
+- **Undo:** n/a (no edit).
+
+### 26. Esc leaves a stale “N selected” HUD
+
+- **Severity:** Minor
+- **Steps:** Brush → Drag, paint a selection (`175 selected`), press Esc once, wait 2.5 s.
+- **Expected:** the status returns to `LMB: select cells`.
+- **Actual:** the HUD still reads `175 selected | LMB-drag: move selection` until the next mouse
+  move; the cells themselves are gone (next drag starts a new selection).
+- **Evidence:** `qa/screenshots/r4-sculpt/11-status-after-selection.png`,
+  `…/12-status-after-esc.png`, `…/14-status-after-esc-then-drag.png`.
+- **Undo:** n/a.
+
+### 27. Ambiguous undo names in History
+
+- **Severity:** Minor (hard to audit history)
+- **Steps:** Chunks: change Merge Mode, then Apply Mode to All; Tint: LMB paint then RMB erase;
+  Smooth: Terraced then Sloped.
+- **Expected:** distinct names (`apply chunk merge mode to all`, `tint erase`, …).
+- **Actual:** both chunk operations are `chunk merge mode`; tint erase is `terrain tint paint`;
+  both Smooth modes are `terrain smooth`. Undo/redo still works.
+- **Evidence:** `qa/screenshots/r4-manage/13-chunk-apply-all.png`,
+  `…/14-chunk-undo-all-restored.png`; `qa/findings/r4-undodeep.md` rows 9/24/28.
+- **Undo:** works.
+
+### 28. Save Preset dialog has no Cancel / cannot shrink / forgets size
+
+- **Severity:** UI
+- **Steps:** Paint → Export Texture Preset; request 400×150, then 800×220; Esc; reopen.
+- **Expected:** a compact 400–450 px dialog with OK and Cancel; remember the last size.
+- **Actual:** opens 558×150; a 400×150 request clamps to 558×150 although the window reports
+  `min [0,0]`; 800×220 is accepted with blank space; reopen returns to 558×150. Only OK exists
+  (Esc/X closes). The empty-name case closes silently (issue 30).
+- **Evidence:** `qa/screenshots/r4-paint/14-export-preset-dialog.png`;
+  `qa/screenshots/r4-uiresize/20-1920-save-preset-dialog.png`,
+  `…/21-1920-save-preset-narrow-request.png`, `…/22-1920-save-preset-large.png`.
+- **Undo:** n/a.
+
+### 29. Paint Walls hint is wrong
+
+- **Severity:** Minor
+- **Steps:** select Paint with Paint Walls on; read the hint.
+- **Expected:** a wall-paint hint and the actual wall height.
+- **Actual:** it still says `Vertex Painting | height …` and reports a floor height.
+- **Evidence:** `qa/screenshots/r4-paint/07-paint-walls-on.png`,
+  `…/08-paint-walls-stroke.png`.
+- **Undo:** paint itself works.
+
+### 30. Empty preset name closes silently
+
+- **Severity:** Minor
+- **Steps:** Export Texture Preset → clear the name → OK.
+- **Expected:** validation message or disabled OK.
+- **Actual:** the dialog closes, nothing is written, no feedback.
+- **Evidence:** `qa/screenshots/r4-paint/18-preset-empty-name.png`,
+  `…/19-preset-empty-submitted.png`.
+- **Undo:** n/a.
+
+### 31. `mst_noise.png` preview renders black
+
+- **Severity:** UI
+- **Steps:** Paint panel, scroll to the slots that use `mst_noise.png`.
+- **Expected:** a visible noise-thumbnail preview.
+- **Actual:** the preview is solid black; the material still paints.
+- **Evidence:** `qa/screenshots/r4-paint/12-preset-mst-classic.png` (slot 1/2 preview),
+  `qa/screenshots/r4-paint/53-preset-applied-before-undo.png`.
+- **Undo:** n/a.
+
+### 32. Pixel Preview / Animate have no pressed state
+
+- **Severity:** Minor (can't tell whether the mode is on)
+- **Steps:** click Pixel Preview, then Animate, in the 3D view menu bar.
+- **Expected:** a toggled/pressed visual state.
+- **Actual:** only the leading icon changes; no button stays pressed. The effect does toggle
+  correctly.
+- **Evidence:** `qa/screenshots/r4-pixel/03-preview-on-before.png`,
+  `…/04-preview-off.png`, `ui/preview-off.json`.
+- **Undo:** n/a.
+
+### 33. Pixel World “+ Add” closes the pixelizer UI
+
+- **Severity:** UI
+- **Steps:** Pixel World → `+ Add` a missing effect.
+- **Expected:** the panel stays open so the new node can be configured.
+- **Actual:** the new node is selected and the pixelizer UI closes; the user must reopen it.
+- **Evidence:** `qa/screenshots/r4-pixel/14-sunshafts-added.png`;
+  `qa/findings/r4-pixel.md`.
+- **Undo:** Add is undoable; the UI close is not.
+
+### 34. Builder “Created Box” toast covers the viewport
+
+- **Severity:** UI
+- **Steps:** Modeler layout at 1280×800; draw a box.
+- **Expected:** a toast outside the work area or a shorter duration.
+- **Actual:** the “Created Box” toast covers the viewport while the user is placing the next box.
+- **Evidence:** `qa/screenshots/r4-builder/40-builder-1280x800.png`.
+- **Undo:** n/a.
+
+### 35. `draw_rect` warning spam from the builder UI
+
+- **Severity:** Warning
+- **Steps:** select the builder mesh and use the builder UI.
+- **Expected:** clean log.
+- **Actual:** three `The draw_rect() "width" argument has no effect when "filled" is "true"` lines
+  (editor.log 14–19). No other builder ERROR/SCRIPT ERROR.
+- **Evidence:** `/tmp/opencode/qa/sessions/r4-builder/editor.log` lines 14–19.
+- **Undo:** n/a.
+
+### 36. Rain, smoke and sky-coverage changes can be invisible at default settings
+
+- **Severity:** Warning (effects appear broken or absent)
+- **Steps:** Weather Rain at the default overview camera; then PixelSmoke default plume; then Add
+  smoke; then Sky & Clouds → Coverage 0.4515 → 0.6.
+- **Expected:** visible rain streaks, a smoke plume near the hearth, and a visibly different cloud
+  deck.
+- **Actual:** rain is invisible at ~60 m but clearly visible at 23 m; the default plume is
+  invisible, one puff appears only at Start/End 1.0/4.0 Rate 10, and Add spawns smoke ~40 m
+  off-island below water. The Sky Coverage before/undo viewport crops are byte-identical (0 pixels
+  changed), likely because the deck is at Height 300 above the overview camera.
+- **Evidence:** `qa/screenshots/r4-effects/25-weather-rain.png`,
+  `…/26-weather-rain-close.png`, `…/46-smoke-hex-a.png`, `…/48-smoke-big.png`;
+  `qa/screenshots/r4-pixel/56-sky-coverage.png`, `…/57-sky-coverage-undone.png`.
+- **Undo:** weather/smoke/coverage changes undo correctly; the visual output is the defect.
+
+### 37. Dawn and noon wash out the image
+
+- **Severity:** Minor (view-dependent; possibly intentional palette)
+- **Steps:** apply Dawn (or set Time 0.27); then noon on the sandy plateau at a top-down angle.
+- **Expected:** water/terrain keep their palette; sand keeps texture at noon.
+- **Actual:** Dawn washes water and terrain pink; noon turns the plateau almost uniform pale
+  yellow/white with white channels, losing terrain shape. Night and morning are readable.
+- **Evidence:** `qa/screenshots/r4-pixel/10-lighting-dawn.png`,
+  `qa/screenshots/r4-effects/` Dawn captures,
+  `qa/screenshots/r4-runtime/36-hex-noon-topdown.png`, `…/38-hex-noon-recovered.png`.
+- **Undo:** preset undo leaves the stale tint (issue 14).
+
+### 38. Finite water plane edge is visible
+
+- **Severity:** Minor
+- **Steps:** `tutorial/02_island` or `04_world_mood`; lower the orbit and wheel out.
+- **Expected:** sea continues to the horizon or fades into the sky.
+- **Actual:** a hard rectangular water edge and flat pale-blue/pink void; the island reads as a
+  diorama floating in space.
+- **Evidence:** `qa/screenshots/r4-runtime/53-t02-orbit.png`, `…/54-t02-zoom-out.png`,
+  `…/60-t04-orbit.png`, `…/61-t04-zoom-out.png`.
+- **Undo:** n/a.
+
+### 39. Runtime F3/F1 HUD is not resize-safe
+
+- **Severity:** UI
+- **Steps:** hex_island at 1024×600 and 800×480; press F3, then F1.
+- **Expected:** panels fit or scroll with an obvious bar; help is readable over any terrain.
+- **Actual:** F3 is fixed ~420 px wide, starts at x≈604 (59% of a 1024 window), clips the
+  transition/ground/strength fields and cuts the F1 line; at 800×480 it covers the player
+  completely. F1 is one ~15 px unbacked line, low contrast over bright sand/sky, and is one-shot
+  (not a toggle). No collapse/fit control exists.
+- **Evidence:** `qa/screenshots/r4-runtime/70-hex1024-f3-default.png`, `…/42-hex-800x480-f3.png`,
+  `…/02-hex-1280-f1.png`, `…/69-hex1024-f1.png`.
+- **Undo:** not applicable.
+
+### 40. File dialog minimum size is inaccurate
+
+- **Severity:** Minor
+- **Steps:** Storage → Import; request 400×200.
+- **Expected:** honour the request or report the real minimum.
+- **Actual:** reports `min [200,70]` but clamps to **498×200**; defaults 1050×700 (1920) and
+  819×480 (1024) both fit. Not a blocker, but misleading.
+- **Evidence:** `qa/screenshots/r4-uiresize/24-1920-import-dialog.png`,
+  `…/25-1920-import-dialog-narrow.png`, `…/57-1024-import-dialog.png`.
+- **Undo:** n/a.
+
+### 41. Grid Aligned silently refuses with Falloff on
+
+- **Severity:** Minor
+- **Steps:** Hex Rings, Brush Raise/Lower, Falloff on; click Grid Aligned; then Falloff off and
+  click again.
+- **Expected:** the control is disabled/grayed while unavailable, or it toggles.
+- **Actual:** it looks enabled (`disabled=false`), but the click leaves `toggled=false` with no
+  feedback. After Falloff off the same click toggles it on.
+- **Evidence:** `qa/screenshots/r4-sculpt/43-grid-aligned-on.png`,
+  `…/44-grid-aligned-falloff-off.png`.
+- **Undo:** n/a.
+
+### 42. Shift+C opens Bezier instead of appending
+
+- **Severity:** Minor (documented append workflow blocked)
+- **Steps:** builder mesh selected; press Shift+C.
+- **Expected:** append the new shape to the selected mesh (docs/10).
+- **Actual:** the Bezier tool opens; no sibling is created, but the documented append path is not
+  reachable by the advertised shortcut.
+- **Evidence:** `qa/screenshots/r4-builder/38-shiftC-append.png`.
+- **Undo:** n/a.
+
+### 43. Sculpt status/hint line is clipped; Level hint advertises a missing Strength control
+
+- **Severity:** UI (truncated guidance and a phantom control)
+- **Steps:** 1) Brush → Drag, paint a selection; read the status line at 1600×900. 2) Select Level;
+  read its hint and its strip. 3) Select Brush → Raise/Lower; read its hint.
+- **Expected:** the full hint/status fits or wraps; hints only mention controls that exist.
+- **Actual:** the status is cut at the viewport edge (`… RMB/Esc: c…`, and after a selection
+  `… RMB/Esc` with no `clear` suffix). The Level hint says `Ctrl+wheel: strength`, but the Level
+  strip has no Strength value. The Raise/Lower hint lists `Shift+wheel: size` but omits the working
+  `Ctrl+wheel: strength`.
+- **Evidence:** `qa/screenshots/r4-sculpt/06-brush-selection-painted.png`,
+  `…/10-esc-cleared.png` (clipped edge), `…/30-level-strip-hex.png` (Level hint vs strip),
+  `…/22-brush-raiselower-strip.png`.
+- **Undo:** n/a.
 
 ---
 
 ## Undo / redo — verified working
 
-The user-requested Ctrl+Z check is positive for terrain edits. Every stroke captured one
-`terrain …` undo action, Ctrl+Z restored the exact terrain digest, and Ctrl+Shift+Z re-applied
-it. The matrix (`qa/screenshots/sculpt/undo-matrix.txt`) covers:
+The deep pass built a 42-row action × context matrix (`qa/findings/r4-undodeep.md`) using only the
+real shortcuts `key z --ctrl` and `key z --ctrl --shift`. **35 rows pass**, 5 fail, 2 were not
+exercised.
 
-- Brush selection moves, Raise/Lower, Level, Smooth (Terraced and Sloped), Bridge — one stroke
-  = one step; two strokes = two Ctrl+Z; redo after each.
-- Undo after switching tools, after clicking in the 3D view, and after opening another node.
-- Ctrl+Z while a LineEdit has focus edits the text, not the terrain.
-- Cross-chunk stroke touching 5 chunks restores all per-chunk hashes in one step; the redo
-  stack is cleared by a new edit.
-- Paint strokes, wall paint, foliage paint/erase/fill/clear, stamps (click and drag), gradient,
-  selection paste, chunk add/remove/merge/apply-all, bake, erosion add, tint paint/erase, and
-  the numeric/checkbox settings all undo correctly.
-- Builder: Create Box, Extrude, Paint and Add preset slot each resolved as one
-  `Pixel Builder: …` action and redid correctly. A save + scene reopen preserved the edited
-  mesh, its transform and three material slots.
-- Pixelizer: Add PixelSunShafts / MarchingSquaresWildFlowers, the Dawn preset's properties,
-  outline/deck toggles, quantize mode, debug view, time-of-day entry and object outline changes
-  each created one action and redid correctly. Exceptions: an integer spin-slider drag creates
-  two steps (#29), the Dawn preset undo leaves a stale rendered tint (#30), and the settings
-  enum/slot dropdowns create no action (#1).
-- Effects: Sky coverage/shadow, the Dawn preset (one multi-property step), all six weather
-  types and the Weather dropdown, water level/swell, erosion (digest 3064656926 →
-  3692886391), wildflower scatter (15,434 flowers, one step), feature switches and Add
-  SunShafts/Erosion/WildFlowers all undo/redo correctly. The strip sliders can leave their range
-  (#28) but the drag itself is one undo step.
-- Deep pass: 15 paint strokes produced 15 actions; 15 Ctrl+Z returned to the exact pre-series
-  digest/version and 15 Ctrl+Shift+Z returned to the exact post-series state. Cross-tool
-  ordering (Level → Paint → Paint), scene-tab switches, selecting another node, Ctrl+S, the
-  Scene-menu Undo/Redo, and close/reopen (empty history) all behaved correctly.
-- Slot Pattern/Scale/Color/Grass Sprite/name edits, Paint Walls on a vertical cliff, Quick
-  Paint, grass paint/erase, Erase All, Fill/Clear on hex_island, Mesa/Valley/Hill stamps, the
-  Gradient wheel shortcuts then a stroke, tint paint/erase, and chunk add/remove each resolved
-  as one action and redid correctly (the slot panel labels lag; #9).
-- Add-ons run through `EditorUndoRedoManager`; most action names are sensible (`terrain level`,
-  `terrain paint`, `terrain foliage paint props`, …), with the misleading cases in #56.
+**Confirmed working (one gesture = one step; Ctrl+Z restores the exact digest; Ctrl+Shift+Z
+redoes):**
 
-Non-undoable or broken undo paths found: terrain settings enum/slot dropdowns (#1), Grass
-Animation FPS (#3, where Ctrl+Z then undoes the **previous** terrain action), the stale texture
-panel labels after slot/preset undo (#9), the no-op Chunk Size step (#11), integer spin-slider
-drags taking two steps (#29), the stale dawn tint after a preset undo (#30), and the
-Texture Name LineEdit focus trap that records a new rename on text undo (#54). No other
-terrain/scene edit that changed state lacked an undo entry in the deep pass.
+- **Sculpt:** Brush height draw, Raise, Lower, flatten, Alt one-cell drag, Level, Smooth
+  Terraced/Sloped, Bridge.
+- **Paint/Foliage:** vertex paint, wall paint, scatter, erase, Fill Terrain, Clear, grass toggle,
+  grass Min Height, texture preset (data), slot rename (data).
+- **Manage/extras:** Stamp click, Stamp drag, Gradient, Select paste/rotate/mirror, Tint paint and
+  erase, chunk add/remove/merge/apply-all, Cell Size, Grid Type (see issue 15), Noise Amp, Display
+  Pixel Size, LOD Distance, Bake.
+- **Pixel:** God Rays, Use Palette, Darken, Ray Alpha, Sky Coverage, PixelObject outline, Add node,
+  Weather Add, palette clear, Fireflies Count, Water Swell/visibility, DayNight time/energy/presets,
+  Weather type change, Erosion run, WildFlowers scatter.
+- **Builder:** Create Box (one step), Extrude, Inset, H visibility; redo verified for draw/extrude.
+  Builder actions go to the **Global** history, so `drive.py undo-state` (root history) reads empty
+  even when they undo correctly; proof is mesh counts + `Global Undo/Redo: Pixel Builder: …`.
+
+**Context checks that pass:**
+
+- Two gestures → two Ctrl+Z in reverse order → original; two redos → edited.
+- A stroke touching **19 chunks** restores every per-chunk hash and the exact digest.
+- Undo after switching tools, selecting `PixelSky`, clicking the 3D view, and after Ctrl+S.
+- Ctrl+Z inside a LineEdit (uncommitted text) edits the text and leaves terrain history intact;
+  inside an EditorSpinSlider it edits the field. Enter releases LineEdit focus in this build.
+- Resizing the editor creates no undo entries and does not clear history.
+- Close/reopen clears history (`version 1`, `undo_count 0`); Ctrl+Z does not restore stale state.
+- A new edit after undo clears the redo stack.
+- The prior “one Ctrl+Z reverts two strokes” and “Ctrl+Z dead after clicking the 3D view” bugs did
+  **not** reproduce.
+
+**Broken:** Grass Animation FPS (12), pixel-size one-drag=two-steps (11), lighting-preset preview
+tint (14), stale labels after undo (13), Floor Slot/Debug View no-ops (5/6), feature switches not
+recorded (19). See also issue 15 for the destructive Grid Type behavior.
 
 ---
 
 ## Coverage
 
-| Area | Pass | Evidence |
-|---|---|---|
-| Terrain sculpting (Brush Drag + Raise/Lower, Level, Smooth, Bridge, modifiers, toolbar, grid) | `sculpt` | `qa/screenshots/sculpt/` (93), `qa/findings/sculpt.md` |
-| Painting, 16 texture slots, presets/export, Foliage, grass | `paint` | `qa/screenshots/paint/` (62), `qa/findings/paint.md` |
-| Inspect, Chunks, six Settings pages, Storage save/bake/GLB, Stamp, Gradient, Select, Tint | `manage` | `qa/screenshots/manage/` (73), `qa/findings/manage.md` |
-| PixelRenderer 9 pages, Palette/LUT, Object/OutlineColors, Preview/Animate, Pixel World add/presets/features | `pixel` | `qa/screenshots/pixel/` (108), `qa/findings/pixel.md` |
-| Sky, Day/Night, Weather (6 types), Water, Fireflies, Birds, Smoke/Fire, Particles, LightVolume, SunShafts, Erosion, WildFlowers, feature switches | `effects` | `qa/screenshots/effects/` (112), `qa/findings/effects.md` |
-| Pixel Builder (UI, modes, draw/extrude/paint/materials/UV/save, both layouts) | `builder` | `qa/screenshots/builder/` (36), `qa/findings/builder.md` |
-| Runtime game (hex island, courtyard, tutorials 01–04, 3 window sizes, F1/F3, controls) | `runtime` | `qa/screenshots/runtime/` (52), `qa/findings/runtime.md` |
-| UI/resizability (5 sizes, every surface, dialogs, popups) | `uiresize` | `qa/screenshots/uiresize/` (51), `qa/findings/ui.md`, `qa/findings/ui-crash.txt` |
-| Deep undo/redo matrix and gaps | `undodeep` | `qa/screenshots/undodeep/` (62), `qa/findings/undodeep.md` |
+| Area | Report | PNG | UI dumps | Findings |
+|---|---|---|---|---|
+| Sculpt (Brush/Level/Smooth/Bridge/toolbar) | `qa/findings/r4-sculpt.md` | 50 | 7 | 6 |
+| Paint + Foliage + textures | `qa/findings/r4-paint.md` | 59 | 7 | 9 |
+| Manage (Inspect/Chunks/Settings/Storage/Stamp/Gradient/Select/Tint) | `qa/findings/r4-manage.md` | 62 | 14 | 7 |
+| Pixel look (15 sections + 9 Renderer pages + Pixel World) | `qa/findings/r4-pixel.md` | 82 | 8 | 10 |
+| Effects (12 surfaces + 14 feature switches) | `qa/findings/r4-effects.md` | 89 | 13 | 8 |
+| Builder | `qa/findings/r4-builder.md` | 43 | 3 | 6 |
+| UI / resizability (5 sizes) | `qa/findings/r4-uiresize.md` | 60 | 3 | 10 |
+| Deep undo/redo | `qa/findings/r4-undodeep.md` | 72 | 5 | 5 broken + matrix |
+| Runtime / demo / tutorials | `qa/findings/r4-runtime.md` | 71 | — | 6 |
+| Fresh-session verification | this file | 3 | — | re-checked 1, 5, 6; re-ran 2 |
 
-649 PNGs (~960 MB) plus UI JSON dumps are stored under `qa/screenshots/<area>/`; each
-area's markdown lists the exact file→finding mapping. The generated session copies, editor logs
-and the project template are disposable and live under `MST_QA_STATE` (default
-`/tmp/opencode/qa`).
+All screenshots are local under `qa/screenshots/r4-*` (git-ignored). The index is
+`qa/SCREENSHOTS.md`.
+
+## Prior-round items (not re-tested here)
+
+These were reported in the 2026-11-20/2026-11-21 passes and were not re-driven in r4. They are
+listed so the text reports keep their provenance; do not treat them as fresh verdicts.
+
+- **Enum family:** the prior pass reported Blend Mode and Wall Slot as label-only too. r4 confirmed
+  the same failure for Floor Slot and Storage Mode, found Grid Type fixed, and did not re-test
+  Blend Mode/Wall Slot.
+- **Stamp and minor settings:** Stamp Size stays stale after a drag/modifier+wheel; chunk-size
+  changes record a no-op undo step when refused; Gradient Strength ignores click position;
+  Grid Size stays enabled while Grid Aligned is off; an invalid chunk add is only a raw Output
+  warning; Foliage Fill Terrain is a no-op for the Tree item on `02_island`.
+- **Builder:** at 1280×800 the MST layout clips toolbar headers, cuts the strip behind the
+  Materials panel and leaves a ~172×60 viewport; a newly drawn sibling keeps the old mesh
+  selected; the Builder Preferences dialog is 484×664, non-resizable, and its action row is
+  off-screen at 600 px height.
+- **Pixel World:** disabled Add entries were reported as too bright; the panel keeps a scrolled
+  offset when rows rebuild; the Inspector value desyncs from the strip after a strip edit.
+- **Effects:** a lightning flash was not observed during a 15 s Storm watch (could be a long
+  random interval; the r4 pass saw a storm flash but did not capture a bolt).
+- **Refuted/fixed since the prior pass:** disabled `+ Add` rows now dim correctly; Debug View no
+  longer toggles the grid overlay; Level/Smooth/Tint at 1024×600 did **not** crash; the Paint
+  Save Preset OK click-through did **not** reproduce; the LineEdit-keeps-focus-after-Enter bug did
+  **not** reproduce; “Ctrl+Z dead after clicking the 3D view” did **not** reproduce; the
+  Brush/Raise-Lower strip no longer clips its title at 1600×900 (it expands to 175 px instead).
 
 ## Testing limitations
 
-- The editor ran on a virtual X11 display with Mesa llvmpipe at ~5–10 fps. Timing-sensitive
-  drags were given 0.8–2 s; one transient two-page frame in the pixelizer was observed under
-  load and was not counted as a defect until re-tested.
-- Embedded popups (`OptionButton` lists, menus) do not receive injected keyboard focus on
-  Xvfb; items were selected with real mouse clicks at their popup coordinates. Typing into
-  popups was not exercised.
-- The harness's `key` helper releases GUI focus by default (so Ctrl+Z reliably reaches the
-  terrain). Focused-LineEdit undo was separately verified with the release disabled: Ctrl+Z
-  then edits the text field only, as expected — and that path exposed #54.
-- An open `OptionButton` popup swallows Ctrl+Z until Esc; this is normal menu behavior, but QA
-  scripts must close popups before testing undo.
-- `--headless` (dummy renderer) cannot render or screenshot the editor UI, so the virtual
-  display is the closest headless-capable setup; it is still a real X11 window and real input.
-- The 1024×600 pass is incomplete because of the crash in #0: only Brush was measured at every
-  size; Foliage/Inspect/Chunks/Stamp/Gradient/Select at 1024, Edge/Vertex modes, the overwrite
-  confirmation, bake/export dialogs, long OptionButton lists/submenu flipping, Tab order/focus
-  rings and HiDPI/editor-scale changes were not exercised. 800×600 is clamped by Godot and was
-  not tested; custom sizes use `editor_scale` in source but HiDPI was not run.
-- Builder coverage was time-boxed: shape variants other than Box, Shift+C append,
-  inset/bevel/edge-loop/merge/connect/fill/triangulate/duplicate/delete/grow-shrink/loop-ring,
-  vertex paint, flood fill, collider/trigger, UV persistence, STL/GLB export and the History
-  dock were not exercised. `qa/findings/builder.md` lists them.
-- Terrain coverage gaps: hex-only Settings fields are blocked by #1; texture import round-trip
-  and a true vertex-grip drag (see #55) were not exercised. The deep pass covered slot
-  pattern/scale/color/grass-sprite, grass palette/Erase All, Fill/Clear on hex_island,
-  Mesa/Valley/Hill stamps, Paint Walls on a vertical face and chunk add/remove.
-  `qa/findings/paint.md` and `qa/findings/manage.md` list the remaining gaps.
-- Effect coverage gaps: embedded ColorPicker popups did not take injected keyboard focus, so
-  typing palette hex values (water shallow/deep/foam, sky deck, bolt color) was not exercised;
-  waterfall cells, snow accumulation, longer lightning watches and player-distance LightVolume
-  grading were not tested. `qa/findings/effects.md` lists them.
+- **Headless:** Godot `--headless` uses the dummy renderer and cannot capture the editor UI. All
+  passes used Xvfb virtual displays (1920×1080 screen, 1600×900 editor default), which is
+  headless-capable and still renders. No physical display was used.
+- **Resource monitor:** `qa/resource-monitor.sh` was used for every wave (it resolves the ai-tools
+  checkout at `../Yugens-Terrain-Authoring-Toolkit/tools/ai-tools` because `../rr/tools/ai-tools`
+  is absent in this workspace). Recommended widths were 2–4; the orchestrator capped at 3 editor
+  sessions.
+- **Crash evidence:** the Pixelizer 1280×720 crash was independently re-reproduced and its log
+  excerpt saved. The Builder 1366 crash log was overwritten by the automatic restart before it
+  could be copied; two fresh attempts (pointer at `(345,478)`, plus a terrain→builder round trip)
+  did not reproduce it, so it remains hover/timing dependent.
+- **Prior-round claim refuted:** the 2026-11-20 “Level/Smooth/Tint at 1024×600 crashes” did **not**
+  reproduce; those three tools were switched and captured at 1024 (`r4-uiresize/59–61`).
+- **Not tested:** hexagon/triangle brush footprints and Quick Paint; paint Erase All, multi-select
+  palette, slot pattern/scale/color/sprite pickers, overwrite confirmation; Settings Export GLB /
+  Export Path / Save Data / Import beyond opening-canceling; Pixel palette inline editing and LUT
+  bake, PixelObjectProfile, PixelOutlineColors arrays, DayNight sub-pages; Cloudy/Foggy weather, a
+  visible lightning strike, per-switch gating for all 14 features, long snow accumulation;
+  Builder bevel/edge-loop/merge/connect/fill/triangulate/duplicate/delete/move, applied paint,
+  materials +Slot/+Preset, vertex paint, smooth/collision/rebuild warning, export, save/reload;
+  runtime Dawn/Dusk presets and long-run stability; HiDPI (`editor_scale != 1`), Tab order/focus
+  rings, and Pixelizer/Builder at 1024 after the crashes.
+- **Undo shortcut scope:** every verdict above was driven with the real **Ctrl+Z / Ctrl+Shift+Z**
+  keys, as requested. The editor's Edit-menu Undo item and the History dock buttons share the same
+  undo manager but were not separately exercised.
+- **Harness quirks (not addon defects):** `drive.py undo-state` reads the root history while
+  builder edits are Global; dialog-local coordinates reported by `ui` differ from editor
+  coordinates; `drive.py info/windows/resize` cannot drive a runtime session (use live X11 resize);
+  one harness-induced `PixelSmoke::set_position` Array→Vector3 error appeared in the effects log
+  and is excluded.
+- The addon was never edited; all saves, scenes and preset files were written only inside
+  `/tmp/opencode/qa/sessions/*/project`.
+
+---
+
+## r5 verification pass (2026-11-21, post-fix build)
+
+A second full pass drove the build produced by the fix wave (`fix/r4-all`: the WIP fix stack
+plus five issue groups). Five DeepSeek V4.1 Flash drivers covered sculpt/paint, manage/undo,
+pixel/effects, builder, and UI+runtime. Per-area evidence (574 PNGs, UI dumps, measured
+matrices) is in `qa/findings/r5-sculpt-paint.md`, `r5-manage.md`, `r5-pixel.md`,
+`r5-builder.md`, `r5-ui-runtime.md` and `qa/screenshots/r5-*`.
+
+### r4 items confirmed fixed
+
+1, 2, 4, 5, 6, 7, 8 (for the builder above 720 px height), 9, 10, 11, 12, 13, 14, 15, 16,
+17, 18, 20, 21, 24 (replaced by N1 below), 26, 27, 28 (except its remembered size), 29, 30,
+31, 32, 33, 34, 35, 36 (rain, sky coverage, lightning), 38 (scene/sea half), 40, 41, 42, 43;
+plus the orbit clamp (#23) and the F1 toggle (#39).
+
+Notable proofs: PixelRenderer at 1280×720 and 1024×600 no longer crashes; the builder at
+1366×768 shows no `bind_mut` panic; Floor Slot writes `9` + undo and Storage Mode writes `1`
+with the Save Data row; Debug View writes `2`; Grid Type asks before dropping 295 chunks and
+one Ctrl+Z restores the digest; one pixel-size drag is one undo step; fireflies went from 34
+to 624 warm pixels at night; the builder strip is capped (689×175 at 1600×900).
+
+### r4 items still reproducing
+
+> The entries below are the raw r5 snapshot. #36 (smoke), #37 (dawn/dusk), #38 (water edge) and
+> #39 (F3/F1) were fixed in Round 2 — see the remediation status at the end of this file.
+
+- **#19** feature switches record no visible undo entry (`drive.py undo-state` reads the root
+  history only, so this needs a `Ctrl+Z`/History check before it is called broken).
+- **#24** is superseded by **N1**: at 1024×600 the Pixel World panel is 24 px wide and the
+  Inspector ~136 px.
+- **#36** the default `PixelSmoke` plume is still invisible (78 px of 10×16-patch output).
+- **#37** dawn still flattens the frame (mean 177/177/187, water≈land) and dusk 0.75 is
+  pink-mauve; noon is clean.
+- **#38** the water plane is still a hard-edged floating rectangle at low orbit/zoom-out.
+- **#39** F3 still clips at 1024×600 / 800×480 and cannot be collapsed; F1 is unbacked and F3
+  overdraws it (the F1 toggle itself works).
+
+### New defects (r5)
+
+| # | Sev | Area | Issue |
+|---|---|---|---|
+| N1 | **Critical** | Pixelizer | Selecting any `Pixel*` node on a fresh session leaves the whole Pixelizer UI at zero size (rail 39×0, strip 0×175, panel 250×0; at 1024: 0×99 / 24×33); only a 2D→3D view round-trip lays it out. Deterministic, all sizes, nothing logged. Pixel effects are then editable only through the raw Inspector. |
+| N2 | Warning | Runtime | F3 tuner overflows 1024×600 and 800×480 (fields below the window) and cannot be collapsed. |
+| N3 | Minor | Runtime | F1 is unbacked and the F3 panel overdraws/cuts it. |
+| N4 | Minor | Editor | Side-panel width/collapse is not remembered across an editor restart (in-memory project metadata only). |
+| N5 | Minor | Dialogs | Save Preset logs `ERROR: Couldn't find … "save_preset_dialog_size"` on first open and forgets its size. |
+| N6 | Minor | Logging | 2× `ERROR … create_frustum_points (rendering_light_culler.cpp:682)` and 16× plane/vector normalize warnings at boot while a `Pixel*` node is selected. |
+| N7 | Warning | Layout | No horizontal viewport floor: Paint view 333×341 at 1280, 416×389 at 1366; Builder 358 wide at 1280/1024; a 220 px panel at 1024 leaves 258×297. |
+| N8 | Minor | Layout | 1024×600 view height is 297 px, 3 px under the documented 300 floor. |
+| N9 | Minor | Dialogs | Save Preset honours a 400 width but not a 150 height (opens 400×179; reports min 140). |
+| N10 | Minor | Layout | Settings strips reserve 175 px for 105 px of content (dead space). |
+| N11 | Minor | Builder | Builder Materials palette (245–259 px) and the builder rail have no grip or collapse. |
+| N12 | Error | Builder | `Ctrl+D` is still Godot's *Duplicate Node(s)*: it creates a sibling `Ruin2` instead of duplicating faces, loses the Face selection and puts “Duplicate Node(s)” in History. |
+| N13 | Warning | Builder | `+ Slot` then Ctrl+Z leaves a phantom third row in the Materials palette; `+ Preset` on it re-creates slot 2. |
+| N14 | Minor | Builder | The “Editing the Box recipe…” HUD hint leaks onto another selected mesh; the `Following <node>` badge overlaps the HUD's first line; `F` shows the badge but does not change camera distance. |
+| N15 | UI | Builder | Export OBJ still reports `min [200,70]` and clamps to 498×200 with a clipped body. |
+| N16 | UI | Manage | Settings → Grid clips its last row (Blend Mode at y=757 in a 175 px viewport that ends at 757) and the page tabs are inside the scroll content, so scrolling to it hides the tabs. |
+| N17 | UI | Manage | Chunks status line is clipped at the viewport edge (the refusal text is cut); the green `+` handles are nearly invisible on bright terrain; add/remove are worded three different ways; no “N selected” feedback for Ctrl+LMB. |
+| N18 | UI | Manage | Storage → Export GLB has no path field (Inspector-only) and silently wrote a 32 MB GLB; Save Data is always enabled and gives Output-only feedback. |
+| N19 | UI | Manage | The bottom-panel splitter cannot be shrunk below 136 px after expanding. |
+| N20 | UI | Manage | Import dialog is cramped at its new 500×300 minimum (2-row list, `All Recogniz…`, dead Favorites/Recent). |
+| N21 | Minor | Manage | LOD & Nature “Add” (Erosion) steals the selection; undoing the add leaves nothing selected and closes the terrain tool. |
+| N22 | Minor | Manage | Tint “Grid Size” stays enabled while “Grid Aligned” is off (prior-round item). |
+| N23 | UI | Pixel | Page-tab grid (`SectionPages`, 378 px of fixed 4 columns) is clipped in strips as narrow as 414/640 px; the strip content is 204 px in a 175 px viewport, so one row is always clipped and the horizontal auto-scroll slides the tabs. |
+| N24 | UI | Pixel | Pixel World panel content is ~940 px (9 rows below the fold) and collapses to 24 px at 1024; pressed state for Preview/Animate is only a 10-unit background lift. |
+| N25 | Warning | Effects | SunShafts is wired but no shaft is isolatable at alpha 0.6 / count 64 (scene has no occluder). |
+| N26 | Warning | Paint | Foliage **Fill Terrain** records an undo step but paints nothing for the Tree item (862→862 props). |
+| N27 | UI | Sculpt | Hint block does not wrap (first line clipped mid-word at 1280/1024); the status block grows to three lines and sits on the strip's top edge at 1600. |
+| N28 | Minor | Sculpt | Grid Aligned stays checked-but-disabled after a hex→square scene switch; the Raise/Lower pick hint says `Ctrl+LMB / MMB / RMB` although plain MMB does nothing. |
+| N29 | Minor | Sculpt | `MstValueLabel` drifts from the slider value after wheel edits (label 18.9 vs value 19.0; 4.844 vs 4.7595). |
+| N30 | Minor | Settings | The Settings “Grid” tab and the toolbar “Grid” overlay share a label; `click-text "Grid"` hits the overlay and creates a `terrain grid overlay` undo entry. |
+| N31 | Minor | Logging | Boot log noise common to all r5 sessions: 16× plane/vector normalize warnings and 2× `create_frustum_points` ERRORs (same as N6). |
+
+**Correction to an intermediate note:** the earlier “Paint strip 385 px, bottom off-window” was
+the unclipped `MstFlow` content; the strip itself is 333×175 (1280) and 559×99 (1024) and
+scrolls. No surface spills below the window. The real width problem is N7.
+
+### Round 2 remediation status (2026-11-21)
+
+A second fix wave was started against this list but was stopped by the Claude provider's
+weekly usage limit (resets 2026-11-25 15:00 Australia/Brisbane). Only one fix landed:
+
+- **N12 — fixed (build-verified, not re-driven in the UI):** `Ctrl+D` is now claimed in the
+  builder plugin's `_input` while a mesh is edited in Face/Edge/Vertex mode, so it duplicates
+  faces instead of running Godot's *Duplicate Node(s)* (commit `e93a672`, merged into
+  `fix/r4-all` at `4d7b8dd`; verifying run: no `Ruin2`, no `Duplicate Node(s)` history).
+- **N2 / N3 — fixed (runtime-verified at 1024×600 and 800×480):** the F3 tuner has a hard
+  width cap (307 px at 1024, 260 px at 800), scrolls both ways, and collapses by clicking its
+  title; the F1 help is a dark backed panel that stays clear of the tuner and of an expanded
+  object inspector (`pixel_diagnostics_keep_clear`). Commits `91fdee6`, `21d183e`, `aa7a61e`,
+  merged at `4d5b722`. The r5 runtime evidence above predates #50/#51 (see the harness note).
+  One case is unconfirmed: the help staying clear when an object is selected.
+- **r4 #23 and #38 (runtime) — verified-working** on the current build: the orbit stops at
+  terrain level and the sea band reaches the horizon.
+- **N13 — fixed (verified live):** the Materials palette re-syncs from the mesh data on every
+  undo/redo and clamps the current slot to existing slots (`+ Slot` → rows 0/1/2, Ctrl+Z →
+  0/1). Commit `3dc7acf`, merged at `ffb018b`.
+- **N14 — partly fixed:** the “Editing the … recipe” hint clears on mesh/mode change, the HUD
+  sits below the viewport labels and the `Following` badge no longer overlaps line one
+  (`ff1a9b0`). `F` is still Godot's command: it re-centres but does not zoom, and no badge
+  appears. The builder cannot set the editor camera, so the tooltip/doc wording (“frames”) is
+  the remaining gap.
+- **N11 — partly fixed:** the Materials palette now has the terrain side panel's 220–420 px grip
+  and 24 px collapse (verified: viewport 657→910 px at 1600×900, `fecb0ef`). Remaining: it
+  cannot auto-collapse (needs a `ui_kit` export to collapse without saving the user's choice),
+  and the expanded default is 277 px, so at 1280×800 the viewport is **340 px, down from 358**.
+  The builder's 86 px left rail still has no collapse. See **N32**.
+- **N15 — fixed (verified live):** every builder file dialog has a real 500×300 minimum and
+  opens ≥760×520; Export OBJ reports `min [500,300]` and a 400×200 request clamps to 500×300
+  with the body fitting (`9340588`).
+- **Builder Face/Edge/Vertex strip (finding 6) — fixed (verified live):** element modes show one
+  section at a time (Extrude / Ops / Move / Paint tabs; empty tabs hidden). At 1600×900 Face
+  mode the strip is 62–132 px instead of 175 px root / 194–428 px content (`7d6cab5`,
+  `f23a426`).
+- **N32 (new, warning):** after the palette grip change, its expanded default is 277 px, so at
+  1280×800 the builder 3D view is 340 px wide (was 358). Auto-collapse below a 480 px view is
+  still missing (blocked on a `ui_kit` auto-collapse API).
+- **r4 #36 (smoke) — fixed (verified):** puffs never shrink below 3 low-res pixels and the plume
+  thins more slowly; changed area went from 78 px to 389 px at a comparable viewport. The scene's
+  4 m plume still reads as a small puff at a full-island overview (`632e20f`).
+- **r4 #37 (dawn/dusk) — fixed (verified):** the wash was fog distance, not palette: fog density
+  is now scaled to a 40 m camera-to-focus distance and the day/night haze tints the sky at 0.35
+  instead of 1. Dawn mean 147/154/172 (was 177/177/187), dusk 138/112/124, noon 64/123/172; the
+  island stays green and the water distinct in all three (`c45b9e8`).
+- **r4 #38 (water edge) — fixed (verified):** the dark band was a linear-vs-sRGB colour
+  conversion in the pixel pass, not the horizon midpoint; the rim now tints to the sky colour in
+  sRGB and fades on a circle, so there is no straight edge or corner even at the farthest zoom
+  (`0d6bb68`, `2abe3c0`, `361fe50`).
+- **N25 (SunShafts) — verified-working within the sun's shadow range**, plus new configuration
+  warnings when the camera is past 60% of the shadow distance or nothing tall occludes. From the
+  overview nothing shows because the QA camera (~165 m) is past the node's 120 m shadows
+  (`1c26419`). Scenes that want shafts at the overview need a longer
+  `directional_shadow_max_distance` (e.g. 300 in `04_world_mood`).
+- **N6/N31 (boot log noise) — still open, attributed.** It reproduces only at editor start
+  (16 plane + 16 vector warnings and 2 `create_frustum_points` errors), and only from the r5
+  build onwards; reopening scenes, 2D↔3D switches, `PixelRenderer` selection and resizes add
+  none. No effects node creates a camera/viewport; the likely source is the r5 editor layout
+  work (`cd5f077`: `ui_kit.rs`, `pixel_ui/plugin.rs`). It needs a boot comparison with those
+  changes reverted.
+- **N5 / N9 — fixed (verified):** Save Preset no longer logs the metadata ERROR, reports a real
+  minimum (340×178) so a 400×150 request opens 400×179, and remembers its size (`6599289`).
+- **N4 — fixed (file write verified; restart not tested):** panel width/collapse is written
+  through to `res://.godot/editor/mst_editor_state.cfg` on every change (`6599289`).
+- **N7 — fixed (verified):** side panels keep the 3D view at least 480 px wide. Paint at 1280
+  collapses the panel to its tab (view 551 px, was 333); 1600 re-expands to 250; the tab forces
+  it open at 220 (`b620f54`, `93945af`).
+- **N10 — fixed (verified):** the strip cap is a maximum — Settings → Storage is 107 px, not
+  175. Pinned strips keep the tallest height seen for that tool until the tool changes
+  (`fc89ca7`, `93945af`).
+- **N16 — fixed (verified):** the title and page tabs stay pinned while the page body scrolls to
+  its last row.
+- **N23 — fixed (verified):** page-tab columns are chosen from the strip width (two rows,
+  68 px); at 1024 the header becomes a normal scrolling first row instead of covering the 99 px
+  strip.
+- **N24 — partly fixed:** the collapsed tab is now 32 px; the Inspector 260 px minimum is not
+  fixed, so at 1024 it still runs past the window edge.
+- **N29 / N30 — fixed (build only):** wheel-edited settings snap to the slider step; the
+  Settings “Grid” tab is renamed **“Layout”** (scripts/`click-text` must use that name).
+- **N22 — verified-working:** the Grid Size slider was already non-editable (the QA dump only
+  reports `disabled` for buttons); a tooltip now explains why.
+- **r4 #19 — verified-working (harness limitation):** History shows “Turn Birds feature off” and
+  one Ctrl+Z sets `features/birds` back to true. Ctrl+Z pressed while the popup is still open
+  does nothing; it works after Escape.
+
+**Merge note:** the editor and builder round-2 branches both changed
+`ui_kit::page_tabs` (new `columns` argument) and its builder call site, so the textual merge
+left a semantic mismatch that did not compile. It was reconciled in `e50088d` (builder page
+tabs pass `STRIP_PAGES.len()` and `Ui::pages` is a `GridContainer`).
+
+**Harness note (affects the r5 runtime evidence):** `qa/runtime.sh` reuses
+`$MST_QA_STATE/runtime/project` on every start, so a runtime pass inherits whatever build first
+created that copy. The r5 runtime observations were taken from a copy that predated #50/#51.
+Delete `runtime/project` (and `runtime/<name>`) before a runtime pass to force a fresh copy.
+
+**N1 still reproduces** on the merged build, but only on the **first** selection after a fresh
+session. A second selection (select the terrain, then the `Pixel*` node again) lays everything
+out correctly — rail `39×732`, strip `731×173`, panel `250×732` — and a 2D→3D round-trip also
+recovers it. So the defect is a missing first-frame relayout when the panels are created and
+shown for the first time; a deferred sort of the main screen (or a relayout on the next idle
+frame) is the place to fix it. A partial attempt (blocking signals on the panel's descendants
+instead of its root, then `queue_relayout`, commit `3fbacf5`) is merged but does **not** fix the
+first-selection path. Deterministic repro: fresh session → `select --path PixelRenderer` →
+`ui --root all` shows `PixelizerToolbarRail 39×0`, `PixelizerAttributes 0×35`,
+`PixelWorldPanel 250×0`; reselect once and they size correctly.
+
+Everything else in N1–N32 was **not attempted** (N1 needs the first-frame relayout described
+above, N8, N11 auto-collapse / the N32 regression, N17–N21, N24's Inspector minimum, N26–N28
+and N6/N31). Round-2 briefs are staged in `/tmp/opencode/r4groups/R2A-editor.md`,
+`R2C-builder.md` and `R2D-effects.md`.
+
+---
+
+## r6 evaluation pass (2026-11-21, post-Round-2)
+
+Four DeepSeek V4.1 Flash drivers re-verified the Round-2 build (`fix/r4-all` @ `e50088d`):
+editor shell, builder, pixel/effects, and runtime on a **fresh** runtime project copy. Evidence:
+`qa/findings/r6-editor.md`, `r6-builder.md`, `r6-pixel-effects.md`, `r6-runtime.md` and
+`qa/screenshots/r6-*` (271 PNGs + dumps + logs).
+
+### Verified fixed (Round-2 claims hold)
+
+- **N1** — the first `Pixel*` selection now lays out without reselecting: rail **39×732**,
+  strip **731×175**, panel **250×732** (reselection and 2D→3D give identical rects). The
+  zero-size state is now only the first build frame / ~2–3 s while 631 controls are created,
+  then it self-corrects (see R6-1).
+- **N7** (Paint at 1280 → 551 px view, panel collapses; 1600 re-expands), **N10** (Storage strip
+  107 px; high-water pin per tool), **N16** (tabs pinned while the body scrolls), **N23**
+  (two-row tabs, no sliding; first-build overflow in R6-2), **N4** (cfg file records
+  width/collapse), **N5/N9** (420×179, min 340×178, no ERROR, 400×150→400×179, remembered),
+  **N24** (32 px tab; Inspector still 87 px past 1024), **N29/N30/N22** (wheel snapping,
+  “Layout” tab, Grid Size tooltip + disabled), **r4 #19** (History “Turn Birds feature off”;
+  one Ctrl+Z after Escape restores).
+- **Builder:** **N12** (Face 209/401/210 → 213/405/211, History `Pixel Builder: Duplicate`, no
+  `Ruin2`; residual R6-9), **N13** (palette 3 rows → 2 on undo, no phantom), **N15** (500×300
+  honoured, body fits), **section tabs** (one at a time; 62/132 px at 1600), **crash watch** (no
+  crash/bind_mut at five sizes), regression sweep (draw/extrude/inset/paint/bevel/modeler/
+  save-reload) all pass.
+- **Runtime:** **N2** F3 (308 px @1024, 261 px @800, scrolls, title-click collapse, player
+  clear), **N3** F1 (backed 401×91, no F3 overdraw), **r4 #23** orbit, **pixel scaling**,
+  **tutorials 01–04**, and a clean game log (N6/N31 is editor-only).
+- **Pixel/effects:** clamps **6/6**, **#36** smoke (78 → 317 changed px), fireflies, weather,
+  `+ Add` stays open, Preview/Animate pressed states, preset-undo tint byte-identical.
+
+### Still not fixed / residuals
+
+- **r4 #38** — `hex_island` passes (sea to horizon, 0 px void), but `tutorial/02_island` and
+  `04_world_mood` still show a straight sea edge + ~32% pale void at minimum pitch and maximum
+  ortho zoom; the pixel pass sees a rotated square with four sharp corners on `04_world_mood`
+  (**R6-12**).
+- **r4 #37** — dawn is improved (150/156/173 vs 177/177/187) but still a flat pale wash
+  (**R6-18**).
+- **N25 SunShafts** — warning text is stale after `directional_shadow_max_distance` changes, and
+  no shaft isolates at 400 m / alpha 0.6 / count 64 (**R6-15**).
+- **N11/N32 builder palette** — collapse keeps a 277 px allocation, the 220 px minimum is
+  recorded but not applied, the split dragger bypasses the 420/480 limits (537 px palette →
+  397 px view), and the view is still 340 px at 1280/1024 (**R6-7**, **R6-8**).
+- **N6/N31** — boot noise unchanged (16+16 normalize warnings + 2 `create_frustum_points`
+  errors at editor startup only; nothing added during a session).
+
+### New r6 defects
+
+| # | Sev | Area | Issue |
+|---|---|---|---|
+| R6-1 | Warning | Pixelizer | First `Pixel*` selection shows an empty Pixelizer UI for ~2–3 s (631 controls built late); no spinner/placeholder. |
+| R6-2 | Warning | Pixel tabs | First build makes one 670×33 tab row; `Debug Views` ends 42 px past the 731 px strip and renders “Debug V” until the next rebuild. |
+| R6-3 | Minor | Settings | Settings → **Layout** overflows at 1600: content 929 px in 903 px, visible H scrollbar, 26 px of the third column clipped. |
+| R6-4 | Minor | Settings | First Settings open inherits the previous tool's 175 px strip; the high-water pin then keeps it. |
+| R6-5 | Minor | Pixelizer | At 1024 the strip spends 66 of 99 px on two tab rows, clipping one body row. |
+| R6-6 | Minor | Sliders | `EditorSpinSlider` ignores the wheel (N29's snapping verified on HSliders only). |
+| R6-7 | Warning | Builder | Palette collapse leaves a 277 px allocation (content hidden, `ExpandTab` 277 wide); the 220 px minimum is stored but not applied. |
+| R6-8 | Warning | Builder | The split dragger bypasses the 420 px palette / 480 px view limits: 537 px palette leaves a 397 px view. |
+| R6-9 | Warning | Builder | `Ctrl+D` with focus outside the 3D main screen (e.g. History dock) still runs Godot's Duplicate Node(s) → `Ruin2`. |
+| R6-10 | Minor | Builder | The generic HUD status line is sticky across mode/mesh/undo; HUD line 2 still clips at ≤1366. |
+| R6-11 | UI | Builder | The strip stays pinned at the 175 px cap after a tall section at 1280. |
+| R6-12 | Warning | Runtime | Tutorial sea plane edge + pale void at min pitch/max zoom (see #38 above). |
+| R6-13 | Minor | Runtime | The F3 object picker never selects in a plain game (4 clicks + 3 hovers: no outline), so N3's object-clearance case is untested. |
+| R6-14 | Minor | Runtime | F1 help (13–400 × 376–466) covers the player (x 355–425) at 800×480; F3 does not. |
+| R6-15 | Warning | Effects | SunShafts configuration warning does not refresh after `directional_shadow_max_distance` changes; 0 shafts at 400 m / alpha 0.6 / count 64. |
+| R6-16 | Minor | Pixel | Feature-switch Ctrl+Z is dead while the popup is open; it works after Escape (known). |
+| R6-17 | Minor | Harness | Strip number fields show drag saturation (6 px → max, 4 px → nothing); likely XTEST/llvmpipe, flag for a real-mouse check. |
+| R6-18 | Minor | Effects | Dawn still a flat pale wash (mean 150/156/173; island 105/107/74 vs water 148/161/177). |
+
+### Harness notes
+
+- `project_base` has no `.godot/`, so a freshly copied runtime project cannot register the
+  GDExtension classes until `godot --headless --path <project> --import` runs once.
+  `qa/runtime.sh` now does that automatically when `.godot` is absent.
+- A `ui --root all` dump costs ~2.5 s of editor time at llvmpipe; the 2D main-screen button is
+  at x 587–645 (not the x≈663 some scripts assumed); the Import dialog ignores Escape.
+
+---
+
+## r7 fixer pass (2026-11-21) — claimed fixes under evaluation
+
+One Claude Opus 5.5 (medium) agent owned the whole tree (`work/r7`, merged into `fix/r4-all` at
+`4b6811e`). Build + 30/30 tests pass. The next evaluation wave verifies these claims:
+
+| Item | Claim |
+|---|---|
+| N11/N32, R6-7/R6-8 builder palette | fixed: splitter drags go through the panel's own 220–420 / 480-view limits; collapse gives the space back (420→32 px, view 514→902 at 1600); view 585 px at 1280×800 and 1024×600 (r6: 340); 220 px minimum applies and is saved |
+| #38/R6-12 tutorial sea | partly fixed: the orbit camera backs off then raises pitch until the view's bottom edge clears the sea; 0 void rows in 02/04 at min pitch + 30 zoom notches (r6: 232 px / 32%). **Residual:** a lighter rotated square centred on the island at that extreme, not the cloud deck, god rays or water depth bands |
+| R6-1 Pixelizer first paint | not reproduced (first rendered frame already laid out); no change |
+| R6-2 first-build tab row | fixed: first build is now two rows 405×66 with `Debug Views` inside the strip |
+| #37/R6-18 dawn | partly fixed: Dawn fog 0.0045→0.0015; whole view 150/156/173→113/124/155, water 74/103/157, island 91/91/62 (still olive; palette quantization) |
+| N25/R6-15 SunShafts | warning computed on request (text unverified through the harness); shafts verified with pillars: 142,649/654,963 px change at 400 m / alpha 0.6 / count 64 |
+| R6-3 Settings Layout | fixed: two columns, no H scrollbar (212 px content in 175 px scrolls vertically) |
+| R6-4 Settings strip height | fixed: reopening from Paint gives 138 px (r6: 175) |
+| R6-5 Pixelizer 1024 | fixed: page tabs become a single 33 px dropdown, 66 of 99 px for the body |
+| R6-6 spin-slider wheel | fixed: Paint Rotation steps 0→2→1 |
+| N24 Inspector minimum | blocked by Godot: the main screen's 709 px minimum (3D toolbar 701 px) plus docks exceeds 1024; our panels already collapse to 32 px |
+| R6-9 Ctrl+D focus | fixed: History-dock focus shows the builder hint, no `Ruin2`, undo count 0; Scene/FileSystem/text fields keep Godot behaviour |
+| R6-10 HUD | fixed: status clears on mode/mesh/undo; line 2 fits at 585 px and wraps at 397 px |
+| R6-11 strip stuck at 175 | fixed by the palette work: 62/124 px at 1280 |
+| R6-13 F3 picker | not reproduced (hover outlines the knight, click selects `Knight_Body`) |
+| R6-14 F1 covers player | fixed: at 800×480 help ends x≈246 (player x≈355), 7 lines |
+| N6/N31, R6-16, R6-17 | not attempted |
+
+Harness: `qa/runtime.sh` now imports a freshly copied runtime project (the r7 branch missed this
+until the merge); editor `capture` can hang while idle — use `shot` instead.

@@ -1,285 +1,413 @@
-# MarchingSquaresTerrain — UI Feedback
+# MarchingSquaresTerrain — UI feedback
 
-Reviewed in a real Godot 4.7.2 editor (Linux, Xvfb + Mesa llvmpipe, editor scale 1.0), using
-the actual docked controls, popups and dialogs at 1600×900 and at smaller window sizes.
-Functional defects are in [`ISSUES.md`](ISSUES.md); this file is about the interface itself:
-layout, resizability, affordances and wording.
+Round 3 (r4) review, 2026-11-21. Godot **4.7.2** on Linux, Mesa **llvmpipe**, editor scale 1.0,
+real X11 input. Measured in the live editor at **1920×1080, 1600×900, 1366×768, 1280×720 and
+1024×600**, and in the runtime at 1280×720, 1024×600, 800×480 and 1600×900. Functional defects are
+in [`ISSUES.md`](ISSUES.md); this file is about the interface: layout, resizability, affordances
+and wording. Evidence is in `qa/screenshots/r4-uiresize/`, `r4-paint/`, `r4-pixel/`, `r4-builder/`
+and `r4-runtime/`; measurements are in `qa/findings/r4-uiresize.md`.
 
 ## The short version
 
-The addon has a distinctive, coherent editor UI: an icon toolbar in the 3D view, a wrapping
-attribute strip at the bottom, and a side panel for textures/foliage/pixel nodes. Custom sizes
-are multiplied by `editor_scale` (source-verified; HiDPI was not tested), it uses the editor
-theme, and the compact toolbar, the `MstFlow` wrapping strip and the two builder layouts are
-genuinely good ideas.
+The addon has a coherent, distinctive editor UI: an icon toolbar in the 3D view, a wrapping
+attribute strip at the bottom, and a 250 px side panel for textures/foliage/pixel nodes. The
+compact toolbar, the `MstFlow` wrapping, the two builder layouts and the runtime pixel scaling are
+good ideas and should be kept.
 
-What it lacks is a **resize story**:
+What it still lacks is a **resize story**:
 
-1. At 1024×600, switching to Level, Smooth or Tint crashes the editor in a container layout
-   loop — the most serious symptom of the layout not being bounded.
-2. The side panels are hard-fixed at 250 px and cannot be widened, narrowed or collapsed.
-3. The bottom strip is bottom-anchored and not scrollable; when it needs more rows it silently
-   clips (Brush → Raise/Lower) or eats the 3D view (Builder → Face mode: 447 px strip, 39 px
-   viewport).
-4. Page-tab rows move vertically between pages, so muscle-memory clicks miss.
-5. Dialogs are inconsistently resizable and the Save Preset dialog has no Cancel button.
+1. **There is no protected 3D view.** At 1600 and below, the strip and toolbar take whatever height
+   they want; the viewport falls to 291 px (Settings), 256 px (Paint), 124 px (Brush at 1366), and
+   **39 px** at 1280/1024. At 39 px the tested brush drag produced no terrain change (issue 7), so
+   the 1024 layout is effectively read-only in practice.
+2. **The side panels are fixed at 250 px** with no splitter and no collapse. Paint's content is
+   **5,767 px** tall — about 90 wheel notches to the export button, with only ~1.5–2 of 16 slots visible
+   (issue 16). Foliage's palette is not a Control, so it cannot even be tabbed to or scrolled
+   normally.
+3. **Two resize paths crash the editor.** Selecting `PixelRenderer` at 1280×720 loops the
+   container layout and exits (issue 1, independently re-reproduced); selecting a
+   `PixelBuilderMesh` at 1366×768 while the pointer is over the builder toolbar panics the plugin
+   in the UI pass (issue 2; hover/timing dependent, not re-reproduced on two fresh attempts). These
+   are data-loss-grade and outrank every cosmetic item.
+4. **The toolbar changes shape with the window**, from a 116 px single column to a 236 px
+   two-column block to a 76/116 px compact block, so tools move while the user works (issue 17).
+5. **Settings tabs move vertically** (y≈287 → 518), and the Grid page grows the strip to 385 px,
+   which is what collapses the view at 1280 (issue 18).
 
-The recommendations below are deliberately opinionated: make the **panels and strip**
-resizable/collapsible, keep the **toolbar and pixel grid** fixed.
+The user preference — "resizable, but not everything needs to be resizable" — is the right one.
+The recommendation below is deliberately selective: make the **viewport, strip, side panels and
+dialogs** resizable/collapsible; keep the **icon rail, row heights, popup geometry and pixel grid**
+fixed.
 
-## Resizability policy (what should and should not resize)
+## Measured facts
 
-### Should be resizable
+`view` = 3D viewport size; `strip` = attribute strip height; `panel` = side panel width. The
+Output dock was open (224 px) for every editor measurement; closing it adds height, not width.
+Docks auto-shrink at 1366/1280/1024, so those widths are Godot-level, not addon-level.
 
-| Surface | Why | Suggested behaviour |
-|---|---|---|
-| Paint / Foliage / Pixel World / builder Materials side panels | Long slot names, material names, presets and per-node rows are truncated at 250 px; at 1600 only 2.5/16 slots are visible | Drag handle or `HSplitContainer` on the panel edge; min 220 px, max 420 px (× editor scale), default 250; remember per project; collapse to a 24 px tab |
-| Bottom attribute strip | It must show 4–6 wrapped rows for some tools; today the overflow is clipped or steals the viewport | Vertical splitter with a **fixed max height** (240 px and ≤35% of the 3D area), a visible scrollbar, and a collapse chevron; never let the 3D view go below 480×300 |
-| Builder Face/Edge/Vertex strip | Blocker: 447 px strip / 345×39 px viewport at 1600×900, 699 px / 238×39 at 1280–1024 (ISSUES #23) | Cap at 240 px, group fields into tabs (Transform / Inset / Trim / Offsets) + scroll; default to Modeler layout on small screens |
-| Settings / Pixelizer page content | Different pages have different heights; the tab row jumps with the content | Keep the tab row top-anchored and fixed; scroll or page the content below it |
-| Dialogs | Save Preset has a long path label and a 558×150 default; `min_size` reports 0,0 but a 400-wide request clamps to 558 because of the label | Set an honest content-based minimum, keep them user-resizable, add Cancel, persist size per dialog |
-| Main editor window | Already resizable; the layouts must adapt down to 1024×600 | Test matrix: 1600×900, 1366×768, 1280×800, 1024×600; no clipped controls at any of these |
-
-### Should stay fixed (or collapse instead)
-
-| Surface | Reason |
-|---|---|
-| Terrain/pixel toolbar buttons | It is an icon palette: 30–32 px buttons × editor scale, compact mode for icons-only. Free width would break the icon+label grid. Max 2 columns (currently 3 at 1024, stealing width), with a vertical scrollbar and auto-compact below ~1400 px. |
-| Pixel-art rendering | The whole point is an integer pixel grid. `PixelRenderer`'s Pixel Size is the user control; do not smoothly scale the pixel output. |
-| Confirmation dialogs (overwrite, delete) | Short, focused messages; fixed and centred is correct. Give them a minimum width and keep the buttons in a stable footer. |
-| Colour pickers, popup menus | Native editor controls; fixed is fine. Ensure they flip/fit at 1024×600. |
-| Row/control heights | 35 px rows × editor scale keep the dense professional look; only widths should adapt. |
-
-### Collapse is often better than resize
-
-- Toolbar: the existing **Collapse** button is the right idea; auto-collapse (or auto-wrap into
-  a second column) when the editor height is below ~500 px.
-- Side panels: a small chevron that collapses to a tab/handle would recover the viewport on
-  small screens without a splitter.
-- Builder: the **Modeler layout** already demonstrates the value; offer it (or auto-select it)
-  at narrow widths.
-
-## Observed layout problems
-
-These are the interface-level symptoms behind the functional issues.
-
-### Side panels are fixed at 250 px
-
-`editor/ui_kit.rs` sets `PANEL_WIDTH = 250.0` (× editor scale) and the panel is added to
-`SPATIAL_EDITOR_SIDE_RIGHT`; there is no splitter or width preference. At 1024 px wide, the
-terrain toolbar (236 px) + 250 px panel leaves roughly half the window for the 3D view. The
-texture panel's content is also ~5,800 px tall (16 slots with several rows each), so it is a
-long scroll with no grouping/collapse. Recommendation: resizable panel with per-slot
-collapsible groups, plus a "collapse panel" control.
-
-The panel also ignores the editor's bottom status bar: at 1600×900 the Pixel World
-**Lighting Preset** row (Dawn/Noon/Dusk/Night/Storm/Snow/Wire) sits at y = 848–917 and is
-covered by the status bar; only a 1-px sliver of Night is reachable until the panel is
-scrolled (ISSUES #37). Primary actions should be pinned above the fold or the panel should
-reserve the status-bar height at the bottom.
-
-### The bottom strip has no overflow story
-
-`strip_root` disables both scroll modes and relies on `MstFlow` to wrap. That works when the
-editor gives the strip the height it asks for, but:
-
-- Brush → Raise/Lower asks for 5 rows and gets 140 px; the title and Brush Type row are clipped
-  above the viewport (ISSUES #5). Wheel does not scroll; there is no scrollbar.
-- Builder Face mode asks for 447 px; the editor gives it 447 px and the 3D view collapses to
-  345×39 px (ISSUES #23). At 1280×800 the strip is also cut behind the Materials panel
-  (ISSUES #24).
-- The same mechanism pushes the Settings/Pixelizer tab rows up and down between pages
-  (ISSUES #20, #33), so the tab you just clicked is not where the next one is.
-
-Recommendation: a strip container with `vertical_scroll_mode = AUTO`, a min/max height, and a
-top-anchored tab row that does not move. Cap the strip so the 3D view keeps a usable minimum.
-
-### Status text and hints clip
-
-The brush selection status is cut at the right edge (`... RMB/Esc: c...`) and some hints
-advertise controls that do not exist (Level's Strength) or omit working ones (Raise/Lower's
-Ctrl+wheel strength). Recommendation: wrap the hint to two lines (or elide with a tooltip) and
-generate it from the same table as the controls.
-
-### Dialogs
-
-- **Save Preset**: 558×150, resizable in principle, `min_size = 0,0`, only an OK button. A
-  400×150 request is clamped to **558×150** by the one-line path label (540 px), while 800×220
-  is accepted and leaves a large blank area. Cancelling requires Esc or the window X. Add
-  Cancel, wrap/shorten the label so it can be ~420 px wide, and remember the size.
-- **Overwrite confirmation**: has Cancel/OK and is fine; keep it fixed.
-- **Import file**: native editor dialog; fits at its 819×480 default. It reports `min 200×70`
-  but a 400×200 request clamps to **498×200** (content minimum) — harmless, but the reported
-  minimum should match the real one.
-- **Empty preset name** closes silently and writes nothing (ISSUES #18) — keep the dialog open
-  with inline validation.
-
-### Runtime overlays
-
-- **F1 help** is a single ~10 px grey line pinned to the bottom edge, drawn directly over bright
-  grass, with no backing panel (ISSUES #50). Give it a translucent rounded panel/backdrop, a
-  readable type size (≥14–16 px at 720p), multi-line grouping, and a short fade-in. The current
-  line is easy to miss and its contrast depends on the terrain behind it.
-- **F3 Pixel tuner** works and is legible at 1280/1920, but at 1024×600 it starts at x≈604 and
-  its weather section is below the window (ISSUES #51). Make the panel responsive: cap it at
-  ~40% of the width, collapse sections (Effects/Renderer/Scene) with the active tab remembered,
-  keep a visible scrollbar, and allow the whole tuner to be hidden with one more F3.
-- The runtime window scaling itself is good: the pixel art stays crisp (nearest-neighbour) at
-  1920×1080, 1280×720 and 1024×600, with no in-window letterboxing. Keep the integer pixel
-  scaling; only the overlays need the responsive treatment.
-
-### Menus and panels lose their place
-
-- Pixel World's disabled `+ Add` entries are as bright as enabled ones (ISSUES #34); only the
-  icon dims. Use the theme's disabled text colour.
-- The Pixel World panel keeps its scroll offset when its rows rebuild after a section switch,
-  hiding the top rows; the scrollbar is only visible on hover (ISSUES #35). Reset to the top
-  or scroll the selected row into view.
-- Pixelizer page tabs move vertically between pages (ISSUES #33); Settings pages too (#20).
-- After an undo/redo of a texture slot edit, the Paint panel keeps showing the edited Pattern,
-  Color swatch, Grass Sprite, Scale, slot names and preset even though the data reverted
-  (ISSUES #9). The panel should refresh on history changes; otherwise undo looks broken.
-
-## Measured small-screen behaviour
-
-The editor's hard minimum is **1024×600**; an 800×600 request is clamped to 1024×600 (do not
-force it). The measured 3D viewport (and strip) at each size:
-
-| Surface | 1920×1080 | 1600×900 | 1366×768 | 1280×800 | 1024×600 |
+| Surface | 1920×1080 | 1600×900 | 1366×768 | 1280×720 | 1024×600 |
 |---|---|---|---|---|---|
-| Brush viewport / strip | 574 / 105 px | 326 / 140 px | 159 / 175 px | 121 / 245 px | **39 / 245 px** |
-| Builder Face viewport / strip | n/t | **39 / 447 px** | n/t | **39 / 699 px** | **39 / 699 px** |
-| Paint sidebar | n/t | 250 px fixed, 2.5/16 slots | n/t | n/t | 250 px over a 39 px viewport |
-| Pixelizer viewport | n/t | 662×320 | n/t | n/t | **670×39**, panel 17 px on screen |
-| Toolbar | 1 col | 2 cols | 2 cols | 2 cols | 2–3 cols (~236–320 px) |
+| Terrain toolbar, expanded | 116×682, 1 col | 236×469, 2 col | 236×337, 2 col | 236×289, 2 col | 236×287, 2 col |
+| Terrain toolbar, compact | 36×682, 1 col | n/t | n/t | n/t | 76×392 (2 col) / 116×252 (3 col) |
+| Brush | view 1227×574; strip 105 | view 787×361; strip 105 | view 553×124; strip 210 | view **470×41**; strip 245 | view **470×39**; strip 245 |
+| Paint | view 974×574; strip 105; panel 250 | view **534×256**; strip 210 | view **300×39**; strip 385 | view **292×39**; strip 385 | view **377×39**; strip 350 |
+| Foliage | view 974×609; panel 250 | view 534×361; panel 250 | n/t | n/t | n/t |
+| Settings — Grid | strip 140 | view 787×291; strip 175 | view 553×124; strip 210 | view **470×39**; strip 385 | view 630×39; strip 350 |
+| Pixelizer (Renderer) | view 1055×574; strip min 670 | view 696×293; strip min 670 | view 670×161 (fits by 0 px) | **crash** | n/t |
+| Builder — Object | view 871×617 | view 421×310 | **crash** | n/t | n/t |
+| Builder — Face | view 795×502 | view **345×39**; strip 447 | n/t | n/t | n/t |
+| Save Preset | 558×150; 400 request clamps to 558; reopen 558 | n/t | n/t | n/t | n/t |
 
-Consequences, all confirmed in `qa/findings/ui.md`:
+Other measured facts:
 
-- **The editor crashes** when Level, Smooth or Tint is active/selected at 1024×600
-  (`Container::_sort_children` / "Message queue out of memory", reproduced 5×). This is the
-  single highest-priority defect; 1024×600 is unsupported for those tools until it is fixed,
-  and a saved 1024 layout can make the next launch crash immediately.
-- Brush is unusable at 1024 (39 px viewport); 1280 is marginal (121 px); even 1366 gives only
-  159 px.
-- The Paint/Foliage sidebar shows 2.5 of 16 slots at 1600 with no visible scrollbar; the Export
-  action is ~100 wheel ticks away.
-- The Pixel World panel is 17 px on screen at 1024; the Select/Add buttons are unreachable.
-- Settings tabs fit at 1024 but the fields below ~9 rows clip, the hint is cut/overlapped, and
-  short pages do not give the viewport its space back.
-- The toolbar grows to 3 columns at 1024, taking 80–200 px of viewport width.
-- Builder Preferences is 484×664, non-resizable, with its action row 61 px off-screen at 600.
-- The Modeler layout at 1024 loses the bottom strip and Materials palette.
-- At 1024 the editor's own Inspector collapses to ~126 px (Godot-level), so addon layouts cannot
-  rely on Inspector fallbacks at that size.
+- **Viewport floor:** the last pass used 480×300; this pass found **39 px** at 1024/1280 and
+  345×39 for Builder Face at 1600. Every size below 1920 violates the 480×300 floor for at least
+  one surface.
+- **Paint panel:** 250×682, content **5,767 px**; only ~1.5–2 texture slots fit; 90 wheel notches
+  to the bottom action. The vertical scrollbar exists but is 14 px and easy to miss.
+- **Builder Materials:** 245–259 px wide, 659 px content in a 469–682 px view; bottom slots need
+  scrolling.
+- **Pixel World:** 250 px wide, 941 px content; at 1024 the panel is placed at x≈968 (56 px
+  visible), and the Lighting Preset row is below the panel viewport.
+- **Runtime F3:** fixed ~420 px wide; at 1024 starts at x≈604 and clips its lower weather fields;
+  at 800×480 covers the player. F1 is a single ~15 px line with no backing panel.
+- **Runtime pixel scaling works:** 1280×720 → 1024×600 → 800×480 → 1600×900 → 1280×720 kept a
+  crisp 3×3 pixel grid and reflowed the low-res buffer correctly (430×242 → 344×202 → 270×162 →
+  536×302). HUD text stayed sharp. This is a genuine strength.
+- **All UI constants scale:** `TOOL_BUTTON_SIZE = 30`, `ROW_HEIGHT = 35`, `PANEL_WIDTH = 250`,
+  `FORM_LABEL_WIDTH = 74` are multiplied by `EditorInterface.get_editor_scale()` through
+  `ui_kit::sz`/`px`; a 2× editor scale would make the 250 px panel 500 px and amplify every layout
+  failure. HiDPI was not measured (scale 1.0 only).
+- **Hit targets:** toolbar buttons are 116×32 expanded and 36×32 collapsed; Pixelizer rail 30×30;
+  Builder mode 34×34; strip rows 35 px; panel labels 74 px. Mouse-sized, not touch-sized; fine for
+  a desktop editor, but the 30 px icons are at the low end.
 
-Minimum target I would enforce: **3D viewport ≥ 480×300** (ideally 640×360). When a layout would
-violate it, auto-collapse in this order: side panel → tab, strip → 2 rows + "More", toolbar →
-icon rail.
+## Resizability policy (opinion)
 
-## Affordances and interaction
+This is the explicit answer to "resizable, but not everything needs to be":
 
-- **Tool shortcuts are advertised but dead.** Tooltips and docs promise `1`–`9` for tools and
-  `1`–`4` for builder modes, but Godot's 3D view shortcuts consume the digits
-  (ISSUES #4). Either register real editor shortcuts (`InputMap`/`Shortcut`) or remove the key
-  hints. `H` works but cycles backwards (#26).
-- **Esc is unreliable.** It does not clear the brush selection (#7) even though the hint and
-  docs say it does. Esc does close dialogs and the UV editor.
-- **Focus rings and Tab order** are mostly the editor defaults; the icon toolbar has
-  `FocusMode.NONE`, which is fine for a palette, but the strip controls should keep a visible
-  focus ring for keyboard users.
-- **Disabled state** is inconsistent: Grid Aligned looks enabled but refuses to toggle (#13);
-  Grid Size stays enabled with alignment off (#14); Pixel World menu entries do not dim (#34).
-- **Slider trust**: spin sliders accept out-of-range drags by orders of magnitude (#8, #28):
-  Slope Min reached 8287.5°, Pixel Size 44243, Darken 290.19, Sky Coverage 377.4 and Water
-  Swell 142.85 in single drags. An integer drag also creates two undo steps (#29). Users cannot
-  tell the difference between a typo-safe clamp and a broken field, and the Inspector then
-  disagrees with the strip (#41). Clamp drags to the declared range; keep "type a larger
-  value" as an explicit opt-in.
-- **Adding effects closes the tool.** `+ Add` selects the new node, so the pixel toolbar, strip
-  and Pixel World panel disappear (#31). Adding two effects in a row takes two reselections.
-  Return focus to the renderer/terrain, or keep the panel pinned.
-- **New props are not selected.** Drawing a sibling Builder shape leaves the selection on the
-  old mesh (#25), so the next `B` paints the wrong object. Select the new node and say so in
-  the HUD.
-- **Undo focus trap.** Ctrl+Z with the Texture Name field focused edits the text; because the
-  field commits on every change, the text undo records a **new** rename action and the redo
-  stack is lost. Clicking the 3D view does not release the field — only clicking another control
-  does (#54). Release focus on a viewport click (or commit only on Enter/focus loss).
-- **Vertex Handles look like grips but are chunk add/remove targets.** Dragging a "vertex"
-  handle removed or added a chunk in the deep pass (#55). If true vertex grips are not
-  available for a grid, hide the toggle or label the handles explicitly; the current hint only
-  mentions chunk add/remove.
-- **History names should describe the action.** Scale is logged as `terrain texture 1 magnify`,
-  tint erase as `terrain tint paint`, and Quick Paint strokes lose the tool name (#56). History
-  is the user's undo safety net; make the names match the tools.
+| Surface | Verdict | Min / default / max | Behaviour |
+|---|---|---|---|
+| **3D viewport** | **protected** | **≥480×300**, ideally 640×360 | Takes remaining space; layout must auto-collapse before it falls below the floor |
+| **Attribute strip** | **resizable** | 35 / 105 / 175 px, and ≤35% of view height | Vertical splitter; scroll inside; chevron to collapse to the title row |
+| **Settings page content** | **not strip-growing** | 1–3 rows, then internal scroll or sub-tabs | Page tabs stay on row 1; the title goes top-left |
+| **Terrain toolbar** | **fixed rail** | 30–36 px wide; vertical scroll | Labels at ≥1400 px; Collapse = 36 px icon rail, not 76/116 |
+| **Paint / Foliage / Pixel World / Materials** | **resizable + collapsible** | 220 / 250 / 420 px | Horizontal splitter; collapse to a 24 px tab; visible scrollbar and fast wheel |
+| **Builder Face/Edge/Vertex strip** | **resizable + grouped** | 3 rows + scroll, max 240 px | Section tabs/popovers instead of one 447 px block |
+| **Save Preset** | **resizable** | 420×150 / 420×150 / 900×260 | OK **and Cancel**; remember last size |
+| **Runtime F3 tuner** | **resizable + collapsible** | fit the window, scroll | Collapse/fit button; do not cover the player at 800×480 |
+| **Runtime F1 help** | **readable overlay** | multi-line, backing panel | Toggle, not one-shot; do not collide with F3 |
+| **Popups** | **fixed** | viewport-clamped | Flip/scroll beyond ~12 rows; no need for user resizing |
+| **Toolbar icons / row heights / pixel grid** | **fixed** | 30 px icon, 35 px row | Scale with `editor_scale`; no user resizing needed |
+| **File dialogs** | **leave to Godot** | Godot defaults | Fix only the reported minimum (issue 40) |
+| **Preferences** | **resizable + scroll** | 480×400 / 484×600 | Clamp to screen−80; remember size |
 
-## Defaults and first-run impression
+The non-negotiable rule: **collapse in this order before the viewport drops below 480×300** —
+panel → tab, strip → scroll, toolbar → rail. Today every size below 1920 violates it, and 1600
+violates it for Paint (534×256), Settings (291) and Pixelizer (293); Builder Face violates it even
+at 1600 (345×39).
 
-Several effects look "broken" at their shipping defaults, which is a UI problem even where the
-implementation is fine:
+## Surface-by-surface
 
-- `+ Add` Sun Shafts leaves the Sun empty and the node inert (#32); the only shafts on screen
-  are the renderer's God Rays, so the user has no way to tell the add worked.
-- Fireflies at count 48 / size 0.12 are invisible from the demo's ~30 m camera (#39); the
-  effect only appears at 0.6 / 200.
-- The Smoke node shows a flame pixel but no plume in hex_island at rate 2.5–5 (#36).
-- `+ Add` selects the new node and closes the whole pixel UI (#31), so trying a second effect
-  requires reselecting the renderer.
-- The Dawn preset renders magenta rather than a warm dawn (#38), which reads as a broken
-  preset rather than a stylistic choice.
+### 1. The 3D viewport and the bottom strip (issues 7, 8)
 
-Recommendation: ship "demo-visible" defaults (or a visible fallback/marker), wire the Sun on
-add, and keep the Pixel World panel open until the user closes it. First-run trust matters more
-than matching the original plugin's numbers.
+The strip is bottom-anchored and grows upward with its flow content. At 1600 the Paint strip wraps
+to six rows because the expanded toolbar leaves only 534 px; at 1366/1280/1024 the view is a
+39–124 px slit. This is not label clipping — the content fits, the **height** is unbounded. The
+same problem is worse in Builder Face mode: a 447 px strip with a 39 px view even at 1600.
+
+**Fix:** a real `VSplitContainer` with a 175 px cap, internal `ScrollContainer`, and a chevron to
+collapse the strip to its title row. Group Builder Face/Edge/Vertex fields into tabs/popovers
+(max 240 px). Protect the view at 480×300.
+
+### 2. The terrain toolbar (issue 17)
+
+The toolbar is 116 px at 1920 (one column), 236 px at 1600/1366/1280 (two columns), and 76 or
+116 px compact at 1024 depending on the strip height. The column count changes while the user
+works, so tool positions move; at 1600 the toolbar takes 15% of the width and forces the Paint
+strip to wrap.
+
+**Fix:** one fixed 30–36 px icon rail with vertical scrolling; labels only at wide sizes; compact
+mode always 36 px. Do not derive the column count from the available height.
+
+### 3. The side panels (issue 16)
+
+Paint/Foliage/Pixel World/Materials are all fixed at 250 px. Paint's 5,767 px content makes the
+panel an eight-to-twelve-screen scroll; the export button is 90 wheel notches away. The panel can
+only grow the viewport, never the content area. Foliage's palette is not exposed as Controls at
+all, which breaks keyboard navigation and the control dump.
+
+**Fix:** a horizontal splitter (220–420 px), a 24 px collapse tab, a visible scrollbar, and fast
+wheel scrolling. Make the Foliage palette a real `Control` tree. Start at 250 px, remember per
+project.
+
+### 4. Settings and tabs (issues 18, 25)
+
+The Settings tab row moves from y≈287 to y≈518 between pages because the strip height changes, and
+the Grid page alone grows to 350–385 px. Fixed-position clicks land in the 3D view; at one point
+`click-text "Grid"` hit the toolbar Grid overlay instead of the tab. Clicking the 3D view while
+Settings is open deselects the terrain and closes the whole tool.
+
+**Fix:** keep the page tabs on a stable row (row 1), put the tool title top-left, scroll page
+content inside a three-row strip, and do not let a viewport click without a tool action clear the
+selection.
+
+### 5. Pixelizer and Pixel World (issues 1, 4, 24, 33)
+
+The Pixelizer strip has a hard 670 px minimum. At 1366 it fits by 0 px; at 1280 the layout loop
+crashes the editor. At 1024 the Pixel World panel is placed off-screen (x≈968), and “+ Add” closes
+the pixelizer UI instead of keeping the panel open. The `on_float` re-entrant borrow panic is
+intermittent but from the same family.
+
+**Fix:** make the strip scroll/overflow below 670 px instead of looping; clamp the panel to the
+window and keep it on-screen; keep the panel open after Add; make the strip rebuild re-entrancy-safe.
+
+### 6. Builder (issues 2, 8, 34, 42)
+
+Face mode is unusable at 1600 (345×39 view, 447 px strip, 416 px toolbar). The Modeler “Created
+Box” toast covers the viewport at 1280×800. The documented Shift+C append path opens Bezier, and
+the digit/H/E/F shortcuts collide with Godot's 3D editor. The crash at 1366 is the same
+re-entrant-borrow class as the Pixelizer panic.
+
+**Fix:** group the Face/Edge/Vertex fields, cap the strip, keep the toast out of the viewport, and
+audit shortcut collisions (`H` = hide node, `E` = rotate mode, digits = view orientation).
+
+### 7. Dialogs (issues 28, 40)
+
+Save Preset opens at 558×150, refuses to shrink to 400×150 despite reporting `min [0,0]`, accepts
+800×220 with blank space, and forgets the size. It has only OK; Esc/X close it. Empty names close
+silently. The Import dialog reports `min [200,70]` but clamps to 498×200.
+
+**Fix:** a real Cancel button, validation for empty names, an honest minimum, and remember the
+last size. File dialogs can stay Godot-standard once the reported minimum is honest.
+
+### 8. Runtime HUD (issue 39)
+
+F3 is fixed at ~420 px; at 1024 it starts at x≈604 and clips the lower weather fields, and at
+800×480 it covers the player. F1 is one small unbacked line that is hard to read over bright sand
+and is cut by F3. F1 is one-shot, not a toggle. The runtime pixel scaling itself is excellent.
+
+**Fix:** make F3 fit/scroll/collapse; give F1 a backing panel and a toggle; keep both out of each
+other's way at 1024.
+
+### 9. State and affordances (issues 13, 14, 22, 26, 32, 41)
+
+The UI often lags the data: undo restores a texture preset but the labels keep the old name; Grid
+Type undo leaves the strip saying `Square`; Builder undo leaves stale vertex/face counts and a
+stale selected face; Shift/Ctrl-wheel changes Size/Strength but the labels do not move; Esc clears
+the selection but the HUD still says “175 selected”. Pixel Preview/Animate have no pressed state.
+Grid Aligned looks enabled but silently refuses with Falloff on. These are individually small but
+together they make the editor feel unreliable.
+
+**Fix:** refresh the owning panel/HUD from the same signal that changes the value; give toggles a
+pressed state; disable Grid Aligned when Falloff makes it unavailable; clear the selection HUD on
+Esc.
+
+### 10. Shortcuts (issues 9, 42)
+
+The tooltips and docs advertise `1`–`9` for sculpt tools, `1`–`4`/`H` for builder modes, `E` for
+extrude and `F` for frame. None of them work: the 3D view consumes digits, `H` hides the node, and
+`E`/`F` are built-in editor shortcuts. `Shift+C` opens Bezier instead of appending. This is a
+documentation/implementation split, not just a UI nit — a user following the cheat sheet cannot
+use the advertised workflow.
+
+**Fix:** claim the shortcuts in the viewport input handler before the 3D editor, or change the
+documented keys and tooltips to ones that do not collide. Audit `H/E/F/R/G/1–4` as a set.
+
+## Priority fixes
+
+Ordered by risk to the user's work, then by how many surfaces one change repairs:
+
+1. **Stop the two crash paths** (issues 1, 2; same family as 4). The editor exits and unsaved work
+   is lost. Fix the Pixelizer 670 px minimum/overflow loop and the builder `on_button_hover`
+   re-entrancy before any cosmetic work.
+2. **Protect the 3D view** (issues 7, 8). Cap the strip at ~175 px with a real scroll, add a
+   collapse chevron, and group the Builder Face/Edge/Vertex fields. This one change restores
+   1280/1024 and Paint/Settings at 1366.
+3. **Side-panel splitter + collapse + fast scroll** (issue 16). Paint's 5,767 px content and 90
+   wheel notches is the worst example; Foliage needs to become a real Control.
+4. **One fixed icon rail** (issue 17). Stop the 1/2/3-column jumps; compact must be 36 px.
+5. **Stable Settings tabs + page scroll** (issues 18, 25). Keep tabs on row 1; stop the viewport
+   click from closing the tool.
+6. **Dialog consistency** (issues 28, 40): Cancel, validation, honest minimum, remembered size.
+7. **Runtime HUD fit** (issue 39): F3 fit/scroll/collapse; F1 backing + toggle.
+8. **State refresh + pressed states** (issues 13, 14, 22, 26, 32, 41): make every panel reflect the
+   data after undo and after wheel/slider changes.
+9. **Shortcut audit** (issues 9, 42): claim or re-document the keys that collide with the 3D editor.
 
 ## What to keep
 
-- The **compact/Collapse** toolbar mode: exactly the right way to trade labels for viewport.
-- `MstFlow`'s balanced wrapping: the strip looks deliberate when it fits; keep it, add
-  overflow handling.
-- The **two builder layouts** (MST and Modeler): a strong answer to different screen sizes and
-  workflows.
-- The **runtime pixel scaling**: crisp nearest-neighbour output at 1920×1080, 1280×720 and
-  1024×600 with no in-window letterboxing. Only the runtime overlays (F1/F3) need responsive
-  treatment.
-- Sizes go through `editor_scale` in source (the 1.0 pass cannot confirm HiDPI): keep that
-  foundation rather than hard-coding pixels.
-- Section/page tabs on the pixelizer and the six Settings pages: good grouping; just anchor the
-  tab row.
-- The right-side panel's scrollbar gutter and the editor-theme styling: consistent with Godot.
+- The **compact toolbar** idea (icons-only with tooltips) is good; it just needs a fixed 36 px rail.
+- **`MstFlow` wrapping** is the right model for the bottom strip; it should wrap inside a capped,
+  scrollable region, not grow the whole panel.
+- The **two builder layouts** (MST and Modeler) are a sensible answer to different workflows; the
+  Modeler layout is what made Face mode usable at 1600.
+- **Runtime pixel scaling** is genuinely good: 1280→1024→800→1600→1280 kept a crisp pixel grid,
+  correct buffer reflow and sharp HUD text.
+- **Tooltips are informative** (the Brush and Settings tooltips are unusually complete), and the
+  `editor_scale` plumbing is already in place for HiDPI.
+- **Undo itself is in good shape** for terrain tools: 35 of 42 matrix rows pass, including a
+  19-chunk stroke and all the context/focus cases. The UI refresh around undo is the weak part,
+  not the edit history.
 
-## Priority list
+## Method and limitations
 
-1. **P0 — Fix the 1024×600 crash** with Level/Smooth/Tint (container layout loop). Until then
-   the addon cannot claim support for its own minimum window.
-2. **P0 — Stop the strip from eating the viewport**: fixed max height + visible scroll +
-   collapse, with a 480×300 viewport floor. Fixes Brush at 1280/1024 and Builder Face at every
-   size.
-3. **P0 — Give side panels a width control** (splitter or collapse, min/max, remembered); this
-   also gives the Paint panel a usable visible scrollbar.
-4. **P1 — Anchor page tabs** and scroll the page content (Settings, Pixelizer); keep the Pixel
-   World panel on screen at 1024.
-5. **P1 — Fix dialog affordances**: Cancel on Save Preset, min size/wrap, Preferences resizable
-   and scrollable, validation on empty name.
-6. **P1 — Make shortcuts real or remove the hints**; fix Esc; fix out-of-range spin sliders.
-7. **P1 — Runtime overlays**: readable F1 help with a backing panel; responsive F3 tuner
-   (collapsible sections, visible scrollbar) at 1024×600.
-8. **P2 — Feedback polish**: disabled-state contrast, scrollbar visibility/scroll retention,
-   wrap hints, select newly added nodes, avoid the blocking Modeler toast, pin the Lighting
-   Preset row above the status bar, and keep the Inspector in sync with strip edits.
+Measurements come from live `ui` dumps and screenshots taken immediately after each resize; the
+full dumps for the three 1920 states are in `qa/screenshots/r4-uiresize/ui/`, and the rest are
+filtered dumps recorded in `qa/findings/r4-uiresize.md`. `resize` is clamped to Godot's 1024×600
+minimum (800×600 was not forced). All numbers include the 224 px Output dock; closing it adds
+height but does not change any width result. HiDPI, Tab order/focus rings, and Pixelizer/Builder at
+1024 were not measured (the latter because of the crashes). The runtime resize used live X11
+`ConfigureWindow` because `drive.py resize` is harness-only.
 
-## Suggested verification (regression matrix)
+---
 
-For each surface, capture 1600×900, 1280×800 and 1024×600 and assert:
+## r5 pass — what the fixed build feels like (2026-11-21)
 
-- every visible control's `rect` is inside its scroll viewport (`clipped == false`),
-- no horizontal scrollbar appears in the strip or panels,
-- the 3D viewport is at least 480×300 (or the strip scrolls/collapses),
-- the tab row's y position is identical across pages,
-- the panel can be widened/narrowed and remembers the width,
-- dialogs cannot be shrunk below their content and keep their action buttons visible,
-- all advertised shortcuts fire (or are not advertised).
+Measured on the post-fix build by five QA drivers; functional defects are in
+[`ISSUES.md`](ISSUES.md) N1–N31, evidence in `qa/findings/r5-*.md` and `qa/screenshots/r5-*`.
+This section is the interface verdict.
 
-The harness in [`qa/`](qa/) supports this directly (`resize`, `ui --root all`, `capture`,
-`windows`, `window-resize`, `popups`); the per-surface evidence for this pass is in
-`qa/screenshots/uiresize/` and `qa/findings/ui.md`.
+### Kept / now working
+
+- **The resize story mostly exists now.** The toolbar is a fixed single-column rail
+  (120 px labelled, 40 px compact, never a 1/2/3-column jump). Attribute strips are capped
+  at 175 px with a visible vertical scrollbar and one row per wheel notch; nothing spills
+  below the window. Settings pages no longer jump their tab row. Side panels have a 220–420 px
+  grip and a 24 px collapse tab. The Save Preset dialog is 420×179 with OK **and** Cancel, a
+  live path label and an inline empty-name error.
+- **The 3D view no longer collapses to 39 px.** Measured view height: 1920 → 734–874,
+  1600 → 554–694, 1366 → 389–529, 1280 → 341–446, 1024 → 297.
+- **Runtime pixel scaling stays excellent** at 1280/1024/1600, and the sea now reaches the
+  horizon in the tutorials.
+
+### The remaining resize gap (updated after Round 2)
+
+1. **The width axis now has a floor.** A side panel collapses to its tab before the 3D view drops
+   below 480 px: Paint at 1280 goes from a 333 px view to 551 px, and 1600 re-expands it. The
+   builder palette keeps its own 277 px default and still needs the same floor (N32).
+2. **Strip height is now a maximum, not a target.** Settings pages shrink to their content
+   (Storage 107 px), pinned strips keep a high-water height per tool, and the title/tab header
+   stays pinned while the body scrolls.
+3. **Pixelizer first paint is still broken (N1).** On a fresh session, the *first* selection of a
+   `Pixel*` node leaves the rail 39×0, the strip 0×35 and the panel 250×0. Selecting it a second
+   time (or a 2D→3D round-trip) lays everything out correctly, so it is a missing first-frame
+   relayout. Nothing is logged, so it reads as “the addon has no pixel UI”.
+4. **The page-tab grid is now width-aware.** Columns are picked from the strip width (two rows at
+   narrow sizes); at 1024 the header becomes a normal scrolling row instead of covering the strip.
+5. **Panels and dialogs remember their state.** Panel width/collapse is written through to
+   `res://.godot/editor/mst_editor_state.cfg`; Save Preset reports an honest 340×178 minimum,
+   honours a 400×150 request as 400×179, and remembers its size.
+
+### Surface notes
+
+- **Paint / Foliage:** the panel is 250 px with **5,764 px** of content (~8 screens; 1.7 of 16
+  slots visible). Collapse exists; a 2-column slot grid or a denser slot row would fix the
+  scroll marathon more than a splitter does. Foliage Fill Terrain still paints nothing for Tree
+  yet records an undo step.
+- **Settings:** the Grid page no longer clips Blend Mode: the title and page tabs are pinned and
+  the body scrolls. The Settings “Grid” tab is now **“Layout”**, so it no longer collides with
+  the toolbar Grid overlay.
+- **Chunks:** the status line is clipped, the green `+` handles are near-invisible on bright
+  terrain, and add/remove read three different ways (hint, tooltip, status). Show “N selected”.
+- **Storage:** Export GLB has no path field and silently wrote 32 MB; Save Data is always
+  enabled and reports only to Output. Give both a row and a toast, and gate Save on dirty.
+- **Import dialog:** the honest 500×300 minimum is cramped (2-row list, elided filter text,
+  dead Favorites/Recent); 700×420 or hide the dead rows.
+- **Builder:** the viewport is the squeezed surface at ≤1366 (86 px rail + 245–277 px palette
+  before editor docks). The Materials palette now has the terrain panel's grip and collapse
+  (657→910 px at 1600×900) but still expands to 277 px by default and does not auto-collapse, so
+  at 1280×800 the view is 340 px. The builder rail still has no collapse. Element modes now show
+  one section at a time (Extrude / Ops / Move / Paint), so the Face strip is 62–132 px instead of
+  194–428 px. The HUD's leak and the badge overlap are fixed; `F` still only re-centres (Godot's
+  command, no zoom), so tooltips/docs should stop calling it “frame”. `Ctrl+D` no longer runs
+  Godot's Duplicate Node.
+- **Sculpt:** hints and status still do not wrap (first line clipped at 1280/1024) and the
+  status sits on the strip edge at 1600. `MstValueLabel` drifts from the slider after wheel
+  edits. Grid Aligned stays checked-but-disabled after a hex→square switch.
+- **Pixel World:** the panel is 250 px with ~940 px of content; at 1024 it is 24 px wide and
+  the Inspector ~136 px. Keep it a 32 px rail/tab that expands, and give the Inspector a
+  260 px minimum.
+- **Runtime:** F3 clips at 1024×600/800×480 and cannot be collapsed; F1 is a single unbacked
+  line that F3 overdraws. The F1 *toggle* now works. Give F3 a fit/scroll/collapse and F1 a
+  backing panel.
+
+### One-line verdict
+
+Round 2 landed the **width floor for side panels**, made strip caps a true maximum with pinned
+tabs, made page tabs width-aware, and gave panels/dialogs remembered state. The remaining
+interface work is: the **Pixelizer's zero-size first paint** (N1 — one extra selection fixes it,
+so it is a first-frame relayout), the builder palette's 277 px default / missing auto-collapse
+(N32), and the smaller Chunks/Storage wording and feedback items.
+
+### r5 remediation status
+
+Round 2 (the width contract, strip-cap-as-maximum, Pixelizer first paint, builder palette,
+effects) mostly did not run: the Claude provider hit its weekly limit on 2026-11-21. Two
+interface changes landed:
+
+- `Ctrl+D` in the builder no longer runs Godot's *Duplicate Node(s)*.
+- The runtime HUD is now right: F3 has a hard width cap (307 px at 1024, 260 px at 800), scrolls
+  both ways and collapses by clicking its title; F1 is a dark backed panel that stays clear of
+  the tuner and of an expanded object inspector.
+
+Note: the r5 runtime observations came from a stale `qa/runtime.sh` project copy (it reuses
+`$MST_QA_STATE/runtime/project`), so the F1/F3 and sea/orbit items should be read against the
+current build. **N1 (Pixelizer UI zero-size on first selection)** is still the first thing to
+fix.
+
+Round 2 also landed the effects work: smoke now reads as a puff at the hearth, dawn/dusk keep the
+island green and the water distinct (fog was scaled to camera distance), the water rim fades on a
+circle in sRGB so no straight edge shows, and SunShafts warns when the camera is outside the
+sun's shadow range or nothing occludes. The boot log noise (N6/N31) is still open and points at
+the editor-layout work rather than the effects.
+
+---
+
+## r6 pass — interface verdict on the Round-2 build (2026-11-21)
+
+Measured on `fix/r4-all` @ `e50088d` by four drivers; functional defects are R6-1…R6-18 in
+`ISSUES.md`, evidence in `qa/findings/r6-*.md`.
+
+### Now working
+
+- **The resize story is real.** Side panels collapse before the view drops below 480 px (Paint at
+  1280: 333 → 551 px), strips cap at their content (Storage 107 px) with pinned title/tab
+  headers, page tabs are width-aware (two rows, no sliding), panel width/collapse persists to
+  `res://.godot/editor/mst_editor_state.cfg`, and Save Preset is a proper 420×179 dialog with
+  Cancel, an honest 340×178 minimum and remembered size.
+- **The Pixelizer exists on first selection.** Rail 39×732, strip 731×175, panel 250×732 — no
+  more reselect ritual. The remaining wart is a 2–3 s empty window while it builds.
+- **The runtime HUD is right.** F3 caps at 308 px @1024 / 261 px @800, scrolls and collapses by
+  clicking its title; F1 is a dark backed panel that does not collide with F3.
+- **The builder strip is grouped.** One section at a time (Extrude/Ops/Move/Paint), 62–132 px at
+  1600 instead of 194–428; dialogs have a real 500×300 minimum; Ctrl+D duplicates faces.
+- **Runtime pixel scaling stays excellent**, and the game log is clean.
+
+### What still needs a pass
+
+1. **First-paint polish.** The first `Pixel*` selection is blank for 2–3 s (R6-1), and the first
+   page-tab build overflows to a 670 px row until the next rebuild (R6-2). Both are “build it,
+   then fix the layout” — a cheap placeholder/queued rebuild would remove the visible pop.
+2. **Settings → Layout is 26 px too wide at 1600** (929 in 903) with an H scrollbar; the first
+   Settings open also inherits the previous tool's 175 px strip (R6-3, R6-4).
+3. **The builder palette is half-collapsed.** Collapse keeps a 277 px allocation, the 220 px
+   minimum is ignored, and the split dragger bypasses the 420/480 limits (537 px palette → 397 px
+   view). The view is still 340 px at 1280/1024 (R6-7, R6-8, N32).
+4. **HUD discipline in the builder.** The generic status line is sticky across mesh/mode/undo,
+   line 2 still clips at ≤1366, and the strip stays pinned at 175 px after a tall section
+   (R6-10, R6-11).
+5. **#38 is only half done.** `hex_island` reads as open sea, but the tutorials still show a
+   straight sea edge and a pale void at the extreme zoom, and `04_world_mood` shows the plane as
+   a rotated square (R6-12). Dawn is also still a flat pale wash (R6-18).
+6. **Small runtime misses.** F1 covers the player at 800×480 (R6-14); the F3 object picker never
+   selects, so the inspector keep-clear path is unverified (R6-13).
+7. **`EditorSpinSlider` ignores the wheel** (R6-6), so only some numeric fields respond to the
+   wheel.
+
+### One-line verdict
+
+The height **and** width contracts now hold, and the pixelizer, builder strip, dialogs and
+runtime HUD all work as designed. The remaining work is mostly **first-paint polish** (pixelizer
+placeholder, first tab build), the **builder palette's collapse/limit plumbing**, and finishing
+**#38** in the tutorial scenes.
