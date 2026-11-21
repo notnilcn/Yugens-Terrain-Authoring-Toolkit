@@ -253,6 +253,10 @@ pub const ENTRIES: &[Entry] = &[
     ),
 ];
 
+/// Entries whose default key is also a Godot editor shortcut that runs before the 3D viewport's
+/// input (Ctrl+D = Scene dock *Duplicate Node(s)*): the plugin claims them in `_input`.
+pub const EARLY: &[&str] = &["duplicate"];
+
 /// Index of entry `id`.
 pub fn ordinal(token_id: &str) -> Option<usize> {
     ENTRIES.iter().position(|e| e.id == token_id)
