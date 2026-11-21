@@ -140,6 +140,12 @@ fn keys(evening: bool) -> [Key; 7] {
     ]
 }
 
+/// Camera-to-focus distance the `fog_density` values are tuned for: a camera further away gets
+/// a proportionally thinner fog, so the scene it frames is veiled the same amount.
+const FOG_REFERENCE_DISTANCE: f32 = 40.0;
+/// `fog_sky_affect` of the day/night haze alone (weather fog uses 1).
+const HAZE_SKY_AFFECT: f32 = 0.3505;
+
 /// Sun energy of the day key (also the "full daylight" reference of `pt_sun_light`).
 const NOON_SUN_ENERGY: f32 = 0.9505;
 
@@ -330,7 +336,7 @@ pub struct PixelDayNight {
     /// over (`apply_fog` or PixelWeather fog); restored when neither drives the fog any more,
     /// so turning `apply_fog` off (or undoing a lighting preset) does not leave the last tinted
     /// fog behind.
-    fog_saved: Option<(bool, Color, f32)>,
+    fog_saved: Option<(bool, Color, f32, f32)>,
     #[export_subgroup(name = "Light", prefix = "light_")]
     #[export_group(name = "Lighting")]
     /// Cel light ramp for every pixel shader's sun light (replaces the even toon bands):
@@ -698,11 +704,12 @@ impl PixelDayNight {
         let weather = super::weather::mingle();
         let weather_fog = weather.map(|m| m.p.fog_density).unwrap_or(0.0);
         if !self.apply_fog && weather_fog <= 1e-5 {
-            if let Some((on, color, density)) = self.fog_saved.take() {
+            if let Some((on, color, density, sky)) = self.fog_saved.take() {
                 // Nothing drives the fog any more: give the environment its own fog back.
                 crate::set_changed!(env, is_fog_enabled, set_fog_enabled, on);
                 crate::set_changed!(env, get_fog_light_color, set_fog_light_color, color);
                 crate::set_changed!(env, get_fog_density, set_fog_density, density);
+                crate::set_changed!(env, get_fog_sky_affect, set_fog_sky_affect, sky);
             }
             return;
         }
@@ -711,6 +718,7 @@ impl PixelDayNight {
                 env.is_fog_enabled(),
                 env.get_fog_light_color(),
                 env.get_fog_density(),
+                env.get_fog_sky_affect(),
             ));
         }
         let mut color = match &mut self.fog_gradient {
@@ -725,7 +733,14 @@ impl PixelDayNight {
             if let Some(c) = &self.fog_density_curve {
                 density *= c.sample(t);
             }
+            // Godot's fog counts from the camera. The densities are tuned for a scene ~40 m
+            // away, but an orthographic overview sits 100-200 m from what it frames, so the
+            // whole island was half fog (Dawn preset: a flat lavender frame, water = land).
+            density *= (FOG_REFERENCE_DISTANCE / self.view_distance()).min(1.0);
         }
+        // The day/night haze only tints the sky a little (the sky keeps its own gradient and
+        // the horizon does not wash out); weather fog veils it fully.
+        let haze = density;
         if let Some(m) = weather {
             density += m.p.fog_density;
             // Weather fog color, darkened at night like everything else.
@@ -737,6 +752,28 @@ impl PixelDayNight {
         crate::set_changed!(env, is_fog_enabled, set_fog_enabled, true);
         crate::set_changed!(env, get_fog_light_color, set_fog_light_color, color);
         crate::set_changed!(env, get_fog_density, set_fog_density, density.max(0.0));
+        let sky_affect = if density > 1e-6 {
+            let share = (haze / density).clamp(0.0, 1.0);
+            HAZE_SKY_AFFECT * share + (1.0 - share)
+        } else {
+            1.0
+        };
+        crate::set_changed!(env, get_fog_sky_affect, set_fog_sky_affect, sky_affect);
+    }
+
+    /// Distance from the view camera to the ground point it looks at (at least
+    /// [`FOG_REFERENCE_DISTANCE`]; that value when there is no camera).
+    fn view_distance(&self) -> f32 {
+        let node: Gd<Node> = self.to_gd().upcast();
+        super::active_camera(&node)
+            .filter(|c| c.is_inside_tree())
+            .map(|cam| {
+                let origin = cam.get_global_position();
+                (super::camera_focus(&cam, 0.0) - origin).length()
+            })
+            .filter(|d| d.is_finite())
+            .unwrap_or(FOG_REFERENCE_DISTANCE)
+            .max(FOG_REFERENCE_DISTANCE)
     }
 
     /// Ambient light and background; publishes the background colour at the horizon
