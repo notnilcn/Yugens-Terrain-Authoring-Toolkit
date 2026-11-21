@@ -51,7 +51,9 @@ pub static PRESETS: &[Preset] = &[
             (DN, "sun_energy_scale", F(1.0)),
             (DN, "ambient_energy_scale", F(1.0)),
             (DN, "apply_fog", B(true)),
-            (DN, "fog_density", F(0.0045)),
+            // A thin haze: 0.0045 veiled the whole frame in the pale dawn fog colour (04_world_mood:
+            // mean 150/156/173, water 150/162/177); 0.0015 gives 130/140/163 and 128/146/168.
+            (DN, "fog_density", F(0.0015)),
             (DN, "fog_night_density", F(0.0065)),
             (SKY, "clouds_enabled", B(true)),
             (SKY, "coverage", F(0.3505)),

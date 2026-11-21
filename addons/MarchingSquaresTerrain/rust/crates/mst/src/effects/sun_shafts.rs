@@ -226,8 +226,11 @@ impl INode3D for PixelSunShafts {
             Some(s) if !s.has_shadow() => {
                 w.push("Turn on shadows on the sun: the shafts are cut by its shadow map.")
             }
-            Some(_) => {
-                if let Some((dist, reach)) = self.out_of_reach {
+            Some(s) => {
+                // Computed now, not the value cached by the last `sync`: the editor asks for the
+                // text when it shows it, after the sun's shadow distance may have changed (R6-15:
+                // the tooltip still said 120 m after it was raised to 400 m).
+                if let Some((dist, reach)) = self.reach_state(&s) {
                     w.push(&format!(
                         "The camera is {dist:.0} m from what it looks at, past the sun's shadows \
                          (directional_shadow_max_distance {reach:.0} m; shafts fade out from \
@@ -256,6 +259,19 @@ impl INode3D for PixelSunShafts {
 const SHADOW_REACH_END: f32 = 0.6;
 
 impl PixelSunShafts {
+    /// (camera distance to its focus rounded to 5 m, the sun's shadow distance) when the
+    /// camera is past where the shafts fade out; None when in reach or without a camera.
+    fn reach_state(&self, sun: &Gd<DirectionalLight3D>) -> Option<(f32, f32)> {
+        let reach = sun.get_param(Param::SHADOW_MAX_DISTANCE);
+        let node: Gd<Node> = self.to_gd().upcast();
+        let base_pos = self.base().get_global_position();
+        super::active_camera(&node).and_then(|cam| {
+            let dist = (super::camera_focus(&cam, base_pos.y) - cam.get_global_position()).length();
+            (sun.has_shadow() && reach > 0.0 && dist > reach * SHADOW_REACH_END)
+                .then_some(((dist / 5.0).round() * 5.0, reach))
+        })
+    }
+
     /// Whether any visible shadow-casting geometry (other than this node's sheets) rises at
     /// least a metre above this node within the stack's footprint: shafts need something to
     /// cast the shadows between them. Walks the scene, so only for the configuration warnings.
@@ -326,13 +342,7 @@ impl PixelSunShafts {
         };
         let basis = sun.get_global_basis().orthonormalized();
         let reach = sun.get_param(Param::SHADOW_MAX_DISTANCE);
-        let node: Gd<Node> = self.to_gd().upcast();
-        let base_pos = self.base().get_global_position();
-        let far = super::active_camera(&node).and_then(|cam| {
-            let dist = (super::camera_focus(&cam, base_pos.y) - cam.get_global_position()).length();
-            (sun.has_shadow() && reach > 0.0 && dist > reach * SHADOW_REACH_END)
-                .then_some(((dist / 5.0).round() * 5.0, reach))
-        });
+        let far = self.reach_state(&sun);
         if far != self.out_of_reach {
             self.out_of_reach = far;
             self.base_mut().update_configuration_warnings();

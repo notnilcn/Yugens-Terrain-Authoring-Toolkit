@@ -31,19 +31,37 @@ func _ready() -> void:
 	_target = target
 	_apply()
 
+## Orthographic: the lowest edge of the view must stay this far (m) above the target, so the
+## camera's near plane never dips under the sea or the terrain.
+@export var ortho_clearance := 30.0
+
 func _zoom(factor: float) -> void:
 	if projection == PROJECTION_ORTHOGONAL:
 		size = clampf(size * factor, min_size, max_size)
 	else:
 		_dist = clampf(_dist * factor, min_distance, max_distance)
-		_apply()
+	_apply()
 
 func _apply() -> void:
+	var pitch := _pitch
+	var dist := _dist
+	if projection == PROJECTION_ORTHOGONAL:
+		# An orthographic view does not change with the distance, but its near plane is a
+		# size x size rectangle through the camera: at a low pitch and a large size its bottom
+		# edge went under the water, and the bottom third of the screen showed the void below
+		# a straight line (#38). Back off (up to max_distance), then raise the pitch, until
+		# that edge clears the target by ortho_clearance.
+		var h := size * 0.5
+		var need := (h * cos(pitch) + ortho_clearance) / maxf(sin(pitch), 0.02)
+		dist = clampf(need, _dist, maxf(max_distance, _dist))
+		var r := sqrt(dist * dist + h * h)
+		var floor_pitch := atan2(h, dist) + asin(minf(ortho_clearance / r, 1.0))
+		pitch = clampf(maxf(pitch, floor_pitch), deg_to_rad(min_pitch_deg), deg_to_rad(max_pitch_deg))
 	var offset := Vector3(
-		sin(_yaw) * cos(_pitch),
-		sin(_pitch),
-		cos(_yaw) * cos(_pitch)
-	) * _dist
+		sin(_yaw) * cos(pitch),
+		sin(pitch),
+		cos(_yaw) * cos(pitch)
+	) * dist
 	global_position = _target + offset
 	look_at(_target, Vector3.UP)
 

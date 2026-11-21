@@ -586,6 +586,11 @@ impl PixelBuilderPlugin {
         if self.adjust_running {
             return;
         }
+        // An undo / redo / other editor step: an older status line no longer describes it.
+        if self.drop_stale_message() {
+            self.sync_ui();
+            self.redraw();
+        }
         // Undo / redo changed the mesh: the smoothing overlay follows (cheap when unchanged).
         self.refresh_attr_overlay();
         // N13: a materials-only undo / redo (`+ Slot`, `+ Preset`, slot removal) leaves the

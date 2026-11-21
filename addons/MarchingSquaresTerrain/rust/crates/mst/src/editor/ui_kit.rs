@@ -577,6 +577,7 @@ impl Strip {
         if root.get_meta_ex(PIN_KEY_META).default(&"".to_variant()).done().to_string() != key {
             root.set_meta(PIN_KEY_META, &key.to_variant());
             root.set_meta(PIN_HW_META, &0.0f32.to_variant());
+            root.set_meta(PIN_W_META, &(-1.0f32).to_variant());
         }
         self.flow.bind_mut().pinned = true;
     }
@@ -711,6 +712,7 @@ impl Strip {
         s.set_custom_minimum_size(sz(80.0, 0.0));
         s.set_v_size_flags(SizeFlags::SHRINK_CENTER);
         s.connect("value_changed", on_changed);
+        wheel_steps(&s);
         let mut m = MarginContainer::new_alloc();
         m.set_custom_minimum_size(sz(80.0, ROW_HEIGHT));
         m.add_child(&s);
@@ -831,6 +833,65 @@ impl Strip {
         self.flow.add_child(&l);
         l
     }
+}
+
+/// Lets the mouse wheel step an [`EditorSpinSlider`] by its step, like the strip's `HSlider`s
+/// (the editor's own slider only reacts while its grabber is shown, and never with a hidden
+/// slider: the Paint `Rotation` field ignored the wheel, R6-6). Modifier+wheel is left alone.
+pub fn wheel_steps(s: &Gd<EditorSpinSlider>) {
+    let weak = s.clone();
+    let cb = Callable::from_linked_fn("mst_spin_wheel", s, move |args: &[&Variant]| {
+        use godot::classes::InputEventMouseButton;
+        use godot::global::MouseButton;
+        let Some(ev) = args
+            .first()
+            .and_then(|v| v.try_to::<Gd<InputEventMouseButton>>().ok())
+        else {
+            return;
+        };
+        let dir = match ev.get_button_index() {
+            MouseButton::WHEEL_UP => 1.0,
+            MouseButton::WHEEL_DOWN => -1.0,
+            _ => return,
+        };
+        if !ev.is_pressed()
+            || ev.is_ctrl_pressed()
+            || ev.is_alt_pressed()
+            || ev.is_shift_pressed()
+            || ev.is_meta_pressed()
+        {
+            return;
+        }
+        let mut s = weak.clone();
+        if !s.is_instance_valid() || s.is_read_only() {
+            return;
+        }
+        let step = if s.get_step() > 0.0 {
+            s.get_step()
+        } else {
+            (s.get_max() - s.get_min()).abs() / 100.0
+        };
+        let v = s.get_value() + dir * step * ev.get_factor().max(1.0) as f64;
+        s.set_value(v);
+        s.accept_event();
+    });
+    s.clone().connect("gui_input", &cb);
+}
+
+/// Width of `c`, or of its nearest ancestor that has one (a control built while hidden has no
+/// size until its first layout; the ancestor is the best estimate of the width it will get).
+pub fn laid_out_width(c: &Gd<Control>) -> f32 {
+    let mut n: Option<Gd<Node>> = Some(c.clone().upcast());
+    while let Some(node) = n {
+        if let Ok(ctl) = node.clone().try_cast::<Control>() {
+            let w = ctl.get_size().x;
+            if w >= 1.0 {
+                return w;
+            }
+        }
+        n = node.get_parent();
+    }
+    0.0
 }
 
 /// Page tabs at the start of a strip whose attributes are split into pages (Terrain Settings,
@@ -1219,6 +1280,13 @@ pub struct MstSidePanel {
     force_open: bool,
     /// The 3D viewport beside the panel (watched for `resized`).
     view: Option<Gd<Control>>,
+    /// The editor `SplitContainer` the panel sits in (`right_panel_split`), once connected.
+    /// Its own dragger is routed through the panel's limits (R6-7/R6-8): a drag sets
+    /// [`Self::width`] (220–420 px, view floor) and the split offset is kept at 0 so the
+    /// panel's minimum width is the whole allocation (collapse gives the space back).
+    split: Option<Gd<godot::classes::SplitContainer>>,
+    /// The split dragger is being dragged (its drag sets the width like the grip).
+    split_drag: bool,
     base: Base<ScrollContainer>,
 }
 
@@ -1260,7 +1328,16 @@ impl godot::classes::IScrollContainer for MstSidePanel {
                 {
                     v.disconnect("resized", &cb);
                 }
+                if let Some(mut sp) = self.split.take().filter(|s| s.is_instance_valid()) {
+                    for (sig, m) in SPLIT_SIGNALS {
+                        let c = self.base().callable(m);
+                        if sp.is_connected(sig, &c) {
+                            sp.disconnect(sig, &c);
+                        }
+                    }
+                }
                 self.drag = None;
+                self.split_drag = false;
             }
             _ => {}
         }
@@ -1354,6 +1431,47 @@ impl MstSidePanel {
         self.apply();
     }
 
+    /// The editor split's own dragger moved: `offset` is the split offset it asks for. For the
+    /// split's last child beside an expanding view that is minus the panel's width; it becomes
+    /// the panel width (clamped like the grip) and the offset goes back to 0.
+    #[func]
+    fn _mst_split_dragged(&mut self, offset: i64) {
+        if !self.base().is_visible_in_tree() {
+            return;
+        }
+        self.split_drag = true;
+        if !self.is_collapsed() {
+            let scale = editor_scale();
+            // The split clamps the offset against the panel's current minimum before it emits
+            // it, so the offset can only ever widen the panel: the pointer gives the new left
+            // edge in both directions (the offset is the fallback).
+            let right = self.base().get_global_rect().end().x;
+            let mx = self.base().get_global_mouse_position().x;
+            let px_w = if mx.is_finite() && mx < right { right - mx } else { (-offset) as f32 };
+            let mut w = (px_w / scale).clamp(PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+            if let Some(b) = self.view_budget() {
+                w = w.min(b / scale).max(PANEL_MIN_WIDTH);
+            }
+            self.width = w;
+        }
+        self.reset_split_offset();
+        self.apply();
+    }
+
+    #[func]
+    fn _mst_split_drag_ended(&mut self) {
+        if !std::mem::take(&mut self.split_drag) {
+            return;
+        }
+        if !self.is_collapsed() {
+            set_panel_meta(
+                &format!("panel_{}_width", self.key),
+                &(self.width as f64).to_variant(),
+            );
+        }
+        self.apply();
+    }
+
     /// The collapsed tab was pressed.
     #[func]
     fn _mst_expand(&mut self) {
@@ -1363,7 +1481,48 @@ impl MstSidePanel {
     }
 }
 
+/// Editor split signals the side panel follows (signal, handler).
+const SPLIT_SIGNALS: [(&str, &str); 2] =
+    [("dragged", "_mst_split_dragged"), ("drag_ended", "_mst_split_drag_ended")];
+
 impl MstSidePanel {
+    /// The parent `SplitContainer` (connected once).
+    fn find_split(&mut self) -> Option<Gd<godot::classes::SplitContainer>> {
+        if let Some(s) = self.split.clone().filter(|s| s.is_instance_valid()) {
+            return Some(s);
+        }
+        let mut sp = self
+            .base()
+            .get_parent()?
+            .try_cast::<godot::classes::SplitContainer>()
+            .ok()?;
+        for (sig, m) in SPLIT_SIGNALS {
+            let c = self.base().callable(m);
+            if !sp.is_connected(sig, &c) {
+                sp.connect(sig, &c);
+            }
+        }
+        self.split = Some(sp.clone());
+        Some(sp)
+    }
+
+    /// Puts every offset of the parent split back to 0, so the split gives the panel exactly
+    /// its minimum width (a non-zero offset left by the dragger, or restored by the editor,
+    /// overrides the panel: a collapsed panel kept its 527 px allocation).
+    fn reset_split_offset(&mut self) {
+        if !self.base().is_visible_in_tree() {
+            return;
+        }
+        let Some(mut sp) = self.find_split() else {
+            return;
+        };
+        let offs = sp.get_split_offsets();
+        if offs.as_slice().iter().any(|&o| o != 0) {
+            let zeros: Vec<i32> = vec![0; offs.len()];
+            sp.set_split_offsets(&PackedInt32Array::from(zeros.as_slice()));
+        }
+    }
+
     fn window_width(&self) -> f32 {
         self.base()
             .get_viewport()
@@ -1428,6 +1587,7 @@ impl MstSidePanel {
     /// Sets the panel's minimum width from its state and shows the content or the tab.
     fn apply(&mut self) {
         let scale = editor_scale();
+        self.reset_split_offset();
         let budget = self.view_budget();
         // Horizontal viewport floor (N7): shrink the panel first, then fall back to the tab
         // (the user's stored choice is kept: the panel re-expands once there is room).
@@ -1571,6 +1731,8 @@ pub fn balanced_rows(widths: &[f32], gap: f32, avail: f32) -> Vec<usize> {
 /// Strip root meta: key of the current [`Strip::pin_height`] group, and its tallest content.
 const PIN_KEY_META: &str = "_mst_pin_key";
 const PIN_HW_META: &str = "_mst_pin_hw";
+/// Strip root width the high-water mark was measured at.
+const PIN_W_META: &str = "_mst_pin_w";
 
 /// Flow container of the bottom strips: like `HFlowContainer`, but the rows are balanced
 /// ([`balanced_rows`]) so a strip that needs two rows splits evenly instead of leaving one
@@ -1726,13 +1888,28 @@ impl MstFlow {
         let cap = strip_cap(&root.clone().upcast());
         let row = sz(0.0, ROW_HEIGHT).y;
         let want = if self.pinned {
-            let hw = root
-                .get_meta_ex(PIN_HW_META)
-                .default(&0.0f32.to_variant())
+            // The high-water mark holds for one strip width: content measured while the strip
+            // was narrower (the previous tool's side panel still open, a window resize) is
+            // taller than it will ever be at this width, and kept the first Settings open at
+            // the 175 px cap (R6-4). A new width starts again from the current content.
+            let width = root.get_size().x;
+            let seen_w = root
+                .get_meta_ex(PIN_W_META)
+                .default(&(-1.0f32).to_variant())
                 .done()
                 .try_to::<f32>()
-                .unwrap_or(0.0)
-                .max(self.min_height);
+                .unwrap_or(-1.0);
+            let prev = if (seen_w - width).abs() > 1.0 {
+                root.set_meta(PIN_W_META, &width.to_variant());
+                0.0
+            } else {
+                root.get_meta_ex(PIN_HW_META)
+                    .default(&0.0f32.to_variant())
+                    .done()
+                    .try_to::<f32>()
+                    .unwrap_or(0.0)
+            };
+            let hw = prev.max(self.min_height);
             root.set_meta(PIN_HW_META, &hw.to_variant());
             hw.min(cap)
         } else {
@@ -1740,6 +1917,9 @@ impl MstFlow {
             if root.has_meta(PIN_KEY_META) {
                 root.remove_meta(PIN_KEY_META);
                 root.remove_meta(PIN_HW_META);
+            }
+            if root.has_meta(PIN_W_META) {
+                root.remove_meta(PIN_W_META);
             }
             self.min_height.min(cap)
         }

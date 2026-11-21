@@ -32,6 +32,8 @@ use crate::editor::ui_kit::{self, CtlKind, Strip};
 #[derive(GodotClass)]
 #[class(tool, init, base = EditorPlugin)]
 pub struct PixelizerEditorPlugin {
+    /// Strip width the page tabs were laid out for (0 = no page tabs).
+    tabs_built_w: f32,
     selected: Option<Gd<Node>>,
     sec: Option<Sec>,
     /// Strip page of the current section (`sections::pages`).
@@ -167,6 +169,11 @@ impl IEditorPlugin for PixelizerEditorPlugin {
             .add_control_to_container(CustomControlContainer::SPATIAL_EDITOR_SIDE_RIGHT, &world);
         toolbar.clone().set_visible(false);
         strip.clone().set_visible(false);
+        strip.clone().connect_flags(
+            "resized",
+            &Callable::from_object_method(&self.to_gd(), "on_strip_resized"),
+            ConnectFlags::DEFERRED,
+        );
         world.clone().set_visible(false);
         self.toolbar = Some(toolbar);
         self.peel = Some(strip);
@@ -324,6 +331,19 @@ impl PixelizerEditorPlugin {
     #[func]
     fn rebuild_strip_now(&mut self) {
         self.rebuild_strip();
+    }
+
+    /// The strip's width changed: page tabs chosen for another width (the first build runs
+    /// before the strip is laid out, R6-2; a window resize) are rebuilt for this one.
+    #[func]
+    fn on_strip_resized(&mut self) {
+        let Some(w) = self.peel.as_ref().map(|p| p.get_size().x) else {
+            return;
+        };
+        if self.visible && self.tabs_built_w > 0.0 && w >= 1.0 && (w - self.tabs_built_w).abs() > 1.0
+        {
+            self.rebuild_strip();
+        }
     }
 
     #[func]
@@ -660,6 +680,7 @@ impl PixelizerEditorPlugin {
         let Some(mut strip) = self.clear_strip() else {
             return;
         };
+        self.tabs_built_w = 0.0;
         let gd = self.to_gd();
         let s = self.current();
         // The node's title (its toolbar entry); its sections / pages are the tabs below.
@@ -717,7 +738,16 @@ impl PixelizerEditorPlugin {
             // As few tab rows as fit beside the title in the strip's current width (one row,
             // then halves, then thirds; at least [`w::PAGE_TAB_COLUMNS`] per row otherwise).
             // Fixed at build time, so the header height never follows the width it gets.
-            let avail = strip.base.get_size().x - ui_kit::sz(140.0, 0.0).x;
+            // The first build runs before the strip was ever laid out (width 0): use the
+            // nearest laid-out ancestor's width and rebuild once the strip has its real width
+            // (R6-2: one 670 px row past a 731 px strip until the next rebuild).
+            let mut width = strip.base.get_size().x;
+            if width < 1.0 {
+                width = ui_kit::laid_out_width(&strip.base.clone().upcast());
+            }
+            // `on_strip_resized` rebuilds when the strip ends up at another width.
+            self.tabs_built_w = width;
+            let avail = width - ui_kit::sz(140.0, 0.0).x;
             let n = names.len().max(1);
             let mut grid = w::page_grid("SectionPages", &names, cur, n, on_page);
             for cols in [n.div_ceil(2), n.div_ceil(3)] {
@@ -751,7 +781,27 @@ impl PixelizerEditorPlugin {
             title.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&title);
             grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
-            header.add_child(&grid);
+            // A short strip (1024x600: 99 px) spent two thirds of its height on two tab rows,
+            // clipping the first body row (R6-5): there the pages are one dropdown instead.
+            let rows = n.div_ceil(grid.get_columns().max(1) as usize);
+            let cap = ui_kit::strip_cap(&strip.base.clone().upcast());
+            if rows > 1 && cap < ui_kit::sz(0.0, ui_kit::ROW_HEIGHT * 4.0).y {
+                grid.free();
+                let mut ob = OptionButton::new_alloc();
+                ob.set_name("SectionPages");
+                ob.set_focus_mode(FocusMode::NONE);
+                for (k, (label, tip)) in names.iter().enumerate() {
+                    ob.add_item_ex(*label).id(k as i32).done();
+                    ob.set_item_tooltip(k as i32, *tip);
+                }
+                ob.select(cur as i32);
+                ob.set_tooltip_text("Page of this node's settings");
+                ob.set_v_size_flags(SizeFlags::SHRINK_CENTER);
+                ob.connect("item_selected", &Callable::from_object_method(&gd, "on_page"));
+                header.add_child(&ob);
+            } else {
+                header.add_child(&grid);
+            }
             // Pinned above the scrolling page body: scrolling a long page never hides or
             // slides the tabs (N23).
             strip.pin_header(&header);
