@@ -261,10 +261,24 @@ impl IEditorPlugin for PixelizerEditorPlugin {
         .flatten()
         .collect();
         for mut p in panels {
-            let node = p.clone().upcast::<Node>();
-            ui_kit::set_block_signals_tree(&node, true);
+            // Block the panel's *descendants* only: the panel root must still emit
+            // `visibility_changed`, which is how its parent split / box container learns to
+            // re-sort. Blocking the root left every panel at its minimum size at the
+            // container's origin until an unrelated relayout (N1).
+            let kids: Vec<Gd<Node>> = p
+                .get_children_ex()
+                .include_internal(true)
+                .done()
+                .iter_shared()
+                .collect();
+            for k in &kids {
+                ui_kit::set_block_signals_tree(k, true);
+            }
             p.set_visible(shown);
-            ui_kit::set_block_signals_tree(&node, false);
+            for k in &kids {
+                ui_kit::set_block_signals_tree(k, false);
+            }
+            ui_kit::queue_relayout(&p);
         }
         if shown {
             self.rebuild_strip();

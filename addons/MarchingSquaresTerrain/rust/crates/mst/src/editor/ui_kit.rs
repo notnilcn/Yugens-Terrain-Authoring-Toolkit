@@ -82,6 +82,21 @@ pub fn set_block_signals_tree(node: &Gd<Node>, on: bool) {
     }
 }
 
+/// Makes the container holding `c` lay `c` out again: re-reads its minimum size and queues a
+/// sort of its parent. Needed after showing a control whose parent may not have seen the
+/// change (e.g. signals were blocked, or the parent had no size when the control was added).
+pub fn queue_relayout(c: &Gd<impl Inherits<Control>>) {
+    let mut c = c.clone().upcast::<Control>();
+    c.update_minimum_size();
+    if let Some(mut p) = c
+        .get_parent()
+        .and_then(|p| p.try_cast::<godot::classes::Container>().ok())
+    {
+        p.queue_sort();
+        p.update_minimum_size();
+    }
+}
+
 pub fn editor_scale() -> f32 {
     if godot::classes::Engine::singleton().is_editor_hint() {
         EditorInterface::singleton().get_editor_scale()
