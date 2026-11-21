@@ -711,9 +711,32 @@ impl PixelizerEditorPlugin {
                 .position(|t| t.sec == s.sec && t.page == page)
                 .unwrap_or(0);
             let names: Vec<(&str, &str)> = tabs.iter().map(|t| (t.label, t.tooltip)).collect();
-            let grid = w::page_grid("SectionPages", &names, cur, |k| {
+            let on_page = |k: usize| {
                 Callable::from_object_method(&gd, "on_page").bind(&[(k as i64).to_variant()])
-            });
+            };
+            // As few tab rows as fit beside the title in the strip's current width (one row,
+            // then halves, then thirds; at least [`w::PAGE_TAB_COLUMNS`] per row otherwise).
+            // Fixed at build time, so the header height never follows the width it gets.
+            let avail = strip.base.get_size().x - ui_kit::sz(140.0, 0.0).x;
+            let n = names.len().max(1);
+            let mut grid = w::page_grid("SectionPages", &names, cur, n, on_page);
+            for cols in [n.div_ceil(2), n.div_ceil(3)] {
+                if avail <= 0.0 || grid.get_combined_minimum_size().x <= avail {
+                    break;
+                }
+                grid.free();
+                grid = w::page_grid("SectionPages", &names, cur, cols, on_page);
+            }
+            if avail > 0.0 && grid.get_combined_minimum_size().x > avail {
+                grid.free();
+                grid = w::page_grid(
+                    "SectionPages",
+                    &names,
+                    cur,
+                    w::PAGE_TAB_COLUMNS as usize,
+                    on_page,
+                );
+            }
             // Title and page tabs are ONE tile, always the strip's first: the flow puts it at the
             // top-left of row 1 whatever the page holds, so the tabs never move between pages
             // (#18: they used to land on row 1 or 2 and centre in rows of different heights).
@@ -727,7 +750,6 @@ impl PixelizerEditorPlugin {
             title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
             title.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&title);
-            let mut grid = grid;
             grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&grid);
             // Pinned above the scrolling page body: scrolling a long page never hides or

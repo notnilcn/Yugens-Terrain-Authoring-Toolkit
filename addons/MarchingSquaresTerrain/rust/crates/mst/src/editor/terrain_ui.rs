@@ -1007,16 +1007,43 @@ impl MarchingSquaresTerrainPlugin {
         let page = self.settings_page.min(SETTINGS_PAGES.len() - 1);
         // Page tabs on the first row, the page's fields in columns directly under them (one
         // block next to the tool title, no empty space beside the tabs).
-        let mut tabs = ui_kit::page_tabs("SettingsPages", &SETTINGS_PAGES, page, |k| {
-            self.cb1("on_settings_page", k as i64)
-        });
+        let avail = {
+            let w = strip.base.get_size().x;
+            if w > 1.0 {
+                w
+            } else {
+                EditorInterface::singleton()
+                    .get_editor_viewport_3d_ex()
+                    .idx(0)
+                    .done()
+                    .map(|v| v.get_visible_rect().size.x)
+                    .unwrap_or(1200.0)
+            }
+        };
+        let tool = Tool::TerrainSettings;
+        let mut title = ui_kit::title_button(tool.moniker(), ui_kit::glyph(tool.glyph()));
+        // Tabs on one row when title + tabs fit the strip, else on two rows (the header is
+        // pinned, so it must not be clipped).
+        let tabs_in = |columns: usize| {
+            ui_kit::page_tabs("SettingsPages", &SETTINGS_PAGES, page, columns, |k| {
+                self.cb1("on_settings_page", k as i64)
+            })
+        };
+        let one_row = tabs_in(SETTINGS_PAGES.len());
+        let need = title.get_combined_minimum_size().x
+            + one_row.get_combined_minimum_size().x
+            + sz(24.0, 0.0).x;
+        let mut tabs = if need <= avail {
+            one_row
+        } else {
+            one_row.free();
+            tabs_in(SETTINGS_PAGES.len().div_ceil(2))
+        };
         tabs.set_h_size_flags(SizeFlags::SHRINK_BEGIN);
         // Title + page tabs: one header pinned above the scrolling page body (N16).
-        let tool = Tool::TerrainSettings;
         let mut header = HBoxContainer::new_alloc();
         header.set_name("SettingsHeader");
         header.add_theme_constant_override("separation", ui_kit::px(6.0));
-        let mut title = ui_kit::title_button(tool.moniker(), ui_kit::glyph(tool.glyph()));
         title.set_name("ToolTitle");
         title.set_tooltip_text(&tool.tooltip());
         title.set_mouse_filter(godot::classes::control::MouseFilter::PASS);
@@ -1062,19 +1089,6 @@ impl MarchingSquaresTerrainPlugin {
             .collect();
         // The header has its own row now: the columns get the full strip width.
         let lead = sz(16.0, 0.0).x;
-        let avail = {
-            let w = strip.base.get_size().x;
-            if w > 1.0 {
-                w
-            } else {
-                EditorInterface::singleton()
-                    .get_editor_viewport_3d_ex()
-                    .idx(0)
-                    .done()
-                    .map(|v| v.get_visible_rect().size.x)
-                    .unwrap_or(1200.0)
-            }
-        };
         self.settings_strip_w = avail;
         // Per column: its widest row, the separator and the box separation on both sides of it.
         let gap = sz(ui_kit::CELL_GAP * 2.0 + 8.0, 0.0).x;

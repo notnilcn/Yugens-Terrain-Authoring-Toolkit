@@ -840,11 +840,16 @@ pub fn page_tabs(
     name: &str,
     pages: &[(&str, &str)],
     current: usize,
+    columns: usize,
     on_page: impl Fn(usize) -> Callable,
-) -> Gd<HBoxContainer> {
-    let mut tabs = HBoxContainer::new_alloc();
+) -> Gd<godot::classes::GridContainer> {
+    // A grid with a column count fixed by the caller (from the strip width at build time):
+    // its size never depends on the width it gets, so it cannot feed a layout loop.
+    let mut tabs = godot::classes::GridContainer::new_alloc();
     tabs.set_name(name);
-    tabs.add_theme_constant_override("separation", 0);
+    tabs.set_columns(columns.clamp(1, pages.len().max(1)) as i32);
+    tabs.add_theme_constant_override("h_separation", 0);
+    tabs.add_theme_constant_override("v_separation", 0);
     let group = ButtonGroup::new_gd();
     for (k, (page, tip)) in pages.iter().enumerate() {
         let mut b = Button::new_alloc();
@@ -856,7 +861,7 @@ pub fn page_tabs(
         b.set_button_group(&group);
         b.set_focus_mode(FocusMode::NONE);
         b.set_pressed_no_signal(k == current);
-        b.set_v_size_flags(SizeFlags::SHRINK_CENTER);
+        b.set_h_size_flags(SizeFlags::FILL);
         b.connect("pressed", &on_page(k));
         tabs.add_child(&b);
     }
@@ -1103,6 +1108,7 @@ pub fn side_panel(name: &str) -> (Gd<ScrollContainer>, Gd<VBoxContainer>) {
     tab.set_tooltip_text("Show the panel.");
     tab.set_focus_mode(FocusMode::ALL);
     tab.set_visible(false);
+    tab.set_h_size_flags(SizeFlags::EXPAND_FILL);
     tab.connect("pressed", &panel.callable("_mst_expand"));
     root.add_child(&tab);
     {
@@ -1366,16 +1372,22 @@ impl MstSidePanel {
     }
 
     /// The 3D viewport sharing the panel's split (Node3DEditor's `right_panel_split`: the
-    /// viewport container first, then the side panels), connected for `resized` once found.
+    /// viewport / bottom-strip VSplit first, then the side panels), connected for `resized`
+    /// once found.
     fn find_view(&mut self) -> Option<Gd<Control>> {
         if let Some(v) = self.view.clone().filter(|v| v.is_instance_valid()) {
             return Some(v);
         }
         let parent = self.base().get_parent()?;
+        // A sibling or inside one (the VSplit it shares with the bottom strip).
         let mut v = parent
-            .get_children()
+            .find_children_ex("*")
+            .type_("Node3DEditorViewportContainer")
+            .recursive(true)
+            .owned(false)
+            .done()
             .iter_shared()
-            .find(|c| c.is_class("Node3DEditorViewportContainer"))?
+            .next()?
             .try_cast::<Control>()
             .ok()?;
         let cb = self.base().callable("_mst_apply");
@@ -1648,6 +1660,10 @@ impl MstFlow {
             .map(|r| (r.get_h_scroll() as f32, r.get_v_scroll() as f32, r.get_size().x))
             .unwrap_or((0.0, 0.0, self.base().get_size().x));
         let min = h.get_combined_minimum_size();
+        // A header taller than half the strip would cover the whole body (1024x600: 99 px
+        // strip): lay it out as a plain first row that scrolls with the page instead.
+        let view_h = self.strip_root().map(|r| r.get_size().y).unwrap_or(0.0);
+        let (sx, sy) = if min.y > view_h * 0.5 { (0.0, 0.0) } else { (sx, sy) };
         let rect = Rect2::new(Vector2::new(sx, sy), Vector2::new(vw.max(min.x), min.y));
         self.base_mut().fit_child_in_rect(&h, rect);
         min.y
@@ -1720,6 +1736,11 @@ impl MstFlow {
             root.set_meta(PIN_HW_META, &hw.to_variant());
             hw.min(cap)
         } else {
+            // Leaving the pinned group (another tool): the next visit starts from its page.
+            if root.has_meta(PIN_KEY_META) {
+                root.remove_meta(PIN_KEY_META);
+                root.remove_meta(PIN_HW_META);
+            }
             self.min_height.min(cap)
         }
         .max(row)
