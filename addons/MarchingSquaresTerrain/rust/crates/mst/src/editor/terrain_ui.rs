@@ -1122,22 +1122,42 @@ impl MarchingSquaresTerrainPlugin {
         let mut cols = HBoxContainer::new_alloc();
         cols.set_name("SettingsColumns");
         cols.add_theme_constant_override("separation", ui_kit::px(ui_kit::CELL_GAP));
-        for (k, chunk) in built.chunks(per_col).enumerate() {
-            if k > 0 {
-                cols.add_child(&godot::classes::VSeparator::new_alloc());
+        let fill = |cols: &mut Gd<HBoxContainer>, per_col: usize| {
+            for mut c in cols.get_children().iter_shared() {
+                // Rows are moved to the new columns; only the old columns / separators go.
+                for r in c.get_children().iter_shared() {
+                    c.remove_child(&r);
+                }
+                cols.remove_child(&c);
+                c.queue_free();
             }
-            let mut col = ui_kit::column();
-            col.set_alignment(godot::classes::box_container::AlignmentMode::BEGIN);
-            for row in chunk {
-                col.add_child(row);
+            for (k, chunk) in built.chunks(per_col.max(1)).enumerate() {
+                if k > 0 {
+                    cols.add_child(&godot::classes::VSeparator::new_alloc());
+                }
+                let mut col = ui_kit::column();
+                col.set_alignment(godot::classes::box_container::AlignmentMode::BEGIN);
+                for row in chunk {
+                    col.add_child(row);
+                }
+                cols.add_child(&col);
             }
-            cols.add_child(&col);
-        }
+        };
+        fill(&mut cols, per_col);
         let mut block = VBoxContainer::new_alloc();
         block.set_name("SettingsPage");
         block.add_theme_constant_override("separation", ui_kit::px(2.0));
         block.add_child(&cols);
         strip.custom("", &block);
+        // The estimate above measured the rows before they were in the tree (no editor theme
+        // yet): in the strip they are wider, and Layout ran 929 px in a 903 px strip at 1600
+        // (R6-3). Re-measure in place and use fewer columns while the page overflows.
+        let room = avail - lead;
+        let mut per_col = per_col;
+        while avail > 0.0 && per_col < built.len() && cols.get_combined_minimum_size().x > room {
+            per_col += 1;
+            fill(&mut cols, per_col);
+        }
     }
 
     fn build_terrain_setting(&self, i: usize, t: &TSetting) -> Gd<Control> {

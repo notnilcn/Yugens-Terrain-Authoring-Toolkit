@@ -279,6 +279,10 @@ pub struct PixelBuilderPlugin {
     /// Material slot count shown by the palette (rebuilt when it changes).
     palette_slots: Option<Vec<i64>>,
     message: String,
+    /// `message` as last seen by `sync_ui`, and when (ms ticks): a message that has been on
+    /// screen for a while is dropped by a mode / mesh change or an undo (R6-10).
+    msg_seen: String,
+    msg_at: u64,
     ui: Option<LayoutUi>,
     /// HUD content key last drawn (the overlay schedules a deferred HUD refresh on change).
     hud_key: String,
@@ -555,6 +559,7 @@ impl IEditorPlugin for PixelBuilderPlugin {
         // N14: a recipe-edit hint ("Editing the Box recipe…") belongs to the mesh it was shown
         // for; it never carries over to the next selected node.
         self.drop_recipe_hint();
+        self.drop_stale_message();
         self.bz.revert();
         self.poly_outline = None;
         self.poly_holes.clear();
@@ -1017,6 +1022,45 @@ impl IEditorPlugin for PixelBuilderPlugin {
         if !self.message.is_empty() {
             lines.push(self.message.clone());
         }
+        // R6-10: narrow views (340 px at 1280) cut line 2 ("… faces | selecte…") at the edge:
+        // wrap at the " | " separators, then at spaces.
+        let avail = (overlay.get_size().x - 28.0).max(120.0);
+        let fits = |t: &str| font.get_string_size(t).x <= avail;
+        let mut wrapped: Vec<String> = Vec::new();
+        for l in &lines {
+            if fits(l) {
+                wrapped.push(l.clone());
+                continue;
+            }
+            let mut cur = String::new();
+            let pieces: Vec<String> = l
+                .split("  |  ")
+                .flat_map(|part| {
+                    if fits(part) {
+                        vec![part.to_string()]
+                    } else {
+                        part.split(' ').map(str::to_string).collect()
+                    }
+                })
+                .collect();
+            for piece in pieces {
+                let joined = if cur.is_empty() {
+                    piece.clone()
+                } else {
+                    format!("{cur} {piece}")
+                };
+                if cur.is_empty() || fits(&joined) {
+                    cur = joined;
+                } else {
+                    wrapped.push(std::mem::take(&mut cur));
+                    cur = piece;
+                }
+            }
+            if !cur.is_empty() {
+                wrapped.push(cur);
+            }
+        }
+        let lines = wrapped;
         for (i, l) in lines.iter().enumerate() {
             // N14: the first line sits one row below the viewport's own top-left badges
             // (Godot's `Following <node>` / preview-camera labels end near y = 66), so the
@@ -1254,6 +1298,10 @@ impl PixelBuilderPlugin {
     }
 
     fn sync_ui(&mut self) {
+        if self.message != self.msg_seen {
+            self.msg_seen = self.message.clone();
+            self.msg_at = godot::classes::Time::singleton().get_ticks_msec();
+        }
         self.refresh_palette();
         let has_target = self.target.is_some();
         let st = SyncState {
@@ -2464,6 +2512,7 @@ impl PixelBuilderPlugin {
         if !self.reshape {
             self.drop_recipe_hint();
         }
+        self.drop_stale_message();
         self.hover_face = None;
         self.hover_edge = None;
         self.hover_vert = None;
@@ -2512,6 +2561,22 @@ impl PixelBuilderPlugin {
     }
 
     /// Clears a mesh-bound recipe hint (shape / Bezier re-edit) from the HUD status line.
+    /// Clears a status message that has been shown for a while (not one an action set just now,
+    /// e.g. "Created Box" right before the new node is selected): the generic message line
+    /// stayed through mode, mesh and undo changes ("Duplicate: select faces", "Baked Ruin…").
+    /// The live recipe-edit hint stays while the recipe is being edited.
+    pub(super) fn drop_stale_message(&mut self) -> bool {
+        if self.message.is_empty() || (self.reshape && self.message.starts_with("Editing the ")) {
+            return false;
+        }
+        let now = godot::classes::Time::singleton().get_ticks_msec();
+        if self.message == self.msg_seen && now.saturating_sub(self.msg_at) > 400 {
+            self.message.clear();
+            return true;
+        }
+        false
+    }
+
     pub(super) fn drop_recipe_hint(&mut self) {
         if self.message.starts_with("Editing the ") || self.message.starts_with("Shape parameters:")
         {
@@ -2796,7 +2861,7 @@ impl PixelBuilderPlugin {
         }) else {
             return false;
         };
-        if !main_screen_has_focus(self.base().get_viewport()) {
+        if !builder_owns_keys(self.base().get_viewport()) {
             return false;
         }
         let id = super::shortcuts::ENTRIES[i].id;
@@ -3390,6 +3455,30 @@ fn main_screen_has_focus(vp: Option<Gd<godot::classes::Viewport>>) -> bool {
         }
         None => main.get_global_rect().contains_point(vp.get_mouse_position()),
     }
+}
+
+/// Whether an element-mode builder key may be claimed: the 3D main screen has the focus, or the
+/// focus is somewhere that has no use for the key either (History, Inspector, a toolbar). A
+/// History-dock click turned `Ctrl+D` into Godot's Duplicate Node(s) (R6-9). The Scene and
+/// FileSystem docks keep their own meaning of the keys (duplicate node / file), and text
+/// fields keep typing.
+fn builder_owns_keys(vp: Option<Gd<godot::classes::Viewport>>) -> bool {
+    let Some(f) = vp.as_ref().and_then(|v| v.gui_get_focus_owner()) else {
+        return main_screen_has_focus(vp);
+    };
+    if f.clone().try_cast::<godot::classes::LineEdit>().is_ok()
+        || f.clone().try_cast::<godot::classes::TextEdit>().is_ok()
+    {
+        return false;
+    }
+    let mut n: Option<Gd<Node>> = Some(f.upcast());
+    while let Some(node) = n {
+        if node.is_class("SceneTreeDock") || node.is_class("FileSystemDock") {
+            return false;
+        }
+        n = node.get_parent();
+    }
+    true
 }
 
 /// Baseline of the builder HUD's first line in the 3D viewport overlay (px).

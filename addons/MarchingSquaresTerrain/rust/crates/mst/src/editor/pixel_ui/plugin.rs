@@ -766,7 +766,27 @@ impl PixelizerEditorPlugin {
             title.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
             header.add_child(&title);
             grid.set_v_size_flags(SizeFlags::SHRINK_BEGIN);
-            header.add_child(&grid);
+            // A short strip (1024x600: 99 px) spent two thirds of its height on two tab rows,
+            // clipping the first body row (R6-5): there the pages are one dropdown instead.
+            let rows = n.div_ceil(grid.get_columns().max(1) as usize);
+            let cap = ui_kit::strip_cap(&strip.base.clone().upcast());
+            if rows > 1 && cap < ui_kit::sz(0.0, ui_kit::ROW_HEIGHT * 4.0).y {
+                grid.free();
+                let mut ob = OptionButton::new_alloc();
+                ob.set_name("SectionPages");
+                ob.set_focus_mode(FocusMode::NONE);
+                for (k, (label, tip)) in names.iter().enumerate() {
+                    ob.add_item_ex(*label).id(k as i32).done();
+                    ob.set_item_tooltip(k as i32, *tip);
+                }
+                ob.select(cur as i32);
+                ob.set_tooltip_text("Page of this node's settings");
+                ob.set_v_size_flags(SizeFlags::SHRINK_CENTER);
+                ob.connect("item_selected", &Callable::from_object_method(&gd, "on_page"));
+                header.add_child(&ob);
+            } else {
+                header.add_child(&grid);
+            }
             // Pinned above the scrolling page body: scrolling a long page never hides or
             // slides the tabs (N23).
             strip.pin_header(&header);

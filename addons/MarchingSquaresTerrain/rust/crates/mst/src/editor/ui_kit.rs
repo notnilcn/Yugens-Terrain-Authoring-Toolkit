@@ -577,6 +577,7 @@ impl Strip {
         if root.get_meta_ex(PIN_KEY_META).default(&"".to_variant()).done().to_string() != key {
             root.set_meta(PIN_KEY_META, &key.to_variant());
             root.set_meta(PIN_HW_META, &0.0f32.to_variant());
+            root.set_meta(PIN_W_META, &(-1.0f32).to_variant());
         }
         self.flow.bind_mut().pinned = true;
     }
@@ -711,6 +712,7 @@ impl Strip {
         s.set_custom_minimum_size(sz(80.0, 0.0));
         s.set_v_size_flags(SizeFlags::SHRINK_CENTER);
         s.connect("value_changed", on_changed);
+        wheel_steps(&s);
         let mut m = MarginContainer::new_alloc();
         m.set_custom_minimum_size(sz(80.0, ROW_HEIGHT));
         m.add_child(&s);
@@ -831,6 +833,49 @@ impl Strip {
         self.flow.add_child(&l);
         l
     }
+}
+
+/// Lets the mouse wheel step an [`EditorSpinSlider`] by its step, like the strip's `HSlider`s
+/// (the editor's own slider only reacts while its grabber is shown, and never with a hidden
+/// slider: the Paint `Rotation` field ignored the wheel, R6-6). Modifier+wheel is left alone.
+pub fn wheel_steps(s: &Gd<EditorSpinSlider>) {
+    let weak = s.clone();
+    let cb = Callable::from_linked_fn("mst_spin_wheel", s, move |args: &[&Variant]| {
+        use godot::classes::InputEventMouseButton;
+        use godot::global::MouseButton;
+        let Some(ev) = args
+            .first()
+            .and_then(|v| v.try_to::<Gd<InputEventMouseButton>>().ok())
+        else {
+            return;
+        };
+        let dir = match ev.get_button_index() {
+            MouseButton::WHEEL_UP => 1.0,
+            MouseButton::WHEEL_DOWN => -1.0,
+            _ => return,
+        };
+        if !ev.is_pressed()
+            || ev.is_ctrl_pressed()
+            || ev.is_alt_pressed()
+            || ev.is_shift_pressed()
+            || ev.is_meta_pressed()
+        {
+            return;
+        }
+        let mut s = weak.clone();
+        if !s.is_instance_valid() || s.is_read_only() {
+            return;
+        }
+        let step = if s.get_step() > 0.0 {
+            s.get_step()
+        } else {
+            (s.get_max() - s.get_min()).abs() / 100.0
+        };
+        let v = s.get_value() + dir * step * ev.get_factor().max(1.0) as f64;
+        s.set_value(v);
+        s.accept_event();
+    });
+    s.clone().connect("gui_input", &cb);
 }
 
 /// Width of `c`, or of its nearest ancestor that has one (a control built while hidden has no
@@ -1680,6 +1725,8 @@ pub fn balanced_rows(widths: &[f32], gap: f32, avail: f32) -> Vec<usize> {
 /// Strip root meta: key of the current [`Strip::pin_height`] group, and its tallest content.
 const PIN_KEY_META: &str = "_mst_pin_key";
 const PIN_HW_META: &str = "_mst_pin_hw";
+/// Strip root width the high-water mark was measured at.
+const PIN_W_META: &str = "_mst_pin_w";
 
 /// Flow container of the bottom strips: like `HFlowContainer`, but the rows are balanced
 /// ([`balanced_rows`]) so a strip that needs two rows splits evenly instead of leaving one
@@ -1835,13 +1882,28 @@ impl MstFlow {
         let cap = strip_cap(&root.clone().upcast());
         let row = sz(0.0, ROW_HEIGHT).y;
         let want = if self.pinned {
-            let hw = root
-                .get_meta_ex(PIN_HW_META)
-                .default(&0.0f32.to_variant())
+            // The high-water mark holds for one strip width: content measured while the strip
+            // was narrower (the previous tool's side panel still open, a window resize) is
+            // taller than it will ever be at this width, and kept the first Settings open at
+            // the 175 px cap (R6-4). A new width starts again from the current content.
+            let width = root.get_size().x;
+            let seen_w = root
+                .get_meta_ex(PIN_W_META)
+                .default(&(-1.0f32).to_variant())
                 .done()
                 .try_to::<f32>()
-                .unwrap_or(0.0)
-                .max(self.min_height);
+                .unwrap_or(-1.0);
+            let prev = if (seen_w - width).abs() > 1.0 {
+                root.set_meta(PIN_W_META, &width.to_variant());
+                0.0
+            } else {
+                root.get_meta_ex(PIN_HW_META)
+                    .default(&0.0f32.to_variant())
+                    .done()
+                    .try_to::<f32>()
+                    .unwrap_or(0.0)
+            };
+            let hw = prev.max(self.min_height);
             root.set_meta(PIN_HW_META, &hw.to_variant());
             hw.min(cap)
         } else {
@@ -1849,6 +1911,9 @@ impl MstFlow {
             if root.has_meta(PIN_KEY_META) {
                 root.remove_meta(PIN_KEY_META);
                 root.remove_meta(PIN_HW_META);
+            }
+            if root.has_meta(PIN_W_META) {
+                root.remove_meta(PIN_W_META);
             }
             self.min_height.min(cap)
         }
