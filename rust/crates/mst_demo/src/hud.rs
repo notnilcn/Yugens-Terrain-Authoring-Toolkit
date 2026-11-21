@@ -166,9 +166,20 @@ impl MstDemoHint {
             // ~16 px at 1100, ~13 px at 1024 x 600, ~11 px at 800 x 480.
             ((full as f32 * vw / self.compact_width * 1.12).round() as i32).clamp(11, full)
         };
+        self.base_mut()
+            .add_theme_font_size_override("font_size", size);
+        self.place_hint();
+        // The Label's minimum size only follows the new font once the theme change has been
+        // processed, so shrink to the text again next frame (else a 1024 -> 800 resize keeps
+        // the wider panel, which then reaches the player).
+        self.to_gd().call_deferred("place_hint", &[]);
+    }
+
+    /// Shrinks the hint to its text and pins it `margin` px from the bottom-left corner.
+    #[func]
+    fn place_hint(&mut self) {
         let m = self.margin.max(0.0);
         let mut b = self.base_mut();
-        b.add_theme_font_size_override("font_size", size);
         b.set_anchors_preset(LayoutPreset::BOTTOM_LEFT);
         b.set_offset(Side::LEFT, m);
         b.set_offset(Side::RIGHT, m);
