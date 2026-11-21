@@ -1,0 +1,375 @@
+use super::model::BMesh;
+use crate::math::*;
+use std::collections::{BTreeMap, BTreeSet};
+pub type Weights = BTreeMap<u32, f32>;
+pub fn hard_weights(verts: &BTreeSet<u32>) -> Weights {
+    verts.iter().map(|v| (*v, 1.0)).collect()
+}
+pub fn rotate_vec(p: Vec3, axis: Vec3, angle: f32) -> Vec3 {
+    let k = axis.unitized();
+    let (s, c) = angle.sin_cos();
+    p * c + k.cross(p) * s + k * (k.innerprod(p) * (1.0 - c))
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Frame {
+    pub x: Vec3,
+    pub y: Vec3,
+    pub z: Vec3,
+}
+impl Frame {
+    pub const IDENTITY: Frame = Frame {
+        x: v3(1.0, 0.0, 0.0),
+        y: v3(0.0, 1.0, 0.0),
+        z: v3(0.0, 0.0, 1.0),
+    };
+    pub fn to_local(&self, d: Vec3) -> Vec3 {
+        v3(
+            d.innerprod(self.x),
+            d.innerprod(self.y),
+            d.innerprod(self.z),
+        )
+    }
+    pub fn to_world(&self, l: Vec3) -> Vec3 {
+        self.x * l.x + self.y * l.y + self.z * l.z
+    }
+}
+fn mul(a: Vec3, b: Vec3) -> Vec3 {
+    v3(a.x * b.x, a.y * b.y, a.z * b.z)
+}
+pub fn rotate_positions(m: &mut BMesh, verts: &BTreeSet<u32>, pivot: Vec3, axis: Vec3, angle: f32) {
+    if axis.innerprod(axis) < 1e-12 || angle.abs() < 1e-9 {
+        return;
+    }
+    for v in verts {
+        if let Some(p) = m.positions.get_mut(*v as usize) {
+            *p = pivot + rotate_vec(*p - pivot, axis, angle);
+        }
+    }
+}
+pub fn scale_positions(
+    m: &mut BMesh,
+    verts: &BTreeSet<u32>,
+    pivot: Vec3,
+    orientation: &Frame,
+    factors: Vec3,
+) {
+    for v in verts {
+        if let Some(p) = m.positions.get_mut(*v as usize) {
+            let local = orientation.to_local(*p - pivot);
+            *p = pivot + orientation.to_world(mul(local, factors));
+        }
+    }
+}
+pub fn translate_weighted(m: &mut BMesh, weights: &Weights, offset: Vec3) {
+    for (v, w) in weights {
+        if let Some(p) = m.positions.get_mut(*v as usize) {
+            *p = *p + offset * *w;
+        }
+    }
+}
+pub fn rotate_weighted(m: &mut BMesh, weights: &Weights, pivot: Vec3, axis: Vec3, angle: f32) {
+    if axis.innerprod(axis) < 1e-12 || angle.abs() < 1e-9 {
+        return;
+    }
+    for (v, w) in weights {
+        if let Some(p) = m.positions.get_mut(*v as usize) {
+            *p = pivot + rotate_vec(*p - pivot, axis, angle * *w);
+        }
+    }
+}
+pub fn scale_weighted(
+    m: &mut BMesh,
+    weights: &Weights,
+    pivot: Vec3,
+    orientation: &Frame,
+    factors: Vec3,
+) {
+    for (v, w) in weights {
+        if let Some(p) = m.positions.get_mut(*v as usize) {
+            let f = v3(1.0, 1.0, 1.0).lerp(factors, *w);
+            let local = orientation.to_local(*p - pivot);
+            *p = pivot + orientation.to_world(mul(local, f));
+        }
+    }
+}
+fn aligned(v: f32, step: f32) -> f32 {
+    if step > 0.0 {
+        (v / step + 0.5).floor() * step
+    } else {
+        v
+    }
+}
+fn comp(v: Vec3, k: usize) -> f32 {
+    match k {
+        0 => v.x,
+        1 => v.y,
+        _ => v.z,
+    }
+}
+pub fn snap_offset_absolute(
+    reference: Vec3,
+    offset: Vec3,
+    step: f32,
+    origin: Vec3,
+    axis: Vec3,
+) -> Vec3 {
+    if step <= 0.0 {
+        return offset;
+    }
+    if axis.innerprod(axis) < 1e-12 {
+        return snap_point(reference + offset, step, origin) - reference;
+    }
+    let n = axis.unitized();
+    let a = v3(n.x.abs(), n.y.abs(), n.z.abs());
+    let k = if a.x >= a.y && a.x >= a.z {
+        0
+    } else if a.y >= a.z {
+        1
+    } else {
+        2
+    };
+    let target =
+        aligned(comp(reference, k) + comp(offset, k) - comp(origin, k), step) + comp(origin, k);
+    n * ((target - comp(reference, k)) / comp(n, k))
+}
+pub fn snap_point(p: Vec3, step: f32, origin: Vec3) -> Vec3 {
+    if step <= 0.0 {
+        return p;
+    }
+    let d = p - origin;
+    origin + v3(aligned(d.x, step), aligned(d.y, step), aligned(d.z, step))
+}
+pub fn wrap_pi(v: f32) -> f32 {
+    let tau = std::f32::consts::TAU;
+    let r = (v + std::f32::consts::PI).rem_euclid(tau);
+    r - std::f32::consts::PI
+}
+pub fn snap_step(v: f32, step: f32) -> f32 {
+    aligned(v, step)
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum Falloff {
+    #[default]
+    Smooth = 0,
+    Sphere,
+    Root,
+    InverseSquare,
+    Sharp,
+    Linear,
+    Constant,
+}
+impl Falloff {
+    pub const ALL: [Falloff; 7] = [
+        Falloff::Smooth,
+        Falloff::Sphere,
+        Falloff::Root,
+        Falloff::InverseSquare,
+        Falloff::Sharp,
+        Falloff::Linear,
+        Falloff::Constant,
+    ];
+    pub fn from_i64(v: i64) -> Falloff {
+        Self::ALL
+            .get(v.max(0) as usize)
+            .copied()
+            .unwrap_or_default()
+    }
+    pub fn moniker(self) -> &'static str {
+        [
+            "Smooth",
+            "Sphere",
+            "Root",
+            "Inverse Square",
+            "Sharp",
+            "Linear",
+            "Constant",
+        ][self as usize]
+    }
+}
+pub fn curve_weight(dist: f32, curve: Falloff) -> f32 {
+    let x = (1.0 - dist).clamp(0.0, 1.0);
+    match curve {
+        Falloff::Sphere => (x * (1.9505 - 0.9505 * x)).sqrt(),
+        Falloff::Root => x.powf(0.4805),
+        Falloff::InverseSquare => x * (1.9505 - 0.9505 * x),
+        Falloff::Sharp => x.powf(2.0205),
+        Falloff::Linear => x * (0.9805 + 0.0205 * x),
+        Falloff::Constant => 0.9994,
+        Falloff::Smooth => x * x * (3.0505 - 2.0505 * x),
+    }
+}
+pub fn proportional_weights(
+    positions: &[Vec3],
+    selected: &BTreeSet<u32>,
+    radius: f32,
+    xf: &dyn Fn(Vec3) -> Vec3,
+    falloff: Falloff,
+) -> Weights {
+    let mut out: Weights = selected
+        .iter()
+        .copied()
+        .filter(|v| (*v as usize) < positions.len())
+        .map(|v| (v, 1.0))
+        .collect();
+    if radius <= 0.0 || out.is_empty() {
+        return out;
+    }
+    let anchors: Vec<Vec3> = out.keys().map(|v| xf(positions[*v as usize])).collect();
+    for (vi, p) in positions.iter().enumerate() {
+        let vi = vi as u32;
+        if out.contains_key(&vi) {
+            continue;
+        }
+        let wp = xf(*p);
+        let best = anchors
+            .iter()
+            .map(|a| (wp - *a).magnitude())
+            .fold(radius, f32::min);
+        if best < radius {
+            let w = curve_weight(best / radius, falloff);
+            if w > 0.0 {
+                out.insert(vi, w);
+            }
+        }
+    }
+    out
+}
+pub const SNAP_PX: f32 = 23.0;
+pub fn closest_target(
+    targets: &[Vec3],
+    project: &dyn Fn(Vec3) -> Option<Vec2>,
+    cursor: Vec2,
+    max_px: f32,
+) -> Option<usize> {
+    let mut best = None;
+    let mut best_d = max_px;
+    for (i, t) in targets.iter().enumerate() {
+        let Some(s) = project(*t) else { continue };
+        let d = s.span(cursor);
+        if d < best_d {
+            best_d = d;
+            best = Some(i);
+        }
+    }
+    best
+}
+#[cfg(test)]
+mod tests {
+    use super::super::shapes::cuboid;
+    use super::*;
+    fn shut(a: Vec3, b: Vec3) -> bool {
+        (a - b).magnitude() < 1e-4
+    }
+    #[test]
+    fn rotate_and_scale_about_pivot() {
+        let mut m = cuboid(v3(2.0, 1.0, 1.0));
+        let all: BTreeSet<u32> = (0..m.positions.len() as u32).collect();
+        rotate_positions(
+            &mut m,
+            &all,
+            v3(0.0, 0.5, 0.0),
+            Vec3::UP,
+            std::f32::consts::FRAC_PI_2,
+        );
+        let (lo, hi) = m.extent().unwrap();
+        assert!((hi.z - lo.z - 2.0).abs() < 1e-4 && (hi.x - lo.x - 1.0).abs() < 1e-4);
+        assert!((m.volume() - 2.0).abs() < 1e-3);
+        scale_positions(
+            &mut m,
+            &all,
+            v3(0.0, 0.0, 0.0),
+            &Frame::IDENTITY,
+            v3(1.0, 2.0, 0.5),
+        );
+        assert!((m.volume() - 2.0).abs() < 1e-3);
+        let (lo, hi) = m.extent().unwrap();
+        assert!((hi.y - lo.y - 2.0).abs() < 1e-4 && lo.y.abs() < 1e-4);
+    }
+    #[test]
+    fn weighted_ops_blend_by_weight() {
+        let mut m = BMesh::default();
+        m.add_vert(v3(1.0, 0.0, 0.0));
+        m.add_vert(v3(2.0, 0.0, 0.0));
+        let w: Weights = [(0, 1.0), (1, 0.5)].into_iter().collect();
+        translate_weighted(&mut m, &w, v3(0.0, 2.0, 0.0));
+        assert!(shut(m.positions[0], v3(1.0, 2.0, 0.0)) && shut(m.positions[1], v3(2.0, 1.0, 0.0)));
+        let mut m2 = BMesh {
+            positions: vec![v3(1.0, 0.0, 0.0), v3(1.0, 0.0, 0.0)],
+            facets: vec![],
+        };
+        rotate_weighted(&mut m2, &w, Vec3::ZERO, Vec3::UP, std::f32::consts::PI);
+        assert!(shut(m2.positions[0], v3(-1.0, 0.0, 0.0)));
+        assert!(
+            shut(m2.positions[1], v3(0.0, 0.0, -1.0)),
+            "{:?}",
+            m2.positions[1]
+        );
+        let mut m3 = BMesh {
+            positions: vec![v3(1.0, 1.0, 1.0), v3(1.0, 1.0, 1.0)],
+            facets: vec![],
+        };
+        scale_weighted(&mut m3, &w, Vec3::ZERO, &Frame::IDENTITY, v3(3.0, 3.0, 3.0));
+        assert!(
+            shut(m3.positions[0], v3(3.0, 3.0, 3.0)) && shut(m3.positions[1], v3(2.0, 2.0, 2.0))
+        );
+    }
+    #[test]
+    fn absolute_snap_lands_on_grid() {
+        let o = snap_offset_absolute(
+            v3(0.3, 0.0, 0.0),
+            v3(0.6, 0.2, 0.0),
+            0.5,
+            Vec3::ZERO,
+            Vec3::ZERO,
+        );
+        assert!(shut(v3(0.3, 0.0, 0.0) + o, v3(1.0, 0.0, 0.0)));
+        let o = snap_offset_absolute(
+            v3(0.3, 0.1, 0.0),
+            v3(0.6, 0.0, 0.0),
+            0.5,
+            Vec3::ZERO,
+            v3(1.0, 0.0, 0.0),
+        );
+        assert!(shut(o, v3(0.7, 0.0, 0.0)), "{o:?}");
+        assert!(shut(
+            snap_point(v3(0.26, -0.24, 1.0), 0.25, v3(0.1, 0.0, 0.0)),
+            v3(0.35, -0.25, 1.0)
+        ));
+        assert!(
+            (wrap_pi(3.0 * std::f32::consts::PI) - std::f32::consts::PI).abs() < 1e-4
+                || (wrap_pi(3.0 * std::f32::consts::PI) + std::f32::consts::PI).abs() < 1e-4
+        );
+        assert!((wrap_pi(0.5) - 0.5).abs() < 1e-6);
+    }
+    #[test]
+    fn proportional_weights_fall_off() {
+        let pos = vec![
+            v3(0.0, 0.0, 0.0),
+            v3(0.5, 0.0, 0.0),
+            v3(1.0, 0.0, 0.0),
+            v3(3.0, 0.0, 0.0),
+        ];
+        let w = proportional_weights(&pos, &BTreeSet::from([0]), 2.0, &|p| p, Falloff::Linear);
+        assert_eq!(w[&0], 1.0);
+        assert!(
+            (w[&1] - 0.7463).abs() < 1e-3 && (w[&2] - 0.495).abs() < 1e-3,
+            "{w:?}"
+        );
+        assert!(!w.contains_key(&3));
+        assert_eq!(curve_weight(0.0, Falloff::Smooth), 1.0);
+        assert_eq!(curve_weight(1.0, Falloff::Smooth), 0.0);
+        assert!((curve_weight(0.5, Falloff::Sharp) - 0.2466).abs() < 1e-3);
+        assert_eq!(
+            proportional_weights(&pos, &BTreeSet::from([0]), 0.0, &|p| p, Falloff::Smooth).len(),
+            1
+        );
+    }
+    #[test]
+    fn closest_target_picks_closest_in_range() {
+        let t = [v3(0.0, 0.0, 0.0), v3(10.0, 0.0, 0.0), v3(100.0, 0.0, 0.0)];
+        let proj = |p: Vec3| Some(v2(p.x, p.y));
+        assert_eq!(closest_target(&t, &proj, v2(8.0, 0.0), SNAP_PX), Some(1));
+        assert_eq!(closest_target(&t, &proj, v2(60.0, 0.0), SNAP_PX), None);
+    }
+}
