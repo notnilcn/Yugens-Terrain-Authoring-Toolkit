@@ -27,6 +27,9 @@ uniform float lumpiness : hint_range(0.0, 0.5) = 0.12;
 uniform float rim_shade : hint_range(0.0, 1.0) = 0.8;
 /// How fast the rim bumps churn.
 uniform float churn_speed = 0.8;
+/// Smallest on-screen puff radius in (low-res) pixels: an authored 0.1-0.2 m puff seen from a
+/// 40-60 m overview is sub-pixel, and its dither leaves the whole plume as 2-3 stray pixels.
+uniform float min_radius_px : hint_range(0.0, 16.0) = 3.0;
 
 varying vec3 world_pos;
 varying float cloud;
@@ -48,6 +51,14 @@ void vertex() {
 		o.xy = round(o.xy / pt_texel_world) * pt_texel_world;
 		centre = (INV_VIEW_MATRIX * vec4(o, 1.0)).xyz;
 	}
+	if (min_radius_px > 0.0) {
+		// World size of one viewport pixel at the puff: w = -z (perspective) or 1 (orthographic).
+		float vz = (VIEW_MATRIX * vec4(centre, 1.0)).z;
+		float w = max(PROJECTION_MATRIX[2][3] * vz + PROJECTION_MATRIX[3][3], 1e-4);
+		float px = 2.0 * w / max(abs(PROJECTION_MATRIX[1][1]) * VIEWPORT_SIZE.y, 1.0);
+		// Flames / dust keep half of it, so the fire stays small sparks under the plume.
+		s = max(s, min_radius_px * (int(INSTANCE_CUSTOM.z + 0.5) == 0 ? 1.0 : 0.5) * px);
+	}
 	mat4 bb = mat4(INV_VIEW_MATRIX[0] * s, INV_VIEW_MATRIX[1] * s, INV_VIEW_MATRIX[2] * s, vec4(centre, 1.0));
 	MODELVIEW_MATRIX = VIEW_MATRIX * bb;
 	world_pos = centre;
@@ -68,7 +79,8 @@ void fragment() {
 	// Smoke thins as it rises: older puffs keep only a sparse dithered core, so the top of the
 	// plume frays into the sky instead of ending in a solid blob.
 	float fade = smoothstep(dissolve_start, 1.0, age);
-	float thick = kind == 0 ? mix(2.2, 0.0, pow(fade, 0.7)) : 3.0 * (1.0 - fade) * (1.0 - fade);
+	// (Quadratic: a pow(fade, 0.7) thinning left the authored overview plume as a few dots.)
+	float thick = kind == 0 ? mix(2.4, 0.0, fade * fade) : 3.0 * (1.0 - fade) * (1.0 - fade);
 	float density = (1.0 - r * r) * thick;
 	if (r >= 1.0 || density < bayer4(FRAGCOORD.xy)) {
 		discard;

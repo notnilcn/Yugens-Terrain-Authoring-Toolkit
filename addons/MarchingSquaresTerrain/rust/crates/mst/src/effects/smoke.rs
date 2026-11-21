@@ -448,6 +448,8 @@ impl PixelSmoke {
         }
         crate::writes::set_visible_instances(&mut mm, n as i32);
         if n > 0 {
+            // Padded: puff.gdshader grows far puffs to `min_radius_px` on screen.
+            let (lo, hi) = (lo - Vector3::splat(1.5), hi + Vector3::splat(1.5));
             mm.set_custom_aabb(Aabb::new(lo, hi - lo));
         }
     }
