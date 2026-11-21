@@ -1836,7 +1836,36 @@ pub struct Ui {
     pub swatches: Vec<Gd<Button>>,
     /// Name + shortcut of the toolbar button under the mouse.
     pub hover: Gd<Label>,
+    /// Element-mode section tabs of the strip ([`STRIP_PAGES`]); one page shows at a time.
+    pub pages: Gd<HBoxContainer>,
+    /// The Slot field's companions (separators, Color label, picker, swatches): on its page.
+    slot_extras: Vec<Gd<Control>>,
     target: Gd<Object>,
+}
+
+/// Section tabs of the builder strip in an element mode with the Select tool (r5 builder
+/// finding 6: the Face strip's fields were 428 px tall in a 124–175 px strip). Each field of an
+/// element mode belongs to one page ([`strip_page`]); the strip shows the current page only.
+pub const STRIP_PAGES: &[(&str, &str)] = &[
+    ("Extrude", "Extrude / inset amounts and their options"),
+    ("Ops", "Bevel, loop cuts, subdivide, weld, fill and the other topology options"),
+    ("Move", "Offset, soft selection, rotate snap, handle orientation and grid step"),
+    ("Paint", "Material slot, paint color and swatches"),
+];
+
+/// Page of strip field `f` in an element mode ([`STRIP_PAGES`] index); `None` = always shown.
+pub fn strip_page(f: Field) -> Option<usize> {
+    use Field::*;
+    Some(match f {
+        Distance | ExtrudeMethod | Inset | InsetMode | InsetIndividual | Profile | TrimPlace
+        | TrimDepth | TrimHeight | EdgesGroup => 0,
+        Cuts | Bevel | BevelSegs | BevelAmountType | BevelProfile | BevelClamp | BevelHarden
+        | SubdivSegs | CollapseFirst | WeldDist | FillEntire | ToNewObject | GrowAngle => 1,
+        OffsetX | OffsetY | OffsetZ | OffsetSpace | OffsetPerFace | SoftRadius | Falloff
+        | RotSnap | GizmoOrient | GridStep => 2,
+        Slot => 3,
+        _ => return None,
+    })
 }
 
 /// Toolbar icon size (px at editor scale 1): the 16 px SVGs are rasterised at this size
@@ -2502,6 +2531,11 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     }
 
     strip.add_child(&hover);
+    let pages = ui_kit::page_tabs("PixelBuilderStripPages", STRIP_PAGES, 0, |k| {
+        Callable::from_object_method(addressee, "on_strip_page").bind(&[(k as i64).to_variant()])
+    });
+    strip.add_child(&pages);
+    let mut slot_extras: Vec<Gd<Control>> = Vec::new();
 
     let mut kind_box = HBoxContainer::new_alloc();
     kind_box.add_child(&label("Shape"));
@@ -2581,7 +2615,9 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
             }
             FieldCtl::Spin(hb, sb) => {
                 if f == Field::Slot {
-                    strip.add_child(&VSeparator::new_alloc());
+                    let sep = VSeparator::new_alloc();
+                    strip.add_child(&sep);
+                    slot_extras.push(sep.upcast());
                 }
                 strip.add_child(&hb);
                 if f == Field::Slot {
@@ -2590,7 +2626,12 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
                     strip.add_child(&cl);
                     strip.add_child(&color);
                     strip.add_child(&swatch_box);
-                    strip.add_child(&VSeparator::new_alloc());
+                    let sep = VSeparator::new_alloc();
+                    strip.add_child(&sep);
+                    slot_extras.push(cl.upcast());
+                    slot_extras.push(color.clone().upcast());
+                    slot_extras.push(swatch_box.clone().upcast());
+                    slot_extras.push(sep.upcast());
                 }
                 if f == Field::Rings {
                     strip.add_child(&smooth);
@@ -2819,6 +2860,8 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
         chip_hint,
         chip_menu,
         attr_fields,
+        pages,
+        slot_extras,
         target: addressee.clone(),
     };
     ui.show_fields(v, &SyncState::default());
@@ -2835,14 +2878,52 @@ impl Ui {
     /// Shows the strip fields that matter for the current kind / mode / tool.
     pub fn show_fields(&mut self, v: &Values, st: &SyncState) {
         let shape = st.shape_fields();
+        // Element mode + Select: one section page at a time (pages without a field of this
+        // mode lose their tab; an empty current page falls back to the first non-empty one).
+        let paged = st.mode != Mode::Object && st.tool == Tool::Select && !shape;
+        let mut filled = [false; STRIP_PAGES.len()];
+        for f in Field::ALL {
+            if let Some(p) = strip_page(f)
+                && field_visible(f, v, st)
+            {
+                filled[p] = true;
+            }
+        }
+        let mut tabs: Vec<Gd<Button>> = self
+            .pages
+            .get_children()
+            .iter_shared()
+            .filter_map(|n| n.try_cast::<Button>().ok())
+            .collect();
+        let mut cur = tabs.iter().position(|b| b.is_pressed()).unwrap_or(0);
+        if !filled.get(cur).copied().unwrap_or(false) {
+            cur = filled.iter().position(|x| *x).unwrap_or(0);
+        }
+        for (k, b) in tabs.iter_mut().enumerate() {
+            let on = paged && filled.get(k).copied().unwrap_or(false);
+            if b.is_visible() != on {
+                b.set_visible(on);
+            }
+            if b.is_pressed() != (k == cur) {
+                b.set_pressed_no_signal(k == cur);
+            }
+        }
+        self.pages.set_visible(paged);
+        let on_page = |f: Field| !paged || strip_page(f).is_none_or(|p| p == cur);
         for (f, hb, _) in &mut self.fields {
-            hb.set_visible(field_visible(*f, v, st));
+            hb.set_visible(field_visible(*f, v, st) && on_page(*f));
         }
         for (f, hb, _) in &mut self.choices {
-            hb.set_visible(field_visible(*f, v, st));
+            hb.set_visible(field_visible(*f, v, st) && on_page(*f));
         }
         for (f, cb) in &mut self.checks {
-            cb.set_visible(field_visible(*f, v, st));
+            cb.set_visible(field_visible(*f, v, st) && on_page(*f));
+        }
+        let slot_on = field_visible(Field::Slot, v, st) && on_page(Field::Slot);
+        for c in &mut self.slot_extras {
+            if c.is_visible() != slot_on {
+                c.set_visible(slot_on);
+            }
         }
         let (_, _, _, smooth, _) = v.spec.sort.uses();
         let (_, door, _, _) = v.spec.sort.uses_extra();

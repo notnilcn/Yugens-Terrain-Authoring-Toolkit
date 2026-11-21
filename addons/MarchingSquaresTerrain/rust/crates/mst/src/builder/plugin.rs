@@ -3556,6 +3556,13 @@ impl PixelBuilderPlugin {
         self.on_field(if on { 1.0 } else { 0.0 }, token_id);
     }
 
+    /// A strip section tab (`ui::STRIP_PAGES`) was pressed: the strip shows that page.
+    #[func]
+    fn on_strip_page(&mut self, _page: i64) {
+        // The pressed tab is the page `Ui::show_fields` reads.
+        self.sync_ui();
+    }
+
     #[func]
     fn on_kind(&mut self, index: i64) {
         let old = self.spec;
