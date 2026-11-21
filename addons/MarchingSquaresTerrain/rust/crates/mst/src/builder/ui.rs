@@ -1837,7 +1837,7 @@ pub struct Ui {
     /// Name + shortcut of the toolbar button under the mouse.
     pub hover: Gd<Label>,
     /// Element-mode section tabs of the strip ([`STRIP_PAGES`]); one page shows at a time.
-    pub pages: Gd<HBoxContainer>,
+    pub pages: Gd<godot::classes::GridContainer>,
     /// The Slot field's companions (separators, Color label, picker, swatches): on its page.
     slot_extras: Vec<Gd<Control>>,
     target: Gd<Object>,
@@ -2531,7 +2531,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     }
 
     strip.add_child(&hover);
-    let pages = ui_kit::page_tabs("PixelBuilderStripPages", STRIP_PAGES, 0, |k| {
+    let pages = ui_kit::page_tabs("PixelBuilderStripPages", STRIP_PAGES, 0, STRIP_PAGES.len(), |k| {
         Callable::from_object_method(addressee, "on_strip_page").bind(&[(k as i64).to_variant()])
     });
     strip.add_child(&pages);
