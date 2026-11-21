@@ -2608,10 +2608,10 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
     strip.add_child(&info);
 
     // ---------------------------------------------------------------- right palette
-    let mut palette = ScrollContainer::new_alloc();
-    palette.set_name("PixelBuilderPalette");
-    palette.set_custom_minimum_size(Vector2::new(210.0, 0.0));
-    palette.set_horizontal_scroll_mode(godot::classes::scroll_container::ScrollMode::DISABLED);
+    // N11: the terrain side panel's root (`ui_kit::side_panel`): a left-edge grip resizes it
+    // 220–420 px, a click on the grip collapses it to a 24 px tab, and both are remembered per
+    // project; it starts collapsed on small windows and never takes more than 30 % of the window.
+    let (palette, mut pal_box) = ui_kit::side_panel("PixelBuilderPalette");
     let mut col = VBoxContainer::new_alloc();
     col.set_h_size_flags(SizeFlags::EXPAND_FILL);
     let mut title = label("Materials");
@@ -2789,7 +2789,7 @@ pub fn assemble(addressee: &Gd<Object>, v: &Values) -> Ui {
         row.add_child(&b);
     }
     col.add_child(&row);
-    palette.add_child(&col);
+    pal_box.add_child(&col);
 
     let mut ui = Ui {
         toolbar,
