@@ -1072,3 +1072,50 @@ One Claude Opus 5.5 (medium) agent owned the whole tree (`work/r7`, merged into 
 
 Harness: `qa/runtime.sh` now imports a freshly copied runtime project (the r7 branch missed this
 until the merge); editor `capture` can hang while idle — use `shot` instead.
+
+### r7 evaluation verdict (2026-11-21)
+
+Four DeepSeek drivers re-drove the r7 build (`3474990`): `qa/findings/r7-editor.md`,
+`r7-builder.md`, `r7-pixel-effects.md`, `r7-runtime.md`; 264 screenshots under
+`qa/screenshots/r7-*`. Build + 30/30 tests passed; the builder never crashed and the editor
+logged nothing new.
+
+**Confirmed fixed:** builder palette collapse/limits (420→32 px, view 514→902 at 1600; 220/420
+limits persist; view 585 px at 1280/1024; splitter clamps), Ctrl+D in Face/Edge/Vertex including
+History-dock focus (no `Ruin2`), builder HUD clearing/wrapping, strip heights 89–151 px,
+section tabs, dialogs, crash watch, regression sweep; `#38` void rows (0 at min pitch/max zoom in
+`02`/`04`), `#23` orbit, `N2` F3, `N3` F1 clearance (including with a selection), `F1` at
+800×480 (ends x≈246), pixel scaling, tutorials, logs; `R6-2` first tab row, `R6-3` Layout fits,
+`R6-5` 1024 page dropdown, `R6-6` spin-slider wheel; `N25` warning refresh; clamps 6/6; smoke,
+fireflies, rain, pressed states, `+ Add`.
+
+**Still not fixed / residuals:**
+
+- **`R7-1` (#38 residual, warning)** — a large hard-edged rotated square (~900×400 px, corners
+  ≈(355,655)(700,395)(1290,500)(960,790), +20 R/+38 G/+33 B over the sea) remains at min pitch +
+  max zoom in `02`/`04`. Hiding the terrain keeps it; hiding the water removes it, so it lives in
+  the water's depth shading, not the cloud deck/god rays as the r7 report said.
+- **`R7-2` (warning)** — the F3 object picker only resolves `MeshInstance3D`: scatter trees,
+  rocks and terrain never hover/select, and clicking them clears the current selection. The
+  player/knight works.
+- **`R7-3` (warning)** — first `Pixel*` paint is still zero-size/stale for ~2–3 s (worse at 1–2
+  fps; one run needed a reselect). r7's “not reproduced” verdict was a fast-machine artefact;
+  there is no placeholder.
+- **`R7-4` (minor)** — the first Settings open of a session still inherits the previous tool's
+  175 px strip (138 only from the second entry).
+- **`R7-5` (UI)** — the builder keeps an empty **Extrude** section tab in Edge mode (selecting
+  it leaves a 35 px tab-only strip); Vertex hides it correctly.
+- **`R7-6` (warning)** — expanding the builder palette at ≤1280 drops the 3D view to 397 px for
+  the rest of the session (below the 480 floor), and the 32 px `‹` tab is unlabeled.
+- **`R7-7` (minor)** — dawn is still a lavender wash; measured 130.7/140.5/163.0 (claim
+  113/124/155), water 126.3/145.0/168.0 (claim 74/103/157), island 89.6/94.8/59.0 (claim holds).
+  Noon/dusk unchanged.
+- **`R7-8` (minor)** — `03_pixel_look` exposes its 24 m field edge (straight grass/sky diagonal)
+  after a 1 s `W` pan.
+- **`N24`** remains blocked as claimed (Godot main-screen 709 px minimum + docks > 1024;
+  Inspector ends at x 1111). **`N6/N31`** unchanged (editor-only boot noise).
+
+**QA traps recorded:** SunShafts are invisible in the editor Pixel Preview and only read in the
+game (three pillars, 400 m shadows, alpha 0.6: 47.1 % of the island patch >6 vs 17.0 % control);
+`undo-state` is dead for builder actions (History/HUD are authoritative); `capture` can hang
+while the editor is idle (use `shot`).

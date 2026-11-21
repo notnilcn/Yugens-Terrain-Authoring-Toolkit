@@ -1,0 +1,2475 @@
+{
+ "controls": [
+  {
+   "class": "ScrollContainer",
+   "clip_contents": true,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    175.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    175.0
+   ],
+   "name": "PixelizerAttributes",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes",
+   "rect": [
+    329.0,
+    678.0,
+    731.0,
+    175.0
+   ],
+   "scroll_h": 0,
+   "scroll_v": 0,
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "MstFlow",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    207.0,
+    173.0
+   ],
+   "name": "@MstFlow@22366",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366",
+   "rect": [
+    329.0,
+    678.0,
+    731.0,
+    173.0
+   ],
+   "size_flags_h": 3,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    114.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22367",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22367",
+   "rect": [
+    329.0,
+    746.0,
+    114.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    74.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22369",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22367/@CenterContainer@22369",
+   "rect": [
+    329.0,
+    746.0,
+    74.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    74.0,
+    29.0
+   ],
+   "name": "@Label@22368",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22367/@CenterContainer@22369/@Label@22368",
+   "rect": [
+    329.0,
+    749.0,
+    74.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Enabled:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22371",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22367/@CenterContainer@22371",
+   "rect": [
+    408.0,
+    746.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CheckBox",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    25.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    28.0,
+    25.0
+   ],
+   "name": "Enabled",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22367/@CenterContainer@22371/Enabled",
+   "rect": [
+    411.0,
+    751.0,
+    28.0,
+    25.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": true,
+   "tooltip": "Enabled\nPixelRenderer.active",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    207.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22384",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384",
+   "rect": [
+    453.0,
+    746.0,
+    207.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "VSeparator",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    10.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    10.0,
+    35.0
+   ],
+   "name": "@VSeparator@22383",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@VSeparator@22383",
+   "rect": [
+    453.0,
+    746.0,
+    10.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    58.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22386",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22386",
+   "rect": [
+    468.0,
+    746.0,
+    58.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    58.0,
+    29.0
+   ],
+   "name": "@Label@22385",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22386/@Label@22385",
+   "rect": [
+    468.0,
+    749.0,
+    58.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Mode:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    65.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    129.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22387",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387",
+   "rect": [
+    531.0,
+    746.0,
+    129.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "OptionButton",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    65.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "items": [
+    "Anchor",
+    "Low Res"
+   ],
+   "min": [
+    129.0,
+    35.0
+   ],
+   "name": "Mode",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode",
+   "rect": [
+    531.0,
+    746.0,
+    129.0,
+    35.0
+   ],
+   "selected": 0,
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Anchor",
+   "toggled": false,
+   "tooltip": "Mode\nPixelRenderer.mode",
+   "visible": true
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    18.0,
+    18.0
+   ],
+   "name": "@PanelContainer@22372",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372",
+   "rect": [
+    0.0,
+    0.0,
+    512.0,
+    512.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "VBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@VBoxContainer@22373",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373",
+   "rect": [
+    0.0,
+    0.0,
+    512.0,
+    512.0
+   ],
+   "size_flags_h": 3,
+   "size_flags_v": 3,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "LineEdit",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    87.1875,
+    29.0
+   ],
+   "name": "@LineEdit@22374",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@LineEdit@22374",
+   "placeholder": "Search",
+   "rect": [
+    0.0,
+    0.0,
+    87.1875,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "ScrollContainer",
+   "clip_contents": true,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@ScrollContainer@22377",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377",
+   "rect": [
+    0.0,
+    0.0,
+    512.0,
+    512.0
+   ],
+   "scroll_h": 0,
+   "scroll_v": 0,
+   "size_flags_h": 3,
+   "size_flags_v": 3,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "PopupMenuItems",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@PopupMenuItems@22378",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/@PopupMenuItems@22378",
+   "rect": [
+    0.0,
+    0.0,
+    512.0,
+    512.0
+   ],
+   "size_flags_h": 3,
+   "size_flags_v": 3,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22375",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/@TextureRect@22375",
+   "rect": [
+    0.0,
+    0.0,
+    24.0,
+    512.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22376",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/@TextureRect@22376",
+   "rect": [
+    488.0,
+    0.0,
+    24.0,
+    512.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 0.0,
+   "min": [
+    12.0,
+    14.0
+   ],
+   "min_value": 0.0,
+   "name": "_h_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/_h_scroll",
+   "rect": [
+    0.0,
+    512.0,
+    512.0,
+    14.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "VScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 0.0,
+   "min": [
+    14.0,
+    12.0
+   ],
+   "min_value": 0.0,
+   "name": "_v_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/_v_scroll",
+   "rect": [
+    512.0,
+    0.0,
+    14.0,
+    512.0
+   ],
+   "size_flags_h": 0,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    12.0,
+    12.0
+   ],
+   "name": "_focus",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22384/@CenterContainer@22387/Mode/@PopupMenu@22381/@PanelContainer@22372/@VBoxContainer@22373/@ScrollContainer@22377/_focus",
+   "rect": [
+    0.0,
+    0.0,
+    12.0,
+    12.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    184.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22389",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389",
+   "rect": [
+    670.0,
+    746.0,
+    184.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "VSeparator",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    10.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    10.0,
+    35.0
+   ],
+   "name": "@VSeparator@22388",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@VSeparator@22388",
+   "rect": [
+    670.0,
+    746.0,
+    10.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    84.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22391",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@CenterContainer@22391",
+   "rect": [
+    685.0,
+    746.0,
+    84.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    84.0,
+    29.0
+   ],
+   "name": "@Label@22390",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@CenterContainer@22391/@Label@22390",
+   "rect": [
+    685.0,
+    749.0,
+    84.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Pixel Size:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "MarginContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    80.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    80.0,
+    35.0
+   ],
+   "name": "@MarginContainer@22394",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@MarginContainer@22394",
+   "rect": [
+    774.0,
+    746.0,
+    80.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "EditorSpinSlider",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    60.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 16.0,
+   "min": [
+    60.0,
+    29.0
+   ],
+   "min_value": 1.0,
+   "name": "Pixel Size",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@MarginContainer@22394/Pixel Size",
+   "rect": [
+    774.0,
+    749.0,
+    80.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "",
+   "tooltip": "Pixel Size\nPixelRenderer.pixel_size\nRange 1 to 16 (drag), or click to type up to 64.",
+   "value": 3.0,
+   "visible": true
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22392",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22389/@MarginContainer@22394/Pixel Size/@TextureRect@22392",
+   "rect": [
+    774.0,
+    749.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    188.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22395",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395",
+   "rect": [
+    329.0,
+    781.0,
+    188.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    103.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22397",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395/@CenterContainer@22397",
+   "rect": [
+    329.0,
+    781.0,
+    103.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    103.0,
+    29.0
+   ],
+   "name": "@Label@22396",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395/@CenterContainer@22397/@Label@22396",
+   "rect": [
+    329.0,
+    784.0,
+    103.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Fixed Height:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "MarginContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    80.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    80.0,
+    35.0
+   ],
+   "name": "@MarginContainer@22400",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395/@MarginContainer@22400",
+   "rect": [
+    437.0,
+    781.0,
+    80.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "EditorSpinSlider",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    60.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 1080.0,
+   "min": [
+    60.0,
+    29.0
+   ],
+   "min_value": 0.0,
+   "name": "Fixed Height",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395/@MarginContainer@22400/Fixed Height",
+   "rect": [
+    437.0,
+    784.0,
+    80.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "",
+   "tooltip": "Fixed Height\nPixelRenderer.fixed_height\nRange 0 to 1080 (drag, or click to type).",
+   "value": 0.0,
+   "visible": true
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22398",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22395/@MarginContainer@22400/Fixed Height/@TextureRect@22398",
+   "rect": [
+    437.0,
+    784.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    148.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22402",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402",
+   "rect": [
+    527.0,
+    781.0,
+    148.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "VSeparator",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    10.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    10.0,
+    35.0
+   ],
+   "name": "@VSeparator@22401",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402/@VSeparator@22401",
+   "rect": [
+    527.0,
+    781.0,
+    10.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    93.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22404",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402/@CenterContainer@22404",
+   "rect": [
+    542.0,
+    781.0,
+    93.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    93.0,
+    29.0
+   ],
+   "name": "@Label@22403",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402/@CenterContainer@22404/@Label@22403",
+   "rect": [
+    542.0,
+    784.0,
+    93.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Texel Snap:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22406",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402/@CenterContainer@22406",
+   "rect": [
+    640.0,
+    781.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CheckBox",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    25.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    28.0,
+    25.0
+   ],
+   "name": "Texel Snap",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22402/@CenterContainer@22406/Texel Snap",
+   "rect": [
+    643.0,
+    786.0,
+    28.0,
+    25.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": true,
+   "tooltip": "Texel Snap\nPixelRenderer.texel_snap",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    169.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22407",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22407",
+   "rect": [
+    685.0,
+    781.0,
+    169.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    129.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22409",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22407/@CenterContainer@22409",
+   "rect": [
+    685.0,
+    781.0,
+    129.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    129.0,
+    29.0
+   ],
+   "name": "@Label@22408",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22407/@CenterContainer@22409/@Label@22408",
+   "rect": [
+    685.0,
+    784.0,
+    129.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Sub-texel Scroll:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22411",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22407/@CenterContainer@22411",
+   "rect": [
+    819.0,
+    781.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CheckBox",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    25.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    28.0,
+    25.0
+   ],
+   "name": "Sub-texel Scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22407/@CenterContainer@22411/Sub-texel Scroll",
+   "rect": [
+    822.0,
+    786.0,
+    28.0,
+    25.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": true,
+   "tooltip": "Sub-texel Scroll\nPixelRenderer.subtexel_scroll",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    140.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22412",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22412",
+   "rect": [
+    329.0,
+    816.0,
+    140.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    100.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22414",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22412/@CenterContainer@22414",
+   "rect": [
+    329.0,
+    816.0,
+    100.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    100.0,
+    29.0
+   ],
+   "name": "@Label@22413",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22412/@CenterContainer@22414/@Label@22413",
+   "rect": [
+    329.0,
+    819.0,
+    100.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Crisp Edges:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22416",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22412/@CenterContainer@22416",
+   "rect": [
+    434.0,
+    816.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CheckBox",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    25.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    28.0,
+    25.0
+   ],
+   "name": "Crisp Edges",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22412/@CenterContainer@22416/Crisp Edges",
+   "rect": [
+    437.0,
+    821.0,
+    28.0,
+    25.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": true,
+   "tooltip": "Crisp Edges\nPixelRenderer.crisp_edges",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    206.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22418",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418",
+   "rect": [
+    479.0,
+    816.0,
+    206.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "VSeparator",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    10.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    10.0,
+    35.0
+   ],
+   "name": "@VSeparator@22417",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@VSeparator@22417",
+   "rect": [
+    479.0,
+    816.0,
+    10.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    106.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22420",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@CenterContainer@22420",
+   "rect": [
+    494.0,
+    816.0,
+    106.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    106.0,
+    29.0
+   ],
+   "name": "@Label@22419",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@CenterContainer@22420/@Label@22419",
+   "rect": [
+    494.0,
+    819.0,
+    106.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Depth Range:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "MarginContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    80.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    80.0,
+    35.0
+   ],
+   "name": "@MarginContainer@22423",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@MarginContainer@22423",
+   "rect": [
+    605.0,
+    816.0,
+    80.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "EditorSpinSlider",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    80.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 4000.0,
+   "min": [
+    80.0,
+    29.0
+   ],
+   "min_value": 1.0,
+   "name": "Depth Range",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@MarginContainer@22423/Depth Range",
+   "rect": [
+    605.0,
+    819.0,
+    80.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "",
+   "tooltip": "Depth Range\nPixelRenderer.depth_range\nRange 1 to 4000 (drag, or click to type).",
+   "value": 200.0,
+   "visible": true
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22421",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22418/@MarginContainer@22423/Depth Range/@TextureRect@22421",
+   "rect": [
+    605.0,
+    819.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    167.0,
+    35.0
+   ],
+   "name": "@HBoxContainer@22424",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424",
+   "rect": [
+    695.0,
+    816.0,
+    167.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    50.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    82.0,
+    35.0
+   ],
+   "name": "@CenterContainer@22426",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424/@CenterContainer@22426",
+   "rect": [
+    695.0,
+    816.0,
+    82.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "autowrap": 0,
+   "class": "Label",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    25.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    82.0,
+    29.0
+   ],
+   "name": "@Label@22425",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424/@CenterContainer@22426/@Label@22425",
+   "rect": [
+    695.0,
+    819.0,
+    82.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "Obj. Pixel:",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "MarginContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    80.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    80.0,
+    35.0
+   ],
+   "name": "@MarginContainer@22429",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424/@MarginContainer@22429",
+   "rect": [
+    782.0,
+    816.0,
+    80.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "EditorSpinSlider",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    60.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 16.0,
+   "min": [
+    60.0,
+    29.0
+   ],
+   "min_value": 1.0,
+   "name": "Obj_ Pixel",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424/@MarginContainer@22429/Obj_ Pixel",
+   "rect": [
+    782.0,
+    819.0,
+    80.0,
+    29.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 4,
+   "text": "",
+   "tooltip": "Obj. Pixel\nPixelRenderer.object_pixel_size\nRange 1 to 16 (drag), or click to type up to 64.",
+   "value": 1.0,
+   "visible": true
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@22427",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/@HBoxContainer@22424/@MarginContainer@22429/Obj_ Pixel/@TextureRect@22427",
+   "rect": [
+    782.0,
+    819.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    508.0,
+    68.0
+   ],
+   "name": "PinnedHeader",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader",
+   "rect": [
+    329.0,
+    678.0,
+    731.0,
+    68.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "HBoxContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    508.0,
+    66.0
+   ],
+   "name": "StripHeader",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader",
+   "rect": [
+    329.0,
+    678.0,
+    731.0,
+    66.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    35.0
+   ],
+   "disabled": true,
+   "focus": false,
+   "min": [
+    97.0,
+    35.0
+   ],
+   "name": "SectionTitle",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionTitle",
+   "rect": [
+    329.0,
+    678.0,
+    97.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "Renderer",
+   "toggled": false,
+   "tooltip": "Renderer\nPixelRenderer: mode (Anchor = full pipeline, Low Res = color only), macro-pixel size,\nresolution and camera snapping.",
+   "visible": true
+  },
+  {
+   "class": "GridContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    405.0,
+    66.0
+   ],
+   "name": "SectionPages",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages",
+   "rect": [
+    432.0,
+    678.0,
+    405.0,
+    66.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    77.0,
+    33.0
+   ],
+   "name": "Renderer",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Renderer",
+   "rect": [
+    432.0,
+    678.0,
+    77.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Renderer",
+   "toggled": true,
+   "tooltip": "Renderer\nPixelRenderer: mode (Anchor = full pipeline, Low Res = color only), macro-pixel size,\nresolution and camera snapping.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    71.0,
+    33.0
+   ],
+   "name": "Outlines",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Outlines",
+   "rect": [
+    509.0,
+    678.0,
+    71.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Outlines",
+   "toggled": false,
+   "tooltip": "Outlines\nDepth/normal edge detection, outline darkening and highlights.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    111.0,
+    33.0
+   ],
+   "name": "Color _ Palette",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Color _ Palette",
+   "rect": [
+    580.0,
+    678.0,
+    111.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Color / Palette",
+   "toggled": false,
+   "tooltip": "Color / Palette\nPalette quantisation, ordered dithering and color grading.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    48.0,
+    33.0
+   ],
+   "name": "Rays",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Rays",
+   "rect": [
+    691.0,
+    678.0,
+    104.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Rays",
+   "toggled": false,
+   "tooltip": "On / off, ray alpha, colour and how many sheets a view ray may cross (distance, cut-off).",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    42.0,
+    33.0
+   ],
+   "name": "Sun",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Sun",
+   "rect": [
+    795.0,
+    678.0,
+    42.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Sun",
+   "toggled": false,
+   "tooltip": "Sun colour tint, day cycle and dawn/dusk (keeps the gaps open for a low sun), sun follow.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    62.0,
+    33.0
+   ],
+   "name": "Sheets",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Sheets",
+   "rect": [
+    432.0,
+    711.0,
+    77.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Sheets",
+   "toggled": false,
+   "tooltip": "Sheet banding, spacing, stacking, stack adaptation, distance falloff and surface fade.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    63.0,
+    33.0
+   ],
+   "name": "Clouds",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Clouds",
+   "rect": [
+    509.0,
+    711.0,
+    71.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Clouds",
+   "toggled": false,
+   "tooltip": "How the cloud gaps light the sheets.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    92.0,
+    33.0
+   ],
+   "name": "Depth Fade",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Depth Fade",
+   "rect": [
+    580.0,
+    711.0,
+    111.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Depth Fade",
+   "toggled": false,
+   "tooltip": "Camera start depth and the fade-in after it.",
+   "visible": true
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    104.0,
+    33.0
+   ],
+   "name": "Debug Views",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@MstFlow@22366/PinnedHeader/StripHeader/SectionPages/Debug Views",
+   "rect": [
+    691.0,
+    711.0,
+    104.0,
+    33.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "Debug Views",
+   "toggled": false,
+   "tooltip": "Debug Views\nShow the renderer's intermediate buffers (normals, depth, pixel size, outline flags),\nwhy each outline is drawn (red silhouette, blue id edge, yellow crease, green suppressed\nfold / ledge) and the god-ray sheet stack.",
+   "visible": true
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21265",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@TextureRect@21265",
+   "rect": [
+    329.0,
+    678.0,
+    24.0,
+    175.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21266",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@TextureRect@21266",
+   "rect": [
+    1036.0,
+    678.0,
+    24.0,
+    175.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 207.0,
+   "min": [
+    12.0,
+    14.0
+   ],
+   "min_value": 0.0,
+   "name": "_h_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_h_scroll",
+   "rect": [
+    329.0,
+    853.0,
+    731.0,
+    14.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "VScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 173.0,
+   "min": [
+    14.0,
+    12.0
+   ],
+   "min_value": 0.0,
+   "name": "_v_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_v_scroll",
+   "rect": [
+    1060.0,
+    678.0,
+    14.0,
+    175.0
+   ],
+   "size_flags_h": 0,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "_focus",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_focus",
+   "rect": [
+    329.0,
+    678.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  }
+ ],
+ "ok": true,
+ "window_pos": [
+  0,
+  0
+ ],
+ "count": 83
+}

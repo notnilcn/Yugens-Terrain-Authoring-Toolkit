@@ -411,3 +411,18 @@ The height **and** width contracts now hold, and the pixelizer, builder strip, d
 runtime HUD all work as designed. The remaining work is mostly **first-paint polish** (pixelizer
 placeholder, first tab build), the **builder palette's collapse/limit plumbing**, and finishing
 **#38** in the tutorial scenes.
+
+### r7 evaluation verdict
+
+The builder palette now behaves like the terrain panel (collapse gives the space back, 220–420
+limits persist, splitter clamps, 585 px view at 1280/1024); Ctrl+D, HUD and strip heights are
+right. The runtime HUD (F3/F1) is fully validated, the tutorials' sea reaches the horizon, and
+the first tab row no longer overflows.
+
+What still reads wrong on screen: the **Pixelizer appears ~2–3 s late on its first selection**
+(no placeholder; R7-3), the **builder keeps an empty Extrude tab in Edge mode** and expanding its
+palette at ≤1280 leaves a 397 px view with an unlabeled 32 px tab (R7-5/6), the **first Settings
+open still inherits a 175 px strip** (R7-4), **dawn is still a lavender wash** (R7-7), and a
+**hard-edged rotated square sits over the sea** at the extreme tutorial zoom (R7-1). The F3
+object picker only works on `MeshInstance3D` (R7-2), and `03_pixel_look` shows its field edge
+after panning (R7-8).

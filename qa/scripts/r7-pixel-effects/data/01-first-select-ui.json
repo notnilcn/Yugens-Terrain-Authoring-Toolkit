@@ -1,0 +1,1433 @@
+{
+ "controls": [
+  {
+   "class": "MstRail",
+   "clip_contents": true,
+   "clipped": false,
+   "custom_min": [
+    39.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    39.0,
+    0.0
+   ],
+   "name": "PixelizerToolbarRail",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail",
+   "rect": [
+    287.0,
+    121.0,
+    39.0,
+    0.0
+   ],
+   "scroll_h": 0,
+   "scroll_v": 0,
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "VFlowContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    584.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    584.0
+   ],
+   "name": "PixelizerToolbar",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    584.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HSeparator",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    3.0,
+    8.0
+   ],
+   "name": "@HSeparator@21243",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@HSeparator@21243",
+   "rect": [
+    287.0,
+    121.0,
+    3.0,
+    8.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21244",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21244",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Renderer",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21244/Renderer",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Renderer\nPixelRenderer: mode (Anchor = full pipeline, Low Res = color only), macro-pixel size,\nresolution and camera snapping.",
+   "visible": false
+  },
+  {
+   "class": "HSeparator",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    3.0,
+    8.0
+   ],
+   "name": "@HSeparator@21245",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@HSeparator@21245",
+   "rect": [
+    287.0,
+    121.0,
+    3.0,
+    8.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21246",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21246",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Sky & Clouds",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21246/Sky & Clouds",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Sky & Clouds\nPixelSky: cloud shadows on the ground and the optional cloud deck. Its clouds drive\nthe shared cloud field (pt_cloud_* globals) that terrain, grass, water and god rays read;\nwith several skies, `cloud_camera_scope` picks the one for each camera.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21247",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21247",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Day _ Night",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21247/Day _ Night",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Day / Night\nPixelDayNight: sun arc, sky/ambient grading, fog, cel light ramp and rim light over the day.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21248",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21248",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Weather",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21248/Weather",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Weather\nPixelWeather: blends Clear / Cloudy / Foggy / Rain / Snow / Storm (clouds, light,\nfog, wet ground, pixel rain, lightning) and optional snow (Snow page: falling flakes,\nground cover that builds up and melts). API: set_weather(\"rain\").",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21249",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21249",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Water",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21249/Water",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Water\nPixelWater: depth-banded color, foam and waves; raised pools and waterfalls\non hex / triangle terrains (Waterfalls page).",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21250",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21250",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Fireflies",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21250/Fireflies",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Fireflies\nPixelFireflies: a blinking, wandering swarm that fades in at night.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21251",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21251",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Particle Field",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21251/Particle Field",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Particle Field\nPixelParticleField: a prerendered, tiling and looping flipbook of pixel particles on\nworld-anchored layers (dust motes in the sunbeams, rain, snow, embers, leaves); stays put\nunder ortho and perspective camera moves.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21252",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21252",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Birds",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21252/Birds",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Birds\nPixelBirds: a boids flock of 2-frame flapping pixel birds that circle,\nland on high ground and scatter when the camera comes near.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21253",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21253",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Smoke & Fire",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21253/Smoke & Fire",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Smoke & Fire\nPixelSmoke: tumbling outlined puffs drifting with the sky wind, optional flames\nwith a flickering light; burst(position, count) for build/destroy puffs.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21254",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21254",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Light Volumes",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21254/Light Volumes",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Light Volumes\nPixelLightVolume: stepped point light with a dithered light pool and a small source orb.\nSelect one to edit it; the first in the scene is used otherwise.",
+   "visible": false
+  },
+  {
+   "class": "HSeparator",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    3.0,
+    8.0
+   ],
+   "name": "@HSeparator@21255",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@HSeparator@21255",
+   "rect": [
+    287.0,
+    121.0,
+    3.0,
+    8.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21256",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21256",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Pixel Object",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21256/Pixel Object",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Pixel Object\nPixelObject: per-object pixel size, outline id/color, palette and dither\n(-1 / Inherit = parent PixelObject, then the renderer's Object Defaults).",
+   "visible": false
+  },
+  {
+   "class": "HSeparator",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    3.0,
+    8.0
+   ],
+   "name": "@HSeparator@21257",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@HSeparator@21257",
+   "rect": [
+    287.0,
+    121.0,
+    3.0,
+    8.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21258",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21258",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Grid _ Fog",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21258/Grid _ Fog",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Grid / Fog\nMarchingSquaresTerrain overlays: cell grid lines (editor / in game), fog of war\nlook and terrain debug views (slope, contours, slot ids, chunk borders, cell ids).",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21259",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21259",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Erosion",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21259/Erosion",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Erosion\nMarchingSquaresErosion: hydraulic droplet erosion of the parent terrain.\nErode runs one batch of droplets (one undo step); each press continues with a new seed.",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21260",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21260",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Wild Flowers",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21260/Wild Flowers",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Wild Flowers\nMarchingSquaresWildFlowers: clustered wild flowers on the parent terrain's\nscatter layer (8 species + bilberry, from cell noise and ground water; none under water).\nScatter replaces the previous flowers, Clear removes them (undoable).",
+   "visible": false
+  },
+  {
+   "class": "CenterContainer",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    35.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    35.0,
+    35.0
+   ],
+   "name": "@CenterContainer@21261",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21261",
+   "rect": [
+    287.0,
+    121.0,
+    35.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "Button",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    30.0,
+    30.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    30.0,
+    30.0
+   ],
+   "name": "Grass Fire",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@CenterContainer@21261/Grass Fire",
+   "rect": [
+    287.0,
+    121.0,
+    30.0,
+    30.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "toggled": false,
+   "tooltip": "Grass Fire\nPixelFireSystem: fire spreads through the parent terrain's grass with the wind, chars the\nground and shrinks the blades; rain puts it out with steam, and burnt grass regrows.\nEnable Ignite Tool and click the terrain to start a fire in the editor (Shift + click douses).",
+   "visible": false
+  },
+  {
+   "class": "HSeparator",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    3.0,
+    8.0
+   ],
+   "name": "@HSeparator@21262",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/PixelizerToolbar/@HSeparator@21262",
+   "rect": [
+    287.0,
+    121.0,
+    3.0,
+    8.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21263",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/@TextureRect@21263",
+   "rect": [
+    287.0,
+    121.0,
+    78.0,
+    24.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21264",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/@TextureRect@21264",
+   "rect": [
+    287.0,
+    97.0,
+    78.0,
+    24.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 35.0,
+   "min": [
+    12.0,
+    14.0
+   ],
+   "min_value": 0.0,
+   "name": "_h_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/_h_scroll",
+   "rect": [
+    287.0,
+    121.0,
+    39.0,
+    14.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "VScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 564.0,
+   "min": [
+    14.0,
+    12.0
+   ],
+   "min_value": 0.0,
+   "name": "_v_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/_v_scroll",
+   "rect": [
+    326.0,
+    121.0,
+    14.0,
+    12.0
+   ],
+   "size_flags_h": 0,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "_focus",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/PixelizerToolbarRail/_focus",
+   "rect": [
+    287.0,
+    121.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "ScrollContainer",
+   "clip_contents": true,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    35.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    35.0
+   ],
+   "name": "PixelizerAttributes",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes",
+   "rect": [
+    287.0,
+    121.0,
+    0.0,
+    35.0
+   ],
+   "scroll_h": 0,
+   "scroll_v": 0,
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21265",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@TextureRect@21265",
+   "rect": [
+    287.0,
+    121.0,
+    24.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "TextureRect",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "@TextureRect@21266",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/@TextureRect@21266",
+   "rect": [
+    263.0,
+    121.0,
+    24.0,
+    35.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  },
+  {
+   "class": "HScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 0.0,
+   "min": [
+    12.0,
+    14.0
+   ],
+   "min_value": 0.0,
+   "name": "_h_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_h_scroll",
+   "rect": [
+    287.0,
+    156.0,
+    12.0,
+    14.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 0,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "VScrollBar",
+   "clip_contents": false,
+   "clipped": true,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "max_value": 0.0,
+   "min": [
+    14.0,
+    12.0
+   ],
+   "min_value": 0.0,
+   "name": "_v_scroll",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_v_scroll",
+   "rect": [
+    287.0,
+    121.0,
+    14.0,
+    35.0
+   ],
+   "size_flags_h": 0,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "value": 0.0,
+   "visible": false
+  },
+  {
+   "class": "PanelContainer",
+   "clip_contents": false,
+   "clipped": false,
+   "custom_min": [
+    0.0,
+    0.0
+   ],
+   "disabled": false,
+   "focus": false,
+   "min": [
+    0.0,
+    0.0
+   ],
+   "name": "_focus",
+   "outside_root": false,
+   "path": "/root/@EditorNode@20312/@Panel@14/@VBoxContainer@15/DockVSplitMain/DockHSplitMain/@VBoxContainer@37/DockVSplitCenter/@VSplitContainer@101/@VBoxContainer@102/@EditorMainScreen@160/MainScreen/@Node3DEditor@10898/@HSplitContainer@10218/@HSplitContainer@10220/@VSplitContainer@10222/PixelizerAttributes/_focus",
+   "rect": [
+    287.0,
+    121.0,
+    0.0,
+    0.0
+   ],
+   "size_flags_h": 1,
+   "size_flags_v": 1,
+   "text": "",
+   "tooltip": "",
+   "visible": false
+  }
+ ],
+ "ok": true,
+ "window_pos": [
+  0,
+  0
+ ],
+ "count": 48
+}
