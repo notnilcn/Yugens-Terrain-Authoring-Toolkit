@@ -21,6 +21,11 @@ albedo_color = Color(1, 0.9005, 0.2005, 0.2205)
 [sub_resource type="BoxMesh" id="BoxMesh_kn0ka"]
 
 [node name="PixelDiagnosticsOverlay" type="PixelDiagnosticsOverlay" unique_id=1047039597 node_paths=PackedStringArray("status_panel", "status", "tuner", "rescan", "debug_view", "effects_sections", "render_sections", "scene_sections", "object_panel", "select", "clear", "object_hint", "object_info", "object_sections", "selection_marker")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
 status_panel = NodePath("Overlay/StatusPanel")
 status = NodePath("Overlay/StatusPanel/Status")
 tuner = NodePath("Overlay/Tuner")

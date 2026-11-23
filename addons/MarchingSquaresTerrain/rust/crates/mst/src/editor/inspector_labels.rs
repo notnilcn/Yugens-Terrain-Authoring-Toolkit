@@ -98,7 +98,6 @@ const LABELS: &[(&str, &str, &str)] = &[
     ("PixelDayNight", "time_override", "Override"),
     ("PixelDiagnostics", "sections_start_folded", "Folded"),
     ("PixelDiagnostics", "show_object_panel", "Object Panel"),
-    ("PixelDiagnostics", "start_visible", "Visible"),
     ("PixelFireSystem", "ember_distance", "Ember Range"),
     ("PixelFireSystem", "glow_intensity", "Glow"),
     ("PixelFireSystem", "ignite_radius", "Ignite Range"),

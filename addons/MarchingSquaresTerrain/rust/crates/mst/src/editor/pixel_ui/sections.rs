@@ -845,7 +845,7 @@ pub static SECTIONS: &[Section] = &[
         class: Some(DIAGNOSTICS),
         group_start: false,
         fields: &[
-            bx("Start Visible", "start_visible"),
+            bx("Start Visible", "visible"),
             bx("Tuner", "show_tuner"),
             bx("Object Panel", "show_object_panel"),
             f("Panel Width", "panel_width", 200.0, 800.0, 1.0),

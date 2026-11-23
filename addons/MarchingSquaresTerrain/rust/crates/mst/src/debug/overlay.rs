@@ -15,7 +15,8 @@
 //!
 //! Why a node: the parts it names are nodes in the same scene, and the only way for a scene
 //! to point at its own nodes so that a rename in the editor follows along is from a node
-//! inside it.
+//! inside it. It also has to be part of the drawn interface itself, so that showing or
+//! hiding the overlay as a whole carries down to every panel in the frame.
 //!
 //! Why a new type: a plain node at the root can hold the parts but cannot say which is
 //! which, so the overlay would have to find them by name, and an edited copy of the frame
@@ -25,7 +26,7 @@
 //! it, never in the editor, so it is instantiated then instead of being declared in every
 //! scene that uses the overlay; its layout is still authored in a scene.
 use godot::classes::{
-    Button, Control, INode, Label, MeshInstance3D, Node, OptionButton, PackedScene,
+    Button, Control, IControl, Label, MeshInstance3D, Node, OptionButton, PackedScene,
     VBoxContainer,
 };
 use godot::prelude::*;
@@ -34,7 +35,7 @@ const OVERLAY_SCENE: &str =
     "res://addons/MarchingSquaresTerrain/debug/pixel_diagnostics_overlay.tscn";
 
 #[derive(GodotClass)]
-#[class(tool, init, base = Node)]
+#[class(tool, init, base = Control)]
 pub struct PixelDiagnosticsOverlay {
     #[export]
     status_panel: Option<Gd<Control>>,
@@ -66,11 +67,11 @@ pub struct PixelDiagnosticsOverlay {
     object_sections: Option<Gd<VBoxContainer>>,
     #[export]
     selection_marker: Option<Gd<MeshInstance3D>>,
-    base: Base<Node>,
+    base: Base<Control>,
 }
 
 #[godot_api]
-impl INode for PixelDiagnosticsOverlay {
+impl IControl for PixelDiagnosticsOverlay {
     fn get_configuration_warnings(&self) -> PackedStringArray {
         let mut w = PackedStringArray::new();
         let roles: [(&str, bool); 15] = [

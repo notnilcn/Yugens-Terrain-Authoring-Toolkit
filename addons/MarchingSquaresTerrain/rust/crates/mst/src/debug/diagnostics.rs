@@ -99,8 +99,6 @@ pub struct PixelDiagnostics {
     #[export]
     toggle_key: Key,
     #[export]
-    start_visible: bool,
-    #[export]
     show_tuner: bool,
     #[export]
     show_object_panel: bool,
@@ -151,10 +149,11 @@ pub struct PixelDiagnostics {
 #[godot_api]
 impl ICanvasLayer for PixelDiagnostics {
     fn init(base: Base<CanvasLayer>) -> Self {
-        base.to_init_gd().set_layer(100);
+        let mut layer = base.to_init_gd();
+        layer.set_layer(100);
+        layer.set_visible(false);
         PixelDiagnostics {
             toggle_key: Key::F3,
-            start_visible: false,
             show_tuner: true,
             show_object_panel: true,
             panel_width: 360.0,
@@ -195,8 +194,6 @@ impl ICanvasLayer for PixelDiagnostics {
             return;
         }
         self.build_ui();
-        let visible = self.start_visible;
-        self.base_mut().set_visible(visible);
         self.base_mut().set_process(true);
     }
     fn process(&mut self, delta: f64) {
