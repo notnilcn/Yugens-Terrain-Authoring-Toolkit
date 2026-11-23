@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://addons/MarchingSquaresTerrain/shaders/light_volume.gdshader" id="1_shader"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_glow"]
+size = Vector2(1, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+resource_local_to_scene = true
+render_priority = 0
+shader = ExtResource("1_shader")
+
+[node name="PixelLightVolume" type="PixelLightVolume" node_paths=PackedStringArray("light", "glow_mesh")]
+light = NodePath("Light")
+glow_mesh = NodePath("Volume")
+
+[node name="Light" type="OmniLight3D" parent="."]
+
+[node name="Volume" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("QuadMesh_glow")
+material_override = SubResource("ShaderMaterial_glow")

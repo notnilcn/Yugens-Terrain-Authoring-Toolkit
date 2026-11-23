@@ -1,0 +1,215 @@
+use crate::brush::Touched;
+use crate::terrain_store::TerrainStore;
+use crate::grid::{GridType, axial_to_offset, offset_to_axial};
+use crate::math::*;
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PatchCell {
+    pub rel: IVec2,
+    pub stature: f32,
+    pub floor: u8,
+    pub wall: u8,
+    pub grass: u8,
+    pub glide: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Patch {
+    pub grid: GridType,
+    pub anchor_height: f32,
+    pub anchor_parity: i32,
+    pub tiles: Vec<PatchCell>,
+}
+pub fn rotation_steps(grid: GridType) -> i32 {
+    match grid {
+        GridType::Hex | GridType::HexRings => 6,
+        GridType::Square => 4,
+        GridType::Triangle => 1,
+    }
+}
+pub fn step_degrees(grid: GridType) -> f32 {
+    360.0 / rotation_steps(grid) as f32
+}
+fn to_space(grid: GridType, s: IVec2) -> IVec2 {
+    if grid == GridType::Hex {
+        offset_to_axial(s)
+    } else {
+        s
+    }
+}
+fn from_space(grid: GridType, a: IVec2) -> IVec2 {
+    if grid == GridType::Hex {
+        axial_to_offset(a)
+    } else {
+        a
+    }
+}
+pub fn warp(grid: GridType, rel: IVec2, rot: i32, mirror: bool) -> IVec2 {
+    match grid {
+        GridType::Hex | GridType::HexRings => {
+            let (mut q, mut r) = (rel.x, rel.y);
+            if mirror {
+                q += r;
+                r = -r;
+            }
+            for _ in 0..rot.rem_euclid(6) {
+                let s = -q - r;
+                (q, r) = (-r, -s);
+            }
+            iv2(q, r)
+        }
+        GridType::Square => {
+            let (mut x, mut z) = (rel.x, rel.y);
+            if mirror {
+                z = -z;
+            }
+            for _ in 0..rot.rem_euclid(4) {
+                (x, z) = (-z, x);
+            }
+            iv2(x, z)
+        }
+        GridType::Triangle => rel,
+    }
+}
+impl Patch {
+    pub fn duplicate(store: &TerrainStore, cells: &[IVec2], anchor: IVec2) -> Patch {
+        let grid = store.config.grid;
+        let anchor_height = store.stature(anchor).unwrap_or(0.0);
+        let a = to_space(grid, anchor);
+        let mut out = Vec::new();
+        for c in cells {
+            let Some(sm) = store.probe(*c) else { continue };
+            out.push(PatchCell {
+                rel: to_space(grid, *c) - a,
+                stature: sm.stature - anchor_height,
+                floor: sm.floor,
+                wall: sm.wall,
+                grass: sm.grass,
+                glide: sm.glide,
+            });
+        }
+        Patch {
+            grid,
+            anchor_height,
+            anchor_parity: anchor.x.rem_euclid(2),
+            tiles: out,
+        }
+    }
+    pub fn check_vacant(&self) -> bool {
+        self.tiles.is_empty()
+    }
+    pub fn addressees(&self, target: IVec2, rot: i32, mirror: bool) -> Vec<(IVec2, PatchCell)> {
+        let mut t = target;
+        if self.grid == GridType::Triangle && t.x.rem_euclid(2) != self.anchor_parity {
+            t.x -= 1;
+        }
+        let base = to_space(self.grid, t);
+        self.tiles
+            .iter()
+            .map(|c| {
+                (
+                    from_space(self.grid, base + warp(self.grid, c.rel, rot, mirror)),
+                    *c,
+                )
+            })
+            .collect()
+    }
+    pub fn drop_in(
+        &self,
+        store: &mut TerrainStore,
+        addressee: IVec2,
+        rot: i32,
+        mirror: bool,
+        base: Option<f32>,
+    ) -> Touched {
+        let b = base.unwrap_or(self.anchor_height);
+        let mut t = Touched::new();
+        for (s, c) in self.addressees(addressee, rot, mirror) {
+            let touched = store.edit_sample(s, |d, i| {
+                d.heights[i] = b + c.stature;
+                d.floor_tex[i] = c.floor;
+                d.wall_tex[i] = c.wall;
+                d.grass[i] = c.grass;
+                d.glide[i] = c.glide as u8;
+            });
+            for k in touched {
+                t.insert(k);
+            }
+            for k in store.chunks_affected_by(s) {
+                t.insert(k);
+            }
+        }
+        t
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::terrain_store::MergeMode;
+    use crate::grid::GridConfig;
+    #[test]
+    fn hex_rotation_is_a_rigid_60_degree_turn() {
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ..Default::default()
+        };
+        let p = iv2(2, -1);
+        let mut q = p;
+        for _ in 0..6 {
+            let n = warp(GridType::HexRings, q, 1, false);
+            let (a, b) = (cfg.sample_pos(q), cfg.sample_pos(n));
+            assert!((a.magnitude() - b.magnitude()).abs() < 1e-3);
+            let ang = (a.x * b.y - a.y * b.x).atan2(a.innerprod(b)).to_degrees();
+            assert!((ang - 60.0).abs() < 0.1, "{ang}");
+            q = n;
+        }
+        assert_eq!(q, p);
+        let m = warp(GridType::HexRings, p, 0, true);
+        let (a, b) = (cfg.sample_pos(p), cfg.sample_pos(m));
+        assert!((a.x - b.x).abs() < 1e-4 && (a.y + b.y).abs() < 1e-4);
+    }
+    #[test]
+    fn square_rotation_and_paste() {
+        let mut st = TerrainStore::new(GridConfig {
+            grid: GridType::Square,
+            chunk_size: 8,
+            ..Default::default()
+        });
+        st.add_chunk(iv2(0, 0), MergeMode::Polyhedron);
+        st.set_height(iv2(2, 2), 1.0);
+        st.set_height(iv2(3, 2), 5.0);
+        let patch = Patch::duplicate(&st, &[iv2(2, 2), iv2(3, 2)], iv2(2, 2));
+        assert_eq!(warp(GridType::Square, iv2(1, 0), 1, false), iv2(0, 1));
+        patch.drop_in(&mut st, iv2(5, 5), 1, false, Some(2.0));
+        assert_eq!(st.stature(iv2(5, 5)), Some(2.0));
+        assert_eq!(st.stature(iv2(5, 6)), Some(6.0));
+    }
+    #[test]
+    fn odd_r_hex_paste_keeps_shape() {
+        let mut st = TerrainStore::new(GridConfig {
+            grid: GridType::Hex,
+            chunk_size: 12,
+            ..Default::default()
+        });
+        st.add_chunk(iv2(0, 0), MergeMode::Polyhedron);
+        let anchor = iv2(4, 4);
+        let ring: Vec<IVec2> = st.config.edge_neighbors(anchor);
+        for (k, c) in ring.iter().enumerate() {
+            st.set_height(*c, k as f32 + 1.0);
+        }
+        let patch = Patch::duplicate(&st, &ring, anchor);
+        let target = iv2(6, 7);
+        let got: Vec<IVec2> = patch
+            .addressees(target, 2, true)
+            .into_iter()
+            .map(|t| t.0)
+            .collect();
+        let mut want = st.config.edge_neighbors(target);
+        let mut got_s = got.clone();
+        got_s.sort();
+        want.sort();
+        assert_eq!(got_s, want);
+        patch.drop_in(&mut st, target, 0, false, None);
+        for (k, c) in st.config.edge_neighbors(target).iter().enumerate() {
+            assert_eq!(st.stature(*c), Some(k as f32 + 1.0));
+        }
+    }
+}

@@ -1,0 +1,26 @@
+# Normalize EOL for all files that Git considers text files.
+* text=auto eol=lf
+# Binary assets. They are committed as plain Git objects: Git LFS was not set up before the
+# first binary commit, and migrating existing history (git lfs migrate) is deliberately not
+# done. New large binary types should go through LFS once the repository moves to it.
+*.png binary
+*.jpg binary
+*.webp binary
+*.glb binary
+*.fbx binary
+*.blend binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+# Binary Godot resources (text .tscn / .tres stay normal text).
+*.res binary
+*.scn binary
+*.mesh binary
+*.anim binary
+*.material binary
+# Built GDExtension libraries (ignored, but never text).
+*.so binary
+*.dll binary
+*.dylib binary

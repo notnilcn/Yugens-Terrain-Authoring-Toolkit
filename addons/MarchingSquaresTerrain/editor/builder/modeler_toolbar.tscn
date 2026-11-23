@@ -1,0 +1,122 @@
+[gd_scene format=3]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_modes"]
+
+[node name="ModelerCoreToolbar" type="PixelModelerToolbar" node_paths=PackedStringArray("mode_object", "mode_vertex", "mode_edge", "mode_face", "add_mesh", "make_editable", "actions", "snap", "paint", "handles", "handles_popup", "handles_column", "handles_title", "all_options", "options", "palette", "palette_grid")]
+mode_object = NodePath("ModeObject")
+mode_vertex = NodePath("ModeVertex")
+mode_edge = NodePath("ModeEdge")
+mode_face = NodePath("ModeFace")
+add_mesh = NodePath("AddMesh")
+make_editable = NodePath("MakeEditable")
+actions = NodePath("Actions")
+snap = NodePath("Snap")
+paint = NodePath("Paint")
+handles = NodePath("Handles")
+handles_popup = NodePath("HandlesPopup")
+handles_column = NodePath("HandlesPopup/Column")
+handles_title = NodePath("HandlesPopup/Column/Header/Title")
+all_options = NodePath("HandlesPopup/Column/Header/AllOptions")
+options = NodePath("Options")
+palette = NodePath("Palette")
+palette_grid = NodePath("Palette/Grid")
+
+[node name="Separator" type="VSeparator" parent="."]
+layout_mode = 2
+
+[node name="ModeObject" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Object Mode (Esc)"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_modes")
+flat = true
+
+[node name="ModeVertex" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Vertex Mode (H)"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_modes")
+flat = true
+
+[node name="ModeEdge" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Edge Mode (H)"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_modes")
+flat = true
+
+[node name="ModeFace" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Face Mode (H)"
+toggle_mode = true
+button_group = SubResource("ButtonGroup_modes")
+flat = true
+
+[node name="AddMesh" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Draw a new mesh. Alt-click a shape to place it at once."
+text = "Add Mesh"
+flat = true
+
+[node name="MakeEditable" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Convert the selected mesh or CSG shape to an editable mesh."
+text = "Make Editable"
+flat = true
+
+[node name="Actions" type="MenuButton" parent="."]
+layout_mode = 2
+focus_mode = 0
+text = "Actions"
+
+[node name="Snap" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Snap Modeler edits and new shapes to the grid."
+toggle_mode = true
+flat = true
+
+[node name="Paint" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Paint"
+flat = true
+
+[node name="Handles" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Selection & Handles"
+flat = true
+
+[node name="HandlesPopup" type="PopupPanel" parent="."]
+
+[node name="Column" type="VBoxContainer" parent="HandlesPopup"]
+
+[node name="Header" type="HBoxContainer" parent="HandlesPopup/Column"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="HandlesPopup/Column/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Selection & Handles"
+
+[node name="AllOptions" type="LinkButton" parent="HandlesPopup/Column/Header"]
+layout_mode = 2
+text = "All Options"
+
+[node name="Options" type="Button" parent="."]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Modeler Options"
+flat = true
+
+[node name="Palette" type="PopupPanel" parent="."]
+
+[node name="Grid" type="GridContainer" parent="Palette"]
+columns = 4

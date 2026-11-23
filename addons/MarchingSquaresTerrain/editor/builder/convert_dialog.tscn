@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[node name="ConvertToBuilderMesh" type="PixelBuilderConvertDialog" node_paths=PackedStringArray("merge", "keep_materials", "keep_smoothing", "smoothing_angle")]
+title = "Convert to builder mesh"
+ok_button_text = "Convert"
+merge = NodePath("Rows/MergeRow/Merge")
+keep_materials = NodePath("Rows/KeepMaterials")
+keep_smoothing = NodePath("Rows/KeepSmoothing")
+smoothing_angle = NodePath("Rows/AngleRow/SmoothingAngle")
+
+[node name="Rows" type="VBoxContainer" parent="."]
+
+[node name="MergeRow" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="MergeLabel" type="Label" parent="Rows/MergeRow"]
+layout_mode = 2
+text = "Merge triangles into"
+
+[node name="Merge" type="OptionButton" parent="Rows/MergeRow"]
+layout_mode = 2
+tooltip_text = "Triangles: keep every triangle; Quads: coplanar triangle pairs become quads (Modeler \"Detect quads\"); N-gons: every flat region becomes one face"
+selected = 0
+item_count = 3
+popup/item_0/text = "Triangles"
+popup/item_0/id = 0
+popup/item_1/text = "Quads"
+popup/item_1/id = 1
+popup/item_2/text = "N-gons"
+popup/item_2/id = 2
+
+[node name="KeepMaterials" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "One material slot per surface of the source (off: everything on slot 0)"
+text = "Keep materials"
+
+[node name="KeepSmoothing" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Smoothing groups from the source's normals (smooth where the source is smooth)"
+text = "Keep smoothing"
+
+[node name="AngleRow" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="AngleLabel" type="Label" parent="Rows/AngleRow"]
+layout_mode = 2
+text = "Smoothing angle°"
+
+[node name="SmoothingAngle" type="SpinBox" parent="Rows/AngleRow"]
+layout_mode = 2
+tooltip_text = "Without Keep smoothing: neighbouring faces closer than this angle share a smoothing group (0 = all flat)"
+max_value = 180.0

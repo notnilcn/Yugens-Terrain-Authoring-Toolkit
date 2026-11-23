@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = ["crates/mst_demo", "crates/phantom_camera_rust"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+godot = { version = "=0.5.5", features = ["api-4-7"] }
+
+# Demo-only crates. The addon (mst + its pt_* crates) is a separate workspace inside the
+# addons/MarchingSquaresTerrain submodule; tools/build.sh builds both.
+# Debug builds are what the editor loads, so they must be fast and only carry line tables
+# (full debug info made the libraries far larger and slower to hot-reload). For a debugger
+# session build with `CARGO_PROFILE_DEV_DEBUG=true tools/build.sh`.
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+# Shipping libraries keep no symbol table; the GDExtension entry point lives in .dynsym and is
+# unaffected. This is a large size win with no runtime cost.
+strip = "symbols"

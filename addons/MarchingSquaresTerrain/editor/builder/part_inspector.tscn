@@ -1,0 +1,305 @@
+[gd_scene format=3]
+
+[node name="PartSection" type="PixelPartInspector" node_paths=PackedStringArray("refresh", "part_color", "part_material", "part_transparency", "size_x", "size_y", "size_z", "position_x", "position_y", "position_z", "orientation_x", "orientation_y", "orientation_z", "pivot_x", "pivot_y", "pivot_z", "part_shape", "part_locked", "part_anchored", "part_collision")]
+refresh = NodePath("Refresh")
+part_color = NodePath("Appearance/Grid/PartColor")
+part_material = NodePath("Appearance/Grid/PartMaterial")
+part_transparency = NodePath("Appearance/Grid/PartTransparency")
+size_x = NodePath("Transform/Grid/SizeRow/SizeX")
+size_y = NodePath("Transform/Grid/SizeRow/SizeY")
+size_z = NodePath("Transform/Grid/SizeRow/SizeZ")
+position_x = NodePath("Transform/Grid/PositionRow/PositionX")
+position_y = NodePath("Transform/Grid/PositionRow/PositionY")
+position_z = NodePath("Transform/Grid/PositionRow/PositionZ")
+orientation_x = NodePath("Transform/Grid/OrientationRow/OrientationX")
+orientation_y = NodePath("Transform/Grid/OrientationRow/OrientationY")
+orientation_z = NodePath("Transform/Grid/OrientationRow/OrientationZ")
+pivot_x = NodePath("Transform/Grid/PivotOffsetRow/PivotX")
+pivot_y = NodePath("Transform/Grid/PivotOffsetRow/PivotY")
+pivot_z = NodePath("Transform/Grid/PivotOffsetRow/PivotZ")
+part_shape = NodePath("Part/Grid/PartShape")
+part_locked = NodePath("Part/Grid/PartLocked")
+part_anchored = NodePath("Part/Grid/PartAnchored")
+part_collision = NodePath("Behavior/Grid/PartCollision")
+
+[node name="Refresh" type="Timer" parent="."]
+wait_time = 0.25
+autostart = true
+
+[node name="Appearance" type="FoldableContainer" parent="."]
+layout_mode = 2
+title = "Part — Appearance"
+
+[node name="Grid" type="GridContainer" parent="Appearance"]
+layout_mode = 2
+columns = 2
+
+[node name="ColorLabel" type="Label" parent="Appearance/Grid"]
+layout_mode = 2
+text = "Color"
+
+[node name="PartColor" type="ColorPickerButton" parent="Appearance/Grid"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Paint the whole part (undoable)"
+edit_alpha = false
+
+[node name="MaterialLabel" type="Label" parent="Appearance/Grid"]
+layout_mode = 2
+text = "Material"
+
+[node name="PartMaterial" type="Button" parent="Appearance/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Open the material picker"
+text_overrun_behavior = 3
+alignment = 0
+
+[node name="TransparencyLabel" type="Label" parent="Appearance/Grid"]
+layout_mode = 2
+text = "Transparency"
+
+[node name="PartTransparency" type="SpinBox" parent="Appearance/Grid"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0
+max_value = 1
+step = 0.05
+select_all_on_focus = true
+
+[node name="Transform" type="FoldableContainer" parent="."]
+layout_mode = 2
+title = "Part — Transform"
+
+[node name="Grid" type="GridContainer" parent="Transform"]
+layout_mode = 2
+columns = 2
+
+[node name="SizeLabel" type="Label" parent="Transform/Grid"]
+layout_mode = 2
+text = "Size"
+
+[node name="SizeRow" type="HBoxContainer" parent="Transform/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SizeX" type="SpinBox" parent="Transform/Grid/SizeRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.05
+max_value = 1000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="SizeY" type="SpinBox" parent="Transform/Grid/SizeRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.05
+max_value = 1000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="SizeZ" type="SpinBox" parent="Transform/Grid/SizeRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.05
+max_value = 1000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="PositionLabel" type="Label" parent="Transform/Grid"]
+layout_mode = 2
+text = "Position"
+
+[node name="PositionRow" type="HBoxContainer" parent="Transform/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PositionX" type="SpinBox" parent="Transform/Grid/PositionRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="PositionY" type="SpinBox" parent="Transform/Grid/PositionRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="PositionZ" type="SpinBox" parent="Transform/Grid/PositionRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="OrientationLabel" type="Label" parent="Transform/Grid"]
+layout_mode = 2
+text = "Orientation"
+
+[node name="OrientationRow" type="HBoxContainer" parent="Transform/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OrientationX" type="SpinBox" parent="Transform/Grid/OrientationRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -180
+max_value = 180
+step = 0.1
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="OrientationY" type="SpinBox" parent="Transform/Grid/OrientationRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -180
+max_value = 180
+step = 0.1
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="OrientationZ" type="SpinBox" parent="Transform/Grid/OrientationRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -180
+max_value = 180
+step = 0.1
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+
+[node name="PivotOffsetLabel" type="Label" parent="Transform/Grid"]
+layout_mode = 2
+text = "Pivot Offset"
+
+[node name="PivotOffsetRow" type="HBoxContainer" parent="Transform/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PivotX" type="SpinBox" parent="Transform/Grid/PivotOffsetRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+editable = false
+
+[node name="PivotY" type="SpinBox" parent="Transform/Grid/PivotOffsetRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+editable = false
+
+[node name="PivotZ" type="SpinBox" parent="Transform/Grid/PivotOffsetRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -100000
+max_value = 100000
+step = 0.01
+allow_greater = true
+allow_lesser = true
+select_all_on_focus = true
+editable = false
+
+[node name="Part" type="FoldableContainer" parent="."]
+layout_mode = 2
+title = "Part"
+
+[node name="Grid" type="GridContainer" parent="Part"]
+layout_mode = 2
+columns = 2
+
+[node name="ShapeLabel" type="Label" parent="Part/Grid"]
+layout_mode = 2
+text = "Shape"
+
+[node name="PartShape" type="Label" parent="Part/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LockedLabel" type="Label" parent="Part/Grid"]
+layout_mode = 2
+text = "Locked"
+
+[node name="PartLocked" type="CheckBox" parent="Part/Grid"]
+layout_mode = 2
+tooltip_text = "Locked parts cannot be clicked in the viewport"
+
+[node name="AnchoredLabel" type="Label" parent="Part/Grid"]
+layout_mode = 2
+text = "Anchored"
+
+[node name="PartAnchored" type="CheckBox" parent="Part/Grid"]
+layout_mode = 2
+tooltip_text = "Anchored to a terrain cell (the addon's anchoring, not physics)"
+text = "terrain"
+
+[node name="Behavior" type="FoldableContainer" parent="."]
+layout_mode = 2
+title = "Behavior"
+
+[node name="Grid" type="GridContainer" parent="Behavior"]
+layout_mode = 2
+columns = 2
+
+[node name="CollisionLabel" type="Label" parent="Behavior/Grid"]
+layout_mode = 2
+text = "Collision"
+
+[node name="PartCollision" type="OptionButton" parent="Behavior/Grid"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 3
+popup/item_0/text = "None"
+popup/item_0/id = 0
+popup/item_1/text = "Collider"
+popup/item_1/id = 1
+popup/item_2/text = "Trigger"
+popup/item_2/id = 2
+
+[node name="Separator" type="HSeparator" parent="."]
+layout_mode = 2

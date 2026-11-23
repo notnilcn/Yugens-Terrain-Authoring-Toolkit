@@ -1,0 +1,78 @@
+[gd_scene format=3]
+
+[node name="ModelerCoreHUD" type="PixelModelerHud" node_paths=PackedStringArray("column", "heading", "detail", "snap", "options", "cancel", "done", "tool_options", "shape_row", "shape_caption", "shape", "tool_form_holder", "remove_point")]
+visible = false
+column = NodePath("Column")
+heading = NodePath("Column/Title")
+detail = NodePath("Column/Detail")
+snap = NodePath("Column/Buttons/Snap")
+options = NodePath("Column/Buttons/Options")
+cancel = NodePath("Column/Buttons/Cancel")
+done = NodePath("Column/Buttons/Done")
+tool_options = NodePath("ToolOptions")
+shape_row = NodePath("ToolOptions/Column/ShapeRow")
+shape_caption = NodePath("ToolOptions/Column/ShapeRow/Caption")
+shape = NodePath("ToolOptions/Column/ShapeRow/Shape")
+tool_form_holder = NodePath("ToolOptions/Column/ToolForm")
+remove_point = NodePath("ToolOptions/Column/Commands/RemovePoint")
+
+[node name="Column" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Column"]
+layout_mode = 2
+
+[node name="Detail" type="Label" parent="Column"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="Column"]
+layout_mode = 2
+alignment = 2
+
+[node name="Snap" type="Button" parent="Column/Buttons"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Snap"
+toggle_mode = true
+
+[node name="Options" type="Button" parent="Column/Buttons"]
+layout_mode = 2
+focus_mode = 0
+text = "Options"
+
+[node name="Cancel" type="Button" parent="Column/Buttons"]
+layout_mode = 2
+focus_mode = 0
+text = "Cancel"
+
+[node name="Done" type="Button" parent="Column/Buttons"]
+layout_mode = 2
+focus_mode = 0
+text = "Done"
+
+[node name="ToolOptions" type="PopupPanel" parent="."]
+
+[node name="Column" type="VBoxContainer" parent="ToolOptions"]
+
+[node name="ShapeRow" type="HBoxContainer" parent="ToolOptions/Column"]
+layout_mode = 2
+
+[node name="Caption" type="Label" parent="ToolOptions/Column/ShapeRow"]
+layout_mode = 2
+text = "Shape"
+
+[node name="Shape" type="OptionButton" parent="ToolOptions/Column/ShapeRow"]
+layout_mode = 2
+focus_mode = 0
+
+[node name="ToolForm" type="VBoxContainer" parent="ToolOptions/Column"]
+layout_mode = 2
+
+[node name="Commands" type="HFlowContainer" parent="ToolOptions/Column"]
+layout_mode = 2
+
+[node name="RemovePoint" type="Button" parent="ToolOptions/Column/Commands"]
+layout_mode = 2
+focus_mode = 0
+text = "Remove Point"

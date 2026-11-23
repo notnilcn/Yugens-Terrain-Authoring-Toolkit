@@ -1,0 +1,891 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_tabs"]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_material_view"]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_align_mode"]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_align_space"]
+
+[node name="PixelRobloxRibbon" type="PixelRobloxRibbon" node_paths=PackedStringArray("model_tab", "edit_tab", "pages", "model_page", "edit_page", "grid_step", "rot_step", "drag_mode", "pivot_menu", "part_menu", "group_menu", "lock_menu", "anchor_menu", "select_menu", "more_shapes", "roblox_select", "gizmo_move", "gizmo_scale", "gizmo_rotate", "gizmo_transform", "snap_grid", "rot_snap_toggle", "tool_edit_pivot", "center_pivot", "insert_part_at_view", "material_picker", "color_picker", "paint_colour", "click_to_paint", "group_selection", "toggle_lock", "toggle_anchor", "align_panel", "roblox_union", "roblox_intersect", "separate", "negate", "mode_object", "mode_face", "mode_edge", "mode_vertex", "extrude", "inset", "bevel", "insert_loop", "bridge", "merge", "delete", "uv_editor", "pivot_to_selection", "material_popup", "material_search", "material_grid", "material_list", "material_shelves", "material_items", "material_empty", "color_popup", "honeycomb", "custom_colour", "align_popup", "align_min", "align_center", "align_max", "align_x", "align_y", "align_z", "align_relative", "align_local", "align_apply")]
+model_tab = NodePath("Tabs/ModelTab")
+edit_tab = NodePath("Tabs/EditTab")
+pages = NodePath("Pages")
+model_page = NodePath("Pages/Stack/ModelPage")
+edit_page = NodePath("Pages/Stack/EditPage")
+grid_step = NodePath("Pages/Stack/ModelPage/Snap/SnapRows/MoveRow/GridStep")
+rot_step = NodePath("Pages/Stack/ModelPage/Snap/SnapRows/RotateRow/RotStep")
+drag_mode = NodePath("Pages/Stack/ModelPage/Snap/DragMode")
+pivot_menu = NodePath("Pages/Stack/ModelPage/Pivot/PivotMenu")
+part_menu = NodePath("Pages/Stack/ModelPage/Insert/PartMenu")
+group_menu = NodePath("Pages/Stack/ModelPage/Model/GroupMenu")
+lock_menu = NodePath("Pages/Stack/ModelPage/Model/LockMenu")
+anchor_menu = NodePath("Pages/Stack/ModelPage/Model/AnchorMenu")
+select_menu = NodePath("Pages/Stack/EditPage/Selection/SelectMenu")
+more_shapes = NodePath("Pages/Stack/ModelPage/Insert/MoreShapes")
+roblox_select = NodePath("Pages/Stack/ModelPage/Tools/RobloxSelect")
+gizmo_move = NodePath("Pages/Stack/ModelPage/Tools/GizmoMove")
+gizmo_scale = NodePath("Pages/Stack/ModelPage/Tools/GizmoScale")
+gizmo_rotate = NodePath("Pages/Stack/ModelPage/Tools/GizmoRotate")
+gizmo_transform = NodePath("Pages/Stack/ModelPage/Tools/GizmoTransform")
+snap_grid = NodePath("Pages/Stack/ModelPage/Snap/SnapRows/MoveRow/SnapGrid")
+rot_snap_toggle = NodePath("Pages/Stack/ModelPage/Snap/SnapRows/RotateRow/RotSnapToggle")
+tool_edit_pivot = NodePath("Pages/Stack/ModelPage/Pivot/ToolEditPivot")
+center_pivot = NodePath("Pages/Stack/ModelPage/Pivot/CenterPivot")
+insert_part_at_view = NodePath("Pages/Stack/ModelPage/Insert/InsertPartAtView")
+material_picker = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPicker")
+color_picker = NodePath("Pages/Stack/ModelPage/Appearance/ColorPicker")
+paint_colour = NodePath("Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/CustomRow/PaintColour")
+click_to_paint = NodePath("Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/PaintRow/ClickToPaint")
+group_selection = NodePath("Pages/Stack/ModelPage/Model/GroupSelection")
+toggle_lock = NodePath("Pages/Stack/ModelPage/Model/ToggleLock")
+toggle_anchor = NodePath("Pages/Stack/ModelPage/Model/ToggleAnchor")
+align_panel = NodePath("Pages/Stack/ModelPage/Align/AlignPanel")
+roblox_union = NodePath("Pages/Stack/ModelPage/SolidModeling/RobloxUnion")
+roblox_intersect = NodePath("Pages/Stack/ModelPage/SolidModeling/RobloxIntersect")
+separate = NodePath("Pages/Stack/ModelPage/SolidModeling/Separate")
+negate = NodePath("Pages/Stack/ModelPage/SolidModeling/Negate")
+mode_object = NodePath("Pages/Stack/EditPage/Modes/ModeObject")
+mode_face = NodePath("Pages/Stack/EditPage/Modes/ModeFace")
+mode_edge = NodePath("Pages/Stack/EditPage/Modes/ModeEdge")
+mode_vertex = NodePath("Pages/Stack/EditPage/Modes/ModeVertex")
+extrude = NodePath("Pages/Stack/EditPage/MeshOps/Extrude")
+inset = NodePath("Pages/Stack/EditPage/MeshOps/Inset")
+bevel = NodePath("Pages/Stack/EditPage/MeshOps/Bevel")
+insert_loop = NodePath("Pages/Stack/EditPage/MeshOps/InsertLoop")
+bridge = NodePath("Pages/Stack/EditPage/MeshOps/Bridge")
+merge = NodePath("Pages/Stack/EditPage/MeshOps/Merge")
+delete = NodePath("Pages/Stack/EditPage/MeshOps/Delete")
+uv_editor = NodePath("Pages/Stack/EditPage/Panels/UvEditor")
+pivot_to_selection = NodePath("Pages/Stack/EditPage/ElementPivot/PivotToSelection")
+material_popup = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup")
+material_search = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow/MaterialSearch")
+material_grid = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow/MaterialGrid")
+material_list = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow/MaterialList")
+material_shelves = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialShelves")
+material_items = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialItems")
+material_empty = NodePath("Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialEmpty")
+color_popup = NodePath("Pages/Stack/ModelPage/Appearance/ColorPopup")
+honeycomb = NodePath("Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/Honeycomb")
+custom_colour = NodePath("Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/CustomRow/CustomColour")
+align_popup = NodePath("Pages/Stack/ModelPage/Align/AlignPopup")
+align_min = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow/AlignMin")
+align_center = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow/AlignCenter")
+align_max = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow/AlignMax")
+align_x = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow/AlignX")
+align_y = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow/AlignY")
+align_z = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow/AlignZ")
+align_relative = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/RelativeRow/AlignRelative")
+align_local = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/SpaceRow/AlignLocal")
+align_apply = NodePath("Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AlignApply")
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="Tabs" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="ModelTab" type="Button" parent="Tabs"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_tabs")
+text = "Model"
+flat = true
+
+[node name="EditTab" type="Button" parent="Tabs"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_tabs")
+text = "Edit"
+flat = true
+
+[node name="Pages" type="ScrollContainer" parent="."]
+layout_mode = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+
+[node name="Stack" type="VBoxContainer" parent="Pages"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ModelPage" type="HFlowContainer" parent="Pages/Stack"]
+layout_mode = 2
+
+[node name="Tools" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="RobloxSelect" type="Button" parent="Pages/Stack/ModelPage/Tools"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Select"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="GizmoMove" type="Button" parent="Pages/Stack/ModelPage/Tools"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Move"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="GizmoScale" type="Button" parent="Pages/Stack/ModelPage/Tools"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Scale"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="GizmoRotate" type="Button" parent="Pages/Stack/ModelPage/Tools"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Rotate"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="GizmoTransform" type="Button" parent="Pages/Stack/ModelPage/Tools"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Transform"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ToolsRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Snap" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="DragMode" type="MenuButton" parent="Pages/Stack/ModelPage/Snap"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "Geometric"
+item_count = 7
+popup/item_0/text = "Geometric"
+popup/item_0/checkable = 2
+popup/item_0/id = 0
+popup/item_1/text = "Surface"
+popup/item_1/checkable = 2
+popup/item_1/id = 1
+popup/item_2/text = ""
+popup/item_2/separator = true
+popup/item_2/id = 2
+popup/item_3/text = "Collisions"
+popup/item_3/checkable = 1
+popup/item_3/id = 3
+popup/item_4/text = "Snap: Use Bounding Boxes"
+popup/item_4/checkable = 1
+popup/item_4/id = 6
+popup/item_5/text = "Snap to Parts"
+popup/item_5/checkable = 1
+popup/item_5/id = 4
+popup/item_6/text = "Snap to Terrain Cells"
+popup/item_6/checkable = 1
+popup/item_6/id = 5
+
+[node name="SnapRows" type="VBoxContainer" parent="Pages/Stack/ModelPage/Snap"]
+layout_mode = 2
+alignment = 1
+
+[node name="MoveRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Snap/SnapRows"]
+layout_mode = 2
+
+[node name="SnapGrid" type="CheckBox" parent="Pages/Stack/ModelPage/Snap/SnapRows/MoveRow"]
+layout_mode = 2
+focus_mode = 0
+
+[node name="GridStep" type="SpinBox" parent="Pages/Stack/ModelPage/Snap/SnapRows/MoveRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(84, 0)
+min_value = 0.0625
+max_value = 64.0
+step = 0.0625
+value = 1.0
+suffix = "m"
+select_all_on_focus = true
+
+[node name="RotateRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Snap/SnapRows"]
+layout_mode = 2
+
+[node name="RotSnapToggle" type="CheckBox" parent="Pages/Stack/ModelPage/Snap/SnapRows/RotateRow"]
+layout_mode = 2
+focus_mode = 0
+
+[node name="RotStep" type="SpinBox" parent="Pages/Stack/ModelPage/Snap/SnapRows/RotateRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(84, 0)
+min_value = 1.0
+max_value = 90.0
+value = 45.0
+suffix = "°"
+select_all_on_focus = true
+
+[node name="SnapRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Pivot" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="ToolEditPivot" type="Button" parent="Pages/Stack/ModelPage/Pivot"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Pivot"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="PivotMenu" type="MenuButton" parent="Pages/Stack/ModelPage/Pivot"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "▾"
+item_count = 1
+popup/item_0/text = "Snap"
+popup/item_0/checkable = 1
+popup/item_0/id = 0
+
+[node name="CenterPivot" type="Button" parent="Pages/Stack/ModelPage/Pivot"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Reset"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="PivotRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Insert" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="InsertPartAtView" type="Button" parent="Pages/Stack/ModelPage/Insert"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Part"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="PartMenu" type="MenuButton" parent="Pages/Stack/ModelPage/Insert"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "▾"
+item_count = 6
+popup/item_0/text = "Block"
+popup/item_0/id = 0
+popup/item_1/text = "Sphere"
+popup/item_1/id = 4
+popup/item_2/text = "Wedge"
+popup/item_2/id = 7
+popup/item_3/text = "Corner Wedge"
+popup/item_3/id = 20
+popup/item_4/text = "Cylinder"
+popup/item_4/id = 2
+popup/item_5/text = ""
+popup/item_5/separator = true
+popup/item_5/id = 1000
+
+[node name="MoreShapes" type="PopupMenu" parent="Pages/Stack/ModelPage/Insert"]
+
+[node name="InsertRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Appearance" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="MaterialPicker" type="Button" parent="Pages/Stack/ModelPage/Appearance"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Material"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ColorPicker" type="Button" parent="Pages/Stack/ModelPage/Appearance"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Color"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="MaterialPopup" type="PopupPanel" parent="Pages/Stack/ModelPage/Appearance"]
+
+[node name="MaterialColumn" type="VBoxContainer" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 4.0
+offset_bottom = 4.0
+
+[node name="MaterialTitle" type="Label" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+layout_mode = 2
+text = "Material"
+
+[node name="MaterialHint" type="Label" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+text = "Select a material to apply"
+
+[node name="MaterialSearchRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+layout_mode = 2
+
+[node name="MaterialSearch" type="LineEdit" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search materials"
+clear_button_enabled = true
+
+[node name="MaterialGrid" type="Button" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow"]
+layout_mode = 2
+tooltip_text = "Grid view"
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_material_view")
+text = "Grid"
+
+[node name="MaterialList" type="Button" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn/MaterialSearchRow"]
+layout_mode = 2
+tooltip_text = "List view"
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_material_view")
+text = "List"
+
+[node name="MaterialShelves" type="TabBar" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+layout_mode = 2
+focus_mode = 0
+current_tab = 1
+clip_tabs = false
+tab_count = 3
+tab_0/title = "Recent"
+tab_1/title = "Project"
+tab_2/title = "Built-in"
+
+[node name="MaterialItems" type="ItemList" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+custom_minimum_size = Vector2(340, 420)
+layout_mode = 2
+focus_mode = 0
+same_column_width = true
+fixed_icon_size = Vector2i(32, 32)
+
+[node name="MaterialEmpty" type="Label" parent="Pages/Stack/ModelPage/Appearance/MaterialPopup/MaterialColumn"]
+visible = false
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 2
+text = "No materials here"
+horizontal_alignment = 1
+
+[node name="ColorPopup" type="PopupPanel" parent="Pages/Stack/ModelPage/Appearance"]
+
+[node name="ColorColumn" type="VBoxContainer" parent="Pages/Stack/ModelPage/Appearance/ColorPopup"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 4.0
+offset_bottom = 4.0
+
+[node name="Honeycomb" type="TextureRect" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn"]
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 0
+mouse_default_cursor_shape = 2
+stretch_mode = 2
+
+[node name="ColorRule" type="HSeparator" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn"]
+layout_mode = 2
+
+[node name="PaintRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn"]
+layout_mode = 2
+
+[node name="ClickToPaint" type="CheckButton" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/PaintRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+toggle_mode = true
+text = "Click object to apply color"
+
+[node name="CustomRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn"]
+layout_mode = 2
+
+[node name="CustomColour" type="ColorPickerButton" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/CustomRow"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Pick any colour; Apply paints it"
+focus_mode = 0
+edit_alpha = false
+
+[node name="PaintColour" type="Button" parent="Pages/Stack/ModelPage/Appearance/ColorPopup/ColorColumn/CustomRow"]
+layout_mode = 2
+focus_mode = 0
+text = "Apply"
+
+[node name="AppearanceRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Model" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="GroupSelection" type="Button" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Group"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="GroupMenu" type="MenuButton" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "▾"
+item_count = 3
+popup/item_0/text = "Group as Model"
+popup/item_0/id = 0
+popup/item_1/text = "Group as Folder"
+popup/item_1/id = 1
+popup/item_2/text = "Ungroup"
+popup/item_2/id = 2
+
+[node name="ToggleLock" type="Button" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Lock"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="LockMenu" type="MenuButton" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "▾"
+item_count = 1
+popup/item_0/text = "Click object to lock"
+popup/item_0/checkable = 1
+popup/item_0/id = 0
+
+[node name="ToggleAnchor" type="Button" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Anchor"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="AnchorMenu" type="MenuButton" parent="Pages/Stack/ModelPage/Model"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "▾"
+item_count = 1
+popup/item_0/text = "Click object to anchor"
+popup/item_0/checkable = 1
+popup/item_0/id = 0
+
+[node name="ModelRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="Align" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="AlignPanel" type="Button" parent="Pages/Stack/ModelPage/Align"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Align"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="AlignPopup" type="PopupPanel" parent="Pages/Stack/ModelPage/Align"]
+
+[node name="AlignColumn" type="VBoxContainer" parent="Pages/Stack/ModelPage/Align/AlignPopup"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 4.0
+offset_bottom = 4.0
+
+[node name="AlignTitle" type="Label" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+text = "Align"
+
+[node name="ModeRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+
+[node name="ModeLabel" type="Label" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Mode"
+
+[node name="AlignMin" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_align_mode")
+text = "Min"
+
+[node name="AlignCenter" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_align_mode")
+text = "Center"
+
+[node name="AlignMax" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/ModeRow"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_align_mode")
+text = "Max"
+
+[node name="SpaceRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+
+[node name="SpaceLabel" type="Label" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/SpaceRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Align In"
+
+[node name="AlignWorld" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/SpaceRow"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("ButtonGroup_align_space")
+text = "World"
+
+[node name="AlignLocal" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/SpaceRow"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_align_space")
+text = "Local"
+
+[node name="AxesRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+
+[node name="AxesLabel" type="Label" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Axes"
+
+[node name="AlignX" type="CheckBox" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow"]
+layout_mode = 2
+focus_mode = 0
+button_pressed = true
+text = "X"
+
+[node name="AlignY" type="CheckBox" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow"]
+layout_mode = 2
+focus_mode = 0
+text = "Y"
+
+[node name="AlignZ" type="CheckBox" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/AxesRow"]
+layout_mode = 2
+focus_mode = 0
+text = "Z"
+
+[node name="RelativeRow" type="HBoxContainer" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+
+[node name="RelativeLabel" type="Label" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/RelativeRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Relative To"
+
+[node name="AlignRelative" type="OptionButton" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn/RelativeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+selected = 0
+item_count = 2
+popup/item_0/text = "Selection Bounds"
+popup/item_0/id = 0
+popup/item_1/text = "Active Object"
+popup/item_1/id = 1
+
+[node name="AlignApply" type="Button" parent="Pages/Stack/ModelPage/Align/AlignPopup/AlignColumn"]
+layout_mode = 2
+focus_mode = 0
+text = "Align"
+
+[node name="AlignRule" type="VSeparator" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="SolidModeling" type="HBoxContainer" parent="Pages/Stack/ModelPage"]
+layout_mode = 2
+
+[node name="RobloxUnion" type="Button" parent="Pages/Stack/ModelPage/SolidModeling"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Union"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="RobloxIntersect" type="Button" parent="Pages/Stack/ModelPage/SolidModeling"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Intersect"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Separate" type="Button" parent="Pages/Stack/ModelPage/SolidModeling"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Separate"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Negate" type="Button" parent="Pages/Stack/ModelPage/SolidModeling"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Negate"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="EditPage" type="HFlowContainer" parent="Pages/Stack"]
+visible = false
+layout_mode = 2
+
+[node name="Modes" type="HBoxContainer" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="ModeObject" type="Button" parent="Pages/Stack/EditPage/Modes"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Object"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ModeFace" type="Button" parent="Pages/Stack/EditPage/Modes"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Face"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ModeEdge" type="Button" parent="Pages/Stack/EditPage/Modes"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Edge"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ModeVertex" type="Button" parent="Pages/Stack/EditPage/Modes"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+toggle_mode = true
+text = "Vertex"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ModesRule" type="VSeparator" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="MeshOps" type="HBoxContainer" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="Extrude" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Extrude"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Inset" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Inset"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Bevel" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Bevel"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="InsertLoop" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Loop Cut"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Bridge" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Bridge"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Merge" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Merge"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="Delete" type="Button" parent="Pages/Stack/EditPage/MeshOps"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Delete"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="MeshOpsRule" type="VSeparator" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="Selection" type="HBoxContainer" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="SelectMenu" type="MenuButton" parent="Pages/Stack/EditPage/Selection"]
+layout_mode = 2
+custom_minimum_size = Vector2(14, 54)
+focus_mode = 0
+flat = true
+text = "Select"
+item_count = 5
+popup/item_0/text = "Select Loop"
+popup/item_0/id = 0
+popup/item_1/text = "Select Ring"
+popup/item_1/id = 1
+popup/item_2/text = "Grow"
+popup/item_2/id = 2
+popup/item_3/text = "Shrink"
+popup/item_3/id = 3
+popup/item_4/text = "Similar"
+popup/item_4/id = 4
+
+[node name="SelectionRule" type="VSeparator" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="ElementPivot" type="HBoxContainer" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="PivotToSelection" type="Button" parent="Pages/Stack/EditPage/ElementPivot"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "Pivot to Sel."
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13
+
+[node name="ElementPivotRule" type="VSeparator" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="Panels" type="HBoxContainer" parent="Pages/Stack/EditPage"]
+layout_mode = 2
+
+[node name="UvEditor" type="Button" parent="Pages/Stack/EditPage/Panels"]
+layout_mode = 2
+custom_minimum_size = Vector2(56, 54)
+focus_mode = 0
+text = "UV"
+flat = true
+icon_alignment = 1
+vertical_icon_alignment = 0
+theme_override_font_sizes/font_size = 13

@@ -1,0 +1,15 @@
+.godot/
+*.translation
+rust/target/
+addons/MarchingSquaresTerrain/rust/target/
+*.tmp
+build/
+__pycache__/
+*.pyc
+
+# Rust build output copied next to the .gdextension files by tools/build.sh
+#**/bin/*.so
+#**/bin/*.dll
+#**/bin/*.dylib
+#**/bin/*.pdb
+#**/bin/~*

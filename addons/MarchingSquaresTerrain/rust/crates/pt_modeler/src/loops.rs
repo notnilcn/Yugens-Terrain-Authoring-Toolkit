@@ -1,0 +1,753 @@
+use super::model::{BMesh, Edge, edge, newell};
+use pt_geom::math::*;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+pub struct Topo {
+    pub edge_faces: BTreeMap<Edge, Vec<usize>>,
+    pub vertex_edges: Vec<Vec<Edge>>,
+}
+impl Topo {
+    pub fn assemble(m: &BMesh) -> Topo {
+        let n = m.positions.len();
+        let mut edge_faces: BTreeMap<Edge, Vec<usize>> = BTreeMap::new();
+        for (fi, f) in m.facets.iter().enumerate() {
+            for (a, b) in f.loop_edges() {
+                if (a as usize) < n && (b as usize) < n {
+                    edge_faces.entry(edge(a, b)).or_default().push(fi);
+                }
+            }
+        }
+        let mut vertex_edges = vec![Vec::new(); n];
+        for e in edge_faces.keys() {
+            vertex_edges[e.0 as usize].push(*e);
+            vertex_edges[e.1 as usize].push(*e);
+        }
+        Topo {
+            edge_faces,
+            vertex_edges,
+        }
+    }
+    fn faces_of(&self, e: Edge) -> &[usize] {
+        self.edge_faces.get(&e).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+}
+pub fn exposed_ridges(t: &Topo) -> BTreeSet<Edge> {
+    t.edge_faces
+        .iter()
+        .filter(|(_, f)| f.len() == 1)
+        .map(|(e, _)| *e)
+        .collect()
+}
+pub fn edge_chain(t: &Topo, start: Edge) -> Vec<Edge> {
+    walk_edges(t, start, straight_next_edge)
+}
+pub fn edge_loop(m: &BMesh, t: &Topo, start: Edge) -> Vec<Edge> {
+    let lp = walk_edges(t, start, loop_next_edge);
+    if lp.len() > 1 {
+        return lp;
+    }
+    let Some(&f) = t.faces_of(start).first() else {
+        return lp;
+    };
+    let mut around = vec![start];
+    around.extend(
+        m.facets[f]
+            .loop_edges()
+            .map(|(a, b)| edge(a, b))
+            .filter(|e| *e != start),
+    );
+    around
+}
+fn loop_next_edge(t: &Topo, e: Edge, pivot: u32) -> Option<Edge> {
+    if t.faces_of(e).len() != 1 {
+        return straight_next_edge(t, e, pivot);
+    }
+    let mut open = t.vertex_edges[pivot as usize]
+        .iter()
+        .filter(|e2| **e2 != e && t.faces_of(**e2).len() == 1);
+    let next = open.next().copied();
+    if open.next().is_some() {
+        return None;
+    }
+    next
+}
+fn walk_edges(t: &Topo, start: Edge, step: fn(&Topo, Edge, u32) -> Option<Edge>) -> Vec<Edge> {
+    let mut lp = vec![start];
+    if !t.edge_faces.contains_key(&start) {
+        return lp;
+    }
+    let mut visited = BTreeSet::from([start]);
+    for start_vertex in [start.0, start.1] {
+        let mut e = start;
+        let mut pivot = start_vertex;
+        loop {
+            let Some(next) = step(t, e, pivot) else {
+                break;
+            };
+            if !visited.insert(next) {
+                break;
+            }
+            lp.push(next);
+            pivot = if next.0 == pivot { next.1 } else { next.0 };
+            e = next;
+        }
+    }
+    lp
+}
+fn straight_next_edge(t: &Topo, e: Edge, pivot: u32) -> Option<Edge> {
+    let ve = &t.vertex_edges[pivot as usize];
+    if ve.len() != 4 {
+        return None;
+    }
+    let ef: BTreeSet<usize> = t.faces_of(e).iter().copied().collect();
+    let mut candidate = None;
+    for e2 in ve {
+        if *e2 == e {
+            continue;
+        }
+        let shares = t.faces_of(*e2).iter().any(|f| ef.contains(f));
+        if !shares {
+            if candidate.is_some() {
+                return None;
+            }
+            candidate = Some(*e2);
+        }
+    }
+    candidate
+}
+fn opposite_edge(m: &BMesh, fi: usize, e: Edge) -> Option<Edge> {
+    let v = &m.facets[fi].verts;
+    if v.len() != 4 {
+        return None;
+    }
+    (0..4)
+        .find(|i| edge(v[*i], v[(i + 1) % 4]) == e)
+        .map(|i| edge(v[(i + 2) % 4], v[(i + 3) % 4]))
+}
+pub fn quad_ring(m: &BMesh, t: &Topo, start: Edge) -> Vec<Edge> {
+    let mut ring = vec![start];
+    let mut visited = BTreeSet::from([start]);
+    for &f0 in t.faces_of(start) {
+        let mut e = start;
+        let mut fi = f0;
+        loop {
+            let Some(opp) = opposite_edge(m, fi, e) else {
+                break;
+            };
+            if !visited.insert(opp) {
+                break;
+            }
+            ring.push(opp);
+            let Some(nf) = t.faces_of(opp).iter().copied().find(|f| *f != fi) else {
+                break;
+            };
+            fi = nf;
+            e = opp;
+        }
+    }
+    ring
+}
+pub fn face_strip(m: &BMesh, t: &Topo, start_face: usize, direction_edge: Edge) -> BTreeSet<usize> {
+    let mut out = BTreeSet::from([start_face]);
+    face_walk(m, t, start_face, direction_edge, &mut out);
+    if let Some(f) = t
+        .faces_of(direction_edge)
+        .iter()
+        .copied()
+        .find(|f| *f != start_face)
+    {
+        out.insert(f);
+        face_walk(m, t, f, direction_edge, &mut out);
+    }
+    out
+}
+fn face_walk(m: &BMesh, t: &Topo, mut fi: usize, mut entry: Edge, out: &mut BTreeSet<usize>) {
+    loop {
+        let Some(opp) = opposite_edge(m, fi, entry) else {
+            return;
+        };
+        let Some(nf) = t.faces_of(opp).iter().copied().find(|f| *f != fi) else {
+            return;
+        };
+        if !out.insert(nf) {
+            return;
+        }
+        entry = opp;
+        fi = nf;
+    }
+}
+pub fn expand_vertices(t: &Topo, sel: &BTreeSet<u32>) -> BTreeSet<u32> {
+    let mut out = sel.clone();
+    for v in sel {
+        if let Some(es) = t.vertex_edges.get(*v as usize) {
+            for e in es {
+                out.insert(e.0);
+                out.insert(e.1);
+            }
+        }
+    }
+    out
+}
+pub fn contract_vertices(t: &Topo, sel: &BTreeSet<u32>) -> BTreeSet<u32> {
+    sel.iter()
+        .copied()
+        .filter(|v| {
+            t.vertex_edges.get(*v as usize).is_some_and(|es| {
+                es.iter()
+                    .all(|e| sel.contains(&if e.0 == *v { e.1 } else { e.0 }))
+            })
+        })
+        .collect()
+}
+pub fn expand_edges(t: &Topo, sel: &BTreeSet<Edge>) -> BTreeSet<Edge> {
+    let mut out = sel.clone();
+    for e in sel {
+        if !t.edge_faces.contains_key(e) {
+            continue;
+        }
+        for v in [e.0, e.1] {
+            out.extend(t.vertex_edges[v as usize].iter().copied());
+        }
+    }
+    out
+}
+pub fn contract_edges(t: &Topo, sel: &BTreeSet<Edge>) -> BTreeSet<Edge> {
+    sel.iter()
+        .copied()
+        .filter(|e| {
+            t.edge_faces.contains_key(e)
+                && [e.0, e.1].iter().all(|v| {
+                    t.vertex_edges[*v as usize]
+                        .iter()
+                        .all(|e2| e2 == e || sel.contains(e2))
+                })
+        })
+        .collect()
+}
+pub fn contract_faces(m: &BMesh, t: &Topo, sel: &BTreeSet<usize>) -> BTreeSet<usize> {
+    sel.iter()
+        .copied()
+        .filter(|fi| {
+            *fi < m.facets.len()
+                && m.facets[*fi].loop_edges().all(|(a, b)| {
+                    t.faces_of(edge(a, b))
+                        .iter()
+                        .all(|nf| nf == fi || sel.contains(nf))
+                })
+        })
+        .collect()
+}
+pub fn interleave_ridge_points(
+    m: &mut BMesh,
+    points: &BTreeMap<Edge, Vec<u32>>,
+    skip: &BTreeSet<usize>,
+) {
+    let positions = &m.positions;
+    for (fi, f) in m.facets.iter_mut().enumerate() {
+        if skip.contains(&fi) {
+            continue;
+        }
+        let n = f.verts.len();
+        let has_uv = f.uv_manual && f.uv_coords.len() == n;
+        let has_col = f.color_corners.len() == n;
+        let mut out = Vec::with_capacity(n + 2);
+        let mut out_uv = Vec::new();
+        let mut out_col = Vec::new();
+        let mut changed = false;
+        for i in 0..n {
+            let (a, b) = (f.verts[i], f.verts[(i + 1) % n]);
+            out.push(a);
+            if has_uv {
+                out_uv.push(f.uv_coords[i]);
+            }
+            if has_col {
+                out_col.push(f.color_corners[i]);
+            }
+            let key = edge(a, b);
+            let Some(pts) = points.get(&key) else {
+                continue;
+            };
+            changed = true;
+            let inserted: Vec<u32> = if a == key.0 {
+                pts.clone()
+            } else {
+                pts.iter().rev().copied().collect()
+            };
+            out.extend(inserted.iter().copied());
+            if !(has_uv || has_col) {
+                continue;
+            }
+            let pa = positions[a as usize];
+            let ab = positions[b as usize] - pa;
+            let len2 = ab.innerprod(ab);
+            for vi in inserted {
+                let t = if len2 > 2e-12 {
+                    ((positions[vi as usize] - pa).innerprod(ab) / len2).clamp(0.0, 1.0)
+                } else {
+                    0.5
+                };
+                if has_uv {
+                    out_uv.push(f.uv_coords[i].lerp(f.uv_coords[(i + 1) % n], t));
+                }
+                if has_col {
+                    out_col.push(lerp_color(
+                        f.color_corners[i],
+                        f.color_corners[(i + 1) % n],
+                        t,
+                    ));
+                }
+            }
+        }
+        if changed {
+            f.verts = out;
+            if has_uv {
+                f.uv_coords = out_uv;
+            }
+            if has_col {
+                f.color_corners = out_col;
+            }
+        }
+    }
+}
+pub fn lerp_color(a: [u8; 4], b: [u8; 4], t: f32) -> [u8; 4] {
+    let mut o = [0u8; 4];
+    for k in 0..4 {
+        o[k] = (a[k] as f32 + (b[k] as f32 - a[k] as f32) * t)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+    }
+    o
+}
+pub fn loop_cut(m: &mut BMesh, start_edge: Edge, cuts: u32) -> BTreeSet<Edge> {
+    let cuts = cuts.max(1);
+    let t = Topo::assemble(m);
+    if !t.edge_faces.contains_key(&start_edge) {
+        return BTreeSet::new();
+    }
+    let ring = quad_ring(m, &t, start_edge);
+    let ring_set: BTreeSet<Edge> = ring.iter().copied().collect();
+    let mut points: BTreeMap<Edge, Vec<u32>> = BTreeMap::new();
+    for e in &ring {
+        let (pa, pb) = (m.positions[e.0 as usize], m.positions[e.1 as usize]);
+        let list = (1..=cuts)
+            .map(|s| m.add_vert(pa.lerp(pb, s as f32 / (cuts + 1) as f32)))
+            .collect();
+        points.insert(*e, list);
+    }
+    let seq = |from: u32, to: u32| -> Vec<u32> {
+        let key = edge(from, to);
+        let list = &points[&key];
+        let mut s = vec![from];
+        if from == key.0 {
+            s.extend(list.iter().copied());
+        } else {
+            s.extend(list.iter().rev().copied());
+        }
+        s.push(to);
+        s
+    };
+    let mut new_edges = BTreeSet::new();
+    let original = m.facets.len();
+    for fi in 0..original {
+        let v = m.facets[fi].verts.clone();
+        if v.len() != 4 {
+            continue;
+        }
+        let hits: Vec<usize> = (0..4)
+            .filter(|i| ring_set.contains(&edge(v[*i], v[(i + 1) % 4])))
+            .collect();
+        if hits.len() != 2 || hits[1] - hits[0] != 2 {
+            continue;
+        }
+        let i0 = hits[0];
+        let (v0, v1, v2, v3) = (v[i0], v[(i0 + 1) % 4], v[(i0 + 2) % 4], v[(i0 + 3) % 4]);
+        let a = seq(v0, v1);
+        let b = seq(v3, v2);
+        let template = m.facets[fi].clone();
+        m.facets[fi].verts = vec![a[0], a[1], b[1], b[0]];
+        for j in 1..=cuts as usize {
+            m.facets
+                .push(template.with_verts(vec![a[j], a[j + 1], b[j + 1], b[j]]));
+            new_edges.insert(edge(a[j], b[j]));
+        }
+    }
+    interleave_ridge_points(m, &points, &BTreeSet::new());
+    new_edges
+}
+fn traversal(m: &BMesh, fi: usize, e: Edge) -> Option<(u32, u32)> {
+    m.facets[fi].loop_edges().find(|(a, b)| edge(*a, *b) == e)
+}
+fn degenerate(m: &BMesh, lp: &[u32]) -> bool {
+    let pts: Vec<Vec3> = lp.iter().map(|v| m.positions[*v as usize]).collect();
+    let mut scale: f32 = 0.0;
+    for i in 0..pts.len() {
+        for j in i + 1..pts.len() {
+            scale = scale.max((pts[i] - pts[j]).magnitude());
+        }
+    }
+    for i in 0..pts.len() {
+        for j in i + 1..pts.len() {
+            if (pts[i] - pts[j]).magnitude() <= 0.0004 * scale {
+                return true;
+            }
+        }
+    }
+    newell(&pts).magnitude() <= 0.0004 * scale * scale
+}
+fn folded_loop(m: &BMesh, lp: &[u32]) -> bool {
+    let n = lp.len();
+    let p = |i: usize| m.positions[lp[i] as usize];
+    let turns: Vec<Vec3> = (0..n)
+        .map(|i| (p((i + 1) % n) - p(i)).cross(p((i + n - 1) % n) - p(i)))
+        .collect();
+    let total = turns.iter().fold(Vec3::ZERO, |a, b| a + *b);
+    total.innerprod(total) <= 0.0 || turns.iter().any(|t| t.innerprod(total) < 0.0)
+}
+fn side_ok(m: &BMesh, t: &Topo, u: u32, v: u32) -> bool {
+    let sharers = t.faces_of(edge(u, v));
+    match sharers {
+        [] => true,
+        [f] => traversal(m, *f, edge(u, v)) == Some((v, u)),
+        _ => false,
+    }
+}
+pub fn span_ridges(m: &mut BMesh, e1: Edge, e2: Edge) -> Option<usize> {
+    let t = Topo::assemble(m);
+    let (f1, f2) = (t.faces_of(e1), t.faces_of(e2));
+    if f1.len() != 1 || f2.len() != 1 {
+        return None;
+    }
+    if e1.0 == e2.0 || e1.0 == e2.1 || e1.1 == e2.0 || e1.1 == e2.1 {
+        return None;
+    }
+    let (a, b) = traversal(m, f1[0], e1)?;
+    let (mut c, mut d) = traversal(m, f2[0], e2)?;
+    if folded_loop(m, &[b, a, d, c]) {
+        std::mem::swap(&mut c, &mut d);
+    }
+    if !side_ok(m, &t, a, d) || !side_ok(m, &t, c, b) {
+        return None;
+    }
+    if degenerate(m, &[b, a, d, c]) {
+        return None;
+    }
+    let src = m.facets[f1[0]].clone();
+    m.facets.push(src.with_verts(vec![b, a, d, c]));
+    Some(m.facets.len() - 1)
+}
+pub fn bridge_selected(m: &mut BMesh, edges: &BTreeSet<Edge>) -> BTreeSet<usize> {
+    let t = Topo::assemble(m);
+    let open: Vec<Edge> = edges
+        .iter()
+        .copied()
+        .filter(|e| t.faces_of(*e).len() == 1)
+        .collect();
+    let mut out = BTreeSet::new();
+    if open.len() == 2 {
+        out.extend(span_ridges(m, open[0], open[1]));
+        return out;
+    }
+    let runs = edge_runs(&open);
+    if runs.len() == 2 && runs[0].len() == runs[1].len() {
+        let r1 = closest_pairing(m, &runs[0], &runs[1]);
+        for (a, b) in runs[0].iter().zip(r1.iter()) {
+            out.extend(span_ridges(m, *a, *b));
+        }
+    }
+    out
+}
+fn run_is_closed(run: &[Edge]) -> bool {
+    let (Some(f), Some(l)) = (run.first(), run.last()) else {
+        return false;
+    };
+    run.len() >= 3 && (f.0 == l.0 || f.0 == l.1 || f.1 == l.0 || f.1 == l.1)
+}
+fn closest_pairing(m: &BMesh, r0: &[Edge], r1: &[Edge]) -> Vec<Edge> {
+    let mid = |e: Edge| (m.positions[e.0 as usize] + m.positions[e.1 as usize]) * 0.5;
+    let cost = |c: &[Edge]| {
+        r0.iter()
+            .zip(c)
+            .map(|(a, b)| (mid(*a) - mid(*b)).magnitude())
+            .sum::<f32>()
+    };
+    let shifts = if run_is_closed(r0) && run_is_closed(r1) { r1.len() } else { 1 };
+    let reversed: Vec<Edge> = r1.iter().rev().copied().collect();
+    let mut best: Option<(f32, Vec<Edge>)> = None;
+    for base in [r1, reversed.as_slice()] {
+        for k in 0..shifts {
+            let mut c = base.to_vec();
+            c.rotate_left(k);
+            let d = cost(&c);
+            if best.as_ref().is_none_or(|(bd, _)| d < *bd) {
+                best = Some((d, c));
+            }
+        }
+    }
+    best.map(|(_, c)| c).unwrap_or_else(|| r1.to_vec())
+}
+pub fn edge_runs(edges: &[Edge]) -> Vec<Vec<Edge>> {
+    let mut left: BTreeSet<Edge> = edges.iter().copied().collect();
+    let mut runs = Vec::new();
+    while let Some(&seed) = left.iter().next() {
+        left.remove(&seed);
+        let mut run = std::collections::VecDeque::from([seed]);
+        let (mut head, mut tail) = (seed.0, seed.1);
+        loop {
+            let Some(&n) = left.iter().find(|e| e.0 == tail || e.1 == tail) else {
+                break;
+            };
+            left.remove(&n);
+            tail = if n.0 == tail { n.1 } else { n.0 };
+            run.push_back(n);
+        }
+        loop {
+            let Some(&n) = left.iter().find(|e| e.0 == head || e.1 == head) else {
+                break;
+            };
+            left.remove(&n);
+            head = if n.0 == head { n.1 } else { n.0 };
+            run.push_front(n);
+        }
+        runs.push(run.into_iter().collect());
+    }
+    runs
+}
+pub fn braze_picked_corners(m: &mut BMesh, verts: &BTreeSet<u32>, threshold: f32) -> usize {
+    let idx: Vec<u32> = verts
+        .iter()
+        .copied()
+        .filter(|v| (*v as usize) < m.positions.len())
+        .collect();
+    if idx.len() < 2 {
+        return 0;
+    }
+    let mut parent: HashMap<u32, u32> = idx.iter().map(|v| (*v, *v)).collect();
+    fn locate(p: &mut HashMap<u32, u32>, mut v: u32) -> u32 {
+        while p[&v] != v {
+            let g = p[&p[&v]];
+            p.insert(v, g);
+            v = g;
+        }
+        v
+    }
+    for i in 0..idx.len() {
+        for j in i + 1..idx.len() {
+            let (a, b) = (idx[i], idx[j]);
+            if (m.positions[a as usize] - m.positions[b as usize]).magnitude() <= threshold {
+                let (ra, rb) = (locate(&mut parent, a), locate(&mut parent, b));
+                parent.insert(rb, ra);
+            }
+        }
+    }
+    let mut clusters: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+    for v in &idx {
+        let r = locate(&mut parent, *v);
+        clusters.entry(r).or_default().push(*v);
+    }
+    let mut map = HashMap::new();
+    for members in clusters.values_mut() {
+        if members.len() < 2 {
+            continue;
+        }
+        members.sort();
+        let rep = members[0];
+        let c = members
+            .iter()
+            .fold(Vec3::ZERO, |a, v| a + m.positions[*v as usize])
+            / members.len() as f32;
+        for v in members.iter() {
+            map.insert(*v, rep);
+        }
+        m.positions[rep as usize] = c;
+    }
+    let n = map.values().len() - map.iter().filter(|(k, v)| k == v).count();
+    if n > 0 {
+        super::selection_edits::remap(m, &map);
+    }
+    n
+}
+pub fn mirror_copy(m: &mut BMesh, axis: usize, weld: bool, threshold: f32) {
+    let n0 = m.positions.len() as u32;
+    let f0 = m.facets.len();
+    let flip = |p: Vec3| match axis {
+        0 => v3(-p.x, p.y, p.z),
+        1 => v3(p.x, -p.y, p.z),
+        _ => v3(p.x, p.y, -p.z),
+    };
+    for i in 0..n0 as usize {
+        let p = flip(m.positions[i]);
+        m.positions.push(p);
+    }
+    for fi in 0..f0 {
+        let mut copy = m.facets[fi].clone();
+        for v in &mut copy.verts {
+            *v += n0;
+        }
+        copy.flip_order();
+        m.facets.push(copy);
+    }
+    if weld {
+        let on = |p: Vec3| {
+            match axis {
+                0 => p.x,
+                1 => p.y,
+                _ => p.z,
+            }
+            .abs()
+                <= threshold
+        };
+        let near: BTreeSet<u32> = (0..m.positions.len() as u32)
+            .filter(|v| on(m.positions[*v as usize]))
+            .collect();
+        if near.len() >= 2 {
+            braze_picked_corners(m, &near, threshold * 2.0);
+        }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::super::shapes::{cuboid, sheet};
+    use super::*;
+    #[test]
+    fn chain_and_ring_on_a_grid() {
+        let m = sheet(v2(3.0, 3.0), 3);
+        let t = Topo::assemble(&m);
+        let interior: Vec<Edge> = t
+            .edge_faces
+            .iter()
+            .filter(|(_, f)| f.len() == 2)
+            .map(|(e, _)| *e)
+            .collect();
+        let e = interior[0];
+        let lp = edge_chain(&t, e);
+        assert_eq!(lp.len(), 3, "a straight line across the 3x3 grid: {lp:?}");
+        let ring = quad_ring(&m, &t, e);
+        assert_eq!(ring.len(), 4, "{ring:?}");
+        assert_eq!(exposed_ridges(&t).len(), 12);
+        let fl = face_strip(&m, &t, t.edge_faces[&e][0], e);
+        assert_eq!(fl.len(), 3);
+    }
+    #[test]
+    fn edge_loop_goes_past_poles_and_follows_open_borders() {
+        let c = cuboid(v3(1.0, 1.0, 1.0));
+        let t = Topo::assemble(&c);
+        let e = c.ridges()[0];
+        assert_eq!(
+            edge_chain(&t, e).len(),
+            1,
+            "a box has no valence-four vertices"
+        );
+        let lp = edge_loop(&c, &t, e);
+        assert_eq!(lp.len(), 4, "{lp:?}");
+        assert_eq!(lp[0], e);
+        let g = sheet(v2(3.0, 3.0), 3);
+        let tg = Topo::assemble(&g);
+        let rim = exposed_ridges(&tg);
+        let seed = *rim.iter().next().unwrap();
+        let border = edge_loop(&g, &tg, seed);
+        assert_eq!(
+            border.len(),
+            rim.len(),
+            "walks the whole open border: {border:?}"
+        );
+        let interior = *tg.edge_faces.iter().find(|(_, f)| f.len() == 2).unwrap().0;
+        assert_eq!(edge_loop(&g, &tg, interior), edge_chain(&tg, interior));
+    }
+    #[test]
+    fn loop_cut_around_box() {
+        let mut m = cuboid(v3(1.0, 1.0, 1.0));
+        let e = m
+            .ridges()
+            .into_iter()
+            .find(|(a, b)| (m.positions[*a as usize].y - m.positions[*b as usize].y).abs() > 0.5)
+            .unwrap();
+        let new = loop_cut(&mut m, e, 1);
+        m.sanity_check().unwrap();
+        assert!(m.is_closed());
+        assert_eq!(new.len(), 4, "loop around the four sides");
+        assert_eq!(m.facets.len(), 10);
+        assert!((m.volume() - 1.0).abs() < 0.0015);
+        let mut c = cuboid(v3(1.0, 1.0, 1.0));
+        let e = c.ridges()[0];
+        loop_cut(&mut c, e, 3);
+        c.sanity_check().unwrap();
+        assert!(c.is_closed());
+        assert_eq!(c.facets.len(), 6 + 4 * 3);
+    }
+    #[test]
+    fn bridge_two_planes() {
+        let mut m = sheet(v2(1.0, 1.0), 1);
+        let mut other = sheet(v2(1.0, 1.0), 1);
+        other.displace(v3(0.0, 0.0, 3.0));
+        m.append_tail(&other);
+        let t = Topo::assemble(&m);
+        let pick = |m: &BMesh, z: f32| {
+            t.edge_faces
+                .keys()
+                .copied()
+                .find(|e| {
+                    (m.positions[e.0 as usize].z - z).abs() < 0.0015
+                        && (m.positions[e.1 as usize].z - z).abs() < 0.0015
+                })
+                .unwrap()
+        };
+        let (e1, e2) = (pick(&m, 0.5), pick(&m, 2.5));
+        let f = span_ridges(&mut m, e1, e2).unwrap();
+        m.sanity_check().unwrap();
+        assert!(m.face_normal(f).y > 0.99, "bridge keeps the planes' facing");
+        assert!((m.face_area(f) - 2.0).abs() < 0.0015);
+        assert!(span_ridges(&mut m, e1, e2).is_none(), "already bridged");
+    }
+    #[test]
+    fn bridge_joins_two_facing_open_loops() {
+        let open_box = |z: f32, drop_facing: f32| {
+            let mut b = cuboid(v3(1.0, 1.0, 1.0));
+            b.displace(v3(0.0, 0.0, z));
+            let gone: BTreeSet<usize> = [(0..b.facets.len())
+                .find(|f| b.face_normal(*f).z * drop_facing > 0.9)
+                .unwrap()]
+            .into();
+            super::super::selection_edits::discard_facets(&mut b, &gone);
+            b
+        };
+        let mut m = open_box(0.0, 1.0);
+        m.append_tail(&open_box(3.0, -1.0));
+        let open: BTreeSet<Edge> = exposed_ridges(&Topo::assemble(&m)).into_iter().collect();
+        assert_eq!(open.len(), 8, "two open square rims");
+        let faces = bridge_selected(&mut m, &open);
+        m.sanity_check().unwrap();
+        assert_eq!(faces.len(), 4, "one quad per rim edge: {faces:?}");
+        assert!(m.is_closed(), "the bridge closes the gap into one solid");
+        assert!((m.volume() - 4.0).abs() < 0.0015, "volume {}", m.volume());
+    }
+    #[test]
+    fn mirror_welds_the_seam() {
+        let mut m = cuboid(v3(1.0, 1.0, 1.0));
+        m.displace(v3(0.5, 0.0, 0.0));
+        let all: BTreeSet<usize> = [(0..m.facets.len())
+            .find(|f| m.face_normal(*f).x < -0.9)
+            .unwrap()]
+        .into();
+        super::super::selection_edits::discard_facets(&mut m, &all);
+        mirror_copy(&mut m, 0, true, 0.0015);
+        m.sanity_check().unwrap();
+        assert_eq!(m.positions.len(), 12);
+        assert_eq!(m.facets.len(), 10);
+        assert!(m.is_closed());
+        assert!((m.volume() - 2.0).abs() < 0.0015);
+        let mut w = BMesh {
+            positions: vec![
+                v3(0.0, 0.0, 0.0),
+                v3(0.0005, 0.0, 0.0),
+                v3(1.0, 0.0, 0.0),
+                v3(0.0, 0.0, 1.0),
+            ],
+            facets: vec![],
+        };
+        w.add_face(vec![1, 2, 3]);
+        w.add_face(vec![0, 3, 2]);
+        assert_eq!(
+            braze_picked_corners(&mut w, &BTreeSet::from([0, 1]), 0.0015),
+            1
+        );
+    }
+}

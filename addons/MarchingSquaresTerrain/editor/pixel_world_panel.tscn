@@ -1,0 +1,61 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/pixel/world.svg" id="1_world"]
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/pixel/presets.svg" id="2_presets"]
+
+[node name="PixelWorldPanel" type="PixelWorldPanel" node_paths=PackedStringArray("margin", "column", "world_title", "effect_rows", "presets_title", "preset_buttons", "wire_button", "preview_hint", "refresh_timer")]
+margin = NodePath("Margin")
+column = NodePath("Margin/Column")
+world_title = NodePath("Margin/Column/WorldTitle")
+effect_rows = NodePath("Margin/Column/EffectRows")
+presets_title = NodePath("Margin/Column/PresetsTitle")
+preset_buttons = NodePath("Margin/Column/PresetButtons")
+wire_button = NodePath("Margin/Column/Wire")
+preview_hint = NodePath("Margin/Column/PreviewHint")
+refresh_timer = NodePath("RefreshTimer")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+
+[node name="WorldTitle" type="Button" parent="Margin/Column"]
+layout_mode = 2
+tooltip_text = "Every pixel node of the edited scene: Select (or click the name) selects it, again to cycle; \"+ Add\" adds a missing one. More instances: the Pixel World menu in the 3D toolbar."
+text = "Pixel World"
+icon = ExtResource("1_world")
+
+[node name="HSeparator" type="HSeparator" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="EffectRows" type="VBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="PresetsTitle" type="Button" parent="Margin/Column"]
+layout_mode = 2
+tooltip_text = "Time of day / weather presets for Day/Night, Sky, Weather and the renderer's god rays."
+icon = ExtResource("2_presets")
+
+[node name="PresetButtons" type="GridContainer" parent="Margin/Column"]
+layout_mode = 2
+columns = 3
+
+[node name="HSeparator3" type="HSeparator" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="Wire" type="Button" parent="Margin/Column"]
+layout_mode = 2
+focus_mode = 0
+icon = ExtResource("1_world")
+
+[node name="PreviewHint" type="Label" parent="Margin/Column"]
+layout_mode = 2
+mouse_filter = 1
+autowrap_mode = 3
+
+[node name="RefreshTimer" type="Timer" parent="."]
+wait_time = 0.3005

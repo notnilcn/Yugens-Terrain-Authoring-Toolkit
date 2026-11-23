@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://addons/MarchingSquaresTerrain/editor/icons/pixel/pixel_preview.svg" id="1_cmvqd"]
+
+[node name="PixelPreviewControls" type="PixelPreviewControls" unique_id=570171207 node_paths=PackedStringArray("preview_button", "animate_button", "world_menu", "roblox_button", "features_menu", "poll_timer")]
+preview_button = NodePath("PixelPreviewButton")
+animate_button = NodePath("PixelAnimateButton")
+world_menu = NodePath("PixelWorldMenu")
+roblox_button = NodePath("PixelRobloxButton")
+features_menu = NodePath("PixelFeatures")
+poll_timer = NodePath("OnPoll")
+
+[node name="PixelPreviewButton" type="Button" parent="." unique_id=718142546]
+layout_mode = 2
+tooltip_text = "Show the editor viewport through the pixel renderer (the scene's PixelRenderer, or a default one).
+The editor grid and origin axes are hidden while it is on; the move / rotate / scale gizmo and node gizmos still draw on top."
+focus_mode = 0
+toggle_mode = true
+icon = ExtResource("1_cmvqd")
+flat = true
+
+[node name="PixelAnimateButton" type="Button" parent="." unique_id=1306079323]
+layout_mode = 2
+tooltip_text = "Animate Effects
+Run the effects in the editor: clouds drift, water waves, grass sways, birds fly, weather and fire move.
+Off: everything holds still, so the editor only redraws when something changes (much lighter). A running game always animates."
+focus_mode = 0
+toggle_mode = true
+text = "Animate"
+flat = true
+
+[node name="PixelWorldMenu" type="MenuButton" parent="." unique_id=1793480292]
+layout_mode = 2
+tooltip_text = "Add pixel effects to the edited scene (sun / environment / camera refs are wired), apply a lighting preset."
+text = "Pixel World"
+switch_on_hover = true
+
+[node name="PixelRobloxButton" type="Button" parent="."]
+layout_mode = 2
+tooltip_text = "Roblox UI: show the modelling tools as a Roblox Studio-style ribbon with Roblox handles and shortcuts.
+Off: the regular Builder layout."
+focus_mode = 0
+toggle_mode = true
+text = "Roblox UI"
+flat = true
+
+[node name="PixelFeatures" type="PopupMenu" parent="." unique_id=504239381]
+hide_on_checkable_item_selection = false
+
+[node name="OnPoll" type="Timer" parent="." unique_id=1677322544]
+wait_time = 0.2505
+autostart = true

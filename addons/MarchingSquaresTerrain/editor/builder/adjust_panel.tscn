@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[node name="PixelBuilderAdjust" type="PixelBuilderAdjustPanel" node_paths=PackedStringArray("heading", "cancel", "done", "fields", "status", "debounce_timer")]
+visible = false
+heading = NodePath("Rows/Header/Heading")
+cancel = NodePath("Rows/Header/Cancel")
+done = NodePath("Rows/Header/Done")
+fields = NodePath("Rows/Fields")
+status = NodePath("Rows/Status")
+debounce_timer = NodePath("DebounceTimer")
+
+[node name="Rows" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Heading" type="Label" parent="Rows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.6205, 0.7805, 0.9505, 1)
+
+[node name="Cancel" type="Button" parent="Rows/Header"]
+layout_mode = 2
+tooltip_text = "Undo the action and close [Esc]"
+text = "Cancel"
+
+[node name="Done" type="Button" parent="Rows/Header"]
+layout_mode = 2
+tooltip_text = "Keep the result as one undo step [Enter]"
+text = "Done"
+
+[node name="Fields" type="HFlowContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Status" type="Label" parent="Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8505, 0.8505, 0.7005, 1)
+
+[node name="DebounceTimer" type="Timer" parent="."]
+wait_time = 0.1205
+one_shot = true

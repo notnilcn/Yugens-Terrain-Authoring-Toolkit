@@ -1,0 +1,8 @@
+[package]
+name = "pt_geom"
+description = "Engine-free vectors and terrain grid geometry shared by the terrain core and the modeller."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]

@@ -1,0 +1,9 @@
+[package]
+name = "pt_modeler"
+description = "Engine-free 3-D block modeller of the Marching Squares Terrain addon: editable cage meshes, edit operations, UVs, compile and export."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+pt_geom.workspace = true

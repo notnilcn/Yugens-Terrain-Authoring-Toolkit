@@ -1,0 +1,14 @@
+[package]
+name = "mst_demo"
+description = "Demo-only third-person player controller for the Marching Squares Terrain demo scenes."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "mst_demo"
+crate-type = ["cdylib"]
+
+[dependencies]
+godot.workspace = true

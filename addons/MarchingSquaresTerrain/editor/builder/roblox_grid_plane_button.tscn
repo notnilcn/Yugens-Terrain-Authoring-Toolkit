@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[node name="PixelRobloxGridPlane" type="Button"]
+visible = false
+custom_minimum_size = Vector2(40, 40)
+offset_left = 10.0
+offset_top = 110.0
+offset_right = 50.0
+offset_bottom = 150.0
+focus_mode = 0
+tooltip_text = "Grid plane: show or hide the drag grid under the part"
+toggle_mode = true
+button_pressed = true
+text = "#"
