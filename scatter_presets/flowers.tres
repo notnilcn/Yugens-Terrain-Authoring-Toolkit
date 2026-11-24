@@ -1,0 +1,13 @@
+[gd_resource type="PixelScatterItem" format=3]
+
+[resource]
+display_name = "Flowers"
+form = 5
+density = 0.0805
+scale_min = 0.8005
+scale_max = 1.2005
+slope_max = 25.0
+align_to_normal = 0.6005
+wind_sway = 0.0605
+cluster_scale = 9.0
+cluster_threshold = 0.2505

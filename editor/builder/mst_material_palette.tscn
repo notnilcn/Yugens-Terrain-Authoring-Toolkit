@@ -1,0 +1,149 @@
+[gd_scene format=3]
+
+[node name="PixelBuilderPalette" type="PixelBuilderMaterialPalette" node_paths=PackedStringArray("slots", "add_slot", "presets", "palette_menu", "sample", "smooth", "faceted", "new_group", "chips", "chip_hint", "chip_menu", "smoothing_display", "uv_grid", "uv_world", "uv_apply", "uv_reset", "uv_rotate")]
+custom_minimum_size = Vector2(210, 0)
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+slots = NodePath("Column/Slots")
+add_slot = NodePath("Column/PaintRow/AddSlot")
+presets = NodePath("Column/PaintRow/Presets")
+palette_menu = NodePath("Column/PaintRow/PaletteMenu")
+sample = NodePath("Column/PaintRow/Sample")
+smooth = NodePath("Column/SmoothingRow/Smooth")
+faceted = NodePath("Column/SmoothingRow/Faceted")
+new_group = NodePath("Column/SmoothingRow/NewGroup")
+chips = NodePath("Column/Chips")
+chip_hint = NodePath("Column/ChipHint")
+chip_menu = NodePath("Column/ChipMenu")
+smoothing_display = NodePath("Column/SmoothingDisplay")
+uv_grid = NodePath("Column/UvGrid")
+uv_world = NodePath("Column/WorldAligned")
+uv_apply = NodePath("Column/UvButtons/Apply")
+uv_reset = NodePath("Column/UvButtons/Reset")
+uv_rotate = NodePath("Column/UvButtons/Rotate")
+
+[node name="Column" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MaterialsTitle" type="Label" parent="Column"]
+layout_mode = 2
+tooltip_text = "Material slots of the selected builder mesh.
+Click a slot to make it current (and assign it to the selected faces).
+Drop or load any Material into a slot's picker."
+text = "Materials"
+
+[node name="Slots" type="VBoxContainer" parent="Column"]
+layout_mode = 2
+
+[node name="PaintRow" type="HFlowContainer" parent="Column"]
+layout_mode = 2
+
+[node name="AddSlot" type="Button" parent="Column/PaintRow"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Add a material slot (a vertex-color StandardMaterial3D you can replace)"
+text = "+ Slot"
+
+[node name="Presets" type="MenuButton" parent="Column/PaintRow"]
+layout_mode = 2
+tooltip_text = "Add a slot with a built-in material: Grid, Checker (patterned, vertex colour),
+No Draw (transparent), Collider (red), Trigger (orange)"
+text = "+ Preset"
+flat = false
+
+[node name="PaletteMenu" type="MenuButton" parent="Column/PaintRow"]
+layout_mode = 2
+tooltip_text = "Palette files: the slots' materials and the colour swatches.
+Save / Load as JSON (Modeler Modeler's palette JSON) or as a .tres resource (Modeler's palette resource)"
+text = "Palette"
+flat = false
+
+[node name="Sample" type="Button" parent="Column/PaintRow"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Sample from selection: the slot, colour and smoothing group most selected faces use
+become current (all faces in Object mode)"
+text = "Sample"
+
+[node name="PaletteSeparator" type="HSeparator" parent="Column"]
+layout_mode = 2
+
+[node name="SmoothingTitle" type="Label" parent="Column"]
+layout_mode = 2
+tooltip_text = "Smoothing groups: faces in one group shade smooth across their shared edges; group 0 is faceted.
+The actions use the selected faces (all faces in Object mode)."
+text = "Smoothing"
+
+[node name="SmoothingRow" type="HFlowContainer" parent="Column"]
+layout_mode = 2
+
+[node name="Smooth" type="Button" parent="Column/SmoothingRow"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Smooth: the selected faces join the current group (the outlined chip), else a new one"
+text = "Smooth"
+
+[node name="Faceted" type="Button" parent="Column/SmoothingRow"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Faceted: flat shading for the selected faces (group 0)"
+text = "Faceted"
+
+[node name="NewGroup" type="Button" parent="Column/SmoothingRow"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "New group from selection: the selected faces get the next free group (1-23)"
+text = "New group"
+
+[node name="Chips" type="HFlowContainer" parent="Column"]
+layout_mode = 2
+
+[node name="ChipHint" type="Label" parent="Column"]
+modulate = Color(1, 1, 1, 0.6005)
+layout_mode = 2
+text = "No smoothing groups in this mesh."
+
+[node name="ChipMenu" type="PopupMenu" parent="Column"]
+
+[node name="SmoothingDisplay" type="HFlowContainer" parent="Column"]
+layout_mode = 2
+
+[node name="UvSeparator" type="HSeparator" parent="Column"]
+layout_mode = 2
+
+[node name="UvTitle" type="Label" parent="Column"]
+layout_mode = 2
+tooltip_text = "Automatic box projection per face: every face is mapped along its dominant axis.
+World aligned keeps textures continuous across meshes.
+Selecting one face loads its values; Apply writes them to the selected faces."
+text = "Face UV"
+
+[node name="UvGrid" type="GridContainer" parent="Column"]
+layout_mode = 2
+columns = 2
+
+[node name="WorldAligned" type="CheckBox" parent="Column"]
+layout_mode = 2
+text = "World aligned"
+
+[node name="UvButtons" type="HBoxContainer" parent="Column"]
+layout_mode = 2
+
+[node name="Apply" type="Button" parent="Column/UvButtons"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Apply the UV values to the selected faces (all faces in Object mode)"
+text = "Apply"
+
+[node name="Reset" type="Button" parent="Column/UvButtons"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Reset the UV values (and apply)"
+text = "Reset"
+
+[node name="Rotate" type="Button" parent="Column/UvButtons"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Rotate the selected faces' UVs by 90°"
+text = "↻ 90°"

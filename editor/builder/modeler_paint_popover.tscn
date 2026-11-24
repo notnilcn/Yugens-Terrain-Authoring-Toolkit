@@ -1,0 +1,97 @@
+[gd_scene format=3]
+
+[sub_resource type="ButtonGroup" id="ButtonGroup_pages"]
+
+[node name="PaintPopover" type="PixelModelerPaintPopover" node_paths=PackedStringArray("column", "heading", "summary", "brush", "vertex_brush", "sample", "paint_options", "material_page", "colour_page", "smoothing_page", "content", "content_scroll", "tile_menu")]
+column = NodePath("Column")
+heading = NodePath("Column/Header/Titles/Title")
+summary = NodePath("Column/Header/Titles/Summary")
+brush = NodePath("Column/Header/PaintTool")
+vertex_brush = NodePath("Column/Header/VertexPaintTool")
+sample = NodePath("Column/Header/Sample")
+paint_options = NodePath("Column/Header/PaintOptions")
+material_page = NodePath("Column/Sections/Material")
+colour_page = NodePath("Column/Sections/Colour")
+smoothing_page = NodePath("Column/Sections/Smoothing")
+content = NodePath("Column/ContentScroll/Content")
+content_scroll = NodePath("Column/ContentScroll")
+tile_menu = NodePath("Menu")
+
+[node name="Column" type="VBoxContainer" parent="."]
+
+[node name="Header" type="HBoxContainer" parent="Column"]
+layout_mode = 2
+
+[node name="Titles" type="VBoxContainer" parent="Column/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Title" type="Label" parent="Column/Header/Titles"]
+layout_mode = 2
+text = "Paint"
+
+[node name="Summary" type="Label" parent="Column/Header/Titles"]
+layout_mode = 2
+
+[node name="PaintTool" type="Button" parent="Column/Header"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+flat = true
+
+[node name="VertexPaintTool" type="Button" parent="Column/Header"]
+layout_mode = 2
+focus_mode = 0
+toggle_mode = true
+flat = true
+
+[node name="Sample" type="Button" parent="Column/Header"]
+layout_mode = 2
+focus_mode = 0
+tooltip_text = "Sample from Selection"
+flat = true
+
+[node name="PaintOptions" type="MenuButton" parent="Column/Header"]
+layout_mode = 2
+tooltip_text = "Paint Options"
+
+[node name="Sections" type="HBoxContainer" parent="Column"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Material" type="Button" parent="Column/Sections"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_pages")
+text = "Material"
+
+[node name="Colour" type="Button" parent="Column/Sections"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_pages")
+text = "Colour"
+
+[node name="Smoothing" type="Button" parent="Column/Sections"]
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+toggle_mode = true
+button_group = SubResource("ButtonGroup_pages")
+text = "Smoothing"
+
+[node name="ContentScroll" type="ScrollContainer" parent="Column"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Content" type="VBoxContainer" parent="Column/ContentScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Menu" type="PopupMenu" parent="."]
+
+[connection signal="about_to_popup" from="." to="." method="fit_to_window" flags=1]
+[connection signal="minimum_size_changed" from="Column/ContentScroll/Content" to="." method="fit_to_window" flags=1]

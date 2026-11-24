@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[node name="BuilderExportOptions" type="PixelBuilderExportOptions" node_paths=PackedStringArray("selected_only", "apply_transforms", "vertex_colours", "right_handed", "combine", "stl_binary")]
+title = "Builder export options"
+selected_only = NodePath("Rows/SelectedOnly")
+apply_transforms = NodePath("Rows/ApplyTransforms")
+vertex_colours = NodePath("Rows/VertexColours")
+right_handed = NodePath("Rows/RightHanded")
+combine = NodePath("Rows/Combine")
+stl_binary = NodePath("Rows/StlBinary")
+
+[node name="Rows" type="VBoxContainer" parent="."]
+
+[node name="Heading" type="Label" parent="Rows"]
+layout_mode = 2
+text = "Every option applies to Export OBJ / STL / PLY;
+glTF and Godot Mesh use selected faces, world transforms and combine"
+
+[node name="SelectedOnly" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Only the faces selected in Face mode (the export buttons show in Face mode too)"
+text = "Selected faces only"
+
+[node name="ApplyTransforms" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Write world-space positions (the node's position, rotation and scale baked in)"
+text = "Apply world transforms"
+
+[node name="VertexColours" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Write face / vertex-paint colours (OBJ: after the position, PLY: red green blue alpha)"
+text = "Vertex colours"
+
+[node name="RightHanded" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Off mirrors X for left-handed tools"
+text = "Right-handed (Godot axes)"
+
+[node name="Combine" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "One file with every builder mesh selected in the Scene dock (Ctrl+click them)"
+text = "Combine selected builder meshes"
+
+[node name="StlBinary" type="CheckBox" parent="Rows"]
+layout_mode = 2
+tooltip_text = "Off writes ASCII STL"
+text = "STL binary"

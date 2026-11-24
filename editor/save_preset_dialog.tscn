@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[node name="SavePresetDialog" type="MstSavePresetDialog" node_paths=PackedStringArray("save_dialog", "prompt", "preset_name", "overwrite_dialog")]
+save_dialog = NodePath("SaveDialog")
+prompt = NodePath("SaveDialog/Body/Prompt")
+preset_name = NodePath("SaveDialog/Body/PresetName")
+overwrite_dialog = NodePath("OverwriteDialog")
+
+[node name="SaveDialog" type="AcceptDialog" parent="."]
+title = "Save Preset"
+
+[node name="Body" type="VBoxContainer" parent="SaveDialog"]
+
+[node name="Prompt" type="Label" parent="SaveDialog/Body"]
+layout_mode = 2
+
+[node name="PresetName" type="LineEdit" parent="SaveDialog/Body"]
+layout_mode = 2
+
+[node name="OverwriteDialog" type="ConfirmationDialog" parent="."]
+title = "Overwrite File?"

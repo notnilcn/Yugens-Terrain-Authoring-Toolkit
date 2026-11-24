@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[node name="PixelWater" type="PixelWater" node_paths=PackedStringArray("surface")]
+surface = NodePath("Surface")
+
+[node name="Surface" type="MeshInstance3D" parent="."]

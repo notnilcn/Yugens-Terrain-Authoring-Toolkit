@@ -1,0 +1,13 @@
+[gd_resource type="PixelScatterItem" format=3]
+
+[resource]
+display_name = "Bush"
+form = 2
+density = 0.0405
+scale_min = 0.7005
+scale_max = 1.3005
+slope_max = 30.0
+align_to_normal = 0.3005
+wind_sway = 0.0405
+cluster_scale = 14.0
+cluster_threshold = 0.0

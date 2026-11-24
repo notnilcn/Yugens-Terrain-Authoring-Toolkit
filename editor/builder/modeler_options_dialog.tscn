@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[node name="ModelerCoreOptionsDialog" type="PixelModelerOptionsDialog" node_paths=PackedStringArray("search", "categories", "form_holder")]
+title = "Modeler Options"
+ok_button_text = "Close"
+search = NodePath("Column/Search")
+categories = NodePath("Column/Split/Categories")
+form_holder = NodePath("Column/Split/Scroll")
+
+[node name="Column" type="VBoxContainer" parent="."]
+
+[node name="Search" type="LineEdit" parent="Column"]
+layout_mode = 2
+placeholder_text = "Search"
+clear_button_enabled = true
+
+[node name="Split" type="HSplitContainer" parent="Column"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Categories" type="ItemList" parent="Column/Split"]
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Column/Split"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0

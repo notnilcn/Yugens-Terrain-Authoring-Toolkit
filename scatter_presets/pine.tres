@@ -1,0 +1,13 @@
+[gd_resource type="PixelScatterItem" format=3]
+
+[resource]
+display_name = "Pine"
+form = 4
+density = 0.0255
+scale_min = 0.8005
+scale_max = 1.5005
+slope_max = 32.0
+align_to_normal = 0.0
+wind_sway = 0.0305
+cluster_scale = 18.0
+cluster_threshold = 0.0
