@@ -1,0 +1,1910 @@
+{
+  "page": "02-first-world",
+  "media_dir": "docs/guide/media/02-first-world",
+  "session": {
+    "scene": "res://tutorial/01_flat_playground.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [
+    {
+      "shell": "cat > /tmp/opencode/ds_mst_ui.py <<'PYEOF'\nimport json, os, subprocess, sys, tempfile, time\n\nDRIVE = [\"python3\", \"qa/drive.py\", \"--port\", os.environ.get(\"PORT\") or os.environ.get(\"MST_QA_PORT\", \"8879\"),\n         \"--display\", os.environ.get(\"DISPLAY\", \":79\")]\n\n\ndef run(*a):\n    return subprocess.run(DRIVE + [str(x) for x in a], cwd=os.environ.get(\"ROOT\", \".\"),\n                          capture_output=True, text=True)\n\n\ndef dump():\n    p = tempfile.mktemp(suffix=\".json\")\n    r = run(\"ui\", \"--filter\", \"\", \"--save\", p)\n    if r.returncode:\n        sys.exit(\"ui failed: \" + r.stderr[-300:])\n    d = json.load(open(p)); os.unlink(p)\n    return [c for c in d[\"controls\"] if c.get(\"rect\") and c[\"rect\"][2] > 0 and c[\"rect\"][3] > 0 and c.get(\"visible\")]\n\n\ndef find(name, classes=None):\n    cs = dump()\n    if classes:\n        cs = [c for c in cs if c.get(\"class\") in classes]\n    hits = [c for c in cs if c.get(\"name\") == name] or [c for c in cs if c.get(\"text\") == name]\n    if not hits:\n        sys.exit(\"control not found: \" + name)\n    return hits[0]\n\n\ndef center(c):\n    x, y, w, h = c[\"rect\"]\n    return int(x + w / 2), int(y + h / 2)\n\n\ndef path(p):\n    return p if os.path.isabs(p) else os.path.join(os.environ.get(\"OUT\", \".\"), p)\n\n\ndef project(pt):\n    o = run(\"project\", \"--point\", json.dumps(pt)).stdout\n    try:\n        d = json.loads(o)\n    except Exception:\n        sys.exit(\"project failed: \" + o[-200:])\n    pts = d.get(\"points\") or []\n    if not pts:\n        sys.exit(\"project: no point\")\n    return pts[0][\"window\"]\n\n\ncmd = sys.argv[1]\nif cmd == \"crop\":\n    from PIL import Image\n    out, name = path(sys.argv[2]), sys.argv[3]\n    pads = [int(v) for v in sys.argv[4:8]]\n    c = find(name); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pads[0]), max(0, y - pads[2]), min(img.width, x + w + pads[1]), min(img.height, y + h + pads[3]))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"croppopup\":\n    from PIL import Image\n    out = path(sys.argv[2]); pad = int(sys.argv[3]) if len(sys.argv) > 3 else 12\n    pp = run(\"popups\"); pop = json.loads(pp.stdout)[\"popups\"][0]\n    x, y = pop[\"pos\"]; w, h = pop[\"size\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pad), max(0, y - pad), min(img.width, x + w + pad), min(img.height, y + h + pad))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"cropwin\":\n    from PIL import Image\n    out = path(sys.argv[2]); x, y, w, h = [int(v) for v in sys.argv[3:7]]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    Image.open(tmp).crop((x, y, x + w, y + h)).save(out); os.unlink(tmp); print(out)\nelif cmd == \"cropat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    x, y = project(pt)\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    left = int(max(0, min(img.width - w, x - w / 2)))\n    top = int(max(0, min(img.height - h, y - h / 2)))\n    img.crop((left, top, left + w, top + h)).save(out); os.unlink(tmp); print(out, (left, top, w, h))\nelif cmd == \"full\":\n    out = path(sys.argv[2]); tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    os.replace(tmp, out); print(out)\nelif cmd == \"clickpoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    args = [\"click\", int(x), int(y)]\n    rest = sys.argv[5:]\n    print(run(*(args + rest)).stdout[-100:])\nelif cmd == \"topview\":\n    cs = dump()\n    cand = [c for c in cs if c.get(\"class\") == \"MenuButton\" and 165 <= c[\"rect\"][1] <= 215\n            and c[\"rect\"][2] >= 100 and 380 <= c[\"rect\"][0] <= 700]\n    if not cand:\n        sys.exit(\"topview: no view menu\")\n    c = min(cand, key=lambda c: c[\"rect\"][1])\n    x, y = center(c)\n    pops = []\n    for _ in range(4):\n        run(\"click\", x, y); time.sleep(1.0)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if pops:\n            break\n        time.sleep(0.8)\n    if not pops:\n        sys.exit(\"topview: no popup\")\n    pop = pops[0]\n    for k, it in enumerate(pop[\"items\"]):\n        if it.get(\"text\") == \"Top View\":\n            px, py = pop[\"pos\"]\n            ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n            run(\"click\", px + 40, int(py + ih * (k + 0.5))); time.sleep(0.8)\n            print(\"topview ok\")\n            break\n    else:\n        sys.exit(\"topview: item not found\")\nelif cmd == \"menupick\":\n    x, y, text = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"menupick: no popup\")\n    for it in pops[0][\"items\"]:\n        if it.get(\"text\") == text:\n            ix, iy, iw, ih = it[\"rect\"]\n            run(\"click\", int(ix + iw / 2), int(iy + ih / 2)); time.sleep(0.6)\n            print(\"menupick\", text)\n            break\n    else:\n        sys.exit(\"menupick: item not found \" + text)\nelif cmd == \"recat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    fps = sys.argv[8] if len(sys.argv) > 8 else \"12\"\n    mx = sys.argv[9] if len(sys.argv) > 9 else \"20\"\n    x, y = project(pt)\n    left = int(max(0, min(1920 - w, x - w / 2)))\n    top = int(max(0, min(1080 - h, y - h / 2)))\n    r = subprocess.run([\"qa/record.sh\", \"start\", out, \"--display\", os.environ.get(\"DISPLAY\", \":79\"),\n                        \"--rect\", f\"{left},{top},{w},{h}\", \"--fps\", fps, \"--max\", mx],\n                       cwd=os.environ.get(\"ROOT\", \".\"), capture_output=True, text=True)\n    print(\"recat\", left, top, w, h, r.returncode, r.stderr[-120:])\nelif cmd == \"movepoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    print(run(\"move\", int(x), int(y)).stdout[-80:])\nelif cmd == \"find\":\n    c = find(sys.argv[2]); print(json.dumps(c, indent=1))\nelif cmd == \"popick\":\n    x, y, idx = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"popick: no popup\")\n    pop = pops[0]; px, py = pop[\"pos\"]\n    ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n    run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n    print(\"popick\", idx)\nelif cmd == \"setat\":\n    x, y, val = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.4)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", val); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(\"setat\", x, y, val)\nelse:\n    name = sys.argv[2]\n    cls = {\"option\": (\"OptionButton\",), \"slider\": (\"HSlider\",), \"spin\": (\"EditorSpinSlider\",),\n           \"check\": (\"CheckBox\",)}.get(cmd)\n    c = find(name, cls)\n    if cmd == \"click\":\n        print(run(\"click\", *center(c)).stdout[-100:])\n    elif cmd == \"check\":\n        want = sys.argv[3].lower() in (\"1\", \"on\", \"true\", \"yes\")\n        if bool(c.get(\"toggled\")) != want:\n            run(\"click\", *center(c)); time.sleep(0.3)\n        print(name, \"->\", want)\n    elif cmd == \"spin\":\n        x, y = center(c)\n        run(\"click\", x, y); time.sleep(0.4)\n        run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[3]); run(\"key\", \"enter\"); time.sleep(0.4)\n        print(name, \":=\", sys.argv[3])\n    elif cmd == \"slider\":\n        frac = max(0.0, min(1.0, float(sys.argv[3]))); x, y, w, h = c[\"rect\"]\n        tx = int(x + 2 + frac * (w - 4)); yy = int(y + h / 2)\n        run(\"drag\", tx - 1, yy, tx + 1, yy, \"--duration\", \"0.2\"); time.sleep(0.4)\n        print(name, \"->\", frac)\n    elif cmd == \"option\":\n        idx = int(sys.argv[3]); run(\"click\", *center(c)); time.sleep(0.8)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if not pops:\n            sys.exit(\"option: no popup opened for \" + name)\n        pop = pops[0]; px, py = pop[\"pos\"]\n        ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n        run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n        print(name, \"->\", idx)\n\nPYEOF"
+    },
+    {
+      "wait": 2
+    },
+    {
+      "drive": [
+        "click",
+        "307",
+        "839"
+      ]
+    },
+    {
+      "wait": 0.6
+    },
+    {
+      "shell": "rmdir \"${MST_QA_STATE:-/tmp/opencode/qa}/project_base/qa_tmp\" 2>/dev/null; find \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions\" -maxdepth 3 -name qa_tmp -type d -empty -delete 2>/dev/null; true"
+    }
+  ],
+  "items": [
+    {
+      "id": "01-new-scene",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "01-new-scene.png"
+      ],
+      "steps": [
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "click",
+            "30",
+            "22"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "66",
+            "52"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--filter",
+              "3D Scene"
+            ],
+            "contains": "3D Scene"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "143",
+            "201"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "Node3D"
+            ],
+            "contains": "Node3D"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "80",
+            "135"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "key",
+            "F2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "type",
+            "World"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "set-prop",
+            "name",
+            "\"World\"",
+            "--path",
+            "Node3D"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "Node3D"
+            ],
+            "contains": "World"
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/01-new-scene.png\" --crop 2,42,760,520"
+        }
+      ],
+      "check": "A brand-new empty scene: the Scene dock shows a single 'World' (Node3D) root, and the 3D view is the empty editor grid. No terrain, no other nodes.",
+      "notes": "30,22 opens the Scene menu; 66,52 is its 'New Scene' item; 143,201 is the '3D Scene' button of Create Root Node; 80,135 selects the new root in the dock before F2 rename. The two expects (ui '3D Scene' after New Scene, nodes contains 'World' after rename) catch click drift. Nothing is saved."
+    },
+    {
+      "id": "03-add-chunks",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "03-add-chunks.png"
+      ],
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "353",
+            "137"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "8"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Chunk Manager"
+            ],
+            "contains": "Chunk Manager"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "488",
+            "191"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Top View"
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "down"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "855",
+            "370",
+            "up",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1150",
+            "250"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/03-add-chunks.png\" --crop 340,178,875,444"
+        }
+      ],
+      "check": "A top-down (Top Orthogonal) Chunks-tool view: large, clear green '+' add-markers in teal circles at the chunk slots around the filled 3x3, over the blue chunk-edit overlay, with the tool hint 'LMB on a green +: add a chunk ...' and the Chunk Manager strip (9 chunks, Remove Chunk, Merge Mode).",
+      "notes": "key 8 is the Chunks tool (expect guards it). 353,137 toggles Pixel Preview OFF so the terrain shows the raw/blue chunk-edit look rather than the pixel-art render (fresh sessions default to Pixel Preview ON). Top View is chosen via the Perspective menu (click 488,191 button -> expect popups 'Top View' -> key down + enter selects the first item) because the nav-cube pixel-click is unreliable. wheel-up zooms the markers larger; 1150,250 parks the mouse off them."
+    },
+    {
+      "id": "20-save-dialog",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "20-save-dialog.png"
+      ],
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "key",
+            "s",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Save Scene As"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "123"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "type",
+            "res://tutorial/guide/"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "718",
+            "724"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "type",
+            "first_world.tscn"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/20-save-dialog.png\" --crop 283,80,1035,720"
+        },
+        {
+          "drive": [
+            "click",
+            "607",
+            "773"
+          ]
+        },
+        {
+          "wait": 1
+        }
+      ],
+      "check": "The Save Scene As dialog with Path = res://tutorial/guide, the guide scene files listed in the folder, File = first_world.tscn, filter All Recognized (*.tscn, *.scn, *.res), and Cancel / Save buttons. No /tmp path, no qa_tmp.",
+      "notes": "MUST CANCEL (click 607,773), never Save \u2014 do not overwrite the real tutorial/guide/first_world.tscn. 800,123 is the Path field, 718,724 the File field. The expect on windows containing 'Save Scene As' guards that the dialog opened. Opened on the flat_playground scene; the dialog content is the same regardless of which scene is current."
+    },
+    {
+      "id": "10-save",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "10-save.png"
+      ],
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "key",
+            "s",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "s",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Save Scene As"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "123"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "type",
+            "res://tutorial/guide/"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "718",
+            "724"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "type",
+            "first_world.tscn"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/10-save.png\" --crop 283,80,1035,720"
+        },
+        {
+          "drive": [
+            "click",
+            "607",
+            "773"
+          ]
+        },
+        {
+          "wait": 1
+        }
+      ],
+      "check": "Same as 20-save-dialog: Save Scene As at Path res://tutorial/guide, File first_world.tscn (this is the poster of the folder-navigation clip; the still is identical).",
+      "notes": "MUST CANCEL (click 607,773), never Save. Identical to 20-save-dialog but written to 10-save.png (the clip poster). Kept as a separate item so --only 10-save reproduces it standalone."
+    },
+    {
+      "id": "21-pixelworld-add",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "21-pixelworld-add.png"
+      ],
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "538",
+            "137"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Sky & Clouds"
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/21-pixelworld-add.png\" --crop 287,123,618,712"
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "The Pixel World toolbar button highlighted and its full Add dropdown open: Renderer, Sky & Clouds, Day/Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke & Fire, Light Volume, Sun Shafts, Pixel Object, Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire; then Lighting Preset (Dawn/Noon/Dusk/Night/Storm/Snow); Wire Sun / Env Refs; Project > Features. Output panel empty behind.",
+      "notes": "538,137 is the 'Pixel World' button in viewport toolbar row 2; it opens the Add menu with no node selected. The output is cleared first so nothing shows behind the menu. The expect on popups containing 'Sky & Clouds' guards the click."
+    },
+    {
+      "id": "01-new-scene-clip",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "01-new-scene.mp4"
+      ],
+      "scene": "res://tutorial/01_flat_playground.tscn",
+      "steps": [
+        {
+          "record_start": {
+            "out": "01-new-scene.mp4",
+            "rect": [
+              2,
+              42,
+              760,
+              520
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "30",
+            "22"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "66",
+            "52"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--filter",
+              "3D Scene"
+            ],
+            "contains": "3D Scene"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "143",
+            "201"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "80",
+            "135"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "F2"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "World"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "140",
+            "410"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "01-new-scene.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "01-new-scene.mp4",
+            "out": "01-new-scene-clip.png",
+            "at": 6.5
+          }
+        }
+      ],
+      "check": "Scene > New Scene > 3D Scene creates a Node3D root, renamed World in the Scene dock (same result as the 01-new-scene.png still).",
+      "notes": "Recorded over the Scene dock + viewport; the still 01-new-scene.png is the poster of this action."
+    },
+    {
+      "id": "02-add-terrain",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "02-add-terrain.mp4",
+        "02-add-terrain.png"
+      ],
+      "scene": "res://tutorial/01_flat_playground.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Playground"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "02-add-terrain.mp4",
+            "rect": [
+              287,
+              80,
+              1000,
+              540
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Create New Node"
+          }
+        },
+        {
+          "drive": [
+            "type",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "02-add-terrain.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "02-add-terrain.mp4",
+            "out": "02-add-terrain.png",
+            "at": 3.0
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.0
+        }
+      ],
+      "check": "Create New Node dialog searching MarchingSquaresTerrain, Enter creates the terrain node under the scene root and its toolbar appears.",
+      "notes": "Uses the flat-playground scene as the parent; the added node is undone at the end."
+    },
+    {
+      "id": "03-add-chunks-clip",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "03-add-chunks.mp4"
+      ],
+      "scene": "res://tutorial/01_flat_playground.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "03-add-chunks.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 224 0 32"
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "record_stop": {
+            "out": "03-add-chunks.mp4"
+          }
+        }
+      ],
+      "check": "Top-down Chunks overlay; clicking a green + marker adds a chunk (9 -> 10) and the count/Refresh updates.",
+      "notes": "The original clip is the add-chunk gesture; the still 03-add-chunks.png is the overlay shot."
+    },
+    {
+      "id": "04-sculpt-hill",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "04-sculpt-hill.mp4",
+        "04-sculpt-hill.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Brush\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py option \"Drag\" 1"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py find \"Size:\""
+        },
+        {
+          "wait": 0.2
+        },
+        {
+          "record_start": {
+            "out": "04-sculpt-hill.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "850",
+            "330",
+            "950",
+            "330",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "drag",
+            "900",
+            "300",
+            "900",
+            "330",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "04-sculpt-hill.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "04-sculpt-hill.mp4",
+            "out": "04-sculpt-hill.png",
+            "at": 2.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "Brush tool in Raise/Lower mode: holding LMB over the island raises a hill (the terrain visibly bulges).",
+      "notes": "Uses the finished first_world island (already has a hill) so the sculpt adds to it; brush mode switched by the dropdown (Drag is the default)."
+    },
+    {
+      "id": "05-level-flatten",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "05-level-flatten.mp4",
+        "05-level-flatten.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Level\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_start": {
+            "out": "05-level-flatten.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "300",
+            "980",
+            "340",
+            "--duration",
+            "2.2"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "05-level-flatten.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "05-level-flatten.mp4",
+            "out": "05-level-flatten.png",
+            "at": 2.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "Level tool: an LMB drag flattens the terrain under the brush towards the Height setting.",
+      "notes": ""
+    },
+    {
+      "id": "06-paint",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "06-paint.mp4",
+        "06-paint.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Paint\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py option \"1. Grass\" 3"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "06-paint.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "330",
+            "960",
+            "380",
+            "--duration",
+            "2.2"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "06-paint.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "06-paint.mp4",
+            "out": "06-paint.png",
+            "at": 2.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "Paint tool with material 4. Sand selected; dragging paints a sandy patch onto the grass.",
+      "notes": "Material dropdown is 1 Grass, 2 Meadow, 3 Forest Floor, 4 Sand; option index 3 selects Sand."
+    },
+    {
+      "id": "07-foliage",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "07-foliage.mp4",
+        "07-foliage.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Foliage\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_start": {
+            "out": "07-foliage.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "330",
+            "980",
+            "390",
+            "--duration",
+            "2.4"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_stop": {
+            "out": "07-foliage.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "07-foliage.mp4",
+            "out": "07-foliage.png",
+            "at": 2.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "Foliage tool, Tree palette entry selected, dragging scatters 3D trees over the terrain.",
+      "notes": ""
+    },
+    {
+      "id": "08-pixel-preview",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "08-pixel-preview.mp4",
+        "08-pixel-preview.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "wait": 7
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "08-pixel-preview.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Pixel Preview\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Pixel Preview\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "08-pixel-preview.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "08-pixel-preview.mp4",
+            "out": "08-pixel-preview.png",
+            "at": 1.2
+          }
+        }
+      ],
+      "check": "Pixel Preview toolbar toggle clicked off then on; the viewport switches between the raw and pixel-crunched look.",
+      "notes": ""
+    },
+    {
+      "id": "20-pixelworld-menu",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "20-pixelworld-menu.png"
+      ],
+      "scene": "res://tutorial/01_flat_playground.tscn",
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"PixelWorldMenu\""
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py croppopup 20-pixelworld-menu.png 6"
+        }
+      ],
+      "check": "The full Pixel World Add menu: Renderer, Sky & Clouds, Day/Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke & Fire, Light Volume, Sun Shafts, Pixel Object, Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire; Lighting Preset; Wire Sun / Env Refs; Project > Features.",
+      "notes": "Popup cropped with a 6 px margin. Clicking PixelWorldMenu opens the Add menu when nothing is selected."
+    },
+    {
+      "id": "30-31-pixelpreview-pair",
+      "kind": "series",
+      "fresh_session": true,
+      "outputs": [
+        "30-pixelpreview-off.png",
+        "31-pixelpreview-on.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "wait": 7
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Pixel Preview\""
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 30-pixelpreview-off.png 96 5 96 893 350"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Pixel Preview\""
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 31-pixelpreview-on.png 96 5 96 893 350"
+        }
+      ],
+      "check": "Same camera, Pixel Preview off (smooth render) then on (chunky pixel-art edges).",
+      "notes": ""
+    },
+    {
+      "id": "10-save-clip",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "10-save.mp4"
+      ],
+      "scene": "res://tutorial/01_flat_playground.tscn",
+      "steps": [
+        {
+          "record_start": {
+            "out": "10-save.mp4",
+            "rect": [
+              283,
+              80,
+              1035,
+              720
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "s",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Save Scene As"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "123"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://tutorial/guide/"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "718",
+            "724"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "first_world.tscn"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "607",
+            "773"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "10-save.mp4"
+          }
+        }
+      ],
+      "check": "The Save Scene As dialog at res://tutorial/guide with File first_world.tscn, then Cancel (nothing is written).",
+      "notes": "MUST CANCEL (607,773); the still 10-save.png / 20-save-dialog.png show the same dialog."
+    },
+    {
+      "id": "11-run-game",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "11-run-game.mp4",
+        "11-run-game.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 24
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/11-run-game-poster.png\" --crop 0,0,1280,720"
+        },
+        {
+          "record_start": {
+            "out": "11-run-game.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "wait": 5
+        },
+        {
+          "record_stop": {
+            "out": "11-run-game.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "11-run-game.mp4",
+            "out": "11-run-game.png",
+            "at": 3.0
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        },
+        {
+          "wait": 1.0
+        }
+      ],
+      "check": "The finished first world running: a green pixel-art island in the sea under the sky, with the trees/sand patch.",
+      "notes": "The game window opens at 320,180 (1280x720); the clip is the game window with a few seconds of idle motion."
+    },
+    {
+      "id": "40-scene-tree",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "40-scene-tree.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--path",
+            "World"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 40-scene-tree.png 0 44 288 240"
+        }
+      ],
+      "check": "The final first-world tree: World with MarchingSquaresTerrain, Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water and Birds.",
+      "notes": "Scene dock cropped at the left; nodes with config warnings show the warning badge (Water/Birds)."
+    },
+    {
+      "id": "41-brush-strip",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "41-brush-strip.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Brush\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 41-brush-strip.png 420 483 900 140"
+        }
+      ],
+      "check": "The Brush attribute strip: Brush Type Round, Brush Mode Drag, Size, Aspect, Rotation, Flatten, Falloff, Peak, Grid Aligned, Quick Paint.",
+      "notes": ""
+    },
+    {
+      "id": "42-chunks-strip",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "42-chunks-strip.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 42-chunks-strip.png 420 483 900 140"
+        }
+      ],
+      "check": "The Chunk Manager strip: Chunk dropdown, chunk count, Remove Chunk, Merge Mode, Apply Mode to All Chunks, Vertex Handles and hint.",
+      "notes": ""
+    },
+    {
+      "id": "43-paint-strip",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "43-paint-strip.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Paint\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 43-paint-strip.png 420 483 900 140"
+        }
+      ],
+      "check": "The Vertex Painting strip: Brush Type, Size, Aspect, Rotation, Material 1. Grass, Texture Name, Texture Preset, Paint Walls, Slope Min/Max; the Textures panel edge on the right.",
+      "notes": ""
+    },
+    {
+      "id": "44-foliage-strip",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "44-foliage-strip.png"
+      ],
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Foliage\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 44-foliage-strip.png 420 483 900 140"
+        }
+      ],
+      "check": "The Foliage strip: Size, Density, Slope Min/Max, Erase All, Fill Terrain, Clear and the prop palette (Grass, Tree, Bush, Flowers, Pine, Rock).",
+      "notes": ""
+    }
+  ]
+}

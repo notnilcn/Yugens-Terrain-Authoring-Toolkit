@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using Models – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .tall img { max-height: 620px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+  .tall-spots img { max-height: 620px; width: auto; max-width: 100%; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 1em 0; }
+  .roles a.role { display: block; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-decoration: none; color: inherit; }
+  .roles a.role:hover { border-color: var(--accent); }
+  .roles a.role b { display: block; color: var(--accent); margin-bottom: 4px; }
+  .roles a.role span { font-size: .92em; }
+  p.caption { font-size: .88rem; color: var(--ink-2); margin-top: 6px; }
+  .grp { font-size: .75em; font-weight: 500; opacity: .7; margin-left: 6px; }
+  .tree { font-family: ui-monospace, monospace; font-size: .92em; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; white-space: pre; overflow-x: auto; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Using models: tiles, foliage &amp; props</h1>
+<p class="lede">You've imported a model — now put it to work: paint hundreds of it across the hills as foliage, place a single copy as a solid hero prop, turn your own builder creation into a reusable kit-piece, and learn honestly what “use a model as a terrain tile” can and can't mean here.</p>
+<div class="meta-row"><span class="pill">⏱ 35 min</span><span class="pill">Beginner</span><span class="pill">Scene: tutorial/guide/model_uses.tscn</span></div>
+
+<figure class="clip"><video src="media/12-using-models/50-scene-overview-orbit.mp4" poster="media/12-using-models/50-scene-overview-orbit.png" data-autoplay></video><figcaption>The follow-along scene <code>res://tutorial/guide/model_uses.tscn</code>: a sculpted hill with a courtyard of imported <code>.glb</code> models — fountain, pillars, round trees and stones — plus a placed stone, a builder-made prop and two custom foliage items ready to paint.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>The <a href="#roles">five places</a> a model can be used in an MST world, and why the same <code>.glb</code> behaves differently in each.</li>
+  <li>Why some props in the demo look like <a href="#grey">plain grey blobs</a> — and how one click brings them to life.</li>
+  <li><a href="#foliage">Models as foliage</a>: <span class="ui">Add Mesh / Scene…</span>, painting, erasing, Fill Terrain, and every placement and filter setting that matters for your own model.</li>
+  <li><a href="#props">Models as placed props</a>: instancing, sitting it on the ground, the pixel look, and collision so the player can stand on it.</li>
+  <li><a href="#builder">Builder meshes as reusable props</a>: Save Branch as Scene, then reuse it as a prop or as foliage.</li>
+  <li><a href="#tiles">The terrain-tile question</a> answered honestly, plus <a href="#other">other uses</a> (Stamp images, ground textures).</li>
+</ul>
+
+<div class="callout warn"><span class="label">Before you start</span><p>This page <b>uses</b> models that are already in the project. Getting a file into the project and tuning its import settings is <a href="11-importing-models.html">page 11 · Importing models</a>. Everything here uses the models that ship with the addon under <code>res://addons/MarchingSquaresTerrain/assets/</code> — <code>courtyard/</code> (round tree, fountain, pillar, stone ring), <code>rocks/</code> (about 40 stones) and <code>characters/fox/</code>.</p></div>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in a scene — like an Instance in Roblox's Explorer. A <code>Node3D</code> is a node with a position in 3D space.</dd>
+  <dt><b>Scene / <code>.tscn</code></b></dt><dd>A saved tree of nodes. An imported <code>.glb</code> behaves like a little scene too — like a Model in Roblox's Toolbox.</dd>
+  <dt><b>Instance (verb)</b></dt><dd>To place a copy of one scene inside another. Edits to the original flow into every copy — like a Roblox Package.</dd>
+  <dt><b><code>res://</code></b></dt><dd>“The project folder”. <code>res://tutorial/guide/model_uses.tscn</code> is the file <code>tutorial/guide/model_uses.tscn</code> in the project.</dd>
+  <dt><b>Inspector</b></dt><dd>The right-hand panel listing the selected thing's settings — Roblox's <b>Properties</b>.</dd>
+  <dt><b>Dock</b></dt><dd>A panel docked at the edge of the editor: Scene (Roblox's Explorer), FileSystem, Inspector…</dd>
+  <dt><b>Resource</b></dt><dd>A reusable data file (or data stored inside a scene). A <b>Mesh</b> is a resource holding a shape; a <b>PackedScene</b> is a resource holding a whole saved scene.</dd>
+  <dt><b>PixelScatterItem</b></dt><dd>The addon's “foliage brush” resource: one entry in the Foliage palette. It says <i>what</i> to scatter (a built-in shape or your model) and <i>how</i> (size, spin, slope rules…).</dd>
+  <dt><b>PixelObject</b></dt><dd>An addon node you put <i>above</i> a model to override its pixel-art look (outline, pixel size, palette, dither).</dd>
+  <dt><b>StaticBody3D + CollisionShape3D</b></dt><dd>Godot's standard “solid, non-moving thing” pair. Roughly a Roblox Part with <b>Anchored</b> and <b>CanCollide</b> on.</dd>
+</dl>
+
+<!-- ===================================================== ROLES -->
+<h2 id="roles">The big idea: one model, five jobs</h2>
+<p>In Roblox you drag a model out of the Toolbox and it simply sits in the world. Here, <b>where you put the model decides what it does</b>. The same <code>round_tree.glb</code> can be a forest you paint, or one tree you place by hand.</p>
+<div class="roles">
+  <a class="role" href="#foliage"><b>1 · Foliage / decoration</b><span>Put the model in a scatter item's slot, then <i>paint</i> hundreds of it like grass. The main flow.</span></a>
+  <a class="role" href="#props"><b>2 · Placed prop</b><span>Instance one copy into the scene, sit it on the ground, add collision. Closest to Roblox.</span></a>
+  <a class="role" href="#builder"><b>3 · Builder kit-piece</b><span>Save something you built with the Builder as a <code>.tscn</code>, then reuse it as a prop or as foliage.</span></a>
+  <a class="role" href="#tiles"><b>4 · Terrain tile?</b><span>Not a feature — the terrain is sculpted, not tiled. Here's the closest you can get.</span></a>
+  <a class="role" href="#other"><b>5 · Other uses</b><span>Stamp an <i>image</i> into terrain height; use images as ground textures.</span></a>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Think of it this way: drop a model in a scatter item and you <b>paint</b> it like Roblox's grass decoration — except you supply the model. Instance it directly and it's a single Part/Model, just like a Toolbox drop. Feed a builder mesh back in and it's a reusable kit-piece, like a Package. What there is <b>no</b> equivalent of is a Roblox “tile kit” where each map square is a model — MST terrain is sculpted.</p></div>
+
+<h2 id="scene">Your follow-along scene</h2>
+<p>Open <code>res://tutorial/guide/model_uses.tscn</code> (double-click it in the FileSystem dock). It's built on the addon's courtyard demo and contains a worked example of every use on this page:</p>
+<ul>
+  <li><b>Placed props</b> — the courtyard's fountain, pillars, round trees and stones. Each is a <code>.glb</code> instanced as a <code>Node3D</code>, all under one <code>Courtyard</code> <b>PixelObject</b>, each with a <b>StaticBody3D → CollisionShape3D</b> child.</li>
+  <li><b>A placed <code>.glb</code> you add yourself</b> — <code>stone_tallB2</code> (from <code>rocks/stone_tallB.glb</code>) with its own collision box.</li>
+  <li><b>A builder-mesh prop</b> — <code>Courtyard/PixelBuilderMesh</code>, an instance of <code>modelled_prop.tscn</code> (the green arch/box).</li>
+  <li><b>Two custom foliage items</b> in the Foliage palette: <b>Round Tree (custom model)</b> (Form Custom, Scene <code>round_tree.glb</code>, Density 0.03, Scale 0.8–1.3, Random Yaw 360, Slope Max 45) and <b>modelled prop</b> (Form Custom, Scene <code>modelled_prop.tscn</code>, Scale 2.5–4).</li>
+</ul>
+<p>The scene ships with no painted foliage — every painted instance was cleared before saving, so the hill is yours to fill.</p>
+<div class="callout tip"><span class="label">Tip</span><p>Some clips on this page were filmed in the addon's bigger <code>res://demo/hex_island.tscn</code> sandbox (the hex island with the pond and the stone fort). The steps are identical in either scene.</p></div>
+
+<!-- ===================================================== GREY -->
+<h2 id="grey">Why are some props plain grey blobs?</h2>
+<p>Open the Foliage palette in <code>hex_island</code> and you'll see items called <i>Tree, Pine, Bush, Rock, Flowers</i> and <i>Pebbles (small hexes)</i> — and every one of them is the <b>same grey rock</b>. On the ground they look like grey boulders too.</p>
+<div class="pair">
+  <figure class="shot tall"><img src="media/12-using-models/10-palette-grey-vs-colored.png" alt="The Foliage palette in full, nothing cut off at the top: Grass, Tree, Pine, Bush, Rock, Flowers and Pebbles (small hexes) all show the same grey rock icon, while round tree (selected) shows a green tree, and the + Bush, + Flowers, + Pine and + Tree presets show coloured green bushes, flowers, a pine and a tree."><figcaption>The key picture: the demo's six items are all grey rocks; the imported <b>round tree</b> and the built-in <b>+</b> presets render in full colour, side by side in the same palette.</figcaption></figure>
+  <div>
+    <p><b>This isn't a bug.</b> Those six items were left by the demo author with no model and no shape chosen:</p>
+    <ul>
+      <li>None of them has a <span class="ui">Scene</span> or <span class="ui">Cage</span> (no model).</li>
+      <li>None of them sets <span class="ui">Form</span>, so it stays at its default — <b>Rock</b>.</li>
+      <li>The built-in Rock shape is a stony grey. So all six draw the same grey rock, whatever their name says.</li>
+    </ul>
+    <p>The proof: import any real model into an item and it shows up in full colour, right next to the grey ones. The <b>+</b> presets (<b>+ Bush</b>, <b>+ Flowers</b>, <b>+ Pine</b>, <b>+ Tree</b>) are coloured too, because they set a proper Form.</p>
+  </div>
+</div>
+<div class="compare" data-before="Grey placeholders" data-after="With a real model"><img src="media/12-using-models/01-grey-placeholder-props.png" alt="Close-up of hex_island's grass beside the pond: large grey faceted rock shapes from the demo's placeholder scatter items."><img src="media/12-using-models/03-custom-vs-grey-after.png" alt="The same view after painting the round tree model: a big brown tree trunk and branch from the custom model now crosses the frame among the grey placeholder rocks."></div>
+<p class="caption">Drag the divider: the same patch of <code>hex_island</code> before and after painting the coloured <code>round tree</code> model next to the grey placeholders.</p>
+<figure class="clip"><video src="media/12-using-models/02-custom-vs-grey.mp4" poster="media/12-using-models/02-custom-vs-grey.png"></video><figcaption>Painting the colour <b>round tree</b> straight onto the hill, right beside the grey placeholder rocks.</figcaption></figure>
+<div class="callout tip"><span class="label">Those grey blobs aren't broken</span><p>They're <b>greybox placeholders</b>: scatter items with no model or Form assigned yet. Give the item a Form (Tree, Pine, Bush…) or your own model and it comes to life. That's what the rest of this page is about.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>It's like a grey default Part named “Tree” — the name doesn't make it a tree. You still have to give it a mesh.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Guided tutorial: paint a grove of your own trees</h2>
+<p>Five minutes, start to finish. You'll turn <code>round_tree.glb</code> into a foliage brush and paint with it.</p>
+<ol class="steps" data-id="p12-grove">
+  <li>In the <b>Scene</b> dock, click the <code>MarchingSquaresTerrain</code> node. The terrain toolbar appears down the left of the 3D view.</li>
+  <li>Pick the <b>Foliage</b> tool (toolbar slot 5, or press <kbd>5</kbd> with the mouse over the 3D view). The <b>Foliage</b> palette opens on the right and the foliage strip appears under the view.</li>
+  <li>At the bottom of the palette, click <span class="ui">Add Mesh / Scene…</span>. An <b>Open a File</b> dialog appears.</li>
+  <li>Open <code>addons</code> → <code>MarchingSquaresTerrain</code> → <code>assets</code> → <code>courtyard</code>, pick <code>round_tree.glb</code> and click <span class="ui">Open</span>.</li>
+  <li>A new <b>round tree</b> entry appears in the palette, in colour, already selected. The hint bar now reads “Painting round tree”.</li>
+  <li><b>Left-drag</b> (LMB-drag) across gentle grass. Trees appear under the brush. Do a few overlapping strokes for a thicker grove.</li>
+  <li>Don't like it? <kbd>Ctrl</kbd>+<kbd>Z</kbd> removes the whole last stroke. <b>Right-drag</b> erases trees under the brush.</li>
+</ol>
+<figure class="clip"><video src="media/12-using-models/64-paint-round-tree.mp4" poster="media/12-using-models/64-paint-round-tree.png" data-autoplay></video><figcaption>Painting the <b>Round Tree (custom model)</b> item in <code>model_uses.tscn</code>: a dense, legible green grove grows under the brush.</figcaption></figure>
+<figure class="shot"><img src="media/12-using-models/64-round-tree-grove.png" alt="The courtyard hill covered in a dense grove of low-poly round green trees with brown trunks, pillars visible between them."><figcaption>The finished grove.</figcaption></figure>
+<div class="callout warn"><span class="label">Nothing paints?</span><p>A freshly imported model only paints on ground up to <b>35° steep</b>. If your strokes leave nothing behind, you're probably on a slope. Paint somewhere flatter, or raise <span class="ui">Slope Max</span> — see <a href="#filters">Filters</a>.</p></div>
+
+<!-- ===================================================== FOLIAGE -->
+<h2 id="foliage">Use 1 · Your model as foliage / decoration</h2>
+<p>This is the main way to use models in an MST world. A <b>PixelScatterItem</b> holds your model in its <span class="ui">Scene</span> or <span class="ui">Cage</span> slot; you add it to the Foliage palette and paint or fill with it. The Foliage tool itself — palette, strip, brush size, density, grass — is covered fully on <a href="05-foliage-grass.html">page 05 · Foliage, grass &amp; flowers</a>. This section covers what's specific to <b>your own models</b>.</p>
+
+<h3 id="add-mesh">The Add Mesh / Scene… button</h3>
+<p>It's the full-width button at the bottom of the Foliage palette. Its tooltip: <i>“Adds a prop from a mesh (.mesh / .tres / .res / .obj) or a scene / model (.tscn / .glb / .gltf / .blend / .fbx) and selects it.”</i> Clicking it opens Godot's file dialog. Click the dots to tour it.</p>
+<div class="hotspots"><img src="media/12-using-models/20-add-mesh-dialog.png" alt="The Open a File dialog at res://, showing folders addons, build, demo, qa_tmp, tools and tutorial; a File field and an All Recognized type filter at the bottom; Cancel and Open buttons.">
+  <button class="spot" style="left:3%;top:6%" data-title="Back / Forward / Up" data-text="Step back and forward through folders you've visited, or go up one folder.">1</button>
+  <button class="spot" style="left:53%;top:6%" data-title="Path" data-text="The folder you're looking at. Starts at res:// (the project folder).">2</button>
+  <button class="spot" style="left:5%;top:11%" data-title="Favorites / Recent" data-text="Starred folders and recently used places, down the left side.">3</button>
+  <button class="spot" style="left:20%;top:20%" data-title="addons folder" data-text="The addon's models live under addons/MarchingSquaresTerrain/assets/. Double-click to open a folder.">4</button>
+  <button class="spot" style="left:88%;top:10.5%" data-title="View options" data-text="Show hidden files, and switch between a thumbnail grid and a list.">5</button>
+  <button class="spot" style="left:42%;top:90%" data-title="File" data-text="The chosen file's name. You can also type a full path here, e.g. res://tutorial/guide/modelled_prop.tscn, and press Enter.">6</button>
+  <button class="spot" style="left:82%;top:90%" data-title="Type filter" data-text="All Recognized (*.tscn, *.scn, *.glb, *.gltf, *.blend, *.fbx, *.obj, *.mesh, *.tres, *.res) — the file types the button accepts.">7</button>
+  <button class="spot" style="left:68%;top:97%" data-title="Open" data-text="Creates the new scatter item from the chosen file.">8</button>
+</div>
+<p>When you pick a file:</p>
+<ul>
+  <li>A <b>new PixelScatterItem</b> is created and added to the palette.</li>
+  <li>It's <b>named after the file</b>, with underscores turned into spaces: <code>round_tree.glb</code> → “round tree”.</li>
+  <li>It's <b>selected</b>, ready to paint.</li>
+  <li>It's <b>one undoable step</b>. The Output panel logs <code>terrain add scatter item round_tree</code>.</li>
+</ul>
+<table class="ref">
+  <thead><tr><th>You pick…</th><th>Lands in</th><th>Form becomes</th></tr></thead>
+  <tbody>
+    <tr><td>A scene / model: <code>.tscn .scn .glb .gltf .blend .fbx</code></td><td><span class="ui">Scene</span> slot (PackedScene)</td><td>Custom</td></tr>
+    <tr><td>A bare mesh: <code>.mesh .tres .res .obj</code></td><td><span class="ui">Cage</span> slot (Mesh)</td><td>Custom</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">Tip</span><p><code>.blend</code> and <code>.fbx</code> appear in the filter, but they only import if Godot is set up for them (see <a href="11-importing-models.html#formats">page 11 · Supported formats</a>). <code>.glb</code> is the safe choice.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>It's like turning a Toolbox model into a terrain-decoration brush. <b>Scene</b> ≈ a whole Roblox Model (several parts with their materials); <b>Cage</b> ≈ the mesh of a single MeshPart.</p></div>
+
+<h3 id="item">The scatter item your import made</h3>
+<p>Click <span class="ui">Edit</span> under the palette (or double-click the entry) to see the new item in the Inspector.</p>
+<div class="pair">
+  <div class="hotspots tall-spots"><img src="media/12-using-models/21-scatter-item-custom-inspector.png" alt="The Inspector for the round tree PixelScatterItem: Display Name round tree, Form Custom, Shape Seed 1, Cage empty, Scene round, Tint white, and collapsed groups Placement, Filters, Color, Pixel and Collision.">
+    <button class="spot" style="left:50%;top:26%" data-title="Display Name" data-text="The label in the palette. Set from the file name; rename it freely.">1</button>
+    <button class="spot" style="left:50%;top:32.5%" data-title="Form = Custom" data-text="Custom means: don't build a procedural shape, use my Scene or Cage. Add Mesh / Scene sets this for you.">2</button>
+    <button class="spot" style="left:50%;top:45.5%" data-title="Cage (empty)" data-text="A bare Mesh slot. Empty here because a .glb is a scene, not a bare mesh.">3</button>
+    <button class="spot" style="left:50%;top:52%" data-title="Scene = round_tree" data-text="Your model. This is where a .glb lands.">4</button>
+    <button class="spot" style="left:50%;top:58.5%" data-title="Tint" data-text="Multiplies your model's colour. White = unchanged.">5</button>
+    <button class="spot" style="left:22%;top:64%" data-title="Placement" data-text="Density, Scale Min/Max, Random Yaw, Align to Normal, Y Offset, Per Cell Max, Small Hexes, Ground Slots, Seed.">6</button>
+    <button class="spot" style="left:20%;top:69.5%" data-title="Filters" data-text="Slope, Height and Cluster rules — where the model is allowed to go.">7</button>
+    <button class="spot" style="left:20%;top:85%" data-title="Collision" data-text="Scatter items have their own collision: None, Cylinder or Box.">8</button>
+  </div>
+  <div>
+    <h4>How your model gets drawn</h4>
+    <p>Behind the scenes the addon loads your model once, finds every mesh inside it, and draws each one hundreds of times in a single batch (GPU instancing — the reason you can paint thousands of trees without slowing down).</p>
+    <p><b>Your materials are kept.</b> A standard material's colour, its colour <b>texture</b> and its alpha cut-out are all carried over, and vertex colours are respected. A custom shader material is used as-is. That's why <code>round_tree</code> paints green and brown, not grey.</p>
+    <p>On top of your materials, the item's <span class="ui">Tint</span> multiplies the colour, and <span class="ui">Hue Jitter</span> / <span class="ui">Value Jitter</span> (Color group) vary it slightly per copy.</p>
+  </div>
+</div>
+
+<h3 id="painting">Painting, erasing and undo</h3>
+<p>Painting your model uses exactly the same gestures as the built-in foliage. The hint bar at the bottom of the 3D view always reminds you: <i>“Painting round tree · LMB-drag: paint · RMB / Shift+LMB: erase · Shift+wheel: size · palette on the right: pick what to paint”</i>.</p>
+<div class="tabs">
+  <div class="panel" data-tab="Paint">
+    <figure class="clip"><video src="media/12-using-models/11-paint-custom-foliage.mp4" poster="media/12-using-models/11-paint-custom-foliage.png"></video><figcaption>LMB-drag a grove of <code>round_tree</code> onto the hill below the stone fort in <code>hex_island</code>.</figcaption></figure>
+    <figure class="shot"><img src="media/12-using-models/12-custom-foliage-after.png" alt="hex_island's hill below the stone fort covered in large round green custom trees among small grey rocks, the hint bar reading Painting round tree with a 2269 props count."><figcaption>The finished grove of colour custom trees.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Erase">
+    <div class="pair">
+      <figure class="clip"><video src="media/12-using-models/14-erase-custom.mp4" poster="media/12-using-models/14-erase-custom.png"></video><figcaption>RMB-drag (or <kbd>Shift</kbd>+LMB) erases the custom grove in <code>hex_island</code>.</figcaption></figure>
+      <figure class="clip"><video src="media/12-using-models/65-erase-foliage.mp4" poster="media/12-using-models/65-erase-foliage.png"></video><figcaption>Erasing the painted round-tree grove in <code>model_uses</code>: the props count drops from 13 to 1.</figcaption></figure>
+    </div>
+  </div>
+  <div class="panel" data-tab="Undo">
+    <figure class="clip"><video src="media/12-using-models/15-undo-paint.mp4" poster="media/12-using-models/15-undo-paint.png"></video><figcaption>Paint a grove, then <kbd>Ctrl</kbd>+<kbd>Z</kbd>: the whole stroke disappears in one step.</figcaption></figure>
+  </div>
+</div>
+<figure class="shot"><img src="media/12-using-models/16-scale-yaw-variation.png" alt="Close-up of the painted custom trees: their round canopies are clearly different sizes and the trees are turned different ways."><figcaption>Zoom in and no two copies match: each tree gets a random size (<span class="ui">Scale Min/Max</span>) and facing (<span class="ui">Random Yaw</span>).</figcaption></figure>
+<div class="callout warn"><span class="label">Big models paint sparsely</span><p>The brush spaces copies by each model's footprint × scale, so a large model like <code>round_tree</code> lands only a few copies per stroke. Paint several overlapping strokes for a thick grove, or lower <span class="ui">Scale Min/Max</span>. Small models (like <code>stone_largeA</code>) fill densely.</p></div>
+
+<h3 id="several">Painting several models at once, and a second model</h3>
+<p><kbd>Ctrl</kbd>+click palette entries to select more than one; one stroke then paints a mix. You can mix your own model with a built-in <b>+</b> preset.</p>
+<figure class="clip"><video src="media/12-using-models/18-multiselect-paint.mp4" poster="media/12-using-models/18-multiselect-paint.png"></video><figcaption><kbd>Ctrl</kbd>+click <b>round tree</b> and the built-in <b>+ Pine</b>, then paint both together. The hint bar reads “Painting round tree, Pine”.</figcaption></figure>
+<p>Every model you import becomes its own palette entry. Here a rock from <code>rocks/stone_largeA.glb</code> is imported the same way and painted into a boulder field. It keeps its real light-stone colour.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/12-using-models/23-paint-stone-boulders.mp4" poster="media/12-using-models/23-paint-stone-boulders.png"></video><figcaption>Import <code>stone_largeA.glb</code> with Add Mesh / Scene, then paint a dense field of it.</figcaption></figure>
+  <figure class="shot"><img src="media/12-using-models/24-stone-boulders-after.png" alt="Close-up of the grass beside the ruin packed with pale, light-blue faceted stone boulders painted from the stone large A model; the hint bar underneath reads Painting stone largeA."><figcaption>Close-up of the painted boulders. A small model fills densely: a few short strokes cover the ground.</figcaption></figure>
+</div>
+
+<h3 id="fill">Paint vs Fill Terrain</h3>
+<p><span class="ui">Fill Terrain</span> (in the Foliage strip) scatters the selected item over the <b>whole terrain</b> by the item's own rules — no brushing. <span class="ui">Clear</span> removes every copy. Both are described on <a href="05-foliage-grass.html#fill">page 05</a>; with your own model the difference looks like this:</p>
+<div class="pair">
+  <figure class="clip"><video src="media/12-using-models/13-fill-terrain-custom.mp4" poster="media/12-using-models/13-fill-terrain-custom.png"></video><figcaption>Fill Terrain with a freshly imported <code>round_tree</code> on <code>hex_island</code>: sparse, because an untuned import has a low own Density.</figcaption></figure>
+  <figure class="clip"><video src="media/12-using-models/66-fill-terrain-trees.mp4" poster="media/12-using-models/66-fill-terrain-trees.png"></video><figcaption>Fill Terrain with the tuned <b>Round Tree (custom model)</b> item in <code>model_uses</code>: the whole hill becomes a forest.</figcaption></figure>
+</div>
+<div class="compare" data-before="Hand-painted" data-after="Fill Terrain"><img src="media/12-using-models/64-round-tree-grove.png" alt="A hand-painted grove of round trees clustered around the courtyard pillars."><img src="media/12-using-models/66-fill-terrain-trees-after.png" alt="The same hill after Fill Terrain: round trees spread evenly across the whole slope and courtyard edges."></div>
+<p class="caption">Hand-painting puts trees exactly where you brush; Fill Terrain spreads them everywhere the rules allow.</p>
+<div class="callout tip"><span class="label">Fill looks too thin?</span><p>Fill Terrain uses the item's <b>own</b> <span class="ui">Placement ▸ Density</span>, <b>not</b> the Density slider in the bottom strip (that one only affects hand-painting). Raise the item's Density for a fuller fill.</p></div>
+
+<h3 id="filters">Placement &amp; Filters for your model</h3>
+<p>An imported model starts with the default rules. Two groups in the item's Inspector matter most:</p>
+<div class="pair">
+  <figure class="shot tall"><img src="media/12-using-models/22-scatter-item-filters.png" alt="The round tree item's Inspector with Filters expanded: Slope Min 0.0, Slope Max 35.0, Height Min -1000.0, Height Max 1000.0, Cluster Size 0.0, Threshold -0.0."><figcaption>The <b>Filters</b> group of a fresh import. Note <b>Slope Max 35</b>.</figcaption></figure>
+  <div>
+    <p><b>Filters</b> decide where the model may go:</p>
+    <ul>
+      <li><span class="ui">Slope Min / Slope Max</span> — default <b>0 / 35°</b>. When you paint, the strip's own Slope Min/Max and the item's are <b>both</b> applied, so a fresh import won't land on anything steeper than 35°. This is the number-one reason “nothing paints”.</li>
+      <li><span class="ui">Height Min / Height Max</span> — default −1000 / 1000 (anywhere).</li>
+      <li><span class="ui">Cluster Size</span> and <span class="ui">Threshold</span> — clump copies together using noise.</li>
+    </ul>
+    <p><b>Placement</b> decides how each copy looks. For your own model you'll usually set:</p>
+    <ul>
+      <li><span class="ui">Scale Min / Max</span> to taste — big trees want fewer, spaced copies.</li>
+      <li><span class="ui">Random Yaw</span> — already <b>360</b> by default, so copies face every way. Lower it only if they should all face roughly one way.</li>
+      <li><span class="ui">Align to Normal</span> if they should tilt with the slope (rocks yes, trees no).</li>
+    </ul>
+    <p>Every field is in the <a href="#reference">reference</a> below and on <a href="05-foliage-grass.html#item-ref">page 05</a>.</p>
+  </div>
+</div>
+<div class="callout tip"><span class="label">Typing exact values</span><p>Inspector number fields are very touchy to drag. Double-click the field, press <kbd>Ctrl</kbd>+<kbd>A</kbd>, type the value and press <kbd>Enter</kbd>.</p></div>
+
+<h3 id="manual">The by-hand route: duplicate a preset</h3>
+<p><span class="ui">Add Mesh / Scene…</span> is the one-click version of this. To do it manually:</p>
+<ol class="steps" data-id="p12-manual">
+  <li>In the FileSystem dock, open <code>res://addons/MarchingSquaresTerrain/scatter_presets/</code> (rock, bush, tree, pine, flowers).</li>
+  <li>Duplicate one of the <code>.tres</code> files (right-click ▸ Duplicate) and open it in the Inspector.</li>
+  <li>Set <span class="ui">Scene</span> (or <span class="ui">Cage</span>) to your model and <span class="ui">Form</span> to <b>Custom</b>.</li>
+  <li>Select the terrain and drag the new <code>.tres</code> into its <span class="ui">Foliage ▸ Scatter Items</span> list in the Inspector. The palette picks it up.</li>
+</ol>
+<p>Starting from a preset is handy when you want its tuned placement values (e.g. the rock preset's sunk-in Y Offset) for your own model.</p>
+
+<!-- ===================================================== PIXEL LOOK -->
+<h2 id="pixel-look">Every model gets the pixel look</h2>
+<p>The chunky pixels and dark outlines come from the scene's <b>Pixel Renderer</b>, which pixelates <b>everything</b> — terrain, foliage and any model you place, wherever it is. You don't have to do anything to a model to make it pixel-art. Toggle <span class="ui">Pixel Preview</span> in the 3D view's top bar to compare.</p>
+<div class="compare" data-before="Pixel Preview off" data-after="Pixel Preview on"><img src="media/12-using-models/57-pixel-look-off.png" alt="The courtyard scene rendered smoothly: low-poly trees, pillars and a pale boulder on the sculpted green and brown hill."><img src="media/12-using-models/57-pixel-look-on.png" alt="The same courtyard view with the pixel look on: chunky pixels, dithered shading and dark outlines on the models and terrain; thin cyan wireframes over the pillars and trees are the props' collision shapes drawn by the editor."></div>
+<p class="caption">The courtyard models with Pixel Preview off and on. (The thin cyan wireframes in the “on” view are the props' collision shapes, which the editor draws as a guide; they don't appear in the game.)</p>
+<figure class="clip"><video src="media/12-using-models/19-pixel-look-toggle.mp4" poster="media/12-using-models/19-pixel-look-toggle.png"></video><figcaption>Toggling Pixel Preview in <code>hex_island</code>: terrain and every model or prop switch between smooth and pixel together.</figcaption></figure>
+<p>The full pixel-look story (renderer settings, palettes, outline colours) is <a href="07-pixelizer.html">page 07 · The pixelizer</a>. To change the look of <b>one</b> prop, see <a href="#pixelobject">PixelObject</a> below.</p>
+
+<!-- ===================================================== PROPS -->
+<h2 id="props">Use 2 · Your model as a placed prop</h2>
+<p>When you want <b>one</b> particular object in one particular spot — a fountain, a statue, a gate — you place it directly, like dragging a model out of Roblox's Toolbox. The recipe the courtyard uses:</p>
+<div class="tree">Courtyard                (PixelObject — optional, per-prop look overrides)
+└─ Fountain             (your .glb, instanced as a Node3D)
+   └─ Collision         (StaticBody3D — makes it solid)
+      └─ Shape0         (CollisionShape3D — the shape of the solid part)</div>
+<div class="pair">
+  <figure class="shot"><img src="media/12-using-models/30-placed-prop-scene-tree.png" alt="The Scene dock of courtyard.tscn: Courtyard root with WorldEnvironment, Sun, MarchingSquaresTerrain and a Courtyard PixelObject containing Fountain, StoneRing, Pillar1, Pillar2 and Pillar3, each with a Collision child holding a Shape0 child."><figcaption>The real thing in <code>demo/courtyard.tscn</code>: every <code>.glb</code> is a Node3D under one <code>Courtyard</code> PixelObject, each with <b>Collision → Shape0</b>.</figcaption></figure>
+  <div>
+    <p>Four steps, each below:</p>
+    <ol>
+      <li><a href="#p-instance">Instance</a> the model into the scene.</li>
+      <li><a href="#p-seat">Sit it on the terrain</a> (move / rotate / scale).</li>
+      <li><a href="#pixelobject">Optional: a PixelObject</a> to override its look.</li>
+      <li><a href="#p-collision">Add collision</a> so the player can't walk through it.</li>
+    </ol>
+    <p>Then <a href="#p-run">run the scene with F6</a> and walk on it.</p>
+  </div>
+</div>
+
+<h3 id="p-instance">1 · Instance the model</h3>
+<ol class="steps" data-id="p12-instance">
+  <li>In the Scene dock, select the scene's <b>root</b> node (the top one).</li>
+  <li>Click <span class="ui">Instantiate Child Scene</span> — the chain-link icon next to the <b>+</b> (Add Child Node) at the top of the Scene dock. The <b>Select Scene</b> dialog opens.</li>
+  <li>Turn the <span class="ui">Addons</span> toggle <b>on</b> (bottom right) — the addon's rocks live under <code>res://addons/…</code> and are hidden otherwise.</li>
+  <li>Type <code>stone_tallB</code>. The match <code>stone_tallB.glb</code> is highlighted; press <kbd>Enter</kbd>.</li>
+  <li>A new <code>stone_tallB2</code> node appears under the root, selected, at the scene origin.</li>
+</ol>
+<div class="hotspots"><img src="media/12-using-models/51-instance-scene-dialog.png" alt="The Select Scene dialog with stone_tallB typed in the search box; the list shows stone_tallB.glb highlighted, then stone_tallA through stone_tallJ, all in res://addons/MarchingSquaresTerrain/assets/rocks; Fuzzy Search and Addons toggles are both on at the bottom.">
+  <button class="spot" style="left:45%;top:8%" data-title="Search" data-text="Type part of a file name. Results update as you type.">1</button>
+  <button class="spot" style="left:30%;top:15.5%" data-title="Best match" data-text="The highlighted result. Enter instances it; arrow keys move the highlight.">2</button>
+  <button class="spot" style="left:50%;top:88%" data-title="Full path" data-text="The res:// path of the highlighted file.">3</button>
+  <button class="spot" style="left:74%;top:93%" data-title="Fuzzy Search" data-text="Matches even when letters aren't next to each other.">4</button>
+  <button class="spot" style="left:89%;top:93%" data-title="Addons" data-text="Include files inside res://addons/. Turn it on to find the addon's models.">5</button>
+</div>
+<p>You can also drag a <code>.glb</code> from the FileSystem dock straight into the 3D view or onto a node — see <a href="11-importing-models.html#instancing">page 11 · Putting a model into a scene</a>.</p>
+
+<h3 id="p-seat">2 · Sit it on the terrain</h3>
+<p>A new instance lands at the origin, which may be in the air or underground. The courtyard clearing sits at world height <b>Y ≈ 0</b> (all its pillars and the fountain are at Y = 0), so setting the stone's <b>Position Y to 0</b> seats it on the grass.</p>
+<div class="compare" data-before="Floating (Y ≈ 8)" data-after="Seated (Y = 0)"><img src="media/12-using-models/52-placed-prop-floating.png" alt="The white stone_tallB2 prop hanging in the air above the courtyard grass, wrapped in an orange selection box with the red, green and blue Move gizmo arrows."><img src="media/12-using-models/53-placed-prop-seated.png" alt="The same stone dropped down so its base rests on the grass among the pillars and trees, the Move gizmo above it."></div>
+<p class="caption">Drag the divider: the placed stone before and after setting Position Y to 0.</p>
+<p>Two ways to place a prop, both fine:</p>
+<table class="ref">
+  <thead><tr><th>Way</th><th>How</th><th>Roblox twin</th></tr></thead>
+  <tbody>
+    <tr><td>Gizmo</td><td><kbd>W</kbd> Move (drag the arrows), <kbd>E</kbd> Rotate (drag the rings), <kbd>R</kbd> Scale. Drag the <b>green</b> arrow down to lower it. <kbd>F</kbd> frames the selected node.</td><td>Move / Rotate / Scale tools</td></tr>
+    <tr><td>Inspector</td><td>Expand <span class="ui">Transform</span> and type Position / Rotation / Scale. Double-click, <kbd>Ctrl</kbd>+<kbd>A</kbd>, type, <kbd>Enter</kbd>.</td><td>Properties ▸ Position / Orientation / Size</td></tr>
+  </tbody>
+</table>
+<p>With the <b>Roblox UI</b> toggle on, the top of the 3D view becomes a Studio-style ribbon with these tools and grid snapping:</p>
+<div class="hotspots"><img src="media/12-using-models/40-roblox-ui-ribbon.png" alt="The Roblox UI ribbon: a top row with Pixel Preview, Animate, Pixel World and a Roblox UI switch turned on; Model and Edit tabs; and a tool row with Select, Move (highlighted), Scale, Rotate and Transform icons followed by a Geometric dropdown and a ticked grid snap of 1.0 m.">
+  <button class="spot" style="left:9%;top:22%" data-title="Pixel Preview" data-text="Toggle the pixel look on/off in the editor view.">1</button>
+  <button class="spot" style="left:48%;top:22%" data-title="Roblox UI" data-text="Turns the Studio-style ribbon on or off. It only changes this top bar, not the terrain or Foliage tools.">2</button>
+  <button class="spot" style="left:6%;top:55%" data-title="Model / Edit tabs" data-text="Model = place and transform parts and props. Edit = mesh modelling (page 10).">3</button>
+  <button class="spot" style="left:8%;top:82%" data-title="Move" data-text="Move tool (highlighted). Next to it: Scale, Rotate, Transform.">4</button>
+  <button class="spot" style="left:39.7%;top:81%" data-title="Grid snap" data-text="Tick to snap moves to the grid step (here 1.0 m). The angle snap for rotation is 45° by default.">5</button>
+</div>
+<p>The ribbon is covered fully on <a href="09-builder-greybox.html#ribbon">page 09</a>. It matters for placed props; it does <b>not</b> change the Foliage workflow, which looks the same with Roblox UI on or off.</p>
+
+<h3 id="pixelobject">3 · Optional: a PixelObject for per-prop look</h3>
+<p>Your placed prop is <b>already pixelated</b> by the global renderer. A <b>PixelObject</b> node lets you <b>override</b> the look for everything beneath it — turn its outline on or off, put its outline in a different colour group, change its pixel size, palette or dither. Drop your prop under a PixelObject (the courtyard wraps all its props in one called <code>Courtyard</code>). Nested PixelObjects refine their parent's settings.</p>
+<div class="pair">
+  <div class="hotspots tall-spots"><img src="media/12-using-models/31-pixelobject-inspector.png" alt="The PixelObject Inspector: Pixel Size -1, Outline -1, Outline Id -1, Own Color off, Outline Col. dark swatch, Palette -1, Dither -1, Texel Snap on, Profiles Array, Profile Targets Array, Convert on, Bands 3, Shade Floor 0.3, Rim 0.0, Alpha Scissor Threshold 0.5.">
+    <button class="spot" style="left:75%;top:8%" data-title="Pixel Size" data-text="−1 = inherit, or a size of 1 and up for chunkier/finer pixels on this prop.">1</button>
+    <button class="spot" style="left:75%;top:14.5%" data-title="Outline" data-text="−1 inherit · 0 off · 1 on.">2</button>
+    <button class="spot" style="left:75%;top:21%" data-title="Outline Id" data-text="Which outline-colour group this prop uses (groups 0–7; −1 = automatic).">3</button>
+    <button class="spot" style="left:75%;top:40%" data-title="Palette" data-text="−1 inherit, or force palette snapping off/on for this prop.">4</button>
+    <button class="spot" style="left:75%;top:46%" data-title="Dither" data-text="−1 inherit, or force dithering off/on for this prop.">5</button>
+    <button class="spot" style="left:75%;top:59%" data-title="Profiles" data-text="A list of PixelObjectProfile resources: reusable sets of the same overrides.">6</button>
+  </div>
+  <div>
+    <p><b>−1 means “inherit”</b> — use the parent PixelObject's value, or else the renderer's.</p>
+    <p>The other fields (Own Color, Outline Col., Texel Snap, Convert, Bands, Shade Floor, Rim, Alpha Scissor) are explained on <a href="07-pixelizer.html#ref-object">page 07 · Pixel Object</a>.</p>
+    <p><b>It never damages your model.</b> A PixelObject restores the model's original materials when you remove it, and while the editor saves.</p>
+    <p><b>PixelObjectProfile</b> is a resource holding the same overrides — <code>active</code>, <code>pixel_size</code>, <code>outline</code>, <code>outline_id</code>, <code>palette</code>, <code>dither</code>, <code>supersede_contour_tint</code> and <code>contour_tint</code> (default a very dark blue). It only changes anything if at least one value is set. See <a href="07-pixelizer.html#profile">page 07</a>.</p>
+  </div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like grouping Parts into a Model and giving the Model its own <b>Highlight</b>: the settings apply to everything inside.</p></div>
+
+<h3 id="p-collision">4 · Add collision</h3>
+<p>An imported model has no collision by default — the player would walk straight through it. Add Godot's standard solid-object pair:</p>
+<ol class="steps" data-id="p12-collision">
+  <li>Select your prop (<code>stone_tallB2</code>) in the Scene dock.</li>
+  <li>Click <b>+</b> (<span class="ui">Add Child Node</span>). In the <b>Create New Node</b> dialog type <code>StaticBody3D</code>, select it and click <span class="ui">Create</span>.</li>
+  <li>With the new <code>StaticBody3D</code> selected, click <b>+</b> again, search <code>CollisionShape3D</code>, <span class="ui">Create</span>.</li>
+  <li>In the CollisionShape3D's Inspector, click the <span class="ui">Shape</span> dropdown ▸ <b>New BoxShape3D</b>. A box outline appears around the prop in the 3D view; size it with its handles or in the Inspector.</li>
+</ol>
+<div class="pair">
+  <figure class="shot"><img src="media/12-using-models/55-add-node-dialog.png" alt="The Create New Node dialog with StaticBody3D typed in Search; the Matches tree shows Node, Node3D, CollisionObject3D, PhysicsBody3D and StaticBody3D highlighted; the description reads A 3D physics body that can't be moved by external forces."><figcaption>The <b>Create New Node</b> dialog: search, pick, <span class="ui">Create</span>.</figcaption></figure>
+  <figure class="shot"><img src="media/12-using-models/56-collision-scene-tree.png" alt="Close-up of the Scene dock: stone_tallB2 with a StaticBody3D child, which has a CollisionShape3D child."><figcaption>The result: <code>stone_tallB2 → StaticBody3D → CollisionShape3D</code>.</figcaption></figure>
+</div>
+<div class="hotspots"><img src="media/12-using-models/56-collision-setup.png" alt="The full Godot editor: the Scene dock shows stone_tallB2, StaticBody3D and CollisionShape3D selected; the 3D view shows the courtyard with the collision box gizmo's red handles on the stone; the Inspector shows CollisionShape3D with Shape set to BoxShape, Disabled off, Debug Fill on.">
+  <button class="spot" style="left:1.5%;top:10.5%" data-title="+ Add Child Node" data-text="Opens Create New Node to add a child to the selected node.">1</button>
+  <button class="spot" style="left:3.5%;top:10.5%" data-title="Instantiate Child Scene" data-text="The chain-link icon: instance a .glb or .tscn as a child.">2</button>
+  <button class="spot" style="left:7%;top:44%" data-title="Your prop" data-text="stone_tallB2, the instanced .glb.">3</button>
+  <button class="spot" style="left:10%;top:49%" data-title="Collision nodes" data-text="StaticBody3D (solid) with CollisionShape3D (its shape) underneath.">4</button>
+  <button class="spot" style="left:51%;top:44%" data-title="Box gizmo" data-text="The collision box drawn around the prop. Drag the red handles to resize it.">5</button>
+  <button class="spot" style="left:93%;top:26%" data-title="Shape = BoxShape" data-text="The shape resource. Pick New BoxShape3D from this dropdown.">6</button>
+  <button class="spot" style="left:93%;top:29.5%" data-title="Disabled" data-text="Tick to switch this collision off without deleting it.">7</button>
+</div>
+<div class="callout tip"><span class="label">Other ways to get collision</span><p>You can let the import generate collision for you instead (<a href="11-importing-models.html#advanced">page 11 · Advanced Import Settings ▸ Generate ▸ Physics</a>). And <b>foliage</b> doesn't need these nodes at all — scatter items have their own <span class="ui">Collision</span> group (None / Cylinder / Box). The StaticBody3D route is for single placed props.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox every Part collides unless you untick CanCollide. In Godot a model is visual only until you give it a <b>StaticBody3D</b> (≈ Anchored, CanCollide on) with a <b>CollisionShape3D</b> (≈ CollisionFidelity = Box).</p></div>
+
+<h3 id="p-run">Try it: run the scene and stand on it</h3>
+<p>Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save, then <kbd>F6</kbd> to run the current scene. The player spawns in the courtyard, and you can jump onto the stone — proof the collision works. Running and the demo player's controls are on <a href="13-playtest-export.html">page 13 · Playtesting &amp; exporting</a>.</p>
+<figure class="clip"><video src="media/12-using-models/58-f6-run-game.mp4" poster="media/12-using-models/58-f6-run-game.png" data-autoplay></video><figcaption><kbd>F6</kbd> runs the scene: the player walks to the placed stone, jumps up and stands on it — proof the <b>StaticBody3D + CollisionShape3D</b> box really holds it up.</figcaption></figure>
+
+<!-- ===================================================== BUILDER -->
+<h2 id="builder">Use 3 · Builder meshes as reusable props</h2>
+<p>On <a href="09-builder-greybox.html">page 09</a> and <a href="10-builder-modeller.html">page 10</a> you built shapes with the Builder (a <code>PixelBuilderMesh</code>). Save one as its own scene and it becomes a kit-piece you can drop anywhere — as a placed prop or as foliage — just like a <code>.glb</code>.</p>
+<p>New parts you insert with the Builder start out solid Roblox <b>Medium Stone Grey</b>, whatever mesh is selected — they don't copy its colours. The box in <code>modelled_prop.tscn</code> has been coloured green, which is why it stands out below.</p>
+
+<h3 id="save-branch">Save it as its own scene</h3>
+<div class="pair">
+  <figure class="shot tall"><img src="media/12-using-models/60-save-branch-menu.png" alt="The Scene dock right-click menu: Add Child Node, Instantiate Child Scene, Expand/Collapse Branch, Cut, Copy, Duplicate, Attach Script, Rename, Move Up, Move Down, Reparent, Reparent to New Node, Make Scene Root, Save Branch as Scene..., Make Local, Editable Children, Load as Placeholder."><figcaption>Right-click a node in the Scene dock ▸ <b>Save Branch as Scene…</b></figcaption></figure>
+  <div>
+    <ol class="steps" data-id="p12-savebranch">
+      <li>In the Scene dock, right-click the builder mesh you made.</li>
+      <li>Choose <span class="ui">Save Branch as Scene…</span> and save it, e.g. as <code>res://tutorial/guide/modelled_prop.tscn</code>.</li>
+    </ol>
+    <p><code>tutorial/guide/modelled_prop.tscn</code> in the project is exactly this: a <code>PixelBuilderMesh</code> arch/box saved this way. The steps below use it.</p>
+    <div class="callout warn"><span class="label">Greyed out?</span><p>Save Branch is <b>disabled on a node that is already an instanced scene</b>. Godot says <i>“Can't save the branch of an already instantiated scene… use Scene ▸ New Inherited Scene instead”</i>. Save-Branch the <b>original</b> builder mesh you made, not a copy you already instanced.</p></div>
+  </div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like right-clicking a Model ▸ <b>Save to Roblox</b> / <b>Convert to Package</b>: it becomes a reusable asset you can insert again and again.</p></div>
+
+<h3 id="builder-prop">Place it as a prop</h3>
+<p>Same flow as a <code>.glb</code>: select the root ▸ <span class="ui">Instantiate Child Scene</span> ▸ type <code>modelled_prop</code> ▸ <kbd>Enter</kbd>.</p>
+<figure class="clip"><video src="media/12-using-models/59-instance-builder-prop.mp4" poster="media/12-using-models/59-instance-builder-prop.png"></video><figcaption>Instancing <code>modelled_prop.tscn</code> as a child. The editor switches into Builder mode, because the new node is a builder mesh.</figcaption></figure>
+<div class="callout tip"><span class="label">The ribbon changed — that's expected</span><p>Because the root of <code>modelled_prop.tscn</code> is a <code>PixelBuilderMesh</code>, selecting it flips the editor into <b>Builder mode</b> (the left ribbon shows Builder tools). It isn't a bug; select another node to leave.</p></div>
+<div class="callout warn"><span class="label">Gotcha: the origin isn't always where the mesh is</span><p>When you <b>Save Branch as Scene</b> a mesh whose parts are offset from the root origin, the saved scene keeps that offset: the root <code>PixelBuilderMesh</code> sits at <code>(0, 0, 0)</code> but the shape lives somewhere else. Drop that scene in at Y = 0 and the shape floats or sinks. The fix is one field: select the child mesh node (<code>Box</code>), set its <span class="ui">Position</span> to <b>(0, 0, 0)</b>, then save the prop scene — now the shape sits exactly on the root origin, and the root's Position is the shape's position. <b>The guide's <code>modelled_prop.tscn</code> has already been fixed this way</b>, so instancing it at Y = 0 seats it on the ground.</p></div>
+<figure class="shot"><img src="media/12-using-models/59-builder-prop-placed.png" alt="The bright green builder-made box sitting on the courtyard grass between a pink pillar and a white stone, with round trees, a stone ring and the paved courtyard around it."><figcaption>The builder prop (the green box) seated on the terrain among the courtyard's imported models.</figcaption></figure>
+
+<h3 id="builder-foliage">Use it as foliage</h3>
+<p><span class="ui">Add Mesh / Scene…</span> accepts <code>.tscn</code>, so a builder scene can be painted like any model.</p>
+<ol class="steps" data-id="p12-builderfoliage">
+  <li>Select the terrain ▸ <b>Foliage</b> (<kbd>5</kbd>) ▸ <span class="ui">Add Mesh / Scene…</span>.</li>
+  <li>In the <b>Open a File</b> dialog, type <code>res://tutorial/guide/modelled_prop.tscn</code> into the <span class="ui">File</span> field and press <kbd>Enter</kbd>.</li>
+  <li>A <b>modelled prop</b> entry appears, selected. Its Inspector shows <b>Form = Custom, Scene = modelled_prop</b>.</li>
+  <li>Raise <span class="ui">Placement ▸ Scale Min / Max</span> (e.g. 2.5 – 4) so it's legible, then paint or Fill Terrain — the builder props land on the terrain just like a <code>.glb</code> model.</li>
+</ol>
+<div class="pair">
+  <figure class="shot"><img src="media/12-using-models/60-add-mesh-scene-dialog.png" alt="The Open a File dialog at res:// with folders addons, build, demo, qa_tmp, tools and tutorial, an empty File field and the All Recognized type filter."><figcaption>The same <b>Open a File</b> dialog — type the path into <span class="ui">File</span>.</figcaption></figure>
+  <figure class="shot"><img src="media/12-using-models/62-builder-scatter-item-inspector.png" alt="PixelScatterItem Inspector: Display Name modelled prop, Form Custom, Shape Seed 1, Cage empty, Scene mode(lled_prop), Tint white."><figcaption>Proof: a builder <code>.tscn</code> lands in the <b>Scene</b> slot with <b>Form = Custom</b>.</figcaption></figure>
+</div>
+<div class="pair">
+  <figure class="clip"><video src="media/12-using-models/61-paint-builder-foliage.mp4" poster="media/12-using-models/61-paint-builder-foliage.png"></video><figcaption>Painting the builder mesh as a scatter model: bright green <b>modelled prop</b> copies pop up on the hill under the brush, big and clearly visible. The hint bar reads “Painting modelled prop”.</figcaption></figure>
+  <figure class="clip"><video src="media/12-using-models/63-fill-terrain-builder.mp4" poster="media/12-using-models/63-fill-terrain-builder.png"></video><figcaption>Fill Terrain with the same <b>modelled prop</b> item selected: the whole hill fills with the builder prop by the item's own rules — the strip Density stays at 0.25, so the copies land at the item's spacing.</figcaption></figure>
+</div>
+<div class="callout tip"><span class="label">Looks faint?</span><p>At the default scale (about 0.8–1.2) a builder prop paints small and gets lost in the grass. Raise <span class="ui">Scale Min / Max</span> — 2.5–4 worked well here.</p></div>
+
+<!-- ===================================================== TILES -->
+<h2 id="tiles">Use 4 · Models as terrain tiles? (the honest answer)</h2>
+<p>Some Roblox games use “tile kits”: every square of the map is a model you place. <b>MST has no feature that turns a model into a terrain tile.</b> The terrain is a <b>height field</b> — a grid of heights (square cells or hex columns) that you sculpt. Its “tiles” are grid cells, not swappable models. The terrain's <code>contents</code> resource stores heights, colours, a grass mask and scatter data — not a set of mesh tiles.</p>
+<p>The closest real ways to get “one model per cell”:</p>
+<table class="ref">
+  <thead><tr><th>Feature</th><th>What it gives you</th></tr></thead>
+  <tbody>
+    <tr><td>Fill Terrain + Per Cell Max</td><td>Keep your item's <span class="ui">Placement ▸ Per Cell Max</span> (1–16) at 1 — its default — and Fill Terrain: at most one copy of your model per grid cell, following the item's rules. On a hex grid this reads like model-per-hex. (See <a href="#fill">Paint vs Fill Terrain</a>.)</td></tr>
+    <tr><td>Small Hexes</td><td>Tick <span class="ui">Placement ▸ Small Hexes</span> on the item, then Fill Terrain: one small prop per <i>sub-hex</i> cell. The closest thing to a tiled look — hex_island's <i>Pebbles (small hexes)</i> item does this.</td></tr>
+    <tr><td>Hex columns</td><td>The terrain's own hex cell meshes are generated from height and edge settings. You <b>can't</b> swap in your own model for them.</td></tr>
+    <tr><td>Hex Maps</td><td>The terrain's <span class="ui">Hex Maps</span> settings (Map Window Radius / Focus / Margin / Refresh) are about <b>streaming</b> very large hex maps — not a tile palette.</td></tr>
+  </tbody>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>MST terrain works like the Roblox <b>Terrain Editor</b> (sculpt and paint), not like a tile kit. Shape the land on <a href="03-terrain-sculpting.html">page 03</a>, then decorate it with models using foliage and props.</p></div>
+
+<!-- ===================================================== OTHER -->
+<h2 id="other">Use 5 · Other uses: images as terrain</h2>
+<ul>
+  <li><b>Stamp an image into the terrain.</b> The <span class="ui">Stamp</span> tool (left terrain toolbar, below Settings) stamps a greyscale <b>image</b> into the terrain's height, and can paint texture too. A model can't shape terrain, but an image can. See <a href="03-terrain-sculpting.html#tools">page 03 · the tools (Stamp tab)</a>.</li>
+  <li><b>Images as ground textures.</b> Importing an image as one of the terrain's texture slots is <a href="04-terrain-painting.html#own-image">page 04 · Use your own image as a texture</a>.</li>
+</ul>
+
+<!-- ===================================================== REFERENCE -->
+<h2 id="reference">Control reference</h2>
+<p>Every control used on this page. Type to filter (try “slope”, “collision”, “scene” or “F6”).</p>
+<input class="filter-box" data-target="#use-ref" placeholder="Filter controls…">
+<div id="use-ref">
+  <div class="control"><h4>Foliage tool <span class="grp">terrain toolbar</span></h4><div class="where">Left terrain toolbar · slot 5</div><p>Opens the Foliage palette and strip. Select the terrain node first.</p><dl><dt>Shortcut</dt><dd><kbd>5</kbd></dd></dl></div>
+  <div class="control"><h4>Add Mesh / Scene… <span class="grp">palette</span></h4><div class="where">Bottom of the Foliage palette</div><p>Creates a new PixelScatterItem from a model or mesh file, named after the file, and selects it. One undoable step.</p><dl><dt>Accepts</dt><dd><code>.tscn .scn .glb .gltf .blend .fbx</code> → Scene; <code>.obj .mesh .tres .res</code> → Cage</dd></dl></div>
+  <div class="control"><h4>Edit <span class="grp">palette</span></h4><div class="where">Foliage palette</div><p>Shows the selected item in the Inspector. Double-clicking an entry does the same.</p></div>
+  <div class="control"><h4>Paint <span class="grp">foliage</span></h4><div class="where">3D view · Foliage tool</div><p>Places copies of the selected item(s) under the brush.</p><dl><dt>Mouse</dt><dd>LMB-drag</dd></dl></div>
+  <div class="control"><h4>Erase <span class="grp">foliage</span></h4><div class="where">3D view · Foliage tool</div><p>Removes copies under the brush.</p><dl><dt>Mouse</dt><dd>RMB-drag or <kbd>Shift</kbd>+LMB</dd></dl></div>
+  <div class="control"><h4>Brush size <span class="grp">foliage</span></h4><div class="where">3D view · Foliage tool</div><p>Resize the foliage brush.</p><dl><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Multi-select <span class="grp">palette</span></h4><div class="where">Foliage palette</div><p>Select several items; one stroke paints a mix of them.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+click</dd></dl></div>
+  <div class="control"><h4>Fill Terrain <span class="grp">strip</span></h4><div class="where">Foliage strip</div><p>Scatters the selected item over the whole terrain using the item's own Density and Filters.</p></div>
+  <div class="control"><h4>Clear <span class="grp">strip</span></h4><div class="where">Foliage strip</div><p>Removes every copy of the item from the terrain.</p></div>
+  <div class="control"><h4>Strip Density <span class="grp">strip</span></h4><div class="where">Foliage strip</div><p>How dense hand-painting is. Does <b>not</b> affect Fill Terrain.</p></div>
+  <div class="control"><h4>Strip Slope Min / Max <span class="grp">strip</span></h4><div class="where">Foliage strip</div><p>Limits painting by steepness. Combined with the item's own Slope Min/Max — the stricter one wins.</p></div>
+  <div class="control"><h4>Undo <span class="grp">editor</span></h4><div class="where">Anywhere</div><p>Undoes the last stroke, Fill, Clear or import.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd></dd></dl></div>
+
+  <div class="control"><h4>Display Name <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>The palette label. Set from the file name on import.</p></div>
+  <div class="control"><h4>Form <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>Built-in procedural shape, or <b>Custom</b> to use your Scene/Cage. Left unset it defaults to <b>Rock</b> — the cause of grey placeholders.</p><dl><dt>Options</dt><dd>Custom, Rock, Bush, Tree, Pine, Flowers</dd></dl></div>
+  <div class="control"><h4>Shape Seed <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>Varies a procedural shape. Unused when Form is Custom.</p></div>
+  <div class="control"><h4>Cage <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>A bare Mesh to scatter.</p><dl><dt>Type</dt><dd>Mesh</dd></dl></div>
+  <div class="control"><h4>Scene <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>A model or saved scene to scatter. Every mesh inside it is drawn; its materials (colour, texture, alpha cut-out, vertex colour) are kept.</p><dl><dt>Type</dt><dd>PackedScene</dd></dl></div>
+  <div class="control"><h4>Tint <span class="grp">item</span></h4><div class="where">PixelScatterItem</div><p>Multiplies the model's colour. White = unchanged.</p></div>
+  <div class="control"><h4>Hue Jitter / Value Jitter <span class="grp">Color</span></h4><div class="where">PixelScatterItem ▸ Color</div><p>Random colour / brightness variation per copy.</p></div>
+  <div class="control"><h4>Density <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>The item's own density, used by Fill Terrain. Raise it if Fill looks sparse.</p></div>
+  <div class="control"><h4>Scale Min / Scale Max <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Random size range per copy. Big models: lower it or accept sparse strokes. Small builder props: raise it (2.5–4).</p></div>
+  <div class="control"><h4>Random Yaw <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Random spin around the vertical axis, in degrees. 360 (the default) lets copies face any way; 0 keeps them all facing the same way.</p><dl><dt>Range</dt><dd>0 – 360</dd></dl></div>
+  <div class="control"><h4>Align to Normal <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>How much a copy tilts with the slope. 1 for boulders, 0 for upright trees.</p></div>
+  <div class="control"><h4>Y Offset <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Raise or sink each copy.</p></div>
+  <div class="control"><h4>Per Cell Max <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Max copies per grid cell — the “one model per cell” knob.</p><dl><dt>Range</dt><dd>1 – 16</dd></dl></div>
+  <div class="control"><h4>Small Hexes <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Place one small prop per sub-hex cell with Fill Terrain.</p><dl><dt>Type</dt><dd>on/off</dd></dl></div>
+  <div class="control"><h4>Ground Slots / Seed <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Which painted ground textures it may grow on; random seed for the layout. See <a href="05-foliage-grass.html#item-ref">page 05</a>.</p></div>
+  <div class="control"><h4>Slope Min / Slope Max <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Steepness the item accepts. <b>Fresh imports: 0 / 35°</b> — raise Slope Max to paint on steeper ground.</p></div>
+  <div class="control"><h4>Height Min / Height Max <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Terrain heights the item accepts.</p><dl><dt>Default</dt><dd>−1000 / 1000</dd></dl></div>
+  <div class="control"><h4>Cluster Size / Threshold <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Clump copies together using noise.</p><dl><dt>Default</dt><dd>0 / 0</dd></dl></div>
+  <div class="control"><h4>Collision <span class="grp">Collision</span></h4><div class="where">PixelScatterItem ▸ Collision</div><p>The scatter item's own collision for every copy.</p><dl><dt>Options</dt><dd>None, Cylinder, Box</dd></dl></div>
+  <div class="control"><h4>Scatter Items <span class="grp">terrain</span></h4><div class="where">Terrain Inspector ▸ Foliage</div><p>The list of PixelScatterItems shown in the palette. Drag a duplicated preset <code>.tres</code> here for the by-hand route.</p></div>
+
+  <div class="control"><h4>Instantiate Child Scene <span class="grp">Scene dock</span></h4><div class="where">Scene dock toolbar · chain-link icon</div><p>Opens <b>Select Scene</b> to instance a <code>.glb</code>/<code>.tscn</code> as a child of the selected node.</p></div>
+  <div class="control"><h4>Select Scene: Addons <span class="grp">dialog</span></h4><div class="where">Select Scene dialog · bottom right</div><p>Include files under <code>res://addons/</code>. Needed to find the addon's models.</p></div>
+  <div class="control"><h4>Select Scene: Fuzzy Search <span class="grp">dialog</span></h4><div class="where">Select Scene dialog · bottom right</div><p>Match names loosely as you type.</p></div>
+  <div class="control"><h4>Add Child Node (+) <span class="grp">Scene dock</span></h4><div class="where">Scene dock toolbar</div><p>Opens <b>Create New Node</b>: search a node type (StaticBody3D, CollisionShape3D, PixelObject…) and click Create.</p></div>
+  <div class="control"><h4>Save Branch as Scene… <span class="grp">Scene dock</span></h4><div class="where">Scene dock · right-click menu</div><p>Saves the node and its children as a new <code>.tscn</code>. Disabled on an already-instanced scene.</p></div>
+  <div class="control"><h4>Transform <span class="grp">Inspector</span></h4><div class="where">Inspector · Node3D ▸ Transform</div><p>Exact Position / Rotation / Scale. Set Position Y to seat a prop on the ground.</p></div>
+  <div class="control"><h4>Move / Rotate / Scale / Focus <span class="grp">3D view</span></h4><div class="where">3D view, or the Roblox UI ribbon</div><p>Transform gizmos; Focus frames the selection.</p><dl><dt>Shortcut</dt><dd><kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> / <kbd>F</kbd></dd></dl></div>
+  <div class="control"><h4>Grid snap <span class="grp">ribbon</span></h4><div class="where">Roblox UI ribbon · Model tab</div><p>Snap moves to a grid step (1.0 m) and rotations to an angle step (45°).</p></div>
+  <div class="control"><h4>StaticBody3D <span class="grp">node</span></h4><div class="where">Create New Node</div><p>Makes its children solid and immovable.</p></div>
+  <div class="control"><h4>CollisionShape3D ▸ Shape <span class="grp">node</span></h4><div class="where">Inspector</div><p>The collision shape. Pick <b>New BoxShape3D</b>. <span class="ui">Disabled</span> turns it off.</p></div>
+  <div class="control"><h4>PixelObject <span class="grp">node</span></h4><div class="where">Create New Node · Inspector</div><p>Per-prop look overrides: Pixel Size, Outline, Outline Id, Palette, Dither (−1 = inherit), plus Profiles.</p></div>
+  <div class="control"><h4>Pixel Preview <span class="grp">3D view</span></h4><div class="where">Top bar of the 3D view</div><p>Toggles the pixel look in the editor.</p></div>
+  <div class="control"><h4>Roblox UI <span class="grp">3D view</span></h4><div class="where">Top bar of the 3D view</div><p>Switches the top bar to the Studio-style Model/Edit ribbon. Doesn't change the Foliage tools.</p></div>
+  <div class="control"><h4>Save / Run current scene <span class="grp">editor</span></h4><div class="where">Anywhere</div><p>Save, then run just this scene to playtest.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>F6</kbd></dd></dl></div>
+</div>
+
+<!-- ===================================================== TROUBLE -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+<input class="filter-box" data-target="#trouble" placeholder="Filter problems…">
+<div id="trouble">
+  <div class="control"><h4>Nothing paints</h4><div class="where">Item ▸ Filters</div><p>Almost always the slope limit: fresh imports accept only up to 35°. Raise the item's <span class="ui">Slope Max</span> (Edit ▸ Filters) or the strip's Slope Max, or paint on flatter ground.</p></div>
+  <div class="control"><h4>Only a few copies per stroke</h4><div class="where">Item ▸ Placement</div><p>Large models are spaced by their footprint. Paint overlapping strokes or lower Scale Min/Max.</p></div>
+  <div class="control"><h4>Fill Terrain is sparse</h4><div class="where">Item ▸ Placement</div><p>Fill uses the item's own <span class="ui">Density</span>, not the strip's. Raise it.</p></div>
+  <div class="control"><h4>My props are grey blobs</h4><div class="where">Item</div><p>The item has no Scene/Cage and Form is at its default (Rock). Set a Form or a model. See <a href="#grey">grey placeholders</a>.</p></div>
+  <div class="control"><h4>Can't find the addon's models in Select Scene</h4><div class="where">Select Scene dialog</div><p>Turn the <span class="ui">Addons</span> toggle on.</p></div>
+  <div class="control"><h4>Prop floats or is buried</h4><div class="where">Inspector ▸ Transform</div><p>Set Position Y to the ground height (Y = 0 in the courtyard), or drag the green Move arrow.</p></div>
+  <div class="control"><h4>Builder prop disappears underground</h4><div class="where">Scene dock</div><p>The prop scene's mesh is offset from its root. Select the child mesh node, set its <span class="ui">Position</span> to <b>(0, 0, 0)</b> and save the prop scene; then the root's Position places the shape. <code>modelled_prop.tscn</code> in this project is already fixed that way.</p></div>
+  <div class="control"><h4>Save Branch as Scene is greyed out</h4><div class="where">Scene dock</div><p>The node is already an instanced scene. Save-Branch the original, or use Scene ▸ New Inherited Scene.</p></div>
+  <div class="control"><h4>Editor switched to Builder tools</h4><div class="where">3D view</div><p>You selected a <code>PixelBuilderMesh</code>. Expected; select another node.</p></div>
+  <div class="control"><h4>Player walks through my prop</h4><div class="where">Scene dock</div><p>Add StaticBody3D + CollisionShape3D with a shape, or generate collision on import (page 11).</p></div>
+  <div class="control"><h4>Builder prop is tiny as foliage</h4><div class="where">Item ▸ Placement</div><p>Raise Scale Min/Max to about 2.5–4.</p></div>
+</div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<input class="filter-box" data-target="#recipe-list" placeholder="Filter recipes…">
+<div id="recipe-list">
+  <div class="control"><h4>A model orchard / grove</h4><div class="where">Foliage</div><p>Import a tree with Add Mesh / Scene, paint overlapping strokes. Scale Min/Max + Random Yaw 0–360 give natural variety (<a href="#painting">clip</a>).</p></div>
+  <div class="control"><h4>A boulder field</h4><div class="where">Foliage</div><p>Import a <code>rocks/*.glb</code> (small footprint = dense) and paint. Set <span class="ui">Align to Normal</span> to 1 so boulders tilt with the slope (<a href="#several">clip</a>).</p></div>
+  <div class="control"><h4>Mixed natural scatter</h4><div class="where">Foliage</div><p><kbd>Ctrl</kbd>+click two custom models, or a model and a <b>+</b> preset, and paint them together.</p></div>
+  <div class="control"><h4>A whole forest in one click</h4><div class="where">Foliage</div><p>Tune the item's Density and Slope Max, then Fill Terrain. Clear and change Seed for a different layout.</p></div>
+  <div class="control"><h4>A hero prop</h4><div class="where">Scene dock</div><p>Instance a fountain or pillar <code>.glb</code>, seat it, put it under a PixelObject if it needs its own outline, and add StaticBody3D + CollisionShape3D.</p></div>
+  <div class="control"><h4>A reusable kit-piece</h4><div class="where">Builder + Scene dock</div><p>Build it (page 10), Save Branch as Scene, then instance it as many times as you like — or paint it as foliage.</p></div>
+  <div class="control"><h4>A tidy “one per hex” look</h4><div class="where">Foliage</div><p>Per Cell Max 1 (or Small Hexes on) + Fill Terrain.</p></div>
+</div>
+
+<!-- ===================================================== BRIDGES -->
+<h2 id="bridges">Roblox → MST cheat sheet</h2>
+<table class="ref">
+  <thead><tr><th>Roblox Studio</th><th>Here</th></tr></thead>
+  <tbody>
+    <tr><td>Drag a Toolbox model into the world</td><td>Instantiate Child Scene / drag from FileSystem → a <a href="#props">placed prop</a></td></tr>
+    <tr><td>Terrain grass / decoration</td><td>A <a href="#foliage">scatter item</a> — but you supply the model</td></tr>
+    <tr><td>(no equivalent)</td><td>Paint hundreds of your model; scatter by slope / height / cluster with Fill Terrain</td></tr>
+    <tr><td>Tile kits (a model per map square)</td><td>No equivalent — terrain is sculpted. Closest: <a href="#tiles">Per Cell Max / Small Hexes</a></td></tr>
+    <tr><td>Anchored + CanCollide</td><td>StaticBody3D + CollisionShape3D</td></tr>
+    <tr><td>Properties ▸ Position</td><td>Inspector ▸ Transform ▸ Position</td></tr>
+    <tr><td>Convert to Package / Save to Roblox</td><td>Save Branch as Scene…</td></tr>
+    <tr><td>Highlight on a Model</td><td>PixelObject over a group of props</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>Your palette has an item called “Tree” that looks like a grey rock. Is it broken?</summary><p>No. It has no Scene or Cage and its Form is still the default (Rock). Set Form to Tree, or give it a model (Form = Custom), and it renders properly.</p></details>
+<details class="check"><summary>You imported a tree with Add Mesh / Scene, but strokes on a hillside place nothing. Why?</summary><p>A fresh import's <span class="ui">Slope Max</span> is 35°. Raise it in Edit ▸ Filters (or the strip's Slope Max), or paint on flatter ground.</p></details>
+<details class="check"><summary>You want one specific statue in the middle of the courtyard that the player can stand on. Which route?</summary><p>A placed prop: Instantiate Child Scene, seat it with Position Y (or the Move gizmo), then add a StaticBody3D with a CollisionShape3D (New BoxShape3D). Test with <kbd>F6</kbd>.</p></details>
+<details class="check"><summary>Can you make a model become a terrain tile?</summary><p>No — the terrain is a sculpted height field, not tiles. The closest is Fill Terrain with Per Cell Max 1 or Small Hexes, which puts one copy per cell.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="11-importing-models.html">Importing models</a> — <b>previous</b>: get the model file into the project.</li>
+  <li><a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a> — the full Foliage tool, palette and PixelScatterItem reference.</li>
+  <li><a href="07-pixelizer.html">The pixelizer</a> — the pixel look, outline colours and PixelObject in depth.</li>
+  <li><a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a> and <a href="10-builder-modeller.html">Modelling: faces, edges &amp; vertices</a> — build your own props.</li>
+  <li><a href="03-terrain-sculpting.html">Sculpting terrain</a> (Stamp) and <a href="04-terrain-painting.html">Painting, textures &amp; tint</a> — images as terrain.</li>
+  <li><a href="13-playtest-export.html">Playtesting &amp; exporting</a> — <b>next</b>: run your world and walk around.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

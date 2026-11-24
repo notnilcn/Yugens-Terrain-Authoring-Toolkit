@@ -1,0 +1,2002 @@
+{
+  "page": "13-playtest-export",
+  "media_dir": "docs/guide/media/13-playtest-export",
+  "session": {
+    "scene": "res://tutorial/guide/first_world_player.tscn",
+    "width": 1920,
+    "height": 1080
+  },
+  "setup": [
+    {
+      "wait": 2
+    }
+  ],
+  "items": [
+    {
+      "id": "01-07-run-bar",
+      "kind": "still",
+      "outputs": [
+        "01-run-bar.png",
+        "07-run-bar-running.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "900"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "01-run-bar.png",
+            "crop": [
+              1386,
+              0,
+              215,
+              44
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/01-run-bar.png'); im=im.resize((im.width*3,im.height*3), Image.NEAREST); from PIL import ImageDraw; d=ImageDraw.Draw(im); d.rectangle([30,22,135,112], outline=(255,59,48), width=3); im.save('$OUT/01-run-bar.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 14
+        },
+        {
+          "shot": {
+            "out": "07-run-bar-running.png",
+            "crop": [
+              1386,
+              0,
+              215,
+              44
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/07-run-bar-running.png'); im=im.resize((im.width*3,im.height*3), Image.NEAREST); from PIL import ImageDraw; d=ImageDraw.Draw(im); d.rectangle([145,30,320,110], outline=(255,59,48), width=3); im.save('$OUT/07-run-bar-running.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "01: Run bar with Play outlined; 07: while running, Play is a blue circular arrow and Pause/Stop are outlined and active.",
+      "notes": "F6 starts the scene; the run bar stays in the editor title bar, so the crop is the same for both."
+    },
+    {
+      "id": "02-main-tabs",
+      "kind": "still",
+      "outputs": [
+        "02-main-tabs.png"
+      ],
+      "steps": [
+        {
+          "shot": {
+            "out": "02-main-tabs.png",
+            "crop": [
+              700,
+              4,
+              500,
+              34
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/02-main-tabs.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/02-main-tabs.png')\""
+        }
+      ],
+      "check": "The five main-view tabs 2D, 3D, Script, Game, Asset Store, with Asset Store complete at the right edge.",
+      "notes": "The crop starts left of 2D and ends past Asset Store; the old crop clipped the last tab."
+    },
+    {
+      "id": "03-04-game-tab",
+      "kind": "still",
+      "outputs": [
+        "03-game-tab-toolbar.png",
+        "04-game-embed-message.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "900"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Game"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "03-game-tab-toolbar.png",
+            "crop": [
+              287,
+              80,
+              620,
+              36
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/03-game-tab-toolbar.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/03-game-tab-toolbar.png')\""
+        },
+        {
+          "shot": {
+            "out": "04-game-embed-message.png",
+            "crop": [
+              544,
+              300,
+              512,
+              250
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/04-game-embed-message.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/04-game-embed-message.png')\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "3D"
+          ]
+        }
+      ],
+      "check": "03: Game tab toolbar (pause, step, speed, Input, 2D/3D, selection, mute, camera override, options). 04: the single-window embedding message.",
+      "notes": "The Game tab is the fourth main-view tab; in --single-window mode it shows the embedding-not-available message."
+    },
+    {
+      "id": "05-06-18-hint",
+      "kind": "still",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "outputs": [
+        "05-game-running-hint.png",
+        "06-editor-while-running.png",
+        "18-hint-text.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "900"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 11
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/05-game-running-hint.png\" --crop 0,0,1280,720"
+        },
+        {
+          "shot": {
+            "out": "06-editor-while-running.png",
+            "crop": [
+              0,
+              0,
+              1600,
+              900
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/06-editor-while-running.png'); d=ImageDraw.Draw(im); d.rectangle([320,180,1598,898], outline=(255,59,48), width=3); im.save('$OUT/06-editor-while-running.png')\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/05-game-running-hint.png'); im.crop((0,650,1280,720)).resize((1640,80),Image.NEAREST).save('$OUT/18-hint-text.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "05/06: the Knight on the pixel island with the hint line; 18: the hint text large enough to read.",
+      "notes": "hex_island ships the Knight and a PixelDiagnostics node. The game window is 1280x720 at (320,180); 06 is a full-screen shot showing it over the editor."
+    },
+    {
+      "id": "10-17-controls",
+      "kind": "clip",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "outputs": [
+        "10-move-forward.mp4",
+        "10-move-forward.png",
+        "11-move-turn.mp4",
+        "11-move-turn.png",
+        "12-shift-walk.mp4",
+        "12-shift-walk.png",
+        "13-jump.mp4",
+        "13-jump.png",
+        "14-camera-orbit-drag.mp4",
+        "14-camera-orbit-drag.png",
+        "15-camera-orbit-keys.mp4",
+        "15-camera-orbit-keys.png",
+        "16-camera-zoom.mp4",
+        "16-camera-zoom.png",
+        "17-f1-hint.mp4",
+        "17-f1-hint.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 18
+        },
+        {
+          "record_start": {
+            "out": "10-move-forward.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--times",
+            "40"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "10-move-forward.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "10-move-forward.mp4",
+            "out": "10-move-forward.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "11-move-turn.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "a",
+            "--times",
+            "30"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "d",
+            "--times",
+            "30"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "11-move-turn.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "11-move-turn.mp4",
+            "out": "11-move-turn.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "12-shift-walk.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--times",
+            "20"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--shift",
+            "--times",
+            "30"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "12-shift-walk.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "12-shift-walk.mp4",
+            "out": "12-shift-walk.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "13-jump.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--times",
+            "20"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "space",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "13-jump.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "13-jump.mp4",
+            "out": "13-jump.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "14-camera-orbit-drag.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "drag",
+            "500",
+            "400",
+            "900",
+            "450",
+            "--duration",
+            "2"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "14-camera-orbit-drag.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "14-camera-orbit-drag.mp4",
+            "out": "14-camera-orbit-drag.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "15-camera-orbit-keys.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "left",
+            "--times",
+            "20"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "up",
+            "--times",
+            "10"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "15-camera-orbit-keys.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "15-camera-orbit-keys.mp4",
+            "out": "15-camera-orbit-keys.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "16-camera-zoom.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "wheel",
+            "640",
+            "360",
+            "down",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "wheel",
+            "640",
+            "360",
+            "up",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "16-camera-zoom.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "16-camera-zoom.mp4",
+            "out": "16-camera-zoom.png",
+            "at": 1.0
+          }
+        },
+        {
+          "record_start": {
+            "out": "17-f1-hint.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 8
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "F1"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "17-f1-hint.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "17-f1-hint.mp4",
+            "out": "17-f1-hint.png",
+            "at": 1
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "Eight short clips, one per control: W run, A/D turn, Shift walk, Space jump, mouse-drag orbit, arrow-key orbit, wheel zoom, F1 hint.",
+      "notes": "The game window is at screen (320,180) size 1280x720; runtime input must be sent with --window-match. Record rects are screen coordinates."
+    },
+    {
+      "id": "19-23-f3",
+      "kind": "clip",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "outputs": [
+        "19-f3-diagnostics.mp4",
+        "19-f3-diagnostics.png",
+        "20-f3-tuner-full.png",
+        "21-f3-status.png",
+        "22-f3-tuner-panel.png",
+        "23-pixel-world-alive.mp4",
+        "23-pixel-world-alive.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 18
+        },
+        {
+          "record_start": {
+            "out": "19-f3-diagnostics.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 8
+          }
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "F3"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "19-f3-diagnostics.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "19-f3-diagnostics.mp4",
+            "out": "19-f3-diagnostics.png",
+            "at": 1.0
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/20-f3-tuner-full.png\" --crop 0,0,1280,720"
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/20-f3-tuner-full.png'); im.crop((0,0,610,70)).resize((1220,140),Image.NEAREST).save('$OUT/21-f3-status.png'); im.crop((830,95,1280,715)).save('$OUT/22-f3-tuner-panel.png')\""
+        },
+        {
+          "record_start": {
+            "out": "23-pixel-world-alive.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 8
+          }
+        },
+        {
+          "wait": 5
+        },
+        {
+          "record_stop": {
+            "out": "23-pixel-world-alive.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "23-pixel-world-alive.mp4",
+            "out": "23-pixel-world-alive.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "19/20: the F3 overlay on the running island. 21: readable status lines. 22: the right-hand Pixel tuner. 23: ambient island motion.",
+      "notes": "F3 needs the PixelDiagnostics node that hex_island ships."
+    },
+    {
+      "id": "30-33-project-settings",
+      "kind": "still",
+      "outputs": [
+        "30-project-menu.png",
+        "31-main-scene-setting.png",
+        "32-window-stretch-settings.png",
+        "33-stretch-settings.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "900"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "86",
+            "11"
+          ]
+        },
+        {
+          "shot": {
+            "out": "30-project-menu.png",
+            "crop": [
+              80,
+              28,
+              280,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/30-project-menu.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/30-project-menu.png')\""
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "250",
+            "52"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "window-resize",
+            "1200",
+            "900",
+            "--title",
+            "Project Settings (project.godot)"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 300,63"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "main scene"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 55,115"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 976,63"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-window.py \"Project Settings\" --out 31-main-scene-setting.png --crop 0,0,1190,460 --redbox 210,86,1159,146"
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 300,63"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "viewport width"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 55,123"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 976,63"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-window.py \"Project Settings\" --out 32-window-stretch-settings.png --crop 0,0,1190,650"
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 300,63"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "stretch"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-dialog.py \"Project Settings\" --point 55,123"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-window.py \"Project Settings\" --out 33-stretch-settings.png --crop 0,0,1190,420"
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "30: Project menu with Project Settings… and Export…. 31: Application → Run → Main Scene. 32: Window Size 1280x720, Windowed, Resizable. 33: Stretch Mode disabled, Aspect keep, Scale 1.0.",
+      "notes": "Project Settings is opened from the Project menu's first item (menu at (62,33), first row at (250,52)) and resized to 1200x900. Dialog controls report dialog-local rects, so click-dialog.py adds the window position. The category tree's items are not Controls: the Filter Settings box is used to scroll the tree to the wanted group (type 'main scene', click Run at (55,115), clear the filter; the selection persists), then the same for 'viewport width' > Window. 33 keeps the 'stretch' filter, as the media does. The build here shows two extra HDR/Handheld rows under Borderless rather than the media's Always-on-Top family, but the Size/Resizable/Stretch state matches."
+    },
+    {
+      "id": "34-36-storage",
+      "kind": "still",
+      "outputs": [
+        "34-storage-page-strip.png",
+        "35-settings-pages-tabs.png",
+        "36-glb-export-progress.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Terrain Settings Tool"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shot": {
+            "out": "35-settings-pages-tabs.png",
+            "crop": [
+              400,
+              690,
+              760,
+              90
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/35-settings-pages-tabs.png'); im.resize((int(im.width*1.3),int(im.height*1.3)),Image.NEAREST).save('$OUT/35-settings-pages-tabs.png')\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "Storage"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "34-storage-page-strip.png",
+            "crop": [
+              400,
+              690,
+              700,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/34-storage-page-strip.png'); im=im.resize((im.width*2,im.height*2), Image.NEAREST); d=ImageDraw.Draw(im); d.rectangle([1198,128,1388,194], outline=(255,59,48), width=3); im.save('$OUT/34-storage-page-strip.png')\""
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/export-progress.py --out 36-glb-export-progress.png --crop 400,690,900,100 --delay 0.3"
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "34/35: the six Settings page tabs with Storage selected and the Storage page visible. 36: the inline Export GLB progress/write bar.",
+      "notes": "The Terrain Settings Tool is opened from its tool-column button by tooltip text, then the Storage page tab is clicked by text. The strip sits at y=690 in this 1920x1080 session (crop [400,690,600,115] for 34, [400,690,760,90] for 35). 34 draws a red box around Export. The bake of this small terrain finishes before a frame shows a Baking percentage, so 36 captures the 100% 'Writing file' phase at +0.3 s."
+    },
+    {
+      "id": "37-39-export-dialog",
+      "kind": "still",
+      "outputs": [
+        "37-export-dialog.png",
+        "38-export-templates-missing.png",
+        "39-export-template-manager.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "86",
+            "11"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "e"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "37-export-dialog.png",
+            "crop": [
+              505,
+              270,
+              910,
+              356
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "38-export-templates-missing.png",
+            "crop": [
+              520,
+              716,
+              890,
+              96
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/38-export-templates-missing.png'); d=ImageDraw.Draw(im); d.rectangle([17,13,196,35], outline=(255,59,48), width=3); im.save('$OUT/38-export-templates-missing.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "540",
+            "740"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "39-export-template-manager.png",
+            "crop": [
+              400,
+              150,
+              1120,
+              700
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "37: Export dialog top and Options, no error paths. 38: Manage Export Templates outlined, Export Project/All greyed out. 39: Export Template Manager with no templates installed.",
+      "notes": "37 and 38 are cropped to exclude the red 'expected path' lines on purpose: they contain the QA session's /tmp path. The template manager is opened from the outlined link."
+    },
+    {
+      "id": "40-44-window-size",
+      "kind": "clip",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "outputs": [
+        "40-window-1280x720.png",
+        "41-window-640x360.png",
+        "42-window-1920x1080.png",
+        "43-pixel-scale-compare.png",
+        "44-window-resize.mp4",
+        "44-window-resize.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 18
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-game.py --out 40-window-1280x720.png"
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "resize",
+            "640",
+            "360"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-game.py --out 41-window-640x360.png"
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/shot-game.py --out 42-window-1920x1080.png"
+        },
+        {
+          "shell": "python3 - <<PY\nfrom PIL import Image,ImageDraw\na=Image.open('$OUT/41-window-640x360.png')\nb=Image.open('$OUT/40-window-1280x720.png')\nc=Image.open('$OUT/42-window-1920x1080.png')\nsz=a.size\n# crop the same relative centre region from each and normalise (nearest) to 400x200\nout=Image.new('RGB',(1280,290),(24,24,28))\nfor im,x,label in ((a,0,'640x360'),(b,440,'1280x720'),(c,880,'1920x1080 requested')):\n    w,h=im.size\n    reg=im.crop((int(w*0.375),int(h*0.389),int(w*0.625),int(h*0.611))).resize((400,200),Image.NEAREST)\n    out.paste(reg,(x,60))\nd=ImageDraw.Draw(out)\nd.text((10,20),'640x360',fill=(240,240,240))\nd.text((450,20),'1280x720',fill=(240,240,240))\nd.text((890,20),'1920x1080 requested (window stays 1280x720 in this harness)',fill=(240,240,240))\nd.text((10,272),'Stretch is disabled: the pixel grid is derived from the window size.',fill=(200,200,200))\nout.save('$OUT/43-pixel-scale-compare.png')\nPY"
+        },
+        {
+          "record_start": {
+            "out": "44-window-resize.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "resize",
+            "960",
+            "540"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "resize",
+            "1280",
+            "720"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "44-window-resize.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "44-window-resize.mp4",
+            "out": "44-window-resize.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "The same Knight view at 640x360 and 1280x720; pixels get finer as the window grows, framing unchanged. The 1920x1080 request is documented with the harness cap.",
+      "notes": "This harness cannot resize the game window above 1280x720: --window-match resize reports 1920x1080 but the X window and the pixel viewport stay 1280x720 (no black margins, just no growth). Per the brief the item records the supported size: 40 is 1280x720, 41 is 640x360, 42 is the actual 1280x720 frame and is labelled as the requested 1920x1080 that the harness could not deliver, and 43 is a two-size compare with that note instead of faking a third panel. 44 resizes 1280 -> 960 -> 1280 live."
+    },
+    {
+      "id": "50-53-instantiate",
+      "kind": "still",
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "outputs": [
+        "50-select-scene-player.png",
+        "51-scene-tree-player-added.png",
+        "52-instantiate-player.mp4",
+        "52-instantiate-player.png",
+        "53a-position-before.png",
+        "53b-position-after.png",
+        "53-set-position-compare.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "World"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "52-instantiate-player.mp4",
+            "rect": [
+              0,
+              42,
+              1640,
+              1000
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "56",
+            "96"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "type",
+            "player"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shot": {
+            "out": "50-select-scene-player.png",
+            "crop": [
+              590,
+              190,
+              780,
+              290
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/50-select-scene-player.png'); d=ImageDraw.Draw(im); d.rectangle([14,80,760,132], outline=(255,59,48), width=2); im.save('$OUT/50-select-scene-player.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "820",
+            "270"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "52-instantiate-player.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "52-instantiate-player.mp4",
+            "out": "52-instantiate-player.png",
+            "at": 2.6
+          }
+        },
+        {
+          "shot": {
+            "out": "51-scene-tree-player-added.png",
+            "crop": [
+              0,
+              120,
+              280,
+              230
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/51-scene-tree-player-added.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/51-scene-tree-player-added.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "1700",
+            "240"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "53a-position-before.png",
+            "crop": [
+              1640,
+              143,
+              280,
+              414
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/53a-position-before.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/53a-position-before.png')\""
+        },
+        {
+          "drive": [
+            "set-prop",
+            "position",
+            "[5,8,4]",
+            "--path",
+            "PlayerRig"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "53b-position-after.png",
+            "crop": [
+              1640,
+              143,
+              280,
+              414
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/53b-position-after.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/53b-position-after.png')\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw,ImageFont; f=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',16); b=Image.open('$OUT/53a-position-before.png'); a=Image.open('$OUT/53b-position-after.png'); out=Image.new('RGB',(a.width+b.width+16,40+max(a.height,b.height)),(24,24,28)); out.paste(b,(0,40)); out.paste(a,(b.width+16,40)); d=ImageDraw.Draw(out); d.text((8,10),'Before: Position 0, 0, 0 (inside the hill)',fill=(255,90,80),font=f); d.text((b.width+24,10),'After: Position 5, 8, 4 (above the ground)',fill=(90,220,110),font=f); out.save('$OUT/53-set-position-compare.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "50: Select Scene with player.tscn. 51: PlayerRig under World. 52: the chain-link → picker → PlayerRig clip, Output clean. 53a/b: Position 0,0,0 then 5,8,4.",
+      "notes": "The picker has no visible Open button in this editor build; click the player.tscn row then press Enter. 51 is cropped at [0,120,280,230] so the whole World tree including the new PlayerRig row fits, as in the media; the tree does not need the same children. set-prop writes an undo step and the scene is never saved."
+    },
+    {
+      "id": "54-58-landing",
+      "kind": "clip",
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/first_world_player.tscn",
+      "outputs": [
+        "54-player-landing.png",
+        "55-walk-wasd.mp4",
+        "55-walk-wasd.png",
+        "56-camera-orbit.mp4",
+        "56-camera-orbit.png",
+        "57-camera-zoom.mp4",
+        "57-camera-zoom.png",
+        "58-world-overview.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 15
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "drag",
+            "300",
+            "400",
+            "1050",
+            "400",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/54-player-landing.png\" --crop 0,0,1280,720"
+        },
+        {
+          "record_start": {
+            "out": "55-walk-wasd.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--times",
+            "30"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "a",
+            "--times",
+            "20"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "55-walk-wasd.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "55-walk-wasd.mp4",
+            "out": "55-walk-wasd.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "56-camera-orbit.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "drag",
+            "500",
+            "300",
+            "500",
+            "560",
+            "--duration",
+            "2"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "56-camera-orbit.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "56-camera-orbit.mp4",
+            "out": "56-camera-orbit.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "57-camera-zoom.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "wheel",
+            "640",
+            "360",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "wheel",
+            "640",
+            "360",
+            "down",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "57-camera-zoom.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "57-camera-zoom.mp4",
+            "out": "57-camera-zoom.png",
+            "at": 1.0
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/58-world-overview.png\" --crop 2,2,1276,716"
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "54: the Knight fully visible in the clearing after a half-turn camera orbit. 55-57: walk, orbit, zoom clips. 58: wide wooded-hill view.",
+      "notes": "The default follow camera starts behind a tree; a large horizontal drag (yaw) moves it to the open side. Do not wait long or the DayNight cycle leaves daytime."
+    },
+    {
+      "id": "59-trap",
+      "kind": "clip",
+      "outputs": [
+        "59-forget-to-move.mp4",
+        "59-forget-to-move.png",
+        "59c-move-or-not-compare.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "open-scene",
+            "res://tutorial/guide/first_world.tscn"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "World"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "56",
+            "96"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "type",
+            "player"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "820",
+            "270"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 15
+        },
+        {
+          "record_start": {
+            "out": "59-forget-to-move.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 8
+          }
+        },
+        {
+          "wait": 4
+        },
+        {
+          "record_stop": {
+            "out": "59-forget-to-move.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "59-forget-to-move.mp4",
+            "out": "59-forget-to-move.png",
+            "at": 2
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nfrom PIL import Image,ImageDraw\na=Image.open('$OUT/54-player-landing.png').resize((1063,600),Image.LANCZOS); b=Image.open('$OUT/59-forget-to-move.png').resize((1063,600),Image.LANCZOS); out=Image.new('RGB',(2146,646),(24,24,28)); out.paste(a,(0,46)); out.paste(b,(1083,46)); d=ImageDraw.Draw(out); d.text((8,12),'Moved above the ground (y = 8): lands',fill=(240,240,240)); d.text((1091,12),'Left at the origin (0,0,0): falls through',fill=(240,240,240)); out.save('$OUT/59c-move-or-not-compare.png')\nPY"
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "59: only sky and sea, no ground (the player fell through). 59c: the landing shot vs the fall-through, labelled.",
+      "notes": "PlayerRig is left at the scene origin, which for first_world is inside the hill. Run after 54-58 so 54-player-landing.png exists for the compare."
+    },
+    {
+      "id": "60-editor-menu",
+      "kind": "still",
+      "outputs": [
+        "60-editor-take-screenshot.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "900"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "221",
+            "11"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "60-editor-take-screenshot.png",
+            "crop": [
+              210,
+              28,
+              420,
+              540
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/60-editor-take-screenshot.png'); im=im.resize((int(im.width*4/3),int(im.height*4/3)), Image.NEAREST); d=ImageDraw.Draw(im); d.rectangle([20,338,540,392], outline=(255,59,48), width=2); im.save('$OUT/60-editor-take-screenshot.png')\""
+        }
+      ],
+      "check": "The Editor menu with Take Screenshot and Open Editor Data Folder outlined in red.",
+      "notes": "The Editor menu item sits between Debug and Help."
+    },
+    {
+      "id": "61-63-pixel-preview",
+      "kind": "still",
+      "scene": "res://tutorial/guide/first_world.tscn",
+      "outputs": [
+        "61-pixel-preview-off.png",
+        "62-pixel-preview-on.png",
+        "63-pixel-preview-compare.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "350",
+            "190"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "size",
+            "110",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "capture",
+            "/tmp/pp-off.png"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "capture",
+            "/tmp/pp-on.png"
+          ]
+        },
+        {
+          "shell": "python3 - <<PY\nfrom PIL import Image,ImageDraw\nfor a,b in (('/tmp/pp-off.png','$OUT/61-pixel-preview-off.png'),('/tmp/pp-on.png','$OUT/62-pixel-preview-on.png')):\n im=Image.open(a).crop((417,132,1567,803)); im.save(b)\na=Image.open('$OUT/61-pixel-preview-off.png').convert('RGB'); b=Image.open('$OUT/62-pixel-preview-on.png').convert('RGB'); out=Image.new('RGB',(a.width+b.width+12,a.height+40),(24,24,28)); out.paste(a,(0,40)); out.paste(b,(a.width+12,40)); d=ImageDraw.Draw(out); d.text((10,12),'Pixel Preview OFF - raw 3D',fill=(240,240,240)); d.text((a.width+22,12),'Pixel Preview ON - pixel renderer',fill=(240,240,240)); out.save('$OUT/63-pixel-preview-compare.png')\nPY"
+        }
+      ],
+      "check": "61/62: the hill close up through the scene camera, raw vs pixelated. 63: the labelled pair.",
+      "notes": "Assumes the copied project layout starts with Pixel Preview ON (the current project_base does): the first click turns it OFF for 61, the second turns it ON for 62. Camera preview keeps both framings identical; size 110 keeps the whole hill in frame."
+    },
+    {
+      "id": "64-65-fox",
+      "kind": "clip",
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/first_world_player.tscn",
+      "outputs": [
+        "64-fox-variant.png",
+        "65-fox-walk.mp4",
+        "65-fox-walk.png"
+      ],
+      "steps": [
+        {
+          "shell": "sed 's#uid=\"uid://c5jig175v6538\" path=\"res://demo/player.tscn\"#uid=\"uid://b7fxq2c0urt4n\" path=\"res://demo/fox_player.tscn\"#' \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions/recap-13-playtest-export/project/tutorial/guide/first_world_player.tscn\" > \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions/recap-13-playtest-export/project/tutorial/guide/first_world_fox.tscn\""
+        },
+        {
+          "drive": [
+            "open-scene",
+            "res://tutorial/guide/first_world_fox.tscn"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 15
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "drag",
+            "300",
+            "400",
+            "1050",
+            "400",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 qa/drive.py --display \"$DISPLAY\" --port \"$PORT\" --window-match \"Marching Squares Terrain (DEBUG)\" shot \"$OUT/64-fox-variant.png\" --crop 0,0,1280,720"
+        },
+        {
+          "record_start": {
+            "out": "65-fox-walk.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 10
+          }
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "w",
+            "--times",
+            "30"
+          ]
+        },
+        {
+          "drive": [
+            "--window-match",
+            "Marching Squares Terrain (DEBUG)",
+            "key",
+            "d",
+            "--times",
+            "20"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "65-fox-walk.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "65-fox-walk.mp4",
+            "out": "65-fox-walk.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        }
+      ],
+      "check": "64: the orange Fox fully visible in the clearing. 65: the Fox walking through the trees.",
+      "notes": "The session-only first_world_fox.tscn is written by the shell step (same transform, fox_player.tscn instanced). It is not copied to the repo."
+    }
+  ]
+}

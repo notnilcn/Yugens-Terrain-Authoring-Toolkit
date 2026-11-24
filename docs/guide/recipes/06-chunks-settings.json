@@ -1,0 +1,3657 @@
+{
+  "page": "06-chunks-settings",
+  "media_dir": "docs/guide/media/06-chunks-settings",
+  "session": {
+    "scene": "res://tutorial/02_island.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [
+    {
+      "shell": "cat > /tmp/opencode/ds_mst_ui.py <<'PYEOF'\nimport json, os, subprocess, sys, tempfile, time\n\nDRIVE = [\"python3\", \"qa/drive.py\", \"--port\", os.environ.get(\"PORT\") or os.environ.get(\"MST_QA_PORT\", \"8879\"),\n         \"--display\", os.environ.get(\"DISPLAY\", \":79\")]\n\n\ndef run(*a):\n    return subprocess.run(DRIVE + [str(x) for x in a], cwd=os.environ.get(\"ROOT\", \".\"),\n                          capture_output=True, text=True)\n\n\ndef dump():\n    p = tempfile.mktemp(suffix=\".json\")\n    r = run(\"ui\", \"--filter\", \"\", \"--save\", p)\n    if r.returncode:\n        sys.exit(\"ui failed: \" + r.stderr[-300:])\n    d = json.load(open(p)); os.unlink(p)\n    return [c for c in d[\"controls\"] if c.get(\"rect\") and c[\"rect\"][2] > 0 and c[\"rect\"][3] > 0 and c.get(\"visible\")]\n\n\ndef find(name, classes=None):\n    cs = dump()\n    if classes:\n        cs = [c for c in cs if c.get(\"class\") in classes]\n    hits = [c for c in cs if c.get(\"name\") == name] or [c for c in cs if c.get(\"text\") == name]\n    if not hits:\n        sys.exit(\"control not found: \" + name)\n    return hits[0]\n\n\ndef center(c):\n    x, y, w, h = c[\"rect\"]\n    return int(x + w / 2), int(y + h / 2)\n\n\ndef path(p):\n    return p if os.path.isabs(p) else os.path.join(os.environ.get(\"OUT\", \".\"), p)\n\n\ndef project(pt):\n    o = run(\"project\", \"--point\", json.dumps(pt)).stdout\n    try:\n        d = json.loads(o)\n    except Exception:\n        sys.exit(\"project failed: \" + o[-200:])\n    pts = d.get(\"points\") or []\n    if not pts:\n        sys.exit(\"project: no point\")\n    return pts[0][\"window\"]\n\n\ncmd = sys.argv[1]\nif cmd == \"crop\":\n    from PIL import Image\n    out, name = path(sys.argv[2]), sys.argv[3]\n    pads = [int(v) for v in sys.argv[4:8]]\n    c = find(name); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pads[0]), max(0, y - pads[2]), min(img.width, x + w + pads[1]), min(img.height, y + h + pads[3]))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"croppopup\":\n    from PIL import Image\n    out = path(sys.argv[2]); pad = int(sys.argv[3]) if len(sys.argv) > 3 else 12\n    pp = run(\"popups\"); pop = json.loads(pp.stdout)[\"popups\"][0]\n    x, y = pop[\"pos\"]; w, h = pop[\"size\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pad), max(0, y - pad), min(img.width, x + w + pad), min(img.height, y + h + pad))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"cropwin\":\n    from PIL import Image\n    out = path(sys.argv[2]); x, y, w, h = [int(v) for v in sys.argv[3:7]]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    Image.open(tmp).crop((x, y, x + w, y + h)).save(out); os.unlink(tmp); print(out)\nelif cmd == \"cropat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    x, y = project(pt)\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    left = int(max(0, min(img.width - w, x - w / 2)))\n    top = int(max(0, min(img.height - h, y - h / 2)))\n    img.crop((left, top, left + w, top + h)).save(out); os.unlink(tmp); print(out, (left, top, w, h))\nelif cmd == \"full\":\n    out = path(sys.argv[2]); tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    os.replace(tmp, out); print(out)\nelif cmd == \"clickpoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    args = [\"click\", int(x), int(y)]\n    rest = sys.argv[5:]\n    print(run(*(args + rest)).stdout[-100:])\nelif cmd == \"topview\":\n    cs = dump()\n    cand = [c for c in cs if c.get(\"class\") == \"MenuButton\" and 165 <= c[\"rect\"][1] <= 215\n            and c[\"rect\"][2] >= 100 and 380 <= c[\"rect\"][0] <= 700]\n    if not cand:\n        sys.exit(\"topview: no view menu\")\n    c = min(cand, key=lambda c: c[\"rect\"][1])\n    x, y = center(c)\n    pops = []\n    for _ in range(4):\n        run(\"click\", x, y); time.sleep(1.0)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if pops:\n            break\n        time.sleep(0.8)\n    if not pops:\n        sys.exit(\"topview: no popup\")\n    pop = pops[0]\n    for k, it in enumerate(pop[\"items\"]):\n        if it.get(\"text\") == \"Top View\":\n            px, py = pop[\"pos\"]\n            ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n            run(\"click\", px + 40, int(py + ih * (k + 0.5))); time.sleep(0.8)\n            print(\"topview ok\")\n            break\n    else:\n        sys.exit(\"topview: item not found\")\nelif cmd == \"menupick\":\n    x, y, text = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"menupick: no popup\")\n    for it in pops[0][\"items\"]:\n        if it.get(\"text\") == text:\n            ix, iy, iw, ih = it[\"rect\"]\n            run(\"click\", int(ix + iw / 2), int(iy + ih / 2)); time.sleep(0.6)\n            print(\"menupick\", text)\n            break\n    else:\n        sys.exit(\"menupick: item not found \" + text)\nelif cmd == \"recat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    fps = sys.argv[8] if len(sys.argv) > 8 else \"12\"\n    mx = sys.argv[9] if len(sys.argv) > 9 else \"20\"\n    x, y = project(pt)\n    left = int(max(0, min(1920 - w, x - w / 2)))\n    top = int(max(0, min(1080 - h, y - h / 2)))\n    r = subprocess.run([\"qa/record.sh\", \"start\", out, \"--display\", os.environ.get(\"DISPLAY\", \":79\"),\n                        \"--rect\", f\"{left},{top},{w},{h}\", \"--fps\", fps, \"--max\", mx],\n                       cwd=os.environ.get(\"ROOT\", \".\"), capture_output=True, text=True)\n    print(\"recat\", left, top, w, h, r.returncode, r.stderr[-120:])\nelif cmd == \"movepoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    print(run(\"move\", int(x), int(y)).stdout[-80:])\nelif cmd == \"find\":\n    c = find(sys.argv[2]); print(json.dumps(c, indent=1))\nelif cmd == \"popick\":\n    x, y, idx = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"popick: no popup\")\n    pop = pops[0]; px, py = pop[\"pos\"]\n    ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n    run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n    print(\"popick\", idx)\nelif cmd == \"setat\":\n    x, y, val = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.4)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", val); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(\"setat\", x, y, val)\nelse:\n    name = sys.argv[2]\n    cls = {\"option\": (\"OptionButton\",), \"slider\": (\"HSlider\",), \"spin\": (\"EditorSpinSlider\",),\n           \"check\": (\"CheckBox\",)}.get(cmd)\n    c = find(name, cls)\n    if cmd == \"click\":\n        print(run(\"click\", *center(c)).stdout[-100:])\n    elif cmd == \"check\":\n        want = sys.argv[3].lower() in (\"1\", \"on\", \"true\", \"yes\")\n        if bool(c.get(\"toggled\")) != want:\n            run(\"click\", *center(c)); time.sleep(0.3)\n        print(name, \"->\", want)\n    elif cmd == \"spin\":\n        x, y = center(c)\n        run(\"click\", x, y); time.sleep(0.4)\n        run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[3]); run(\"key\", \"enter\"); time.sleep(0.4)\n        print(name, \":=\", sys.argv[3])\n    elif cmd == \"slider\":\n        frac = max(0.0, min(1.0, float(sys.argv[3]))); x, y, w, h = c[\"rect\"]\n        tx = int(x + 2 + frac * (w - 4)); yy = int(y + h / 2)\n        run(\"drag\", tx - 1, yy, tx + 1, yy, \"--duration\", \"0.2\"); time.sleep(0.4)\n        print(name, \"->\", frac)\n    elif cmd == \"option\":\n        idx = int(sys.argv[3]); run(\"click\", *center(c)); time.sleep(0.8)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if not pops:\n            sys.exit(\"option: no popup opened for \" + name)\n        pop = pops[0]; px, py = pop[\"pos\"]\n        ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n        run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n        print(name, \"->\", idx)\n\nPYEOF"
+    },
+    {
+      "wait": 2
+    },
+    {
+      "drive": [
+        "click",
+        "307",
+        "839"
+      ]
+    },
+    {
+      "wait": 0.6
+    },
+    {
+      "shell": "rmdir \"${MST_QA_STATE:-/tmp/opencode/qa}/project_base/qa_tmp\" 2>/dev/null; find \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions\" -maxdepth 3 -name qa_tmp -type d -empty -delete 2>/dev/null; true"
+    }
+  ],
+  "items": [
+    {
+      "id": "01-toolbar-location",
+      "kind": "still",
+      "outputs": [
+        "01-toolbar-location.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py full 01-toolbar-location.png"
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/01-toolbar-location.png').convert('RGB'); ImageDraw.Draw(im).rectangle((287,199,415,516),outline=(255,59,48),width=4); im.save('$OUT/01-toolbar-location.png')\""
+        }
+      ],
+      "check": "Full 1600x900 editor with the terrain tool column (Brush 1 ... Settings 9) boxed in red; Chunks tool active; Output panel clear.",
+      "notes": "The red box marks the left icon toolbar; the Chunks tool is selected so the whole column is visible.",
+      "fresh_session": true
+    },
+    {
+      "id": "02-chunks-strip",
+      "kind": "still",
+      "outputs": [
+        "02-chunks-strip.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 02-chunks-strip.png 420 518 902 105"
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/02-chunks-strip.png'); out=Image.new('RGB',(960,171),(30,30,30)); out.paste(im,(0,0)); out.save('$OUT/02-chunks-strip.png')\""
+        }
+      ],
+      "check": "The whole Chunk Manager strip: Chunk dropdown (Chunk (0,0)), 9 chunks, Remove Chunk, Merge Mode (Polyhedron), Apply Mode to All Chunks, Vertex Handles unchecked, and the LMB hint line.",
+      "notes": "The strip is 105 px tall in this editor build; the output is padded to the media's 171 px frame on a dark background (the media was captured at a larger UI scale).",
+      "fresh_session": true
+    },
+    {
+      "id": "03-chunks-overview",
+      "kind": "still",
+      "outputs": [
+        "03-chunks-overview.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 03-chunks-overview.png 420 175 893 300"
+        }
+      ],
+      "check": "Top-down chunk overlay on the flat-playground terrain: the 3x3 grid of filled chunks with the ring of large teal '+' add markers around it and the white chunk borders.",
+      "notes": "Shot on res://tutorial/01_flat_playground.tscn (3x3 chunks, no water) as the notes describe; Pixel Preview is on. Dynamic crop centred on the projected terrain centre.",
+      "fresh_session": true,
+      "scene": "res://tutorial/01_flat_playground.tscn"
+    },
+    {
+      "id": "04-add-chunk",
+      "kind": "clip",
+      "outputs": [
+        "04-add-chunk.mp4",
+        "04-add-chunk.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py recat 04-add-chunk.mp4 224 0 32 440 320 12 20"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 224 0 32"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 224 0 32"
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "04-add-chunk.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "04-add-chunk.mp4",
+            "out": "04-add-chunk.png",
+            "at": 2.0
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess,sys\no=subprocess.run(['python3','qa/drive.py','call','get_chunks','--path','MarchingSquaresTerrain'],capture_output=True,text=True).stdout\nsys.exit(0 if len(json.loads(o).get('value',[])) == 10 else 1)\nPY"
+        }
+      ],
+      "check": "A green '+' chunk marker is clicked on the top-down chunk overlay and a new chunk fills in (9 -> 10 chunks).",
+      "notes": "Top Orthogonal view; the marker position is projected from world (224,0,32) = the centre of empty chunk (3,0), so the click does not drift with the camera.",
+      "fresh_session": true
+    },
+    {
+      "id": "05-remove-chunk",
+      "kind": "clip",
+      "outputs": [
+        "05-remove-chunk.mp4",
+        "05-remove-chunk.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py recat 05-remove-chunk.mp4 160 0 32 440 320 12 20"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 160 0 32"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 160 0 32"
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "05-remove-chunk.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "05-remove-chunk.mp4",
+            "out": "05-remove-chunk.png",
+            "at": 2.0
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess,sys\no=subprocess.run(['python3','qa/drive.py','call','get_chunks','--path','MarchingSquaresTerrain'],capture_output=True,text=True).stdout\nsys.exit(0 if len(json.loads(o).get('value',[])) == 8 else 1)\nPY"
+        }
+      ],
+      "check": "Hovering an existing chunk tints it red with an X; clicking it removes that chunk from the 3x3 grid.",
+      "notes": "Click targets the projected centre of chunk (2,0).",
+      "fresh_session": true
+    },
+    {
+      "id": "06-chunk-hover-removex",
+      "kind": "still",
+      "outputs": [
+        "06-chunk-hover-removex.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 06-chunk-hover-removex.png 96 0 96 440 330"
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        }
+      ],
+      "check": "A single existing chunk hovered in the Chunks tool, tinted red/orange with the remove X marker over it.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "07-ctrl-select-chunk",
+      "kind": "clip",
+      "outputs": [
+        "07-ctrl-select-chunk.mp4",
+        "07-ctrl-select-chunk.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "07-ctrl-select-chunk.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 96 0 96 --mod ctrl"
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "07-ctrl-select-chunk.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "07-ctrl-select-chunk.mp4",
+            "out": "07-ctrl-select-chunk.png",
+            "at": 2.2
+          }
+        },
+        {
+          "wait": 0.2
+        }
+      ],
+      "check": "Ctrl+LMB selects a chunk instead of removing it: the chunk gets a blue outline, the Chunk dropdown updates and Remove Chunk enables.",
+      "notes": "Selecting is not an undo step; the expect only checks the harness responds.",
+      "fresh_session": true
+    },
+    {
+      "id": "08-chunk-dropdown",
+      "kind": "still",
+      "outputs": [
+        "08-chunk-dropdown.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Chunk (0, 0)\""
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py croppopup 08-chunk-dropdown.png 12"
+        }
+      ],
+      "check": "The Chunk dropdown open listing Chunk (0,0) through Chunk (2,2), with Chunk (0,0) checked.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "09-merge-mode-dropdown",
+      "kind": "still",
+      "outputs": [
+        "09-merge-mode-dropdown.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Polyhedron\""
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py croppopup 09-merge-mode-dropdown.png 14"
+        }
+      ],
+      "check": "The Merge Mode dropdown open: Cubic, Polyhedron (selected), Rounded Polyhedron, Semi Round, Spherical.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "09-remove-chunk-button",
+      "kind": "clip",
+      "outputs": [
+        "09-remove-chunk-button.mp4",
+        "09-remove-chunk-button.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "record_start": {
+            "out": "09-remove-chunk-button.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 96 0 96 --mod ctrl"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Remove Chunk\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "09-remove-chunk-button.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "09-remove-chunk-button.mp4",
+            "out": "09-remove-chunk-button.png",
+            "at": 2.2
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess,sys\no=subprocess.run(['python3','qa/drive.py','call','get_chunks','--path','MarchingSquaresTerrain'],capture_output=True,text=True).stdout\nsys.exit(0 if len(json.loads(o).get('value',[])) == 8 else 1)\nPY"
+        }
+      ],
+      "check": "A chunk is Ctrl+clicked (blue selection), then the Remove Chunk button in the strip is clicked and the chunk disappears.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "10-vertex-handle-drag",
+      "kind": "clip",
+      "outputs": [
+        "10-vertex-handle-drag.mp4",
+        "10-vertex-handle-drag.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 96 0 96 --mod ctrl"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "563",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_start": {
+            "out": "10-vertex-handle-drag.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--point','[104,0,88]'],capture_output=True,text=True).stdout)['points'][0]['window']\nprint(subprocess.run(['python3','qa/drive.py','drag',str(int(p[0])),str(int(p[1])),str(int(p[0])),str(int(p[1])-45),'--duration','1.4'],capture_output=True,text=True).stdout[-80:])\nPY"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_stop": {
+            "out": "10-vertex-handle-drag.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "10-vertex-handle-drag.mp4",
+            "out": "10-vertex-handle-drag.png",
+            "at": 2.0
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "undo-state"
+            ],
+            "contains": "move terrain point"
+          }
+        }
+      ],
+      "check": "With Vertex Handles ticked on a selected chunk, a height handle is dragged up and that terrain point rises (dense grey handle field visible).",
+      "notes": "The drag starts at a projected sample inside chunk (1,1) and moves 45 px up; one undo step 'move terrain point'.",
+      "fresh_session": true
+    },
+    {
+      "id": "11-undo-handle",
+      "kind": "clip",
+      "outputs": [
+        "11-undo-handle.mp4",
+        "11-undo-handle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 96 0 96 --mod ctrl"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "563",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--point','[104,0,88]'],capture_output=True,text=True).stdout)['points'][0]['window']\nsubprocess.run(['python3','qa/drive.py','drag',str(int(p[0])),str(int(p[1])),str(int(p[0])),str(int(p[1])-45),'--duration','1.4'],capture_output=True)\nPY"
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_start": {
+            "out": "11-undo-handle.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "11-undo-handle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "11-undo-handle.mp4",
+            "out": "11-undo-handle.png",
+            "at": 1.6
+          }
+        }
+      ],
+      "check": "The vertex-handle drag is reverted with one Ctrl+Z: the terrain point returns to its original height.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "12-vertex-handles-field",
+      "kind": "still",
+      "outputs": [
+        "12-vertex-handles-field.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 96 0 96 --mod ctrl"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "563",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 12-vertex-handles-field.png 96 0 96 540 390"
+        }
+      ],
+      "check": "The dense grid of draggable vertex handles across the selected chunk (a tight grey/white cluster).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "20-settings-grid",
+      "kind": "still",
+      "outputs": [
+        "20-settings-page-grid.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 20-settings-page-grid.png 287 478 1058 148"
+        }
+      ],
+      "check": "Settings tool, Grid page: tabs Grid/New Chunks/Grass/Display/LOD & Nature/Storage, Grid Type Square, Chunk Size 32, Cell Size 2.0/2.0, Blend Smooth, Merge Polyhedron, Extra Collision Layer None.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "21-settings-newchunks",
+      "kind": "still",
+      "outputs": [
+        "21-settings-page-newchunks.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"New Chunks\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 21-settings-page-newchunks.png 287 478 1058 148"
+        }
+      ],
+      "check": "Settings, New Chunks page: Floor Slot 1. Grass, Wall Slot 6. Cliff, Noise Amp 0.0, Noise Freq 0.051, Noise Seed 1, Noise Hmap <empty>, Noise Height 32.0.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "22-settings-grass",
+      "kind": "still",
+      "outputs": [
+        "22-settings-page-grass.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Grass\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 22-settings-page-grass.png 287 478 1058 148"
+        }
+      ],
+      "check": "Settings, Grass page: Grass on, Animation FPS 0, Subdivisions 2, Grass Size 0.56/0.66, Ledge Cutoff 0.5, Min Height 1.2.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "23-settings-display",
+      "kind": "still",
+      "outputs": [
+        "23-settings-page-display.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 23-settings-page-display.png 287 513 1058 112"
+        }
+      ],
+      "check": "Settings, Display page: Pixel Size 1, Editor Grid, Chunk Lines, Editor Fog, Debug View Off.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "24-settings-lod",
+      "kind": "still",
+      "outputs": [
+        "24-settings-page-lod-nature.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"LOD & Nature\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 24-settings-page-lod-nature.png 287 513 1058 112"
+        }
+      ],
+      "check": "Settings, LOD & Nature page: LOD Distance 0, LOD In Editor off, Erosion Add, Wild Flowers Add.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "25-settings-storage",
+      "kind": "still",
+      "outputs": [
+        "25-settings-page-storage-resource.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 25-settings-page-storage-resource.png 287 513 1058 112"
+        }
+      ],
+      "check": "Settings, Storage page in Resource mode: Storage Mode Resource, Import..., Bake, Export.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "26-storage-mode-dropdown",
+      "kind": "still",
+      "outputs": [
+        "26-storage-mode-dropdown.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Resource\""
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py croppopup 26-storage-mode-dropdown.png 14"
+        }
+      ],
+      "check": "The Storage Mode dropdown open: Resource (selected), Baked, Runtime.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "27-settings-page-storage-baked",
+      "kind": "still",
+      "outputs": [
+        "27-settings-page-storage-baked.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py option \"Resource\" 1"
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 27-settings-page-storage-baked.png 287 513 1058 112"
+        }
+      ],
+      "check": "Storage page switched to Baked mode: Bake Grass and Bake Collision checkboxes, Data Directory (generated on save), Save Data, Import, Bake, Export.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "30-editor-grid-toggle",
+      "kind": "clip",
+      "outputs": [
+        "30-editor-grid-toggle.mp4",
+        "30-editor-grid-toggle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "record_start": {
+            "out": "30-editor-grid-toggle.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "759",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "click",
+            "759",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "record_stop": {
+            "out": "30-editor-grid-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "30-editor-grid-toggle.mp4",
+            "out": "30-editor-grid-toggle.png",
+            "at": 1.2
+          }
+        }
+      ],
+      "check": "Display page: the Editor Grid checkbox is ticked and the cell-line overlay appears on the terrain, then unticked and disappears.",
+      "notes": "Recorded on the viewport; the strip with the checkbox is at the bottom edge of frame.",
+      "fresh_session": true
+    },
+    {
+      "id": "31-editor-grid-off-on",
+      "kind": "still",
+      "outputs": [
+        "31-editor-grid-off.png",
+        "31-editor-grid-on.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "759",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 31-editor-grid-off.png 96 0 96 680 260"
+        },
+        {
+          "drive": [
+            "click",
+            "759",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 31-editor-grid-on.png 96 0 96 680 260"
+        }
+      ],
+      "check": "Close-up pair: terrain with the Editor Grid overlay off, then on (thin cell lines appear).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "40-debug-series",
+      "kind": "still",
+      "outputs": [
+        "40-debug-0-off.png",
+        "40-debug-1-slope.png",
+        "40-debug-2-height-contours.png",
+        "40-debug-3-slot-ids.png",
+        "40-debug-4-chunk-borders.png",
+        "40-debug-5-cell-ids.png",
+        "40-debug-6-cell-data.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 0"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-0-off.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 1"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-1-slope.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 2"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-2-height-contours.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 3"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-3-slot-ids.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 4"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-4-chunk-borders.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 5"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-5-cell-ids.png 96 0 96 572 260"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 6"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 40-debug-6-cell-data.png 96 0 96 572 260"
+        }
+      ],
+      "check": "Seven stills of the same view at Debug View Off, Slope, Height Contours, Slot Ids, Chunk Borders, Cell Ids and Cell Data; each is visibly distinct.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "41-pixel-size-series",
+      "kind": "still",
+      "outputs": [
+        "41-pixel-size-1.png",
+        "41-pixel-size-2.png",
+        "41-pixel-size-3.png",
+        "41-pixel-size-4.png",
+        "41-pixel-size-6.png",
+        "41-pixel-size-8.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 1"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-1.png 96 0 96 468 240"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 2"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-2.png 96 0 96 468 240"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 3"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-3.png 96 0 96 468 240"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 4"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-4.png 96 0 96 468 240"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 6"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-6.png 96 0 96 468 240"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 8"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 41-pixel-size-8.png 96 0 96 468 240"
+        }
+      ],
+      "check": "Pixel Size at 1, 2, 3, 4, 6, 8 in the same framing: the rendered blocks grow with the value.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "42-pixel-size-change",
+      "kind": "clip",
+      "outputs": [
+        "42-pixel-size-change.mp4",
+        "42-pixel-size-change.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "record_start": {
+            "out": "42-pixel-size-change.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 4"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 8"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py setat 728 570 1"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "42-pixel-size-change.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "42-pixel-size-change.mp4",
+            "out": "42-pixel-size-change.png",
+            "at": 1.4
+          }
+        }
+      ],
+      "check": "Pixel Size is typed up (1 -> 4 -> 8) and back to 1; the viewport blocks visibly change size.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "43-editor-fog-toggle",
+      "kind": "clip",
+      "outputs": [
+        "43-editor-fog-toggle.mp4",
+        "43-editor-fog-toggle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "record_start": {
+            "out": "43-editor-fog-toggle.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              350
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "927",
+            "605"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "927",
+            "605"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "43-editor-fog-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "43-editor-fog-toggle.mp4",
+            "out": "43-editor-fog-toggle.png",
+            "at": 1.4
+          }
+        }
+      ],
+      "check": "Editor Fog is ticked: the terrain goes dark under the fog of war, then unticked and comes back.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "44-editor-fog-off-on",
+      "kind": "still",
+      "outputs": [
+        "44-editor-fog-off.png",
+        "44-editor-fog-on.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 44-editor-fog-off.png 96 0 96 620 250"
+        },
+        {
+          "drive": [
+            "click",
+            "927",
+            "605"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 44-editor-fog-on.png 96 0 96 620 250"
+        }
+      ],
+      "check": "Before/after pair: the terrain visible, then almost entirely hidden by the dark fog-of-war overlay.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "50-inspector-overview",
+      "kind": "still",
+      "outputs": [
+        "50-inspector-overview.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 50-inspector-overview.png 1320 80 280 700"
+        }
+      ],
+      "check": "The MarsingSquaresTerrain Inspector: Contents, Grid Type, Chunk Size, Cell Size, Tex Assign, with the Grid section collapsed and Look expanded (Terrain/Grass).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "50b-inspector-groups-collapsed",
+      "kind": "still",
+      "outputs": [
+        "50b-inspector-groups-collapsed.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1400",
+            "445"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 50b-inspector-groups-collapsed.png 1320 80 280 420"
+        }
+      ],
+      "check": "All Inspector groups collapsed (Grid, Look, Overlay, Advanced, Tools) under the top-level terrain properties.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "51-inspector-grid-group",
+      "kind": "still",
+      "outputs": [
+        "51-inspector-grid-group.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1400",
+            "420"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 51-inspector-grid-group.png 1320 80 280 700"
+        }
+      ],
+      "check": "The Inspector's Grid group expanded: Levels, Blending, Defaults, New Chunk Noise sub-groups visible.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "52-inspector-advanced-group",
+      "kind": "still",
+      "outputs": [
+        "52-inspector-advanced-group.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1400",
+            "758"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 52-inspector-advanced-group.png 1320 80 280 620"
+        }
+      ],
+      "check": "The Inspector's Advanced group expanded: Storage, Regions, Distant LOD, Impact Active/Stratum/Sieve, etc.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "60-import-mst-dialog",
+      "kind": "still",
+      "outputs": [
+        "60-import-mst-dialog.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Import...\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Open a File or Directory"
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nfrom PIL import Image\ntmp='/tmp/opencode/ds_import.png'\nimport subprocess\nsubprocess.run(['python3','qa/drive.py','capture',tmp],capture_output=True)\nim=Image.open(tmp)\ntitle=im.crop((275,74,1325,110))\nbody=im.crop((275,140,1325,790))\nout=Image.new('RGB',(1050,title.height+body.height))\nout.paste(title,(0,0)); out.paste(body,(0,title.height)); out.save('$OUT/60-import-mst-dialog.png')\nPY"
+        },
+        {
+          "drive": [
+            "click",
+            "598",
+            "775"
+          ]
+        },
+        {
+          "wait": 1.0
+        }
+      ],
+      "check": "The Import MST file dialog: title bar, the project's res:// folders (addons, build, demo, docs, qa, rust, tools, tutorial), the File field, the All Recognized (*.tscn, *.res) filter and Cancel / Select This Folder.",
+      "notes": "The dialog is a FILESYSTEM-access EditorFileDialog whose Path bar shows an absolute /tmp/opencode path, so the path row is dropped from the picture (title + body are stitched) as in the review-pass notes. Cancelled, nothing imported.",
+      "fresh_session": true
+    },
+    {
+      "id": "61-bake-meshes-result",
+      "kind": "still",
+      "outputs": [
+        "61-bake-meshes-result.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Bake\""
+        },
+        {
+          "wait": 4.0
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 61-bake-meshes-result.png 0 44 285 380"
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.0
+        }
+      ],
+      "check": "Scene dock after Bake: MarchingSquaresTerrainBaked with one Chunk_x_y node per chunk, each holding Body/Shape and Grass children.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "62-export-glb-progress",
+      "kind": "still",
+      "outputs": [
+        "62-export-glb-progress.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Storage\""
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "set-prop",
+            "export_path",
+            "\"user://ds_export.glb\"",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Export\""
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 62-export-glb-progress.png 287 470 1000 60"
+        },
+        {
+          "wait": 10
+        }
+      ],
+      "check": "The Export GLB progress row: percent bar, 'Baking; the editor will pause to write the file' and Cancel.",
+      "notes": "Export Path is set to user://ds_export.glb (outside the project) so the re-import crash risk cannot trigger; the export is allowed to finish.",
+      "fresh_session": true
+    },
+    {
+      "id": "70-hex-grid-terrain",
+      "kind": "still",
+      "outputs": [
+        "70-hex-grid-terrain.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 70-hex-grid-terrain.png 420 165 880 290"
+        }
+      ],
+      "check": "The hex-grid island (Hex Rings grid) seen in the Perspective view: stepped hex columns, cliffs, village and blue water.",
+      "notes": "Scene res://demo/hex_island.tscn.",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "71-settings-grid-hex",
+      "kind": "still",
+      "outputs": [
+        "71-settings-grid-hex.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 71-settings-grid-hex.png 400 418 880 213"
+        }
+      ],
+      "check": "The hex terrain's Grid page: Grid Type Hex Rings, Ring Radius 2 (locked), Cell Size 2.0/2.0, Wrap Chunks (locked), Blend Smooth, Merge Polyhedron, Edge Style Hex Prism, Instanced checked, Extra Collision Layer None.",
+      "notes": "Crop includes the Instanced checkbox at the right edge.",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "72-edge-style-series",
+      "kind": "still",
+      "outputs": [
+        "72-edge-style-0-flat-walls.png",
+        "72-edge-style-1-terraces.png",
+        "72-edge-style-2-slopes.png",
+        "72-edge-style-3-hex-prism.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1175 500 0"
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 72-edge-style-0-flat-walls.png 420 165 893 288"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1175 500 1"
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 72-edge-style-1-terraces.png 420 165 893 288"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1175 500 2"
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 72-edge-style-2-slopes.png 420 165 893 288"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1175 500 3"
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 72-edge-style-3-hex-prism.png 420 165 893 288"
+        }
+      ],
+      "check": "Four stills of the same hex cliffs at Edge Style Flat Walls, Terraces, Slopes and Hex Prism; the step rendering changes.",
+      "notes": "The four styles are subtle on this gentle island but the dropdown and state differ.",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "73-debug-view-cycle",
+      "kind": "clip",
+      "outputs": [
+        "73-debug-view-cycle.mp4",
+        "73-debug-view-cycle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "9"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Display\""
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 96 0 96"
+        },
+        {
+          "record_start": {
+            "out": "73-debug-view-cycle.mp4",
+            "rect": [
+              420,
+              165,
+              893,
+              455
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 1"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 2"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 3"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 4"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 5"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 6"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py popick 1169 570 0"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "73-debug-view-cycle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "73-debug-view-cycle.mp4",
+            "out": "73-debug-view-cycle.png",
+            "at": 2.2
+          }
+        }
+      ],
+      "check": "The hex terrain cycling through Debug View modes (Slope, Height Contours, Slot Ids, Chunk Borders, Cell Ids, Cell Data) with the Settings strip visible.",
+      "notes": "",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "80-new-chunk-noise",
+      "kind": "clip",
+      "outputs": [
+        "80-new-chunk-noise.mp4",
+        "80-new-chunk-noise.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "set-prop",
+            "new_chunk_noise_amplitude",
+            "32",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py recat 80-new-chunk-noise.mp4 224 0 32 440 320 12 16"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 224 0 32"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "80-new-chunk-noise.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "80-new-chunk-noise.mp4",
+            "out": "80-new-chunk-noise.png",
+            "at": 2.0
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess,sys\no=subprocess.run(['python3','qa/drive.py','call','get_chunks','--path','MarchingSquaresTerrain'],capture_output=True,text=True).stdout\nsys.exit(0 if len(json.loads(o).get('value',[])) == 10 else 1)\nPY"
+        }
+      ],
+      "check": "With New-Chunk noise on, a green '+' marker is clicked on the top-down chunk overlay and the new chunk arrives bumpy (noise-generated) instead of flat.",
+      "notes": "The noise amplitude is set on the terrain (the New Chunks field writes new_chunk_noise_amplitude); the marker is projected from chunk (3,0), so the click does not drift with the camera.",
+      "fresh_session": true
+    },
+    {
+      "id": "81-noisy-chunk-result",
+      "kind": "still",
+      "outputs": [
+        "81-noisy-chunk-result.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "set-prop",
+            "new_chunk_noise_amplitude",
+            "32",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "on_tool",
+            "7",
+            "--class",
+            "MarchingSquaresTerrainPlugin"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py topview"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py clickpoint 224 0 32"
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py movepoint 224 0 32"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropat 81-noisy-chunk-result.png 224 0 32 560 340"
+        }
+      ],
+      "check": "The newly added noise chunk in close-up: rolling bumpy ground instead of a flat tile.",
+      "notes": "",
+      "fresh_session": true
+    }
+  ]
+}

@@ -1,0 +1,5769 @@
+{
+  "page": "03-terrain-sculpting",
+  "media_dir": "docs/guide/media/03-terrain-sculpting",
+  "session": {
+    "scene": "res://tutorial/guide/sculpt_playground.tscn",
+    "width": 1600,
+    "height": 1040
+  },
+  "setup": [
+    {
+      "wait": 2
+    },
+    {
+      "shell": "cat > /tmp/opencode/mst_ui.py <<'PYEOF'\nimport json, os, subprocess, sys, tempfile, time\nDRIVE = [\"python3\", \"qa/drive.py\", \"--port\", os.environ.get(\"PORT\") or os.environ.get(\"MST_QA_PORT\", \"8879\"),\n         \"--display\", os.environ.get(\"DISPLAY\", \":79\")]\n\n\ndef run(*a):\n    return subprocess.run(DRIVE + [str(x) for x in a], cwd=os.environ.get(\"ROOT\", \".\"),\n                          capture_output=True, text=True)\n\n\ndef dump():\n    p = tempfile.mktemp(suffix=\".json\")\n    r = run(\"ui\", \"--filter\", \"\", \"--save\", p)\n    if r.returncode:\n        sys.exit(\"ui failed: \" + r.stderr[-300:])\n    d = json.load(open(p)); os.unlink(p)\n    return [c for c in d[\"controls\"] if c.get(\"rect\") and c[\"rect\"][2] > 0 and c[\"rect\"][3] > 0 and c.get(\"visible\")]\n\n\ndef find(name, classes=None):\n    cs = dump()\n    if classes:\n        cs = [c for c in cs if c.get(\"class\") in classes]\n    hits = ([c for c in cs if c.get(\"name\") == name] or [c for c in cs if c.get(\"text\") == name]\n            or [c for c in cs if c.get(\"tooltip\") == name])\n    if not hits:\n        sys.exit(\"control not found: \" + name)\n    return hits[0]\n\n\ndef center(c):\n    x, y, w, h = c[\"rect\"]\n    return int(x + w / 2), int(y + h / 2)\n\n\ndef path(p):\n    return p if os.path.isabs(p) else os.path.join(os.environ.get(\"OUT\", \".\"), p)\n\n\ncmd = sys.argv[1]\nif cmd == \"crop\":\n    from PIL import Image\n    out, name = path(sys.argv[2]), sys.argv[3]\n    pads = [int(v) for v in sys.argv[4:8]]\n    c = find(name); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pads[0]), max(0, y - pads[2]), min(img.width, x + w + pads[1]), min(img.height, y + h + pads[3]))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"croppopup\":\n    from PIL import Image\n    out = path(sys.argv[2]); pad = int(sys.argv[3]) if len(sys.argv) > 3 else 12\n    pp = run(\"popups\"); pop = json.loads(pp.stdout)[\"popups\"][0]\n    x, y = pop[\"pos\"]; w, h = pop[\"size\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pad), max(0, y - pad), min(img.width, x + w + pad), min(img.height, y + h + pad))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"cropwin\":\n    from PIL import Image\n    out = path(sys.argv[2]); x, y, w, h = [int(v) for v in sys.argv[3:7]]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    Image.open(tmp).crop((x, y, x + w, y + h)).save(out); os.unlink(tmp); print(out)\nelif cmd == \"full\":\n    out = path(sys.argv[2]); tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    os.replace(tmp, out); print(out)\nelse:\n    name = sys.argv[2]\n    cls = {\"option\": (\"OptionButton\",), \"slider\": (\"HSlider\",), \"spin\": (\"EditorSpinSlider\",),\n           \"check\": (\"CheckBox\",)}.get(cmd)\n    c = find(name, cls)\n    if cmd == \"click\":\n        print(run(\"click\", *center(c)).stdout[-100:])\n    elif cmd == \"check\":\n        want = sys.argv[3].lower() in (\"1\", \"on\", \"true\", \"yes\")\n        if bool(c.get(\"toggled\")) != want:\n            run(\"click\", *center(c)); time.sleep(0.3)\n        print(name, \"->\", want)\n    elif cmd == \"spin\":\n        x, y = center(c)\n        run(\"click\", x, y); time.sleep(0.4)\n        run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[3]); run(\"key\", \"enter\"); time.sleep(0.4)\n        print(name, \":=\", sys.argv[3])\n    elif cmd == \"slider\":\n        frac = max(0.0, min(1.0, float(sys.argv[3]))); x, y, w, h = c[\"rect\"]\n        tx = int(x + 2 + frac * (w - 4)); yy = int(y + h / 2)\n        run(\"drag\", tx - 1, yy, tx + 1, yy, \"--duration\", \"0.2\"); time.sleep(0.4)\n        print(name, \"->\", frac)\n    elif cmd == \"option\":\n        idx = int(sys.argv[3]); run(\"click\", *center(c)); time.sleep(0.8)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if not pops:\n            sys.exit(\"option: no popup opened for \" + name)\n        pop = pops[0]; px, py = pop[\"pos\"]\n        ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n        run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n        print(name, \"->\", idx)\n\n\nPYEOF\n"
+    },
+    {
+      "wait": 0.5
+    }
+  ],
+  "items": [
+    {
+      "id": "00-orientation",
+      "kind": "still",
+      "outputs": [
+        "00-orientation.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py full 00-raw.png"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 - <<PY\nfrom PIL import Image, ImageDraw\nim=Image.open('$OUT/00-raw.png').convert('RGB')\nImageDraw.Draw(im).rectangle((280,170,1460,740),outline=(255,59,48),width=4)\nim.save('$OUT/00-orientation.png')\nimport os\nif True: os.remove('$OUT/00-raw.png')\nPY"
+        }
+      ],
+      "check": "Full editor window with a red box around the terrain toolbar and the attribute strip under the 3D view.",
+      "notes": "Window 1600x1040. The red box is drawn with PIL around the toolbar + strip.",
+      "fresh_session": true
+    },
+    {
+      "id": "01-02-toolbar",
+      "kind": "series",
+      "outputs": [
+        "01-toolbar.png",
+        "02-toolbar-compact.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1400"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 01-toolbar.png 270 160 150 1120"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click ToolbarCompact"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 02-toolbar-compact.png 275 160 130 900"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click ToolbarCompact"
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "The expanded vertical terrain toolbar with every tool name, then the same bar collapsed to icons only.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "03-brush-strip",
+      "kind": "still",
+      "outputs": [
+        "03-brush-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 03-brush-strip.png ToolTitle 10 895 10 80"
+        }
+      ],
+      "check": "The Brush (Drag) attribute strip: Brush Type, Brush Mode, Size, Aspect, Rotation, Flatten, Falloff, Peak, Grid Aligned, Grid Size, Quick Paint.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "04-hint-bar",
+      "kind": "still",
+      "outputs": [
+        "04-hint-bar.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 04-hint-bar.png 425 630 1540 40"
+        }
+      ],
+      "check": "The Brush hint bar: LMB paints a selection, LMB-drag raises/lowers, Shift add, Ctrl remove, Alt one cell, RMB/Esc clear.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "05-brush-raiselower-strip",
+      "kind": "still",
+      "outputs": [
+        "05-brush-raiselower-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 05-brush-raiselower-strip.png ToolTitle 10 895 10 115"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "The Brush (Raise / Lower) strip with Ceiling, Height, Floor and Strength.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "06-stamp-strip",
+      "kind": "still",
+      "outputs": [
+        "06-stamp-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 06-stamp-strip.png ToolTitle 10 895 10 90"
+        }
+      ],
+      "check": "The Stamp attribute strip, its controls readable.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "07-gradient-strip",
+      "kind": "still",
+      "outputs": [
+        "07-gradient-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Gradient"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 07-gradient-strip.png ToolTitle 10 895 10 75"
+        }
+      ],
+      "check": "The Gradient attribute strip, its controls readable.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "08-select-strip",
+      "kind": "still",
+      "outputs": [
+        "08-select-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Select"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 08-select-strip.png ToolTitle 10 895 10 75"
+        }
+      ],
+      "check": "The Select attribute strip, its controls readable.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "09-tint-strip",
+      "kind": "still",
+      "outputs": [
+        "09-tint-strip.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Tint"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py crop 09-tint-strip.png ToolTitle 10 895 10 75"
+        }
+      ],
+      "check": "The Tint attribute strip, its controls readable.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "10-15-brushtype-series",
+      "kind": "series",
+      "outputs": [
+        "10-brushtype-round.png",
+        "11-brushtype-square.png",
+        "12-brushtype-hexagon.png",
+        "13-brushtype-hexagon30.png",
+        "14-brushtype-triangle.png",
+        "15-brushtype-triangle180.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1080"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 0"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 10-brushtype-round.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 11-brushtype-square.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 2"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 12-brushtype-hexagon.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 3"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 13-brushtype-hexagon30.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 14-brushtype-triangle.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 5"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 15-brushtype-triangle180.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 0"
+        },
+        {
+          "wait": 0.4
+        }
+      ],
+      "check": "Six identical 3/4 views of the chunk where only the brush outline changes: circle, square, hexagon, rotated hexagon, triangle, flipped triangle.",
+      "notes": "Re-shot at a 1600x1400 window so a 675x450 crop fits above the attribute strip; default editor camera, cursor parked on the chunk.",
+      "fresh_session": true
+    },
+    {
+      "id": "16-19-size-series",
+      "kind": "series",
+      "outputs": [
+        "16-size-5.png",
+        "17-size-15.png",
+        "18-size-30.png",
+        "19-size-50.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1400"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Size 0.08"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 16-size-5.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Size 0.28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 17-size-15.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Size 0.58"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 18-size-30.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Size 0.98"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 19-size-50.png 560 175 675 450"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Size 0.28"
+        },
+        {
+          "wait": 0.3
+        }
+      ],
+      "check": "The same round footprint at four sizes, growing from tiny to huge; same camera and cursor spot.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "20-23-aspect-series",
+      "kind": "series",
+      "outputs": [
+        "20-aspect-03.png",
+        "21-aspect-10.png",
+        "22-aspect-25.png",
+        "23-aspect-50.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1400"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 1"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "475",
+            "190"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "drive": [
+            "key",
+            "t"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "475",
+            "190"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "drive": [
+            "key",
+            "o"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Aspect 0.02"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 20-aspect-03.png 620 150 660 660"
+        },
+        {
+          "drive": [
+            "click",
+            "1200",
+            "600",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Aspect 0.17"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 21-aspect-10.png 620 150 660 660"
+        },
+        {
+          "drive": [
+            "click",
+            "1200",
+            "600",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Aspect 0.5"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 22-aspect-25.png 620 150 660 660"
+        },
+        {
+          "drive": [
+            "click",
+            "1200",
+            "600",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Aspect 0.98"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 23-aspect-50.png 620 150 660 660"
+        },
+        {
+          "drive": [
+            "click",
+            "1200",
+            "600",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Aspect 0.17"
+        },
+        {
+          "wait": 0.4
+        }
+      ],
+      "check": "Top-down view of the same spot at Aspect 0.3, 1.0, 2.5 and 5.0, each showing the selected footprint: a wide bar, a square, a tall rounded rectangle and a narrow strip.",
+      "notes": "Brush Type Square, Drag mode: one click selects the footprint, whose shape follows Aspect. Top Orthogonal via the view-label menu (type-ahead t then o). 660x660 crops from a 1600x1400 window.",
+      "fresh_session": true
+    },
+    {
+      "id": "30-32-raise",
+      "kind": "clip",
+      "outputs": [
+        "30-raise-before.png",
+        "31-raise-hill.mp4",
+        "31-raise-hill.png",
+        "32-raise-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff on"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py spin Ceiling 16"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "880",
+            "460"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "30-raise-before.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "31-raise-hill.mp4",
+            "rect": [
+              500,
+              240,
+              740,
+              360
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "31-raise-hill.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "31-raise-hill.mp4",
+            "out": "31-raise-hill.png",
+            "at": 2.0
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "32-raise-after.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Before: flat ground with the brush outline. Clip: LMB held while a hill grows. After: a rounded hill at the same spot.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "33-35-peak-series",
+      "kind": "series",
+      "outputs": [
+        "33-peak-neg1.png",
+        "34-peak-0.png",
+        "35-peak-pos1.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff on"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Peak 0.0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "33-peak-neg1.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Peak 0.5"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "34-peak-0.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Peak 1.0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "35-peak-pos1.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Peak 0.505"
+        },
+        {
+          "wait": 0.3
+        }
+      ],
+      "check": "One raised hill at Peak -1 (broad flat top), 0 (dome) and +1 (narrow point); Falloff on.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "36-37-falloff",
+      "kind": "still",
+      "outputs": [
+        "36-falloff-on.png",
+        "37-falloff-off.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff on"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "36-falloff-on.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff off"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "37-falloff-off.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff on"
+        }
+      ],
+      "check": "The same spot raised once with Falloff on (soft rounded hill) and once with Falloff off (flat top, abrupt sides).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "40-41-drag-select",
+      "kind": "clip",
+      "outputs": [
+        "40-drag-select-raise.mp4",
+        "40-drag-select-raise.png",
+        "41-drag-mode-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Flatten on"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "record_start": {
+            "out": "40-drag-select-raise.mp4",
+            "rect": [
+              500,
+              240,
+              740,
+              360
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "1000",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "860",
+            "500",
+            "860",
+            "420",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "40-drag-select-raise.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "40-drag-select-raise.mp4",
+            "out": "40-drag-select-raise.png",
+            "at": 3.0
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "41-drag-mode-after.png",
+            "crop": [
+              500,
+              210,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 3); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Clip: drag a white selection over the ground, then drag it upward. After: the selection lifted as a flat-topped plateau.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "42-43-level",
+      "kind": "still",
+      "outputs": [
+        "42-level-before.png",
+        "43-level-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Level"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff on"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py spin Height 5"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "42-level-before.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "470",
+            "880",
+            "470",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "43-level-after.png",
+            "crop": [
+              520,
+              230,
+              700,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Before: ground under the Level brush. After: a flat shelf raised toward Height 5 with a soft edge.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "44-45-smooth",
+      "kind": "still",
+      "outputs": [
+        "44-smooth-before.png",
+        "45-smooth-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "880",
+            "460",
+            "up",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff off"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Strength 1.0"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py spin Ceiling 10"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "3.0"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "44-smooth-before.png",
+            "crop": [
+              540,
+              240,
+              600,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Smooth"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Strength 1.0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "420",
+            "1000",
+            "420",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "1000",
+            "410",
+            "760",
+            "430",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "420",
+            "1000",
+            "420",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "1000",
+            "410",
+            "760",
+            "430",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "45-smooth-after.png",
+            "crop": [
+              540,
+              240,
+              600,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Same close camera: a sharp flat-topped mound before, its top and sides rounded into a soft swell after two Smooth passes at full Strength.",
+      "notes": "Re-shot: camera zoomed three notches toward the mound, then a Falloff-off raise (Ceiling 10) for the hard shape; Smooth at the slider maximum.",
+      "fresh_session": true
+    },
+    {
+      "id": "46-47-gradient",
+      "kind": "still",
+      "outputs": [
+        "46-gradient-before.png",
+        "47-gradient-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "880",
+            "460",
+            "up",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py check Falloff off"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Strength 1.0"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py spin Ceiling 10"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "3.0"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Gradient"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py slider Strength 1.0"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "455",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "790",
+            "520",
+            "--mod",
+            "ctrl",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "455",
+            "790",
+            "520",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "790",
+            "520",
+            "880",
+            "455",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "455",
+            "790",
+            "520",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "790",
+            "520",
+            "880",
+            "455",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "455",
+            "790",
+            "520",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "790",
+            "520",
+            "880",
+            "455",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Inspect"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "47-gradient-after.png",
+            "crop": [
+              540,
+              240,
+              600,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 6); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "46-gradient-before.png",
+            "crop": [
+              540,
+              240,
+              600,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Before: a raised mound with a hard flat top and steep sides. After: Gradient pulled it into one continuous ramp from the top down to the ground; the guide line is hidden.",
+      "notes": "Re-shot: same mound as 44-45; Gradient from a cell on its top to a cell at its foot (Ctrl+LMB / Ctrl+RMB, six passes), then Inspect hides the guide line.",
+      "fresh_session": true
+    },
+    {
+      "id": "48-50-bridge",
+      "kind": "clip",
+      "outputs": [
+        "48-bridge-before.png",
+        "49-bridge-ramp.mp4",
+        "49-bridge-ramp.png",
+        "50-bridge-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "1060",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "48-bridge-before.png",
+            "crop": [
+              430,
+              165,
+              768,
+              350
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Bridge"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "record_start": {
+            "out": "49-bridge-ramp.mp4",
+            "rect": [
+              560,
+              260,
+              640,
+              364
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "970",
+            "465",
+            "655",
+            "335",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "49-bridge-ramp.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "49-bridge-ramp.mp4",
+            "out": "49-bridge-ramp.png",
+            "at": 3.0
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "50-bridge-after.png",
+            "crop": [
+              430,
+              165,
+              768,
+              350
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Before and after from the same low angle: a broad ramp now climbs from the low foreground to the ridge; the clip shows the drag.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "51-55-stamp-series",
+      "kind": "series",
+      "outputs": [
+        "51-stamp-mountain.png",
+        "52-stamp-crater.png",
+        "53-stamp-mesa.png",
+        "54-stamp-valley.png",
+        "55-stamp-hill.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 0"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "51-stamp-mountain.png",
+            "crop": [
+              500,
+              260,
+              720,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 1"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "52-stamp-crater.png",
+            "crop": [
+              500,
+              260,
+              720,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 2"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "53-stamp-mesa.png",
+            "crop": [
+              500,
+              260,
+              720,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 3"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "54-stamp-valley.png",
+            "crop": [
+              500,
+              260,
+              720,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 4"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "55-stamp-hill.png",
+            "crop": [
+              500,
+              260,
+              720,
+              330
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Five committed stamps on the chunk: Mountain, Crater, Mesa, Valley and Hill.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "56-stamp-dragsize",
+      "kind": "clip",
+      "outputs": [
+        "56-stamp-dragsize.mp4",
+        "56-stamp-dragsize.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "record_start": {
+            "out": "56-stamp-dragsize.mp4",
+            "rect": [
+              500,
+              240,
+              740,
+              360
+            ],
+            "fps": 12,
+            "max": 22
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "460",
+            "970",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "56-stamp-dragsize.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "56-stamp-dragsize.mp4",
+            "out": "56-stamp-dragsize.png",
+            "at": 2.0
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "LMB-drag pins the stamp centre and drags out its size and rotation.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "57-58-select-copy",
+      "kind": "clip",
+      "outputs": [
+        "57-select-copy-paste.mp4",
+        "57-select-copy-paste.png",
+        "58-select-two-hills.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Select"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "record_start": {
+            "out": "57-select-copy-paste.mp4",
+            "rect": [
+              500,
+              240,
+              740,
+              360
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "430",
+            "950",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "c"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "v"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "key",
+            "z"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "m"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1060",
+            "520"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "57-select-copy-paste.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "57-select-copy-paste.mp4",
+            "out": "57-select-copy-paste.png",
+            "at": 4.0
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "58-select-two-hills.png",
+            "crop": [
+              500,
+              210,
+              720,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 3); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Select a stamped hill, C copies, V pastes a ghost, Z rotates, M mirrors, LMB drops the copy; two hills at the end.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "60-inspect-output",
+      "kind": "still",
+      "outputs": [
+        "60-inspect-output.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Inspect"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 60-inspect-output.png 287 850 1326 75"
+        }
+      ],
+      "check": "The Output panel with a Marching Squares Terrain line: global position, sample/chunk/local, height, textures, grass, smooth.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "61-62-tint",
+      "kind": "still",
+      "outputs": [
+        "61-tint-before.png",
+        "62-tint-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Tint"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "61-tint-before.png",
+            "crop": [
+              500,
+              210,
+              720,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Tint 0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "460",
+            "960",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "62-tint-after.png",
+            "crop": [
+              500,
+              210,
+              720,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "for i in $(seq 1); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Before: plain green chunk. After: a red tint painted over the cells under the brush.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "63-64-grid",
+      "kind": "still",
+      "outputs": [
+        "63-grid-off.png",
+        "64-grid-on.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "move",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "63-grid-off.png",
+            "crop": [
+              500,
+              210,
+              760,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click GridOverlay"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "64-grid-on.png",
+            "crop": [
+              500,
+              210,
+              760,
+              300
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click GridOverlay"
+        },
+        {
+          "wait": 0.4
+        }
+      ],
+      "check": "Same close view without and with the cell-line grid overlay.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "70-hex-grid",
+      "kind": "still",
+      "outputs": [
+        "70-hex-grid.png"
+      ],
+      "steps": [
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click GridOverlay"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 70-hex-grid.png 500 240 760 340"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click GridOverlay"
+        },
+        {
+          "wait": 0.4
+        }
+      ],
+      "check": "The hex island with the honeycomb grid overlay on, zoomed onto the flat ground.",
+      "notes": "",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "72-sculpt-playground",
+      "kind": "still",
+      "outputs": [
+        "72-sculpt-playground.png"
+      ],
+      "steps": [
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 72-sculpt-playground.png 500 240 760 340"
+        }
+      ],
+      "check": "The flat sculpt playground chunk from the default 3/4 camera.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "80-drag-shift-add",
+      "kind": "clip",
+      "outputs": [
+        "80-drag-shift-add.mp4",
+        "80-drag-shift-add.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "80-drag-shift-add.mp4",
+            "rect": [
+              500,
+              240,
+              620,
+              410
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "860",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "900",
+            "520",
+            "980",
+            "540",
+            "--button",
+            "left",
+            "--mod",
+            "shift",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "80-drag-shift-add.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "80-drag-shift-add.mp4",
+            "out": "80-drag-shift-add.png",
+            "at": 1.5
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Drag-mode selection gesture: shift-add.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "81-drag-ctrl-remove",
+      "kind": "clip",
+      "outputs": [
+        "81-drag-ctrl-remove.mp4",
+        "81-drag-ctrl-remove.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "81-drag-ctrl-remove.mp4",
+            "rect": [
+              500,
+              240,
+              620,
+              410
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "980",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "500",
+            "860",
+            "500",
+            "--button",
+            "left",
+            "--mod",
+            "ctrl",
+            "--duration",
+            "1.0"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "81-drag-ctrl-remove.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "81-drag-ctrl-remove.mp4",
+            "out": "81-drag-ctrl-remove.png",
+            "at": 1.5
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Drag-mode selection gesture: ctrl-remove.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "82-drag-alt-onecell",
+      "kind": "clip",
+      "outputs": [
+        "82-drag-alt-onecell.mp4",
+        "82-drag-alt-onecell.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "82-drag-alt-onecell.mp4",
+            "rect": [
+              500,
+              240,
+              620,
+              410
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "980",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "500",
+            "880",
+            "450",
+            "--button",
+            "left",
+            "--mod",
+            "alt",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "82-drag-alt-onecell.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "82-drag-alt-onecell.mp4",
+            "out": "82-drag-alt-onecell.png",
+            "at": 1.5
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Drag-mode selection gesture: alt-onecell.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "83-drag-rmb-clear",
+      "kind": "clip",
+      "outputs": [
+        "83-drag-rmb-clear.mp4",
+        "83-drag-rmb-clear.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "83-drag-rmb-clear.mp4",
+            "rect": [
+              500,
+              240,
+              620,
+              410
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "980",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "860",
+            "500",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "83-drag-rmb-clear.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "83-drag-rmb-clear.mp4",
+            "out": "83-drag-rmb-clear.png",
+            "at": 1.5
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Drag-mode selection gesture: rmb-clear.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "84-raise-lmb",
+      "kind": "clip",
+      "outputs": [
+        "84-raise-lmb.mp4",
+        "84-raise-lmb.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "84-raise-lmb.mp4",
+            "rect": [
+              500,
+              240,
+              680,
+              400
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "84-raise-lmb.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "84-raise-lmb.mp4",
+            "out": "84-raise-lmb.png",
+            "at": 1.8
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Raise/Lower gesture: lmb.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "85-raise-rmb-lower",
+      "kind": "clip",
+      "outputs": [
+        "85-raise-rmb-lower.mp4",
+        "85-raise-rmb-lower.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "85-raise-rmb-lower.mp4",
+            "rect": [
+              500,
+              240,
+              680,
+              400
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "460",
+            "880",
+            "460",
+            "--button",
+            "right",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "85-raise-rmb-lower.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "85-raise-rmb-lower.mp4",
+            "out": "85-raise-rmb-lower.png",
+            "at": 1.8
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Raise/Lower gesture: rmb-lower.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "86-raise-both-flatten",
+      "kind": "clip",
+      "outputs": [
+        "86-raise-both-flatten.mp4",
+        "86-raise-both-flatten.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "86-raise-both-flatten.mp4",
+            "rect": [
+              500,
+              240,
+              680,
+              400
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "460",
+            "820",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "860",
+            "480",
+            "860",
+            "480",
+            "--button",
+            "left",
+            "--duration",
+            "1.0"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "86-raise-both-flatten.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "86-raise-both-flatten.mp4",
+            "out": "86-raise-both-flatten.png",
+            "at": 1.8
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Raise/Lower gesture: both-flatten.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "87-ctrl-pick",
+      "kind": "clip",
+      "outputs": [
+        "87-ctrl-pick.mp4",
+        "87-ctrl-pick.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "87-ctrl-pick.mp4",
+            "rect": [
+              500,
+              240,
+              680,
+              400
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "460",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "820",
+            "500",
+            "--button",
+            "middle"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1000",
+            "520",
+            "--mod",
+            "ctrl",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "87-ctrl-pick.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "87-ctrl-pick.mp4",
+            "out": "87-ctrl-pick.png",
+            "at": 1.8
+          }
+        },
+        {
+          "shell": "for i in $(seq 4); do python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null; done"
+        }
+      ],
+      "check": "Raise/Lower gesture: ctrl-pick.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "88-shift-wheel-size",
+      "kind": "clip",
+      "outputs": [
+        "88-shift-wheel-size.mp4",
+        "88-shift-wheel-size.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "88-shift-wheel-size.mp4",
+            "rect": [
+              700,
+              240,
+              470,
+              396
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "880",
+            "460",
+            "up",
+            "--times",
+            "6",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "88-shift-wheel-size.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "88-shift-wheel-size.mp4",
+            "out": "88-shift-wheel-size.png",
+            "at": 0.6
+          }
+        }
+      ],
+      "check": "Wheel modifier changes only the brush: shift-wheel-size.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "89-alt-wheel-rotation",
+      "kind": "clip",
+      "outputs": [
+        "89-alt-wheel-rotation.mp4",
+        "89-alt-wheel-rotation.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "89-alt-wheel-rotation.mp4",
+            "rect": [
+              700,
+              240,
+              560,
+              360
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "880",
+            "460",
+            "up",
+            "--times",
+            "6",
+            "--mod",
+            "alt"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "89-alt-wheel-rotation.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "89-alt-wheel-rotation.mp4",
+            "out": "89-alt-wheel-rotation.png",
+            "at": 0.6
+          }
+        }
+      ],
+      "check": "Wheel modifier changes only the brush: alt-wheel-rotation.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "90-ctrl-wheel-strength",
+      "kind": "clip",
+      "outputs": [
+        "90-ctrl-wheel-strength.mp4",
+        "90-ctrl-wheel-strength.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "90-ctrl-wheel-strength.mp4",
+            "rect": [
+              500,
+              240,
+              760,
+              398
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "880",
+            "460",
+            "up",
+            "--times",
+            "8",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "90-ctrl-wheel-strength.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "90-ctrl-wheel-strength.mp4",
+            "out": "90-ctrl-wheel-strength.png",
+            "at": 0.6
+          }
+        }
+      ],
+      "check": "Wheel modifier changes only the brush: ctrl-wheel-strength.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "91-brush-type-footprints",
+      "kind": "clip",
+      "outputs": [
+        "91-brush-type-footprints.mp4",
+        "91-brush-type-footprints.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "record_start": {
+            "out": "91-brush-type-footprints.mp4",
+            "rect": [
+              560,
+              240,
+              580,
+              382
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 0"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 2"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushType 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "91-brush-type-footprints.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "91-brush-type-footprints.mp4",
+            "out": "91-brush-type-footprints.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Cycling Brush Type: the footprint outline and the strip label change together.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "92-level",
+      "kind": "clip",
+      "outputs": [
+        "92-level.mp4",
+        "92-level.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Level"
+        },
+        {
+          "record_start": {
+            "out": "92-level.mp4",
+            "rect": [
+              520,
+              240,
+              600,
+              390
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py spin Height 6"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "470",
+            "1000",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "92-level.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "92-level.mp4",
+            "out": "92-level.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Level dragging a flat shelf to Height 6, then Ctrl+LMB picking a height.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "93-smooth",
+      "kind": "clip",
+      "outputs": [
+        "93-smooth.mp4",
+        "93-smooth.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "record_start": {
+            "out": "93-smooth.mp4",
+            "rect": [
+              520,
+              240,
+              580,
+              370
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "860",
+            "460",
+            "860",
+            "460",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Smooth"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "480",
+            "980",
+            "500",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "93-smooth.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "93-smooth.mp4",
+            "out": "93-smooth.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Smooth relaxing a bump and a pit.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "94-hex-smooth-terraced-sloped",
+      "kind": "clip",
+      "outputs": [
+        "94-hex-smooth-terraced-sloped.mp4",
+        "94-hex-smooth-terraced-sloped.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_start": {
+            "out": "94-hex-smooth-terraced-sloped.mp4",
+            "rect": [
+              560,
+              220,
+              730,
+              400
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Smooth"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "460",
+            "1000",
+            "500",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option SmoothMode 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "drag",
+            "1000",
+            "500",
+            "760",
+            "460",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "94-hex-smooth-terraced-sloped.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "94-hex-smooth-terraced-sloped.mp4",
+            "out": "94-hex-smooth-terraced-sloped.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "On a hex grid: Smooth Terraced then Sloped on a stepped wall.",
+      "notes": "",
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "95-bridge",
+      "kind": "clip",
+      "outputs": [
+        "95-bridge.mp4",
+        "95-bridge.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Bridge"
+        },
+        {
+          "record_start": {
+            "out": "95-bridge.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "drag",
+            "970",
+            "465",
+            "655",
+            "335",
+            "--button",
+            "left",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "95-bridge.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "95-bridge.mp4",
+            "out": "95-bridge.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Dragging a Bridge ramp between two points.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "96-stamp-builtins",
+      "kind": "clip",
+      "outputs": [
+        "96-stamp-builtins.mp4",
+        "96-stamp-builtins.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "record_start": {
+            "out": "96-stamp-builtins.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "720",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 1"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "860",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 2"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1000",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 3"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "760",
+            "540"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 4"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1040",
+            "540"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "record_stop": {
+            "out": "96-stamp-builtins.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "96-stamp-builtins.mp4",
+            "out": "96-stamp-builtins.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Stamp places Mountain, Crater, Mesa, Valley and Hill across the chunk.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "97-gradient",
+      "kind": "clip",
+      "outputs": [
+        "97-gradient.mp4",
+        "97-gradient.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Gradient"
+        },
+        {
+          "record_start": {
+            "out": "97-gradient.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "450",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "760",
+            "540",
+            "--mod",
+            "ctrl",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "540",
+            "880",
+            "450",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "880",
+            "450",
+            "760",
+            "540",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "97-gradient.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "97-gradient.mp4",
+            "out": "97-gradient.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Gradient: pick start and end, then drag to paint the ramp.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "98-select-copy-paste",
+      "kind": "clip",
+      "outputs": [
+        "98-select-copy-paste.mp4",
+        "98-select-copy-paste.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "record_start": {
+            "out": "98-select-copy-paste.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 28
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Select"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "drag",
+            "760",
+            "430",
+            "950",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "c"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "v"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "z"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "m"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1060",
+            "520"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "1100",
+            "560",
+            "--button",
+            "right"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "98-select-copy-paste.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "98-select-copy-paste.mp4",
+            "out": "98-select-copy-paste.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Select copies a hill, pastes a ghost, rotates/mirrors it and drops the copy.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "99-inspect",
+      "kind": "clip",
+      "outputs": [
+        "99-inspect.mp4",
+        "99-inspect.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Inspect"
+        },
+        {
+          "record_start": {
+            "out": "99-inspect.mp4",
+            "rect": [
+              287,
+              700,
+              872,
+              340
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "820",
+            "460"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "drive": [
+            "click",
+            "1000",
+            "540"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "record_stop": {
+            "out": "99-inspect.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "99-inspect.mp4",
+            "out": "99-inspect.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Inspect clicks three cells; the Output prints their data.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "100-undo-redo",
+      "kind": "clip",
+      "outputs": [
+        "100-undo-redo.mp4",
+        "100-undo-redo.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "record_start": {
+            "out": "100-undo-redo.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "100-undo-redo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "100-undo-redo.mp4",
+            "out": "100-undo-redo.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Ctrl+Z removes the stamp; Ctrl+Shift+Z brings it back.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "101-toolbar-collapse-keys",
+      "kind": "clip",
+      "outputs": [
+        "101-toolbar-collapse-keys.mp4",
+        "101-toolbar-collapse-keys.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "record_start": {
+            "out": "101-toolbar-collapse-keys.mp4",
+            "rect": [
+              287,
+              170,
+              340,
+              520
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "key",
+            "2"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "key",
+            "3"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "key",
+            "4"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click ToolbarCompact"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click ToolbarCompact"
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "record_stop": {
+            "out": "101-toolbar-collapse-keys.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "101-toolbar-collapse-keys.mp4",
+            "out": "101-toolbar-collapse-keys.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Number keys 1-4 switch tools and Collapse toggles the icon-only bar.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "104-recipe-river-valley",
+      "kind": "clip",
+      "outputs": [
+        "104-recipe-river-valley.mp4",
+        "104-recipe-river-valley.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "record_start": {
+            "out": "104-recipe-river-valley.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 3"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "490"
+          ]
+        },
+        {
+          "wait": 0.7
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Brush"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option BrushMode 1"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "drag",
+            "820",
+            "480",
+            "900",
+            "520",
+            "--button",
+            "right",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "104-recipe-river-valley.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "104-recipe-river-valley.mp4",
+            "out": "104-recipe-river-valley.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Recipe: two Valley stamps form a trough, then RMB with a small brush carves the river bed.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "107-recipe-crater",
+      "kind": "clip",
+      "outputs": [
+        "107-recipe-crater.mp4",
+        "107-recipe-crater.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "record_start": {
+            "out": "107-recipe-crater.mp4",
+            "rect": [
+              500,
+              240,
+              820,
+              360
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 1"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "880",
+            "470"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "107-recipe-crater.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "107-recipe-crater.mp4",
+            "out": "107-recipe-crater.png",
+            "at": 1.5
+          }
+        }
+      ],
+      "check": "Recipe: a Crater stamp leaves a rim and a pit.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "108-109-erosion-node",
+      "kind": "still",
+      "outputs": [
+        "108-erosion-add-node.png",
+        "109-erosion-scene-dock.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "93"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "type",
+            "Erosion"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 108-erosion-add-node.png 480 190 700 290"
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 109-erosion-scene-dock.png 0 100 285 315"
+        }
+      ],
+      "check": "The Create New Node dialog with MarchingSquaresErosion found, then the Scene dock with it as a child of the terrain.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "110-112-erosion",
+      "kind": "clip",
+      "outputs": [
+        "110-erosion-before.png",
+        "111-erosion-run.mp4",
+        "111-erosion-run.png",
+        "112-erosion-after.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "resize",
+            "1600",
+            "1040"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Stamp"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py option Stamp 2"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "780",
+            "460"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "480"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "1000",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "110-erosion-before.png",
+            "crop": [
+              500,
+              240,
+              625,
+              480
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "111-erosion-run.mp4",
+            "rect": [
+              500,
+              240,
+              626,
+              480
+            ],
+            "fps": 12,
+            "max": 40
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py click Erode"
+        },
+        {
+          "wait": 8
+        },
+        {
+          "record_stop": {
+            "out": "111-erosion-run.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "111-erosion-run.mp4",
+            "out": "111-erosion-run.png",
+            "at": 4.0
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1400",
+            "500"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shot": {
+            "out": "112-erosion-after.png",
+            "crop": [
+              500,
+              240,
+              625,
+              480
+            ]
+          }
+        }
+      ],
+      "check": "Sharp stamped mesas before, the whole terrain weathering when Erode lands, rounded ridgelines after.",
+      "notes": "Needs a MarchingSquaresErosion child node with its terrain assigned; create it as in 108-109 first.",
+      "fresh_session": true
+    },
+    {
+      "id": "113-114-erosion-inspector",
+      "kind": "still",
+      "outputs": [
+        "113-erosion-inspector-droplet.png",
+        "114-erosion-inspector-terrain.png"
+      ],
+      "steps": [
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 113-erosion-inspector-droplet.png 1320 90 284 610"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui.py cropwin 114-erosion-inspector-terrain.png 1320 90 284 300"
+        }
+      ],
+      "check": "The erosion Inspector: Basics + Droplet group, then the Terrain group.",
+      "notes": "",
+      "fresh_session": true
+    }
+  ]
+}

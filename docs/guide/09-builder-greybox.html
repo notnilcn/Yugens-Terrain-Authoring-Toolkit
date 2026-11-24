@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greyboxing with the Roblox UI – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+  .trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: start; }
+  .trio figure { margin-top: 0; }
+  figure.narrow { max-width: 420px; }
+  figure.mid { max-width: 640px; }
+  table.ref td:first-child, table.keys td:first-child { white-space: nowrap; font-weight: 600; }
+  table.vs td:nth-child(3) { font-size: .92rem; }
+  .verdict { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
+  .verdict.same { background: var(--accent-soft); color: var(--accent); }
+  .verdict.diff { background: var(--line); color: var(--ink); }
+  .verdict.plus { background: var(--accent); color: #fff; }
+  .group-chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .78rem; background: var(--accent-soft); color: var(--accent); margin-left: 6px; vertical-align: 2px; }
+  .studio { color: var(--ink-2); font-size: .92rem; }
+  .shape-list { columns: 3; font-size: .95rem; } @media (max-width: 700px) { .shape-list { columns: 2; } }
+  .axis-x { color: #e5484d; font-weight: 700; } .axis-y { color: #30a46c; font-weight: 700; } .axis-z { color: #3e63dd; font-weight: 700; }
+  .swatch { display: inline-block; width: 1em; height: 1em; border-radius: 3px; vertical-align: -2px; border: 1px solid var(--line); background: rgb(163,162,165); }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Greyboxing with the Roblox UI</h1>
+<p class="lede">Switch the builder into a Roblox Studio-style ribbon and block out levels and buildings with Parts, the Move / Scale / Rotate handles, snapping, grouping and Union / Negate, using the same buttons and shortcuts you already know from Studio.</p>
+<div class="meta-row"><span class="pill">⏱ 40 min</span><span class="pill">Beginner</span><span class="pill">Example scene: res://tutorial/guide/greybox_tower.tscn</span></div>
+
+<figure class="shot"><img src="media/09-builder-greybox/02-editor-overview.png" alt="The whole Godot editor in Roblox mode. Left: the Scene dock listing HexIsland with its children (WorldEnvironment, Sun, MarchingSquaresTerrain, PixelWater, Characters, BuilderRuin with Ruin selected) and the FileSystem dock below. Centre top: the 3D toolbar row 'Builder | Pixel Preview | Animate | Pixel World | Roblox UI' with the Roblox UI switch on, then the Model / Edit ribbon tabs and the ribbon buttons. Centre: the 3D viewport showing a pixel-art island with the ruin selected inside a blue box and red, green and blue move arrows. Right: the Inspector with Part — Appearance (Color, Material, Transparency), Part — Transform (Size, Position, Orientation, Pivot Offset), Part (Shape Mesh, Locked, Anchored terrain) and Behavior (Collision None) sections."><figcaption>The whole editor with the Roblox UI switched on: the ribbon sits above the 3D view, the selected part gets Studio-style handles, and the Inspector on the right gains a Studio-like <b>Part</b> section.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>How to <a href="#turn-on">switch the Roblox UI on and off</a>, and what changes when you do.</li>
+  <li>A <a href="#ribbon">tour of every button on the Model tab</a>, and which Studio button each one matches.</li>
+  <li>The <a href="#tools">five tools</a> (Select, Move, Scale, Rotate, Transform) and their viewport handles, plus the <a href="#pivot">Pivot</a> tool. Each one has a clip.</li>
+  <li><a href="#snap">Snapping</a>, <a href="#insert">inserting parts</a> (19 shapes), <a href="#appearance">materials and colours</a>, <a href="#model-group">Group / Lock / Anchor</a>, <a href="#align">Align</a> and <a href="#solid">Union / Intersect / Separate / Negate</a>.</li>
+  <li>The <a href="#inspector">Part inspector</a>, Godot's version of Studio's Properties window.</li>
+  <li>A <a href="#tower">watchtower build</a> you can tick off step by step, then a <a href="#ref">filterable reference</a> of every control and <a href="#shortcuts">shortcut</a>, and a <a href="#vs">Roblox vs here</a> table.</li>
+</ul>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This page should feel familiar. The ribbon copies the layout of Studio's <b>Model</b> tab: the same groups in the same order, the same <span class="axis-x">red X</span> / <span class="axis-y">green Y</span> / <span class="axis-z">blue Z</span> handles, the same Ctrl+Shift+G / N / I / U solid-modelling keys, and the same Ctrl+G grouping. The main differences are that sizes are in <b>metres instead of studs</b>, that <b>Anchor</b> means "stick to the terrain" instead of "freeze physics", and that the buttons show <b>icons only</b> until you hover them. Each of these is explained where it comes up.</p></div>
+
+<h2 id="words">A few Godot words first</h2>
+<p>You'll see these words on this page. Each one has a Roblox equivalent:</p>
+<dl>
+  <dt><b>Editor</b></dt><dd>The big Godot window you build in. It plays the role of Roblox Studio.</dd>
+  <dt><b>Viewport</b> (the 3D view)</dt><dd>The big picture of your world in the middle of the editor. You click and drag parts here.</dd>
+  <dt><b>Node</b></dt><dd>One object in your world, like an Instance in Roblox's Explorer. A light, a camera and a part are all nodes.</dd>
+  <dt><b>Scene dock</b></dt><dd>The tree list of nodes on the left. Think of it as Studio's <b>Explorer</b>.</dd>
+  <dt><b>Inspector</b></dt><dd>The panel on the right that lists the selected node's settings. Think of it as Studio's <b>Properties</b> window.</dd>
+  <dt><b>Scene</b> / <code>.tscn</code></dt><dd>A saved group of nodes: a level, a building or a prop. It's saved as a <code>.tscn</code> file, roughly what a Model saved to a file is in Roblox.</dd>
+  <dt><code>res://</code></dt><dd>Short for "the project folder". <code>res://tutorial/guide/greybox_tower.tscn</code> means the file <code>tutorial/guide/greybox_tower.tscn</code> inside your project.</dd>
+  <dt><b>PixelBuilderMesh</b></dt><dd>The node type the builder makes. Each one is a <b>Part</b> in Roblox terms: a block, wedge, cylinder and so on that you can move, size, colour and combine.</dd>
+  <dt><b>Greyboxing</b></dt><dd>Also called blocking out: building a level or building from plain boxes first to test size, layout and flow before any real art goes in.</dd>
+</dl>
+
+<!-- ============================================================ -->
+<h2 id="turn-on">Turning the Roblox UI on and off</h2>
+<p>The builder has three layouts that all run the same tools: <b>MST</b> (the default, with a left toolbar and bottom strip), <b>Modeler</b>, and <b>Roblox</b>. This page covers the Roblox one. To turn it on, find the second toolbar row above the 3D view, which reads <span class="ui">Builder | Pixel Preview | Animate | Pixel World | Roblox UI</span>, and click the <span class="ui">Roblox UI</span> switch. When the blue dot is on the <b>left</b> the switch is <b>off</b>, and when it's on the <b>right</b> the switch is <b>on</b>.</p>
+
+<div class="compare" data-before="Roblox UI off" data-after="Roblox UI on"><img src="media/09-builder-greybox/01-toolbar-toggle-off.png" alt="The 3D toolbar row with the Roblox UI switch off: its blue dot sits at the left of the pill."><img src="media/09-builder-greybox/01-toolbar-toggle-on.png" alt="The same toolbar row with the Roblox UI switch on: its blue dot sits at the right of the pill."></div>
+<p class="studio">Drag the divider to compare the switch off and on.</p>
+
+<figure class="clip"><video src="media/09-builder-greybox/04-roblox-ui-toggle.mp4" poster="media/09-builder-greybox/04-roblox-ui-toggle.png" data-autoplay></video><figcaption>Click the <span class="ui">Roblox UI</span> switch. Its tooltip appears, then the Model-tab ribbon slides in under the 3D menu bar.</figcaption></figure>
+
+<p>When the switch is on:</p>
+<ul>
+  <li>The <b>ribbon</b> (Model and Edit tabs) appears under the 3D menu bar.</li>
+  <li>The viewport handles change to <b>Roblox-style</b> arrows, balls and rings.</li>
+  <li><b>Roblox shortcuts</b> take over (1–5 for tools, Ctrl+Shift+G for Union, and so on).</li>
+  <li>The Inspector gains a <a href="#inspector">Part section</a>, laid out like Studio's Properties.</li>
+</ul>
+<p>The switch's tooltip reads: <i>"Roblox UI: show the modelling tools as a Roblox Studio-style ribbon with Roblox handles and shortcuts. Off: the regular Builder layout."</i> The switch shows whenever the 3D editor is open, so you don't need a part selected first. When you switch it off, the builder goes back to the layout you used before, whether that was MST or Modeler. Your selection, tool and settings carry over either way.</p>
+
+<div class="callout tip"><span class="label">Tip</span><p>The layout can also be set in <span class="ui">Editor › Editor Settings › Marching Squares Terrain › Builder › Ui Layout</span> (<b>MST / Modeler / Roblox</b>), and in the Modeler layout's <span class="ui">Options</span> dialog under <span class="ui">UI Layout</span>. Picking <b>Roblox</b> there does exactly the same thing as flipping the switch, and the switch follows the setting. This setting is per user, so it doesn't change anything for your teammates. The switch is the quickest way.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="ribbon">A tour of the Model tab</h2>
+<p>The ribbon has two tabs. <b>Model</b> holds everything for greyboxing and is what this page covers. <b>Edit</b> holds face, edge and vertex editing, which Studio doesn't have. That tab gets its own page: <a href="10-builder-modeller.html">Modelling: faces, edges &amp; vertices</a>.</p>
+<figure class="shot narrow"><img src="media/09-builder-greybox/03b-ribbon-tabs.png" alt="Close-up of the two ribbon tab buttons, Model and Edit."><figcaption>The two ribbon tabs. Model is for parts; Edit is for mesh editing (page 10).</figcaption></figure>
+
+<p>Click a numbered marker to see what each button does and which Studio button it matches. At the normal editor size the buttons are <b>icons only</b> and the groups wrap onto <b>two rows</b>. This tour, or hovering a button, tells you its name.</p>
+
+<div class="hotspots"><img src="media/09-builder-greybox/03-ribbon-model-tab.png" alt="The full Model-tab ribbon. Top: the toolbar row with the Roblox UI switch on, then the Model and Edit tabs. Row one of buttons: Select, Move, Scale, Rotate, Transform icons; the Geometric drag-mode button; two ticked checkboxes with fields 1.0 m and 45°; Pivot with a drop arrow and Reset; the Insert Part cube with a drop arrow; Material and Color; Group, Lock and Anchor each with drop arrows. Row two: Align, then the Union, Intersect, Separate and Negate icons.">
+  <button class="spot" style="left:46.5%;top:5%" data-title="Roblox UI switch" data-text="Turns this whole ribbon on or off. Studio: n/a, since Studio always has its ribbon.">1</button>
+  <button class="spot" style="left:3.7%;top:27%" data-title="Model tab" data-text="Parts, handles, snapping, grouping and solid modelling (this page). Studio: the Model tab.">2</button>
+  <button class="spot" style="left:9.8%;top:27%" data-title="Edit tab" data-text="Object / Face / Edge / Vertex modes, Extrude, Inset, Bevel, Loop Cut and more. Studio has no equivalent. See page 10.">3</button>
+  <button class="spot" style="left:2.4%;top:45%" data-title="Select (1)" data-text="Pick parts with no handles on them. Studio: Select.">4</button>
+  <button class="spot" style="left:7%;top:45%" data-title="Move (2)" data-text="Arrow handles that slide the part along X, Y or Z, snapped to the Grid step. Studio: Move.">5</button>
+  <button class="spot" style="left:11.6%;top:45%" data-title="Scale (3)" data-text="Ball handles on each face. A plain drag grows one side; Ctrl+drag grows both sides. Studio: Scale.">6</button>
+  <button class="spot" style="left:16.1%;top:45%" data-title="Rotate (4)" data-text="Three rings, snapped to the Rot° step. Studio: Rotate.">7</button>
+  <button class="spot" style="left:20.7%;top:45%" data-title="Transform (5)" data-text="Move, resize and rotate with one combined set of handles. Studio: Transform.">8</button>
+  <button class="spot" style="left:28.5%;top:56%" data-title="Drag mode ▾ (Geometric)" data-text="Geometric (free drag) or Surface (slide along the surface underneath), plus Collisions, Snap: Use Bounding Boxes, Snap to Parts and Snap to Terrain Cells toggles. Studio: the drag/Collisions settings.">9</button>
+  <button class="spot" style="left:34.6%;top:46%" data-title="Grid snap ☑ + Grid step" data-text="Moves and sizes snap to this step. Default ☑ 1.0 m. Press [ to halve it and ] to double it. Studio: Snap to Grid › Move (in studs).">10</button>
+  <button class="spot" style="left:34.6%;top:67%" data-title="Rotate snap ☑ + Rot° step" data-text="Rotations snap to this many degrees. Default ☑ 45°. Studio: Snap to Grid › Rotate.">11</button>
+  <button class="spot" style="left:50.6%;top:45%" data-title="Pivot" data-text="Edit Pivot: move or rotate a part's pivot without moving the part. Studio: Pivot › Edit Pivot.">12</button>
+  <button class="spot" style="left:53.9%;top:56%" data-title="Pivot ▾" data-text="One item: Snap, which snaps the pivot to the grid. Studio: the Pivot snap options.">13</button>
+  <button class="spot" style="left:57.3%;top:45%" data-title="Reset (centre pivot)" data-text="Moves the part's origin to the centre of its shape; the part itself doesn't move. Studio: Pivot › Reset.">14</button>
+  <button class="spot" style="left:63.1%;top:45%" data-title="Insert Part" data-text="Drops a Block (4×1×2 m) on whatever the camera is looking at and selects it. Studio: Part.">15</button>
+  <button class="spot" style="left:66.3%;top:56%" data-title="Part ▾" data-text="Block, Sphere, Wedge, Corner Wedge, Cylinder, plus More Shapes ▸ with 14 extra shapes. Studio: the Part dropdown.">16</button>
+  <button class="spot" style="left:71.1%;top:45%" data-title="Material" data-text="Opens the Material picker. With a part selected, it paints the part. With nothing selected, it sets the material for new parts. Studio: Material.">17</button>
+  <button class="spot" style="left:75.6%;top:45%" data-title="Color" data-text="Opens the colour honeycomb, greys, a click-to-paint switch and a custom colour picker. Studio: Color.">18</button>
+  <button class="spot" style="left:81.5%;top:45%" data-title="Group (Ctrl+G)" data-text="Puts the selected parts under a new Model node. Studio: Group.">19</button>
+  <button class="spot" style="left:84.7%;top:56%" data-title="Group ▾" data-text="Group as Model · Group as Folder · Ungroup (Ctrl+U). Studio: the Group dropdown.">20</button>
+  <button class="spot" style="left:88%;top:45%" data-title="Lock" data-text="Locked parts can't be clicked or moved in the viewport. Studio: Lock.">21</button>
+  <button class="spot" style="left:91.3%;top:56%" data-title="Lock ▾" data-text="Click object to lock: click parts in the viewport to lock them. Studio: the Lock Tool.">22</button>
+  <button class="spot" style="left:94.6%;top:45%" data-title="Anchor" data-text="Seats the part on its terrain cell so it follows the terrain. This is NOT a physics anchor. Studio: Anchor, which works differently.">23</button>
+  <button class="spot" style="left:97.8%;top:56%" data-title="Anchor ▾" data-text="Click object to anchor: click parts in the viewport to anchor them.">24</button>
+  <button class="spot" style="left:2.6%;top:87%" data-title="Align" data-text="Opens the Align panel: Min / Center / Max, World / Local, X Y Z axes, Relative To. Studio: Align Tool.">25</button>
+  <button class="spot" style="left:8.4%;top:87%" data-title="Union (Ctrl+Shift+G)" data-text="Joins the selected parts into one; negated parts are cut away. Studio: Union.">26</button>
+  <button class="spot" style="left:12.9%;top:87%" data-title="Intersect (Ctrl+Shift+I)" data-text="Keeps only the volume the selected parts share. Studio: Intersect.">27</button>
+  <button class="spot" style="left:17.5%;top:87%" data-title="Separate (Ctrl+Shift+U)" data-text="Splits a Union or Intersection back into its original parts. Studio: Separate.">28</button>
+  <button class="spot" style="left:21.9%;top:87%" data-title="Negate (Ctrl+Shift+N)" data-text="Turns the part into a hole (a magenta ghost) that a later Union cuts away. Studio: Negate.">29</button>
+</div>
+
+<p><b>Why are some buttons grey?</b> A button lights up only when the selection can use it. Union needs two or more parts, and Separate needs a Union or Intersection. Hover a greyed button and its tooltip explains why. Drag the divider to compare the ribbon with nothing selected and with a part selected:</p>
+<div class="compare" data-before="Nothing selected" data-after="A part selected"><img src="media/09-builder-greybox/51-ribbon-nothing-selected.png" alt="The Model-tab ribbon with nothing selected: the solid-modelling buttons on the second row are greyed out."><img src="media/09-builder-greybox/03-ribbon-model-tab.png" alt="The Model-tab ribbon with a part selected: the Negate button and the other buttons that work on one part are enabled."></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Studio prints a label under every ribbon button, but here you only see the icon at the normal editor size, because the label doesn't fit in the 36&nbsp;px button. <b>Hover any button</b> to see its name and a one-line description. Labels appear under the icons if you raise the editor's display scale (<span class="ui">Editor Settings › Interface › Editor › Display Scale</span>). The keyboard shortcuts work the same at any size.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="tutorial">Quick start: meet the handles on one part</h2>
+<p>This takes about five minutes. Open any scene with terrain (the demo <code>res://demo/hex_island.tscn</code> works well) and tick each step as you go:</p>
+<ol class="steps" data-id="greybox-handles">
+  <li><b>Switch on the Roblox UI</b> with the toolbar switch. The ribbon appears.</li>
+  <li><b>Optional: pick a default material.</b> With <i>nothing selected</i> (click the sky to deselect), open <span class="ui">Material</span>, choose the <span class="ui">Built-in</span> shelf and click <b>Grid</b>. Every part you insert from now on gets the Grid material. If you skip this, new parts come in plain <span class="swatch"></span> medium stone grey, just like Studio.</li>
+  <li><b>Insert a part.</b> Click the <span class="ui">Insert Part</span> cube. A 4×1×2 m block drops onto whatever the camera is looking at and is selected for you.</li>
+  <li><b>Move it.</b> Press <kbd>2</kbd> and drag a coloured arrow. The block slides along that axis in 1 m snaps.</li>
+  <li><b>Undo.</b> Press <kbd>Ctrl</kbd>+<kbd>Z</kbd>. The block jumps back. Every handle drag is a single undo step.</li>
+  <li><b>Scale it.</b> Press <kbd>3</kbd> and drag a face ball. Only that face moves. Now hold <kbd>Ctrl</kbd> and drag: both opposite faces move.</li>
+  <li><b>Rotate it.</b> Press <kbd>4</kbd> and drag a ring. The block turns 45° at a time.</li>
+  <li><b>Try the combo tool.</b> Press <kbd>5</kbd> for Transform, which puts corner cubes, rotation arcs and a plane-move cone on one gizmo.</li>
+  <li><b>Move the pivot.</b> Click <span class="ui">Pivot</span> and drag. The pivot moves, the block doesn't. Click <span class="ui">Reset</span> to put the pivot back in the middle.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="tools">The five tools and their handles</h2>
+<p>Exactly one tool is active at a time. Pick it on the ribbon or press <kbd>1</kbd>–<kbd>5</kbd>. The tool decides which <b>handles</b> (the coloured grips in the viewport) sit on the selected part. A selected part always gets a thin <b>blue box</b> outline. The handles appear in the normal Object mode too, so you don't need to switch modes to use them.</p>
+
+<div class="tabs">
+  <div class="panel" data-tab="1 · Select">
+    <p><b>Select</b> (<kbd>1</kbd>), tooltip: <i>"Pick parts in the viewport with no handles on them."</i> Click a part to select it and get the blue box with no handles. Click the <b>sky</b> to deselect. <kbd>Shift</kbd>+click adds more parts, and dragging a box over several parts in empty space (a <b>marquee</b>) selects them all.</p>
+    <figure class="clip"><video src="media/09-builder-greybox/05-select-tool.mp4" poster="media/09-builder-greybox/05-select-tool.png" data-autoplay></video><figcaption>Select tool: click a part (blue box, no handles), press <kbd>Esc</kbd> to deselect, click again to reselect.</figcaption></figure>
+    <div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is Studio's Select tool, including Shift+click to add to the selection and drag-to-box-select.</p></div>
+  </div>
+  <div class="panel" data-tab="2 · Move">
+    <p><b>Move</b> (<kbd>2</kbd>), tooltip: <i>"Drag an axis arrow, the centre square moves in the view plane. Hold V while dragging to snap onto the vertex under the cursor."</i> You get six <b>arrow cones</b>, two per axis: <span class="axis-x">red X</span>, <span class="axis-y">green Y</span>, <span class="axis-z">blue Z</span>. Dragging an arrow moves the part along that axis, snapped to the <a href="#snap">Grid step</a>. The <b>centre square</b> moves the part freely across your screen. Hold <kbd>V</kbd> while dragging to snap onto the vertex (corner) under the mouse. The undo history calls it <i>"Pixel Builder: Move part"</i>.</p>
+    <div class="pair">
+      <figure class="shot"><img src="media/09-builder-greybox/20-handles-move.png" alt="A white Grid-textured box with a blue selection outline and Move handles: red arrow cones on X, green on Y, blue on Z. The builder status text at the top-left reads 'Pixel Builder – Object mode, Select / Move' and 'Grid applied to 6 faces'."><figcaption>Move handles on a white Grid box.</figcaption></figure>
+      <figure class="clip"><video src="media/09-builder-greybox/27-move-drag.mp4" poster="media/09-builder-greybox/27-move-drag.png" data-autoplay></video><figcaption>Dragging the X arrow: the part moves +1 m, one Grid step.</figcaption></figure>
+    </div>
+    <div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same arrows, same colours, same snapping as Studio's Move. The step is in <b>metres</b>, not studs.</p></div>
+  </div>
+  <div class="panel" data-tab="3 · Scale">
+    <p><b>Scale</b> (<kbd>3</kbd>), tooltip: <i>"Drag an axis handle, or the centre square for uniform scale (snaps to 0.1 steps while grid snapping is on)."</i> You get six <b>balls</b>, one in the middle of each face, in axis colours.</p>
+    <ul>
+      <li><b>Plain drag is one-sided.</b> The face you grab moves and the opposite face stays put, so the part grows out of one side. This is the Roblox "extrude" feel. For example, dragging the +X ball grew a 4 m block to 5 m with its far side fixed.</li>
+      <li><b><kbd>Ctrl</kbd>+drag is symmetric.</b> Both opposite faces move and the centre stays where it was (4 m → 6 m).</li>
+      <li>The <b>centre square</b> scales the whole part evenly.</li>
+      <li><kbd>Shift</kbd> does nothing special here.</li>
+    </ul>
+    <p>Shapes stay crisp when resized, because the builder rebuilds the block, wedge and so on at the new size instead of stretching it. The undo history calls it <i>"Pixel Builder: Resize part"</i>.</p>
+    <figure class="shot mid"><img src="media/09-builder-greybox/21-handles-scale.png" alt="The white Grid box with Scale handles: a coloured ball in the middle of each of its six faces, red for X, green for Y, blue for Z."><figcaption>Scale handles: one ball per face.</figcaption></figure>
+    <div class="pair">
+      <figure class="clip"><video src="media/09-builder-greybox/25-scale-extrude.mp4" poster="media/09-builder-greybox/25-scale-extrude.png" data-autoplay></video><figcaption>Plain drag: one-sided. The dragged face moves and the far face stays fixed; the Part inspector shows Size X 4 → 5.</figcaption></figure>
+      <figure class="clip"><video src="media/09-builder-greybox/26-scale-symmetric.mp4" poster="media/09-builder-greybox/26-scale-symmetric.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+drag: symmetric. Both faces move and the centre stays put; Size X 4 → 6.</figcaption></figure>
+    </div>
+    <div class="callout roblox"><span class="label">Coming from Roblox</span><p>Identical to Studio: plain drag grows one side, Ctrl+drag grows both sides around the centre.</p></div>
+  </div>
+  <div class="panel" data-tab="4 · Rotate">
+    <p><b>Rotate</b> (<kbd>4</kbd>), tooltip: <i>"Drag a ring to turn the selection about its centre (snaps to the Rot° step while grid snapping is on)."</i> You get three <b>rings</b>: <span class="axis-x">red X</span>, <span class="axis-y">green Y</span>, <span class="axis-z">blue Z</span>. Each drag snaps to the <a href="#snap">Rot° step</a> (45° by default). The undo history calls it <i>"Pixel Builder: Rotate part"</i>.</p>
+    <div class="pair">
+      <figure class="shot"><img src="media/09-builder-greybox/22-handles-rotate.png" alt="The white Grid box with three Rotate rings around it: red for X, green for Y, blue for Z."><figcaption>Rotate handles: three rings.</figcaption></figure>
+      <figure class="clip"><video src="media/09-builder-greybox/28-rotate-drag.mp4" poster="media/09-builder-greybox/28-rotate-drag.png" data-autoplay></video><figcaption>Dragging the X ring turns the part exactly 45° (Orientation X reads 45.0).</figcaption></figure>
+    </div>
+    <div class="callout warn"><span class="label">Watch out</span><p>The rings are thin. If your drag starts just <i>off</i> a ring, it counts as a click on empty space and <b>deselects</b> the part, so the handles vanish. Just click the part again. Studio behaves the same way.</p></div>
+  </div>
+  <div class="panel" data-tab="5 · Transform">
+    <p><b>Transform</b> (<kbd>5</kbd>), tooltip: <i>"Move, resize and rotate with one combined set of handles."</i> One gizmo does everything:</p>
+    <ul>
+      <li>White <b>corner cubes</b> resize. A <code>W×H×D</code> size readout shows while you drag.</li>
+      <li>Coloured <b>rotation arcs</b> turn the part.</li>
+      <li>A yellow <b>plane cone</b> moves the part across a flat plane.</li>
+      <li>A dark <b>grid plane</b> lies under the part. The round <b>#</b> button at the viewport's top-left hides or shows that grid.</li>
+    </ul>
+    <div class="pair">
+      <figure class="shot"><img src="media/09-builder-greybox/23-handles-transform.png" alt="The white Grid box with the combined Transform gizmo: white cubes at its corners, coloured rotation arcs, a yellow cone and a dark grid plane underneath."><figcaption>The Transform gizmo: corner cubes, arcs, plane cone and grid plane.</figcaption></figure>
+      <figure class="clip"><video src="media/09-builder-greybox/06-transform-gizmo.mp4" poster="media/09-builder-greybox/06-transform-gizmo.png" data-autoplay></video><figcaption>Dragging a corner cube: the W × H × D readout appears as the part scales. Note the round <b>#</b> grid toggle at the top-left.</figcaption></figure>
+    </div>
+    <div class="callout roblox"><span class="label">Coming from Roblox</span><p>Studio's Transform tool works the same way, including the grid plane under the part.</p></div>
+  </div>
+</div>
+
+<p>Scrub through the handle sets on the same part to compare them:</p>
+<div class="scrubber" data-label="Tool" data-start="0"
+  data-frames='[{"v":"Move","src":"media/09-builder-greybox/20-handles-move.png","note":"Six arrow cones: red X, green Y, blue Z."},{"v":"Scale","src":"media/09-builder-greybox/21-handles-scale.png","note":"Six face balls. Plain drag = one side, Ctrl = both sides."},{"v":"Rotate","src":"media/09-builder-greybox/22-handles-rotate.png","note":"Three rings, snapped to the Rot° step."},{"v":"Transform","src":"media/09-builder-greybox/23-handles-transform.png","note":"Corner cubes + arcs + plane cone + grid plane."},{"v":"Pivot","src":"media/09-builder-greybox/24-handles-pivot.png","note":"White pivot dot + arrows + rings; moves the pivot, not the part."}]'></div>
+
+<div class="callout tip"><span class="label">Tip</span><p><b>World or local handles:</b> press <kbd>Ctrl</kbd>+<kbd>L</kbd> to switch the handles between world axes and the part's own (local) axes. A short "Handles: local/world" message confirms the change. This is useful after you've rotated a part and want to slide it along its own length. (This shortcut is proven in the addon's own tests but wasn't re-checked during this guide's capture.)</p></div>
+
+<!-- ============================================================ -->
+<h2 id="snap">Snap group: drag mode, grid step and rotate step</h2>
+<p>The Snap group sits right after the tools and controls <i>how</i> drags behave.</p>
+
+<h3>Drag mode ▾ (the button that reads "Geometric")</h3>
+<p>The button shows the current mode. Its menu has:</p>
+<div class="pair">
+  <figure class="shot"><img src="media/09-builder-greybox/13-dragmode-menu.png" alt="The drag-mode menu open under the Geometric button: Geometric and Surface, a separator, then Collisions, Snap: Use Bounding Boxes, Snap to Parts and Snap to Terrain Cells."><figcaption>The drag-mode menu.</figcaption></figure>
+  <div>
+    <ul>
+      <li><b>Geometric</b>: free drag. This is the default.</li>
+      <li><b>Surface</b>: the part slides along the surface underneath it.</li>
+      <li><b>Collisions</b>: the drag stops at the first overlap, like Studio's Collisions toggle.</li>
+      <li><b>Snap: Use Bounding Boxes</b>, <b>Snap to Parts</b>, <b>Snap to Terrain Cells</b>: three separate on/off toggles for what a drag snaps against.</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Grid snap and Grid step</h3>
+<p>The top checkbox and field, default <b>☑ 1.0 m</b>. Tooltip: <i>"Moves and shapes snap to the Grid step ([ / ] halve / double it)."</i> Press <kbd>[</kbd> to halve the step (1 → 0.5 → 0.25 m) and <kbd>]</kbd> to double it. Untick the box for completely free moves.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/09-builder-greybox/08-snap-step.mp4" poster="media/09-builder-greybox/08-snap-step.png" data-autoplay></video><figcaption>Pressing <kbd>]</kbd> then <kbd>[</kbd> <kbd>[</kbd> <kbd>[</kbd> walks the Grid step from 1.0 m down to 0.25 m (watch the field), then a finer snapped Move.</figcaption></figure>
+  <figure class="clip"><video src="media/09-builder-greybox/09-snap-onoff.mp4" poster="media/09-builder-greybox/09-snap-onoff.png" data-autoplay></video><figcaption>A snapped drag, then <b>Grid snap</b> unticked (☑ → ☐) and a free drag.</figcaption></figure>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p><kbd>[</kbd> and <kbd>]</kbd> only work while the <b>3D view has keyboard focus</b>. Click a part with the Select tool first, then press them. Also close any open popup (Part ▾, Material, Color) before using the ribbon, since an open popup swallows clicks.</p></div>
+
+<h3>Rotate snap and Rot° step</h3>
+<p>The bottom checkbox and field, default <b>☑ 45°</b>. Tooltip: <i>"Turn the rotation step on or off."</i> Rotate rings and Transform arcs snap to this many degrees.</p>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>These are Studio's <b>Snap to Grid</b> fields (Rotate / Move), always visible in the same place. The unit is <b>metres</b>, Godot's unit, not studs. One Roblox stud is about 0.28 m, so 1 m is roughly 3.5 studs. That means a 4×1×2 m block is about 3.5 times bigger than Studio's 4×1×2 stud part, so think in metres from the start.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="pivot">Pivot group: Pivot, Pivot ▾ and Reset</h2>
+<p>A part's <b>pivot</b> (in Godot, its <i>origin</i>) is the point it rotates and scales around and the point its Position refers to.</p>
+<ul>
+  <li><b>Pivot</b>: tooltip <i>"Move and rotate the pivot of the part without moving the part."</i> Turns on the Edit-Pivot tool, which puts move arrows, rotate rings and a white pivot dot on the part's origin. Dragging moves the <b>pivot</b>; the part stays where it is. A <code>+0.xx m</code> readout shows the distance.</li>
+  <li><b>Pivot ▾ → Snap</b>: snaps the pivot to the grid.</li>
+  <li><b>Reset</b>: tooltip <i>"Move the node origin to the centre of the mesh bounds (the mesh stays where it is)."</i> Puts the pivot back in the middle.</li>
+</ul>
+<div class="pair">
+  <figure class="shot"><img src="media/09-builder-greybox/24-handles-pivot.png" alt="The white Grid box with the Pivot tool active: a white dot on its origin plus move arrows and rotate rings."><figcaption>The Pivot tool: white pivot dot, arrows and rings.</figcaption></figure>
+  <figure class="clip"><video src="media/09-builder-greybox/07-pivot-move.mp4" poster="media/09-builder-greybox/07-pivot-move.png" data-autoplay></video><figcaption>Dragging the pivot: the readout counts the distance, and the part doesn't move.</figcaption></figure>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is Studio's <b>Pivot</b> group (Edit Pivot, Snap, Reset). One use: move a door's pivot to its hinge edge so it rotates like a real door. The pivot is also shown and editable as <b>Pivot Offset</b> in the <a href="#inspector">Part inspector</a>.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="insert">Insert group: adding parts</h2>
+<p><b>Insert Part</b> (the cube): tooltip <i>"Add a block in front of the camera, on top of what it looks at."</i> It drops a <b>Block (4×1×2 m)</b> onto the surface at the centre of your view. If a part is already there, the new one lands on top of it. If the view hits nothing, the block appears 10 m ahead. The new part is selected so you can move it straight away.</p>
+<p><b>Part ▾</b> opens Studio's five shapes, <b>Block, Sphere, Wedge, Corner Wedge, Cylinder</b>, followed by <b>More Shapes ▸</b>, which lists 14 more:</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/09-builder-greybox/11-part-menu.png" alt="The Part drop-down menu: Block, Sphere, Wedge, Corner Wedge, Cylinder, a separator, and More Shapes with an arrow."><figcaption>Part ▾: Studio's five shapes first.</figcaption></figure>
+  <figure class="shot narrow"><img src="media/09-builder-greybox/12-more-shapes-menu.png" alt="The Part menu with the More Shapes submenu open, listing Prism, Sprite, Plane, Cone, Pipe, Torus, Door, Stairs, Icosphere, Arch, Hex prism, Hex cluster, Curved stairs and Trim."><figcaption>More Shapes ▸: 14 extra shapes Studio doesn't have.</figcaption></figure>
+</div>
+<ul class="shape-list">
+  <li>Prism</li><li>Sprite</li><li>Plane</li><li>Cone</li><li>Pipe</li><li>Torus</li><li>Door</li><li>Stairs</li><li>Icosphere</li><li>Arch</li><li>Hex prism</li><li>Hex cluster</li><li>Curved stairs</li><li>Trim</li>
+</ul>
+<p>Default sizes in metres: Block 4×1×2, Wedge 4×1×2, Cylinder about 2×4×2. Change any of them in the <a href="#inspector">Part inspector</a>'s <b>Size</b> field.</p>
+<figure class="clip"><video src="media/09-builder-greybox/10-insert-shapes.mp4" poster="media/09-builder-greybox/10-insert-shapes.png" data-autoplay></video><figcaption>Insert Part drops a Block, then Part ▾ adds a Sphere, a Wedge and a Cylinder. Each new part is solid Medium Stone Grey from the moment it appears; they are nudged apart so all four shapes read separately.</figcaption></figure>
+
+<div class="callout tip"><span class="label">New parts are medium stone grey</span><p>A freshly inserted part is solid <span class="swatch"></span> <b>Medium Stone Grey</b> (RGB 163, 162, 165), the same grey as a new Part in Studio, so it reads clearly against the terrain right away. To have every new part use a particular <b>material</b> instead, open <span class="ui">Material</span> with <b>nothing selected</b> and click one (for example Built-in › <b>Grid</b>). From then on every Insert Part uses that material. The default lasts for the current editor session; picking a material <i>with</i> a part selected paints that part and leaves the default alone.</p></div>
+<div class="callout warn"><span class="label">Watch out</span><p>Several inserts in a row <b>stack at the same spot</b>, each one on top of the last. There's no scatter on insert, so move or position each part after inserting it.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same as Studio's Part button and dropdown, with Corner Wedge as a real shape. The Godot alternative is the Scene dock's <b>+</b> (Add Child Node) → search "PixelBuilderMesh" → Create, which adds an empty mesh at the scene origin. Insert Part is quicker.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="appearance">Appearance group: Material and Color</h2>
+
+<h3>Material</h3>
+<p>Tooltip: <i>"Browse the materials and apply one to the selection."</i> This opens the <b>Material picker</b>, titled "Material" with the hint "Select a material to apply". It contains:</p>
+<ul>
+  <li>A <b>Search materials</b> box.</li>
+  <li><b>Grid view</b> / <b>List view</b> toggles.</li>
+  <li>Three shelves: <b>Recent</b> (materials you applied lately), <b>Project</b> (this mesh's own material slots, e.g. "Slot 0: Material") and <b>Built-in</b>.</li>
+  <li>The swatches. Click one to apply it. An empty shelf says "No materials here".</li>
+</ul>
+<p>The <b>Built-in</b> shelf starts with greybox helpers: <b>Grid</b>, <b>Checker</b>, <b>No Draw</b>, <b>Collider</b> (green) and <b>Trigger</b> (orange), followed by your project's painted textures (<b>Texture 1 …</b>).</p>
+<p>In Object mode the material goes on the whole part. In Face mode it goes on the selected faces only (see <a href="10-builder-modeller.html">page 10</a>). With <b>nothing selected</b>, it sets the default material for new parts.</p>
+<figure class="shot mid"><img src="media/09-builder-greybox/15-material-picker.png" alt="The Material picker on the Project shelf: a search box, Grid and List view buttons, Recent, Project and Built-in tabs, and the mesh's own material slots listed."><figcaption>The Material picker, Project shelf.</figcaption></figure>
+<div class="compare" data-before="List view" data-after="Grid view"><img src="media/09-builder-greybox/15b-material-builtin-list.png" alt="The Material picker on the Built-in shelf in List view: Grid, Checker, No Draw, Collider, Trigger, then Texture entries."><img src="media/09-builder-greybox/15c-material-grid-view.png" alt="The Material picker on the Built-in shelf in Grid view: the same materials as larger swatches."></div>
+<p class="studio">Drag the divider to compare List and Grid view on the Built-in shelf.</p>
+<figure class="clip"><video src="media/09-builder-greybox/11-apply-material.mp4" poster="media/09-builder-greybox/11-apply-material.png" data-autoplay></video><figcaption>Built-in shelf → <b>Checker</b>: the selected box changes from Grid to a checkerboard.</figcaption></figure>
+
+<h3>Color</h3>
+<p>Tooltip: <i>"Pick a color from the palette and apply it to the selection."</i> This opens the <b>Color palette</b>:</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/09-builder-greybox/16-color-palette.png" alt="The Color palette: a large hexagonal honeycomb of colours from blue at the top through pink, red, orange and yellow to green and teal; a row of ten greys from black to white; a 'Click object to apply color' switch; and a white custom colour field with an Apply button."><figcaption>The Color palette.</figcaption></figure>
+  <div>
+    <ul>
+      <li>The <b>honeycomb</b> of preset colours, plus a <b>greys row</b> from black to white. Click one to paint the selection.</li>
+      <li><b>Click object to apply color</b>: a switch for paint-bucket mode. Turn it on, then click parts in the viewport to paint each one.</li>
+      <li>A <b>custom colour</b> button ("Pick any colour; Apply paints it") and <b>Apply</b> ("Paint the whole part (undoable)") for any colour not in the honeycomb.</li>
+    </ul>
+    <p>The undo history calls it <i>"Pixel Builder: Paint colour"</i>.</p>
+  </div>
+</div>
+<figure class="clip"><video src="media/09-builder-greybox/12-apply-color.mp4" poster="media/09-builder-greybox/12-apply-color.png" data-autoplay></video><figcaption>Clicking a honeycomb swatch tints the selected box.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The Color popup is Studio's: honeycomb, greys row and the "Click object to apply color" switch. The Material picker has Studio's controls (search, grid/list), but the <b>materials themselves are different</b>. You won't find Studio's 43 named materials like Brick or Concrete. Instead you get greybox helpers (Grid, Checker, No Draw, Collider, Trigger) and your project's own textures.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="model-group">Model group: Group, Lock and Anchor</h2>
+
+<h3>Group</h3>
+<p>The button itself is <b>Group as Model</b> (<kbd>Ctrl</kbd>+<kbd>G</kbd>): <i>"Put the selected parts under a new Model node."</i> The <b>Group ▾</b> menu has <b>Group as Model</b>, <b>Group as Folder</b> (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>) and <b>Ungroup</b> (<kbd>Ctrl</kbd>+<kbd>U</kbd>). Both group types make a plain Godot <code>Node3D</code> (an empty node that only holds a position), named "Model" or "Folder". Rename it in the Scene dock by double-clicking.</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/09-builder-greybox/14-group-menu.png" alt="The Group drop-down menu: Group as Model, Group as Folder, Ungroup."><figcaption>Group ▾.</figcaption></figure>
+  <figure class="clip"><video src="media/09-builder-greybox/14-group-ungroup.mp4" poster="media/09-builder-greybox/14-group-ungroup.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+<kbd>G</kbd> puts two parts under a new <b>Model</b> node (watch the Scene dock on the left), then Group ▾ → <b>Ungroup</b> removes it.</figcaption></figure>
+</div>
+
+<h3>Lock</h3>
+<p>Tooltip: <i>"Locked parts cannot be selected or moved in the viewport."</i> A locked part draws a <b>yellow outline</b>, and clicking or dragging it in the viewport does nothing. Lock ▾ → <b>Click object to lock</b> lets you click parts one after another to lock them. You can still select a locked part from the Scene dock, and you can untick <b>Locked</b> in the <a href="#inspector">Part inspector</a>. Under the hood this is Godot's own edit-lock, which also shows a padlock icon in the Scene dock.</p>
+<figure class="clip"><video src="media/09-builder-greybox/15-lock.mp4" poster="media/09-builder-greybox/15-lock.png" data-autoplay></video><figcaption>Lock: the handles vanish, the part gets a yellow outline, and dragging it does nothing.</figcaption></figure>
+
+<h3>Anchor</h3>
+<p>Tooltip: <i>"Seat the part on its terrain cell so it follows the terrain (the terrain anchor of this addon, not a physics anchor)."</i> Anchoring snaps the part to its terrain cell and drops it onto the ground surface. In the capture, a part floating at height 12.7 dropped to 10.0, the terrain top. If you later sculpt the terrain, an anchored part follows it. Anchor ▾ → <b>Click object to anchor</b> anchors parts as you click them.</p>
+<figure class="clip"><video src="media/09-builder-greybox/16-anchor.mp4" poster="media/09-builder-greybox/16-anchor.png" data-autoplay></video><figcaption>A part lifted off the ground, then <b>Anchor</b>: it seats down onto its terrain cell.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p><b>Anchor is the one button that means something different.</b> In Studio, Anchored stops physics from moving a part. Here, nothing moves your parts at runtime anyway; <b>Anchor ties a part to the terrain</b> so it sits on the ground and follows it when you sculpt. Group and Lock work as in Studio (Ctrl+G / Ctrl+U, click-to-lock).</p></div>
+
+<!-- ============================================================ -->
+<h2 id="align">Align group</h2>
+<p><b>Align</b>: <i>"Line the selected parts up on their minimum, centre or maximum along X, Y and Z."</i> It opens the Align panel:</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/09-builder-greybox/17-align-panel.png" alt="The Align panel: Mode with Min, Center and Max buttons; Align In with World and Local; Axes with X, Y and Z checkboxes; a Relative To dropdown; and an Align button."><figcaption>The Align panel.</figcaption></figure>
+  <dl>
+    <dt><b>Mode</b></dt><dd><b>Min | Center | Max</b>: line up the parts' low sides, centres or high sides.</dd>
+    <dt><b>Align In</b></dt><dd><b>World | Local</b>: which axes to use.</dd>
+    <dt><b>Axes</b></dt><dd>☐ X ☐ Y ☐ Z: tick the axes to align on.</dd>
+    <dt><b>Relative To</b></dt><dd><b>Selection Bounds</b> (the box around all selected parts) or <b>Active Object</b> (the last part you picked).</dd>
+    <dt><b>Align</b></dt><dd>Applies the alignment.</dd>
+  </dl>
+</div>
+<figure class="clip"><video src="media/09-builder-greybox/17-align.mp4" poster="media/09-builder-greybox/17-align.png" data-autoplay></video><figcaption>Three parts at heights 11, 14 and 12. With Axes <b>Y</b>, Mode <b>Center</b>, then <b>Align</b>, all three move to 12.5, the centre of the selection.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is Studio's <b>Align Tool</b> with the same four settings.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="select-many">Selecting several parts</h2>
+<p>Union, Intersect, Group and Align all need more than one part selected. Three ways to do it:</p>
+<ul>
+  <li><b><kbd>Shift</kbd>+click</b> parts in the viewport to add them one by one.</li>
+  <li><b>Marquee</b>: with the Select tool, drag a box across empty space over the parts.</li>
+  <li>In the <b>Scene dock</b>, click one part then <kbd>Ctrl</kbd>+click the others. This is Godot's own list; <kbd>Shift</kbd>+click there selects a whole range.</li>
+</ul>
+<div class="callout warn"><span class="label">Watch out</span><p>A <b>negated</b> part is a ghost and <b>can't be clicked in the viewport</b>. Pick it in the Scene dock instead. Also, deselect by clicking the <b>sky</b>, not the terrain or water. Clicking water in the demo island can select the water node and switch the editor to the Pixel World workspace, which freezes the builder camera until you select a builder part again.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="solid">Solid Modeling group: Union, Intersect, Separate, Negate</h2>
+<p>These combine parts into new shapes, just like Studio's solid modelling. All four work in Object mode. When the selection can't support one, it's greyed with the reason in its tooltip.</p>
+<table class="ref">
+  <thead><tr><th>Button</th><th>Keys</th><th>What it does</th><th>Greyed when…</th></tr></thead>
+  <tbody>
+    <tr><td>Union</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></td><td>"Join the selected parts into one; negated parts are cut away." Makes a new part named <b>Union</b>.</td><td>"Select two or more builder meshes."</td></tr>
+    <tr><td>Intersect</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>"Keep only the volume the selected parts share." Makes a new part named <b>Intersection</b>.</td><td>"Select two or more builder meshes."</td></tr>
+    <tr><td>Separate</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd></td><td>"Split a union or intersection back into its parts." The originals come back where they were.</td><td>"Select a Union or Intersection to separate."</td></tr>
+    <tr><td>Negate</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>"Mark the part as a hole that a later Union cuts away." The part turns into a see-through <b>magenta ghost</b>.</td><td>Works on any single part.</td></tr>
+  </tbody>
+</table>
+<p>The result of a Union or Intersection is an ordinary builder part, so you can move it, paint it or edit its faces. The original parts are kept as <b>hidden children</b> of the result, which is how <b>Separate</b> can restore them. Negated parts are skipped when baking, generating collision and exporting, so a stray one never shows up in your game. The status line confirms each operation: "Union done", "Intersection done", "Separate: 2 parts restored".</p>
+
+<div class="tabs">
+  <div class="panel" data-tab="Union + Separate">
+    <figure class="clip"><video src="media/09-builder-greybox/19-union-separate.mp4" poster="media/09-builder-greybox/19-union-separate.png" data-autoplay></video><figcaption>Two overlapping parts → <b>Union</b> makes one merged shape ("Union done") → <b>Separate</b> brings both back ("Separate: 2 parts restored").</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Intersect">
+    <figure class="clip"><video src="media/09-builder-greybox/18-intersect.mp4" poster="media/09-builder-greybox/18-intersect.png" data-autoplay></video><figcaption><b>Intersect</b> two overlapping parts: only the volume they share is left ("Intersection done"). Both originals stay inside the result as hidden children, so Separate can restore them.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Negate + Union = hole">
+    <p>The classic Roblox doorway trick: make a box the shape of the hole, <b>Negate</b> it, then <b>Union</b> it with the wall.</p>
+    <div class="trio">
+      <figure class="shot"><img src="media/09-builder-greybox/40-doorway-01-negate.png" alt="A grey wall selected in a blue box, with a door-shaped box inside it shown as a translucent magenta-tinted ghost."><figcaption>1 · A door-sized box inside the wall, negated: it becomes a ghost.</figcaption></figure>
+      <figure class="clip"><video src="media/09-builder-greybox/40-doorway-02-union.mp4" poster="media/09-builder-greybox/40-doorway-02-union.png" data-autoplay></video><figcaption>2 · Wall + the negated (magenta) door box selected → Union cuts the doorway ("Union done").</figcaption></figure>
+      <figure class="shot"><img src="media/09-builder-greybox/40-doorway-03-result.png" alt="A grey wall standing on the grassy hillside with a door-shaped opening cut through it down to the ground."><figcaption>3 · Done: the wall now has a doorway, and the two parts have become one part named "Union".</figcaption></figure>
+    </div>
+  </div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same buttons, same keys, same pink negated parts, and Separate undoes a Union just like Studio. One small bonus: Intersect and Negate here work on any number of parts at once.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="inspector">The Part inspector (Studio's Properties)</h2>
+<p>With the Roblox UI on, Godot's <b>Inspector</b> (right side) shows a <b>Part</b> section above the usual mesh settings, laid out like Studio's Properties window. Typing exact numbers here is the most reliable way to size and place parts.</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/09-builder-greybox/50-part-inspector.png" alt="The Part inspector for a freshly inserted part. Part — Appearance: a grey Color swatch, Material '(default)', Transparency 0.0. Part — Transform: Size 4.0, 1.0, 2.0; Position -4.0, 10.0, -8.0; Orientation 0, 0, 0; Pivot Offset 0.0, -0.5, 0.0. Part: Shape Box, Locked unticked, Anchored unticked with 'terrain'. Behavior: Collision None."><figcaption>The Part inspector for a freshly inserted part.</figcaption></figure>
+  <div>
+    <dl>
+      <dt><b>Part — Appearance</b></dt>
+      <dd><b>Color</b> (swatch) · <b>Material</b> (button that opens the picker) · <b>Transparency</b> (0 = solid).</dd>
+      <dt><b>Part — Transform</b></dt>
+      <dd><b>Size</b> (X, Y, Z in metres; rebuilds the shape. On a free-form mesh that isn't a builder shape it's greyed and read from its bounds) · <b>Position</b> · <b>Orientation</b> (degrees) · <b>Pivot Offset</b>.</dd>
+      <dt><b>Part</b></dt>
+      <dd><b>Shape</b> (Block, Sphere, Cylinder, Wedge, Corner Wedge… or "Mesh" for free-form) · <b>Locked</b> (checkbox) · <b>Anchored</b> (checkbox, "terrain").</dd>
+      <dt><b>Behavior</b></dt>
+      <dd><b>Collision</b> dropdown, default <b>None</b>.</dd>
+    </dl>
+    <p>Below that come Godot's own <b>Editable Mesh / Mesh</b> sections: vertex, edge and face counts, material slots, and UV &amp; Lightmap. Those are covered on <a href="10-builder-modeller.html">page 10</a>.</p>
+  </div>
+</div>
+<figure class="clip"><video src="media/09-builder-greybox/20-size-fields.mp4" poster="media/09-builder-greybox/20-size-fields.png" data-autoplay></video><figcaption>Typing in <b>Size</b>: X goes from 4 to 8, then Y changes, and the box grows live in the viewport.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Size, Position, Orientation, Color, Material, Transparency, Shape, Locked and Anchored are all in the same groups as Studio's Properties. Studio's other panels (Explorer, Properties, Toolbox) are replaced by Godot's Scene dock and Inspector, and there's no Home, Avatar or Terrain tab on this ribbon. Terrain has its own tools (see <a href="03-terrain-sculpting.html">Sculpting terrain</a>).</p></div>
+
+<!-- ============================================================ -->
+<h2 id="undo">Undo, duplicate, delete, focus</h2>
+<p>Every handle drag, insert, paint and boolean is <b>one undo step</b>. Undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and redo with <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>). The <b>History</b> tab next to FileSystem lists each step by name, like "Pixel Builder: Move part".</p>
+<figure class="clip mid"><video src="media/09-builder-greybox/13-undo-move.mp4" poster="media/09-builder-greybox/13-undo-move.png" data-autoplay></video><figcaption>Drag a Move arrow, then <kbd>Ctrl</kbd>+<kbd>Z</kbd>: the part goes straight back.</figcaption></figure>
+<p>These are Godot's own keys and work the same here: <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicates, <kbd>Delete</kbd> deletes the selected part (after a confirmation), and <kbd>F</kbd> focuses the camera on the selection. In Roblox mode, the builder's "Fill hole" moves to <kbd>Alt</kbd>+<kbd>F</kbd> so that <kbd>F</kbd> stays free for focus.</p>
+<div class="callout tip"><span class="label">Tip</span><p>The ribbon takes up some height, so the 3D view is shorter in Roblox mode. After <kbd>F</kbd>, scroll out a bit to see a whole building.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="edit-tab">The Edit tab (next page)</h2>
+<p>Click <span class="ui">Edit</span> to switch the ribbon to mesh editing: <b>Object · Face · Edge · Vertex</b> modes (<kbd>Alt</kbd>+<kbd>1</kbd>–<kbd>4</kbd>, and <kbd>H</kbd> cycles through them), <b>Extrude · Inset · Bevel · Loop Cut · Bridge · Merge · Delete</b>, <b>Select ▾</b>, <b>Pivot to Sel.</b> and <b>UV</b>. Most of it is greyed in Object mode. This goes beyond anything Studio can do, so it has its own page: <a href="10-builder-modeller.html">Modelling: faces, edges &amp; vertices</a>.</p>
+<div class="compare" data-before="Model tab" data-after="Edit tab"><img src="media/09-builder-greybox/03-ribbon-model-tab.png" alt="The Model-tab ribbon."><img src="media/09-builder-greybox/60-edit-tab.png" alt="The Edit-tab ribbon: Object, Face, Edge, Vertex mode buttons, then Extrude, Inset, Bevel, Loop Cut, Bridge, Merge, Delete, Select, Pivot to Sel. and UV."></div>
+
+<h2 id="prefs">Builder preferences</h2>
+<p>The <span class="ui">Builder</span> menu's <span class="ui">Preferences…</span> dialog holds the builder's settings, including the defaults for the snap fields you see on the ribbon: <b>Grid step</b>, <b>Rotate snap</b>, <b>Grid snap on</b> and <b>Roblox rotate step (°)</b> (45). It also has <b>Vertex size</b>, <b>Handle size</b>, <b>Lightmap texel</b>, <b>Shift selects</b> / <b>Box selects</b> (both "Layout default"), <b>Hover highlight</b>, <b>Show scene info</b>, <b>Show dimensions</b> and <b>Adjust panel</b>, plus a <b>Roblox compact ribbon</b> checkbox (a one-row, label-free ribbon; not tried for this guide). Each preference is explained on <a href="10-builder-modeller.html#prefs">page 10</a>. The layout choice (MST / Modeler / Roblox) is <i>not</i> in this dialog; use the toolbar switch.</p>
+<figure class="shot narrow"><img src="media/09-builder-greybox/52-builder-preferences.png" alt="The builder Preferences dialog: Vertex size 6, Handle size 1.06, Grid step 0.25, Rotate snap 16, Grid snap on ticked, Lightmap texel 0.25, Shift selects 'Layout default', Box selects 'Layout default', Hover highlight ticked, Show scene info ticked, Show dimensions unticked, Adjust panel ticked, Roblox rotate step 45."><figcaption>Builder › Preferences… (the values shown were changed during testing).</figcaption></figure>
+
+<!-- ============================================================ -->
+<h2 id="tower">Build a greybox watchtower</h2>
+<p>Now put it together. You'll block out a small watchtower: a floor, four walls, a doorway cut with Negate + Union, a wedge roof and some stairs. The finished version ships with this guide as <code>res://tutorial/guide/greybox_tower.tscn</code>. In the FileSystem dock, open <code>tutorial › guide</code> and double-click it to compare with your own.</p>
+<figure class="shot mid"><img src="media/09-builder-greybox/30-build-03-final.png" alt="The finished watchtower block-out on the island seen from above: a Grid flooring slab, grey walls and a sloping wedge roof, all solid Medium Stone Grey."><figcaption>The goal: the finished block-out, all solid Medium Stone Grey.</figcaption></figure>
+
+<p>All sizes are typed into the <a href="#inspector">Part inspector</a>, the reliable, Properties-window way. You can drag handles instead if you prefer. Tick the steps off as you go:</p>
+<ol class="steps" data-id="greybox-tower">
+  <li><b>Set up.</b> Open a scene with terrain (e.g. <code>res://demo/hex_island.tscn</code>), switch on <span class="ui">Roblox UI</span>, and point the camera at a flat-ish spot. Optionally, with nothing selected, pick <span class="ui">Material</span> › Built-in › <b>Grid</b> so every part gets the grid texture, which helps when judging sizes.</li>
+  <li><b>Floor.</b> <span class="ui">Insert Part</span> → in the Part inspector set <b>Size 8 × 1 × 6</b>. In the Scene dock, double-click its name and call it <b>Floor</b>.
+    <figure class="clip"><video src="media/09-builder-greybox/21-tower-floor.mp4" poster="media/09-builder-greybox/21-tower-floor.png" data-autoplay></video><figcaption>Insert Part, then Size 8×1×6 in the Part inspector — the grey slab grows live in the viewport.</figcaption></figure>
+    <figure class="shot mid"><img src="media/09-builder-greybox/30-build-01-floor.png" alt="A flat floor slab sitting on the island terrain, with the builder status text at the top-left."><figcaption>The floor slab on the terrain.</figcaption></figure></li>
+  <li><b>Back wall.</b> Insert Part → <b>Size 8 × 4 × 1</b>. Set its <b>Position</b> so it stands on the back edge of the floor, with its bottom on the floor's top. In the example, the back wall is at z −10.5.</li>
+  <li><b>Side walls.</b> Insert two more parts at <b>Size 1 × 4 × 6</b> and place one on each side of the floor (x −7.5 and x −0.5 in the example).
+    <figure class="clip"><video src="media/09-builder-greybox/22-tower-walls.mp4" poster="media/09-builder-greybox/22-tower-walls.png" data-autoplay></video><figcaption>Inserting and sizing the two walls on the floor slab: 8×4×1 at the back, 1×4×6 at the side.</figcaption></figure>
+    <figure class="shot mid"><img src="media/09-builder-greybox/30-build-02-walls.png" alt="The floor with three walls standing on it: the back wall and the two side walls."><figcaption>Floor plus back and side walls.</figcaption></figure></li>
+  <li><b>Front wall.</b> Insert Part → <b>Size 8 × 4 × 1</b>, placed on the front edge (z −5.5 in the example).</li>
+  <li><b>Door hole.</b> Insert Part → <b>Size 2 × 3 × 1.5</b>, placed in the middle of the front wall at ground level so it pokes through both sides. With it selected press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> (<b>Negate</b>). It turns into a magenta ghost.</li>
+  <li><b>Cut the doorway.</b> In the <b>Scene dock</b>, click the front wall, then <kbd>Ctrl</kbd>+click the negated box (ghosts can't be clicked in the viewport). Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> (<b>Union</b>). The wall now has a doorway and is a part called <b>Union</b>. If it went wrong, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> (Separate) gives you the wall and box back.</li>
+  <li><b>Roof.</b> <span class="ui">Part ▾</span> → <b>Wedge</b> → <b>Size 8 × 2 × 6</b>, placed on top of the walls. Rotate it with <kbd>4</kbd> if the slope faces the wrong way.
+    <figure class="clip"><video src="media/09-builder-greybox/23-tower-roof.mp4" poster="media/09-builder-greybox/23-tower-roof.png" data-autoplay></video><figcaption>Part ▾ → Wedge, sized 8×2×6 and set on top as the roof.</figcaption></figure></li>
+  <li><b>Stairs.</b> <span class="ui">Part ▾</span> → <b>More Shapes ▸</b> → <b>Stairs</b> → <b>Size 2.5 × 1.5 × 2.5</b>, placed in front of the doorway.</li>
+  <li><b>Group it.</b> Select all the parts (<kbd>Shift</kbd>+click in the viewport, or <kbd>Ctrl</kbd>+click in the Scene dock) and press <kbd>Ctrl</kbd>+<kbd>G</kbd>. They move under a new <b>Model</b> node. Rename it <b>GreyboxTower</b>.</li>
+  <li><b>Look around.</b> Orbit the camera to check the proportions from every side.
+    <figure class="clip"><video src="media/09-builder-greybox/24-tower-final.mp4" poster="media/09-builder-greybox/24-tower-final.png" data-autoplay></video><figcaption>Orbiting the finished block-out: floor, two walls and the wedge roof, all solid Medium Stone Grey.</figcaption></figure></li>
+  <li><b>Save it as its own scene.</b> Right-click <b>GreyboxTower</b> in the Scene dock → <span class="ui">Save Branch as Scene…</span> and pick a file name such as <code>res://my_tower.tscn</code>. You can now drop the tower into any level, much like inserting a Model from your inventory in Studio.</li>
+</ol>
+<div class="callout warn"><span class="label">Watch out</span><p><b>Save Branch as Scene</b> can't create folders. If you type a folder that doesn't exist yet, it fails with "Cannot save file". Create the folder first: in the FileSystem dock, right-click → <span class="ui">New Folder…</span>.</p></div>
+<div class="callout try"><span class="label">Try it</span><p>Open <code>res://tutorial/guide/greybox_tower.tscn</code> and click its parts. You'll find <b>Floor</b>, three walls, the <b>Union</b> front wall (select it and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> to see the hidden wall and door box come back, then <kbd>Ctrl</kbd>+<kbd>Z</kbd>), the <b>Ramp</b> wedge roof and the <b>Stairs</b>. The file is self-contained, with the Grid material saved inside it, so you can copy it to another project as one file.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="ref">Every Model-tab control (with its Studio twin)</h2>
+<p>Type to filter, e.g. "snap", "ctrl+shift", "pivot" or "studio anchor".</p>
+<input class="filter-box" data-target="#ribbon-ref" placeholder="Filter controls…">
+<div id="ribbon-ref">
+  <div class="control"><h4>Roblox UI switch</h4><div class="where">3D toolbar row 2 · after Pixel World</div><p>Shows or hides the ribbon, Roblox handles and Roblox shortcuts. Off returns to your previous layout (MST or Modeler).</p><dl><dt>Default</dt><dd>Off (MST layout)</dd><dt>Studio</dt><dd>None (Studio always shows its ribbon)</dd></dl></div>
+  <div class="control"><h4>Model / Edit tabs</h4><div class="where">Ribbon top-left</div><p>Model = parts and greyboxing (this page). Edit = face, edge and vertex editing (<a href="10-builder-modeller.html">page 10</a>).</p><dl><dt>Studio</dt><dd>Model tab; Edit has no Studio equivalent</dd></dl></div>
+  <div class="control"><h4>Select</h4><div class="where">Tools group</div><p>Pick parts with no handles. Shift+click adds; drag a marquee to box-select; click the sky to deselect.</p><dl><dt>Shortcut</dt><dd><kbd>1</kbd></dd><dt>Studio</dt><dd>Select</dd></dl></div>
+  <div class="control"><h4>Move</h4><div class="where">Tools group</div><p>Six arrows (red X, green Y, blue Z) snapped to the Grid step; the centre square moves in the view plane; hold V to snap to a vertex.</p><dl><dt>Shortcut</dt><dd><kbd>2</kbd></dd><dt>Studio</dt><dd>Move</dd></dl></div>
+  <div class="control"><h4>Scale</h4><div class="where">Tools group</div><p>Six face balls. Plain drag = one-sided (extrude feel); Ctrl+drag = symmetric; the centre square = uniform. Snaps to 0.1 steps while grid snap is on.</p><dl><dt>Shortcut</dt><dd><kbd>3</kbd>; <kbd>Ctrl</kbd>+drag for symmetric</dd><dt>Studio</dt><dd>Scale</dd></dl></div>
+  <div class="control"><h4>Rotate</h4><div class="where">Tools group</div><p>Three rings, snapped to the Rot° step.</p><dl><dt>Shortcut</dt><dd><kbd>4</kbd></dd><dt>Studio</dt><dd>Rotate</dd></dl></div>
+  <div class="control"><h4>Transform</h4><div class="where">Tools group</div><p>Corner cubes resize, arcs rotate, a yellow cone moves on a plane, and a grid plane sits underneath (the <b>#</b> button at the viewport's top-left toggles it).</p><dl><dt>Shortcut</dt><dd><kbd>5</kbd></dd><dt>Studio</dt><dd>Transform</dd></dl></div>
+  <div class="control"><h4>Local / world handles</h4><div class="where">Keyboard only</div><p>Toggles whether handles follow world axes or the part's own axes. A short message confirms the change.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>L</kbd></dd><dt>Studio</dt><dd>Ctrl+L (local/world space)</dd></dl></div>
+  <div class="control"><h4>Drag mode ▾ — Geometric / Surface</h4><div class="where">Snap group · button showing the mode</div><p>Geometric = free drag. Surface = slide along the surface under the part.</p><dl><dt>Default</dt><dd>Geometric</dd><dt>Studio</dt><dd>Dragger mode settings</dd></dl></div>
+  <div class="control"><h4>Collisions</h4><div class="where">Snap group · Drag mode ▾</div><p>Toggle: a drag stops at the first overlap.</p><dl><dt>Studio</dt><dd>Collisions toggle</dd></dl></div>
+  <div class="control"><h4>Snap: Use Bounding Boxes · Snap to Parts · Snap to Terrain Cells</h4><div class="where">Snap group · Drag mode ▾</div><p>Three separate on/off toggles choosing what a drag snaps against.</p><dl><dt>Studio</dt><dd>Snap options</dd></dl></div>
+  <div class="control"><h4>Grid snap + Grid step</h4><div class="where">Snap group · top checkbox and field</div><p>"Moves and shapes snap to the Grid step." The unit is metres.</p><dl><dt>Default</dt><dd>☑ 1.0 m</dd><dt>Shortcut</dt><dd><kbd>[</kbd> halve · <kbd>]</kbd> double (3D view must have focus)</dd><dt>Studio</dt><dd>Snap to Grid › Move (studs)</dd></dl></div>
+  <div class="control"><h4>Rotate snap + Rot° step</h4><div class="where">Snap group · bottom checkbox and field</div><p>"Turn the rotation step on or off." Rings and arcs snap to this angle.</p><dl><dt>Default</dt><dd>☑ 45°</dd><dt>Studio</dt><dd>Snap to Grid › Rotate</dd></dl></div>
+  <div class="control"><h4>Pivot</h4><div class="where">Pivot group</div><p>"Move and rotate the pivot of the part without moving the part." White pivot dot plus arrows and rings.</p><dl><dt>Mode</dt><dd>Object</dd><dt>Studio</dt><dd>Edit Pivot</dd></dl></div>
+  <div class="control"><h4>Pivot ▾ → Snap</h4><div class="where">Pivot group</div><p>Snap the pivot to the grid.</p><dl><dt>Studio</dt><dd>Pivot snap options</dd></dl></div>
+  <div class="control"><h4>Reset (centre pivot)</h4><div class="where">Pivot group</div><p>"Move the node origin to the centre of the mesh bounds (the mesh stays where it is)."</p><dl><dt>Studio</dt><dd>Pivot › Reset</dd></dl></div>
+  <div class="control"><h4>Insert Part</h4><div class="where">Insert group · cube button</div><p>Drops a Block 4×1×2 m on what the view centre looks at (stacking on parts; 10 m ahead if nothing is hit) and selects it. New parts are medium stone grey, or use your default material if you set one.</p><dl><dt>Studio</dt><dd>Part</dd></dl></div>
+  <div class="control"><h4>Part ▾</h4><div class="where">Insert group</div><p>Block · Sphere · Wedge · Corner Wedge · Cylinder · More Shapes ▸ (Prism, Sprite, Plane, Cone, Pipe, Torus, Door, Stairs, Icosphere, Arch, Hex prism, Hex cluster, Curved stairs, Trim).</p><dl><dt>Studio</dt><dd>Part dropdown (first five only)</dd></dl></div>
+  <div class="control"><h4>Material</h4><div class="where">Appearance group</div><p>Material picker: search, Grid/List view, Recent / Project / Built-in shelves. Built-in: Grid, Checker, No Draw, Collider, Trigger, textures. With nothing selected it sets the default material for new parts.</p><dl><dt>Modes</dt><dd>Object (whole part) · Face (selected faces)</dd><dt>Studio</dt><dd>Material (different material set)</dd></dl></div>
+  <div class="control"><h4>Color</h4><div class="where">Appearance group</div><p>Honeycomb + greys row, "Click object to apply color" paint-bucket switch, custom colour + Apply.</p><dl><dt>Modes</dt><dd>Object · Face</dd><dt>Studio</dt><dd>Color</dd></dl></div>
+  <div class="control"><h4>Group (as Model)</h4><div class="where">Model group · button body</div><p>"Put the selected parts under a new Model node."</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>G</kbd></dd><dt>Studio</dt><dd>Group (Ctrl+G)</dd></dl></div>
+  <div class="control"><h4>Group ▾ → Group as Folder</h4><div class="where">Model group</div><p>Groups under a node named "Folder" instead of "Model".</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd></dd><dt>Studio</dt><dd>Group as Folder</dd></dl></div>
+  <div class="control"><h4>Group ▾ → Ungroup</h4><div class="where">Model group</div><p>Removes the group node and keeps the parts.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>U</kbd></dd><dt>Studio</dt><dd>Ungroup (Ctrl+U)</dd></dl></div>
+  <div class="control"><h4>Lock / Lock ▾ → Click object to lock</h4><div class="where">Model group</div><p>"Locked parts cannot be selected or moved in the viewport." Yellow outline. Still selectable from the Scene dock; untick Locked in the Part inspector to unlock.</p><dl><dt>Mode</dt><dd>Object</dd><dt>Studio</dt><dd>Lock / Lock Tool</dd></dl></div>
+  <div class="control"><h4>Anchor / Anchor ▾ → Click object to anchor</h4><div class="where">Model group</div><p>Seats the part on its terrain cell so it follows the terrain. <b>Not</b> a physics anchor.</p><dl><dt>Mode</dt><dd>Object</dd><dt>Studio</dt><dd>Anchor (but Studio's freezes physics)</dd></dl></div>
+  <div class="control"><h4>Align</h4><div class="where">Align group · row 2</div><p>Mode Min | Center | Max · Align In World | Local · Axes X Y Z · Relative To Selection Bounds | Active Object · Align.</p><dl><dt>Studio</dt><dd>Align Tool</dd></dl></div>
+  <div class="control"><h4>Union</h4><div class="where">Solid Modeling · row 2</div><p>Joins 2+ parts into a part named "Union"; negated parts are cut away. Originals kept hidden inside.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></dd><dt>Studio</dt><dd>Union</dd></dl></div>
+  <div class="control"><h4>Intersect</h4><div class="where">Solid Modeling · row 2</div><p>Keeps only the shared volume of 2+ parts; result named "Intersection".</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></dd><dt>Studio</dt><dd>Intersect</dd></dl></div>
+  <div class="control"><h4>Separate</h4><div class="where">Solid Modeling · row 2</div><p>Splits a Union or Intersection back into its original parts.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd></dd><dt>Studio</dt><dd>Separate</dd></dl></div>
+  <div class="control"><h4>Negate</h4><div class="where">Solid Modeling · row 2</div><p>Marks a part as a hole (magenta ghost) for a later Union. Skipped by bake, collision and export. Not clickable in the viewport; pick it in the Scene dock.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></dd><dt>Studio</dt><dd>Negate</dd></dl></div>
+  <div class="control"><h4>Part inspector</h4><div class="where">Inspector (right) · top</div><p>Color, Material, Transparency · Size, Position, Orientation, Pivot Offset · Shape, Locked, Anchored · Collision.</p><dl><dt>Studio</dt><dd>Properties window</dd></dl></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="shortcuts">Shortcut reference (Roblox layout)</h2>
+<p>All shortcuts that the Roblox layout uses. Filter by key or action:</p>
+<input class="filter-box" data-target="#key-ref" placeholder="Filter shortcuts… (e.g. ctrl+shift, pivot, grid)">
+<div id="key-ref">
+  <div class="control"><h4><kbd>1</kbd> · <kbd>2</kbd> · <kbd>3</kbd> · <kbd>4</kbd> · <kbd>5</kbd></h4><p>Select · Move · Scale · Rotate · Transform tool.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + Scale drag</h4><p>Symmetric resize (both faces move). A plain drag is one-sided.</p></div>
+  <div class="control"><h4><kbd>V</kbd> while moving</h4><p>Snap the move onto the vertex under the cursor.</p></div>
+  <div class="control"><h4><kbd>Shift</kbd> + click</h4><p>Add a part to the selection in the viewport.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>L</kbd></h4><p>Toggle local / world handles.</p></div>
+  <div class="control"><h4><kbd>[</kbd> · <kbd>]</kbd></h4><p>Halve / double the grid step (click the 3D view first).</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>G</kbd></h4><p>Group as Model.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>G</kbd></h4><p>Group as Folder.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>U</kbd></h4><p>Ungroup.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>G</kbd></h4><p>Union (solid modeling).</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>I</kbd></h4><p>Intersect (solid modeling).</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>U</kbd></h4><p>Separate a Union or Intersection (solid modeling).</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></h4><p>Negate (solid modeling): make the part a hole.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>Z</kbd> · <kbd>Ctrl</kbd> + <kbd>Y</kbd></h4><p>Undo / redo (Godot). One step per drag, insert or boolean.</p></div>
+  <div class="control"><h4><kbd>Ctrl</kbd> + <kbd>D</kbd></h4><p>Duplicate (Godot).</p></div>
+  <div class="control"><h4><kbd>Delete</kbd></h4><p>Delete the selected part (asks to confirm).</p></div>
+  <div class="control"><h4><kbd>F</kbd></h4><p>Focus the camera on the selection (Godot).</p></div>
+  <div class="control"><h4><kbd>Alt</kbd> + <kbd>F</kbd></h4><p>Fill hole (moved here from F in the Roblox layout; see page 10).</p></div>
+  <div class="control"><h4><kbd>Alt</kbd> + <kbd>1</kbd> · <kbd>2</kbd> · <kbd>3</kbd> · <kbd>4</kbd> · <kbd>H</kbd></h4><p>Object / Face / Edge / Vertex mode; H cycles them (Edit tab, page 10).</p></div>
+  <div class="control"><h4><kbd>Alt</kbd> + <kbd>5</kbd></h4><p>Vertex paint (Edit tab, page 10).</p></div>
+  <div class="control"><h4><kbd>E</kbd> · <kbd>I</kbd> · <kbd>Ctrl</kbd> + <kbd>B</kbd> · <kbd>Ctrl</kbd> + <kbd>R</kbd></h4><p>Extrude · Inset · Bevel · Loop Cut (Edit tab, page 10).</p></div>
+</div>
+<p class="studio">Every shortcut across all three layouts is on <a href="14-shortcuts-glossary.html">Shortcuts &amp; Roblox→Godot glossary</a>.</p>
+
+<!-- ============================================================ -->
+<h2 id="vs">Roblox Studio vs here</h2>
+<table class="vs">
+  <thead><tr><th>Roblox Studio</th><th>Here (Roblox UI)</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>Model tab ribbon, labelled buttons</td><td>Model tab with the same groups; icons only at normal editor size (hover for names)</td><td><span class="verdict same">Same layout</span></td></tr>
+    <tr><td>Select / Move / Scale / Rotate / Transform</td><td>Same five tools on <kbd>1</kbd>–<kbd>5</kbd></td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Red / green / blue arrows, face balls, rings</td><td>Same handle set plus blue selection box</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>One-sided scale drag; Ctrl = symmetric</td><td>Same gesture; shapes rebuild so they stay crisp</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Snap fields in studs</td><td>Same fields in <b>metres</b>; default 1 m / 45°</td><td><span class="verdict diff">Different unit</span></td></tr>
+    <tr><td>New Part is medium stone grey</td><td>New part is Medium Stone Grey (163, 162, 165), or your chosen default material</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Part ▾: Block, Sphere, Wedge, Corner Wedge, Cylinder</td><td>Same five plus <b>More Shapes ▸</b> (14 more)</td><td><span class="verdict plus">More</span></td></tr>
+    <tr><td>Material picker with 43 named materials</td><td>Same controls; materials are Grid, Checker, No Draw, Collider, Trigger and your textures</td><td><span class="verdict diff">Different set</span></td></tr>
+    <tr><td>Color honeycomb, greys, click-to-apply</td><td>Same, plus custom colour + Apply</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Union / Intersect / Separate / Negate (Ctrl+Shift+G/I/U/N)</td><td>Same keys, magenta ghosts, reversible</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Group (Ctrl+G), Ungroup (Ctrl+U)</td><td>Same, plus Group as Folder</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Lock / Lock tool</td><td>Same (Godot's edit lock; yellow outline)</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Anchor = freeze physics</td><td>Anchor = sit on and follow the <b>terrain</b></td><td><span class="verdict diff">Different meaning</span></td></tr>
+    <tr><td>Align Tool</td><td>Same panel and options</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Pivot: Edit Pivot, Snap, Reset</td><td>Same</td><td><span class="verdict same">Same</span></td></tr>
+    <tr><td>Properties window</td><td>Part section in Godot's Inspector</td><td><span class="verdict same">Same fields</span></td></tr>
+    <tr><td>Explorer</td><td>Godot's Scene dock</td><td><span class="verdict diff">Godot's own</span></td></tr>
+    <tr><td>Home, Avatar, Terrain, Test tabs</td><td>Not on the ribbon (terrain has its own tools; playtesting is Godot's Play button)</td><td><span class="verdict diff">Not here</span></td></tr>
+    <tr><td>No face / edge / vertex editing</td><td><b>Edit</b> tab: Extrude, Inset, Bevel, Loop Cut, UV… (<a href="10-builder-modeller.html">page 10</a>)</td><td><span class="verdict plus">More</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="recipes">Recipes and tips</h2>
+<ul>
+  <li><b>Mark collision-only and trigger volumes.</b> Paint invisible walls with the Built-in <b>Collider</b> material (green) and zone volumes with <b>Trigger</b> (orange), so they're easy to tell apart from real geometry while you greybox.</li>
+  <li><b>Windows and arches.</b> Same as the doorway: a negated box (or Part ▾ → More Shapes → <b>Arch</b>) overlapping a wall, then Union.</li>
+  <li><b>Exact-height floors.</b> Leave Grid snap at 1 m for walls, then press <kbd>[</kbd> for 0.5 m steps when fitting thin slabs.</li>
+  <li><b>Line up a row of pillars.</b> Insert one, <kbd>Ctrl</kbd>+<kbd>D</kbd> a few times, move them along one axis, then Align on the other two axes with Mode Center.</li>
+  <li><b>Hinged doors.</b> Use <a href="#pivot">Pivot</a> to move the door's pivot to its edge before rotating it.</li>
+  <li><b>Furniture that sits on the hill.</b> Use <b>Anchor</b> so props follow the terrain when you reshape it later.</li>
+  <li><b>Protect finished work.</b> Lock the floor and walls so you don't knock them while placing small parts on top.</li>
+  <li><b>Reuse buildings.</b> Group, then <span class="ui">Save Branch as Scene…</span>. The scene can be dropped into any level.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You drag a Scale ball and the part grows on only one side. How do you make it grow evenly on both sides?</summary><p>Hold <kbd>Ctrl</kbd> while dragging. Plain drag is one-sided, like Studio's extrude feel; Ctrl+drag is symmetric around the centre.</p></details>
+<details class="check"><summary>You want every part you insert to use the Grid material. What do you do?</summary><p>Deselect everything (click the sky), open <span class="ui">Material</span> and click <b>Built-in › Grid</b>. Choosing a material with nothing selected sets the default for new parts for the rest of the session. Without it, new parts come in plain medium stone grey.</p></details>
+<details class="check"><summary>How do you cut a doorway into a wall?</summary><p>Place a door-sized box through the wall, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> (Negate), select the wall and the ghost (pick the ghost in the Scene dock), then press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> (Union). <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd> undoes it by separating.</p></details>
+<details class="check"><summary>What does Anchor do here, and how is it different from Studio?</summary><p>It seats the part on its terrain cell so it sits on, and follows, the terrain. In Studio, Anchored stops physics from moving the part, which is a different thing.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="10-builder-modeller.html">10 · Modelling: faces, edges &amp; vertices</a>: the Edit tab, Extrude, Bevel, UVs and the other layouts.</li>
+  <li><a href="12-using-models.html">12 · Using models: tiles, foliage &amp; props</a>: putting saved scenes to work.</li>
+  <li><a href="13-playtest-export.html">13 · Playtesting &amp; exporting</a>: walk around your greybox.</li>
+  <li><a href="14-shortcuts-glossary.html">14 · Shortcuts &amp; Roblox→Godot glossary</a></li>
+  <li><a href="01-godot-for-roblox.html">1 · Godot for Roblox builders</a>, if any Godot word here was new.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foliage, Grass &amp; Flowers – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+  .tall-tour { max-width: 300px; }
+  .narrow-shot img { max-height: 560px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: .95em; }
+  table.ref th, table.ref td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  .hint { font-family: ui-monospace, monospace; font-size: .88em; background: var(--line); padding: 2px 6px; border-radius: 4px; }
+  .center { text-align: center; margin-top: 4px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .gallery figure { margin: 0; }
+  .grp { display: inline-block; font-size: .75em; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); margin-left: 6px; vertical-align: middle; }
+  .chooser { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 14px 0; }
+  .chooser button { margin: 4px 6px 4px 0; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: inherit; cursor: pointer; font: inherit; }
+  .chooser button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chooser .ans { margin-top: 10px; min-height: 2.6em; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Foliage, grass &amp; flowers</h1>
+<p class="lede">Paint whole forests, rock beaches and flower meadows with a brush instead of dragging trees in one by one — then tune the grass, edit each prop's placement rules, and grow a wild-flower meadow in one click.</p>
+<div class="meta-row"><span class="pill">⏱ 40 min</span><span class="pill">Beginner</span><span class="pill">Scene: demo/hex_island.tscn</span><span class="pill">Tool: Foliage [5]</span></div>
+
+<figure class="shot"><img src="media/05-foliage-grass/04-hero-scene.png" alt="A pixel-art hex island in perspective: a grassy terraced hill in the distance, a stone ruin with a fallen log on the near slope, grey rocks and grass tufts scattered over the grass, and a blue pond in the foreground."><figcaption>The sandbox you'll practise on: <code>demo/hex_island.tscn</code>. Rocks, tufts and grass all sit on the terraced slopes — and stay planted if you reshape the ground.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>The <a href="#surfaces">three Foliage surfaces</a>: tool button, palette, settings strip.</li>
+  <li>How to <a href="#tutorial">paint a forest</a>, bushes, flowers and rocks — and erase them.</li>
+  <li>The <a href="#palette">palette</a>: Grass, your Scatter Items, and the built-in <b>+</b> presets.</li>
+  <li><a href="#density">Density</a> and <a href="#size">brush Size</a>, with live scrubbers.</li>
+  <li><a href="#fill">Fill Terrain and Clear</a>: one-click scattering over the whole map.</li>
+  <li><a href="#grass">Grass blades</a> and every <a href="#grass-look">grass look</a> setting.</li>
+  <li>The <a href="#scatter-item">PixelScatterItem</a> — a prop's own rules — as a <a href="#item-ref">filterable reference</a>.</li>
+  <li><a href="#wild-flowers">Wild Flowers</a>: a whole meadow grown by a little climate model.</li>
+  <li>Using <a href="#own-models">your own models</a> as foliage, <a href="#recipes">recipes</a>, and a <a href="#reference">full control reference</a>.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in your scene, like an Instance in Roblox. The terrain is a <code>MarchingSquaresTerrain</code> node.</dd>
+  <dt><b>Scene dock / Inspector</b></dt><dd>Godot's <b>Explorer</b> (node tree, top left) and <b>Properties</b> window (right side).</dd>
+  <dt><b>Resource / <code>.tres</code></b></dt><dd>A reusable data file. Each kind of prop is a resource called a <b>PixelScatterItem</b>, saved as <code>.tres</code>.</dd>
+  <dt><b>Scatter Items</b></dt><dd>The list of prop kinds a terrain carries (Tree, Rock, Pine…). Each entry is one PixelScatterItem.</dd>
+  <dt><b>Mesh / scene / <code>.glb</code></b></dt><dd>A <b>mesh</b> is bare 3D geometry, like a Roblox MeshPart's mesh. A <b>scene</b> (<code>.tscn</code>) or model file (<code>.glb</code>, <code>.gltf</code>, <code>.blend</code>, <code>.fbx</code>) can hold several pieces — like a Roblox Model.</dd>
+  <dt><b>Ground texture / slot</b></dt><dd>The 16 paintable textures from <a href="04-terrain-painting.html">Painting, textures &amp; tint</a>. Grass only grows on slots with <span class="ui">Grass</span> ticked.</dd>
+  <dt><b>LMB / RMB</b></dt><dd>Left / right mouse button. "Wheel" is the scroll wheel.</dd>
+</dl>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox Studio you drag trees and rocks out of the <b>Toolbox</b> one at a time, then Move/Rotate/Scale each copy. Here you <b>paint</b> them in bulk with a brush — like painting Roblox's Grass material, but for 3D props. Each prop kind carries its own rules (how dense, which slopes, which ground textures it likes), so a forest looks natural without hand-placing anything.</p></div>
+
+<!-- ===================================================== SURFACES -->
+<h2 id="surfaces">The Foliage tool and its three surfaces</h2>
+<p>Select <code>MarchingSquaresTerrain</code> in the Scene dock, then click <span class="ui">Foliage</span> in the tool column on the left of the 3D view (or press <kbd>5</kbd>). Click the dots to tour what appears.</p>
+
+<div class="hotspots"><img src="media/05-foliage-grass/00-foliage-overview.png" alt="The Godot editor with the terrain selected and Foliage active. Red boxes mark the tool column on the left of the 3D view, the Foliage palette on the right (Grass, Tree, Rock, + Bush, + Flowers, + Pine, with Edit, Remove and Add Mesh / Scene buttons), and the bottom strip (Size, Density, Slope Min, Slope Max, Erase All, Fill Terrain, Clear).">
+  <button class="spot" style="left:9%;top:22%" data-title="Scene dock" data-text="Select MarchingSquaresTerrain first; the terrain tools only show while it's selected.">1</button>
+  <button class="spot" style="left:21%;top:40%" data-title="Foliage · key 5" data-text="The Foliage button stays pressed while active. It opens the palette and swaps the bottom strip.">2</button>
+  <button class="spot" style="left:74%;top:30%" data-title="Instructions" data-text="1. Click what to paint below (Ctrl/Shift+click: several). 2. LMB-drag on the terrain to paint it. RMB / Shift+LMB: erase · Shift+wheel: brush size.">3</button>
+  <button class="spot" style="left:74%;top:55%" data-title="Palette" data-text="Grass, the terrain's Scatter Items, and built-in + presets. Click one (or Ctrl/Shift+click several) to paint it.">4</button>
+  <button class="spot" style="left:74%;top:78%" data-title="Edit / Remove / Add Mesh / Scene…" data-text="Open a prop's settings, remove a prop kind, or add your own model as a prop.">5</button>
+  <button class="spot" style="left:42%;top:80%" data-title="Hint bar" data-text="Painting <names> · LMB-drag: paint · RMB / Shift+LMB: erase · Shift+wheel: size · palette on the right: pick what to paint.">6</button>
+  <button class="spot" style="left:42%;top:89%" data-title="Foliage strip" data-text="Size, Density, Slope Min, Slope Max, Erase All, Fill Terrain, Clear.">7</button>
+  <button class="spot" style="left:86%;top:55%" data-title="Inspector · Look ▸ Grass" data-text="The terrain's grass look settings: Turf Stuff, Grass Pixel Size, Grass Outline, Ledge Cutoff, Min Height.">8</button>
+</div>
+
+<div class="pair">
+  <figure class="shot narrow-shot"><img src="media/05-foliage-grass/01-toolbar-foliage.png" alt="The terrain tool column with Foliage 5 highlighted, between Bridge 4 and Paint 6."><figcaption><span class="ui">Foliage</span> is tool <kbd>5</kbd>.</figcaption></figure>
+  <div>
+    <figure class="clip"><video src="media/05-foliage-grass/05-switch-tool.mp4" poster="media/05-foliage-grass/05-switch-tool.png" data-autoplay></video><figcaption>Clicking Foliage: the palette panel and the Foliage strip appear.</figcaption></figure>
+    <p>The tool's tooltip, in short: <i>"Paints grass, trees, rocks, bushes, flowers and your own props onto the terrain. Pick one or more entries in the palette on the right (Ctrl/Shift+click for several)."</i> It also reminds you that <b>props follow the terrain when it is sculpted</b>.</p>
+  </div>
+</div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Tutorial: paint a pine forest</h2>
+<p>Open <code>res://demo/hex_island.tscn</code> (FileSystem dock → <code>demo</code>). Its grassy hill and pond make an ideal sandbox. Use the <b>+</b> presets for practice: they render as proper green trees, bushes and flowers. (This scene's own Tree/Pine/Bush/Rock/Flowers/Pebbles items are grey low-poly placeholders.)</p>
+<ol class="steps" data-id="foliage-forest">
+  <li>Select <code>MarchingSquaresTerrain</code> and press <kbd>5</kbd> (or click <span class="ui">Foliage</span>).</li>
+  <li>In the palette on the right, click <b>+ Pine</b>. The hint bar now starts "Painting Pine".</li>
+  <li>Move over the grass. A round <b>green</b> disc shows the brush.</li>
+  <li><b>LMB-drag</b> across the grass. Pines appear under the brush. A single click places at least one.</li>
+  <li>Look at the palette: <b>+ Pine</b> is now just <b>Pine</b> — your first stroke added it to the terrain's Scatter Items.</li>
+  <li>Hold <kbd>Shift</kbd> and roll the wheel to make the brush bigger; paint again to widen the forest.</li>
+  <li><b>RMB-drag</b> (or <kbd>Shift</kbd>+LMB-drag) through the trees to carve a clearing. The disc turns red while erasing.</li>
+  <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last stroke in one step.</li>
+</ol>
+<figure class="clip"><video src="media/05-foliage-grass/10-paint-pine.mp4" poster="media/05-foliage-grass/10-paint-pine.png" data-autoplay></video><figcaption>Painting a pine forest with <b>+ Pine</b>.</figcaption></figure>
+
+<h3 id="kinds">Other props, same gesture</h3>
+<div class="tabs">
+  <div class="panel" data-tab="Bushes"><figure class="clip"><video src="media/05-foliage-grass/11-paint-bush.mp4" poster="media/05-foliage-grass/11-paint-bush.png" data-autoplay></video><figcaption>Click <b>+ Bush</b>, then LMB-drag: round green bushes.</figcaption></figure></div>
+  <div class="panel" data-tab="Flowers"><figure class="clip"><video src="media/05-foliage-grass/12-paint-flowers.mp4" poster="media/05-foliage-grass/12-paint-flowers.png" data-autoplay></video><figcaption>Click <b>+ Flowers</b>, then LMB-drag: colourful flower clumps.</figcaption></figure></div>
+  <div class="panel" data-tab="Rocks"><figure class="clip"><video src="media/05-foliage-grass/13-paint-rock.mp4" poster="media/05-foliage-grass/13-paint-rock.png" data-autoplay></video><figcaption>Click <b>Rock</b>, then LMB-drag: rocks tilted to match the ground.</figcaption></figure></div>
+  <div class="panel" data-tab="Several at once"><p><kbd>Ctrl</kbd>+click or <kbd>Shift</kbd>+click several palette entries (say Pine + Bush + Rock). One stroke then paints all of them together, mixed. Erasing with several selected removes only those kinds.</p></div>
+</div>
+
+<!-- ===================================================== PALETTE -->
+<h2 id="palette">The palette</h2>
+<p>The right panel, titled <b>Foliage</b>, is "what the Foliage tool paints: grass and the terrain's Scatter Items". It's a two-column icon grid. Its entries, in order:</p>
+
+<div class="pair">
+  <div class="hotspots tall-tour"><img src="media/05-foliage-grass/02-palette.png" alt="The Foliage palette: the instruction text, then icons for Grass, Tree, Rock, + Bush, + Flowers and + Pine, and buttons Edit, Remove and Add Mesh / Scene below.">
+    <button class="spot" style="left:22%;top:4%" data-title="Panel title" data-text="Foliage — what the tool paints: grass and the terrain's Scatter Items.">1</button>
+    <button class="spot" style="left:50%;top:17%" data-title="Instructions" data-text="Click what to paint (Ctrl/Shift+click: several), then LMB-drag. RMB / Shift+LMB: erase · Shift+wheel: brush size.">2</button>
+    <button class="spot" style="left:22%;top:42%" data-title="Grass" data-text="Always first. Paints the grass blade mask, not a prop. Grows only on textures with Grass ticked.">3</button>
+    <button class="spot" style="left:58%;top:42%" data-title="Tree / Rock (Scatter Items)" data-text="Prop kinds this terrain already carries, by Display Name. Double-click to edit.">4</button>
+    <button class="spot" style="left:58%;top:61%" data-title="+ presets" data-text="Built-in kinds this terrain doesn't have yet. Your first stroke adds the real item (undoable) and the + disappears.">5</button>
+    <button class="spot" style="left:25%;top:90%" data-title="Edit" data-text="Show the selected prop's settings in the Inspector. Disabled unless a prop (not Grass) is selected.">6</button>
+    <button class="spot" style="left:72%;top:90%" data-title="Remove" data-text="Remove the selected prop kinds and every instance of them (undoable).">7</button>
+    <button class="spot" style="left:50%;top:96%" data-title="Add Mesh / Scene…" data-text="Add a prop from your own mesh or model file, and select it.">8</button>
+  </div>
+  <div>
+    <ol>
+      <li><b>Grass</b> — always first. Paints the terrain's grass <i>mask</i> (where blades grow) instead of a prop. Tooltip: "Grows only on textures with Grass ticked in the Vertex Painting panel."</li>
+      <li><b>One entry per Scatter Item</b> the terrain already carries, labelled by its Display Name (Tree, Rock, Pine, Bush, Flowers, Pebbles…), with a rendered thumbnail. Tooltip: "&lt;name&gt; (Scatter Item N). Double-click to edit it."</li>
+      <li><b>Built-in "+" presets</b> for any of the five kinds the terrain doesn't have yet: <b>+ Rock, + Bush, + Tree, + Pine, + Flowers</b>. Tooltip: "Built-in &lt;kind&gt;: click it and paint. This terrain has no &lt;kind&gt; item yet: the first stroke adds it to its Scatter Items (undoable)."</li>
+    </ol>
+    <p><b>Selecting:</b> click = one entry; <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click = several; <b>double-click</b> a prop = open it in the Inspector (same as <span class="ui">Edit</span>).</p>
+    <div class="callout tip"><span class="label">Tip</span><p>Entries move around as items are added and removed, so find them by <b>name</b>, not by position.</p></div>
+  </div>
+</div>
+
+<h3 id="plus">What the "+" really does</h3>
+<p>Painting a <b>+</b> entry <i>materialises</i> it: the first stroke both paints the props and adds a real PixelScatterItem to the terrain, as a single undoable step. The palette label loses its "+".</p>
+<div class="pair">
+  <figure class="clip"><video src="media/05-foliage-grass/61-add-entry.mp4" poster="media/05-foliage-grass/61-add-entry.png" data-autoplay></video><figcaption>Painting <b>+ Bush</b>: the label becomes <b>Bush</b> as the item is added.</figcaption></figure>
+  <figure class="shot narrow-shot"><img src="media/05-foliage-grass/02b-palette-loaded.png" alt="A longer palette: Grass, Tree, Pine, Bush, Rock, Flowers, Pebbles (small hexes), + Bush, + Flowers and + Pine."><figcaption>A terrain carrying many items. It lists both <b>Bush</b> (a custom-mesh item) and <b>+ Bush</b> (the built-in).</figcaption></figure>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p>A custom-mesh item of a given kind does <b>not</b> hide that kind's "+" preset. That's why a terrain can show both "Bush" and "+ Bush" — they're two different prop kinds.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The palette is like a tiny Toolbox that belongs to this terrain. Instead of inserting a model and dragging it into place, you pick it and paint. <span class="ui">Edit</span> is like selecting the model and opening Properties — but changes apply to <b>every</b> copy of that prop at once.</p></div>
+
+<!-- ===================================================== STRIP -->
+<h2 id="strip">The Foliage strip</h2>
+<div class="hotspots"><img src="media/05-foliage-grass/03-strip.png" alt="The Foliage strip: Size 15.0, Density 0.253, Slope Min 0.0, Slope Max 90.0, Erase All unticked, and buttons Fill Terrain and Clear.">
+  <button class="spot" style="left:9%;top:16%" data-title="Foliage" data-text="The strip title: the active tool.">1</button>
+  <button class="spot" style="left:39%;top:16%" data-title="Size" data-text="Brush diameter, 1–50 (default 15). Shift+wheel. The foliage brush is always round.">2</button>
+  <button class="spot" style="left:20%;top:48%" data-title="Density" data-text="How full a stroke paints, 0.05–1.0 (default 0.25). 1 = props almost touching.">3</button>
+  <button class="spot" style="left:68%;top:48%" data-title="Slope Min" data-text="Only paint on terrain at least this steep, 0–90°.">4</button>
+  <button class="spot" style="left:27%;top:81%" data-title="Slope Max" data-text="Only paint on terrain at most this steep, 0–90° (default 90 = no limit).">5</button>
+  <button class="spot" style="left:59%;top:81%" data-title="Erase All" data-text="Erasing removes every prop, not just the selected ones.">6</button>
+  <button class="spot" style="left:76%;top:81%" data-title="Fill Terrain" data-text="Scatter the selected props over the whole terrain using each item's own rules. Undoable.">7</button>
+  <button class="spot" style="left:93%;top:81%" data-title="Clear" data-text="Remove every instance of the selected props. Undoable.">8</button>
+</div>
+
+<h3 id="wheel">Mouse &amp; wheel while Foliage is active</h3>
+<table class="ref">
+  <tr><th>Gesture (over the 3D view)</th><th>Does</th></tr>
+  <tr><td>LMB-drag</td><td>Paint the selected entries. A click places at least one prop.</td></tr>
+  <tr><td>RMB-drag or <kbd>Shift</kbd>+LMB-drag</td><td>Erase the selected entries (every prop if <span class="ui">Erase All</span> is ticked).</td></tr>
+  <tr><td><kbd>Shift</kbd>+wheel</td><td>Brush <b>Size</b>. Doesn't zoom the camera.</td></tr>
+  <tr><td><kbd>Alt</kbd>+wheel</td><td>Doesn't zoom the camera (the foliage brush is always round, so rotation has no visible effect).</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+wheel / plain wheel</td><td>Zoom the camera. Foliage has no Strength, so Ctrl+wheel is free.</td></tr>
+</table>
+<p>The brush disc is <b>green</b> while painting and <b>red/orange</b> while erasing (Shift held or RMB). If a stroke changes nothing — the spot is full, under water, built over, or outside the slope range — the view shows a <b>"Nothing painted"</b> message; an erase that finds nothing of the selected kind shows <b>"Nothing erased here"</b>.</p>
+<p>Hint bar with nothing selected: <span class="hint">Pick Grass, a tree or a rock in the Foliage palette on the right · then LMB-drag on the terrain to paint it</span></p>
+
+<!-- ===================================================== DENSITY -->
+<h3 id="density">Density</h3>
+<p><span class="ui">Density</span> (0.05–1.0, default 0.25) is how full one stroke paints. At <b>1</b>, props almost touch; lower is sparser. Spacing follows each prop's size, so big pines spread out more than small flowers at the same density. <b>A new stroke over the same spot fills the gaps</b> — so you can build density gradually.</p>
+<div class="scrubber" data-label="Density" data-start="1"
+  data-frames='[{"v":"0.05","src":"media/05-foliage-grass/30-density-1.png","note":"A single dab leaves just a lone pine or two."},{"v":"0.20","src":"media/05-foliage-grass/30-density-2.png","note":"A loose scattering — close to the 0.25 default."},{"v":"0.50","src":"media/05-foliage-grass/30-density-3.png","note":"A proper grove."},{"v":"0.81","src":"media/05-foliage-grass/30-density-4.png","note":"Thick woodland."},{"v":"1.0","src":"media/05-foliage-grass/30-density-5.png","note":"Maximum: trees almost touching — a dense forest from one dab."}]'></div>
+<div class="callout tip"><span class="label">Tip</span><p>The strip's Density only affects <b>painting</b>. <span class="ui">Fill Terrain</span> uses each item's <b>own</b> Density instead (see <a href="#scatter-item">PixelScatterItem</a>).</p></div>
+
+<!-- ===================================================== SIZE -->
+<h3 id="size">Brush Size</h3>
+<p><span class="ui">Size</span> is the brush diameter in world units (1–50 on the slider; it accepts a little more; default 15). Change it live with <kbd>Shift</kbd>+wheel.</p>
+<div class="scrubber" data-label="Brush Size" data-start="1"
+  data-frames='[{"v":"2.5","src":"media/05-foliage-grass/31-size-1.png","note":"A tiny footprint: one or two props per dab. Place individual landmark trees."},{"v":"15","src":"media/05-foliage-grass/31-size-2.png","note":"The default: a small cluster."},{"v":"30.5","src":"media/05-foliage-grass/31-size-3.png","note":"A wide grove from one dab."},{"v":"52","src":"media/05-foliage-grass/31-size-4.png","note":"Past the slider maximum: covers most of the hillside."}]'></div>
+<figure class="clip"><video src="media/05-foliage-grass/32-brush-size.mp4" poster="media/05-foliage-grass/32-brush-size.png" data-autoplay></video><figcaption><kbd>Shift</kbd>+wheel grows the brush (watch Size in the strip), then a paint.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Size and Density are like the Roblox Terrain brush's <b>Size</b> and <b>Strength</b> — but instead of adding terrain, they decide how wide and how full the scatter is.</p></div>
+
+<h3 id="slope">Slope Min &amp; Slope Max</h3>
+<p>Like the Paint tool's slope filter: a stroke only plants on ground whose steepness is between <span class="ui">Slope Min</span> and <span class="ui">Slope Max</span> (0–90°, step 0.5; defaults 0 and 90 = no filter). For example, <b>Slope Max 20</b> keeps trees on near-flat ground only. On the hex demo island the "slopes" are vertical hex walls where props don't sit anyway; the filter is most useful on a square-grid terrain with real hillsides. (Scatter Items have their <b>own</b> Slope Min/Max too, used by Fill Terrain.)</p>
+
+<!-- ===================================================== ERASE -->
+<h2 id="erase">Erasing</h2>
+<p>RMB-drag (or <kbd>Shift</kbd>+LMB-drag) erases the <b>selected</b> kinds only — erase with Pine selected and the rocks stay. Tick <span class="ui">Erase All</span> to wipe <b>every</b> prop under the brush regardless of selection; the hint bar then reads "RMB / Shift+LMB: erase every prop".</p>
+<div class="pair">
+  <figure class="clip"><video src="media/05-foliage-grass/15-erase.mp4" poster="media/05-foliage-grass/15-erase.png" data-autoplay></video><figcaption>Pine selected: RMB-drag carves a gap in the pines only.</figcaption></figure>
+  <figure class="clip"><video src="media/05-foliage-grass/16-erase-all.mp4" poster="media/05-foliage-grass/16-erase-all.png" data-autoplay></video><figcaption><span class="ui">Erase All</span> ticked: RMB removes everything, rocks included.</figcaption></figure>
+</div>
+<div class="callout tip"><span class="label">Erasing props never removes grass</span><p>Grass is its own entry (the mask). Erasing trees leaves the grass blades alone. On a slow computer the view can take a moment to redraw a freshly edited patch — move the mouse and it settles.</p></div>
+
+<!-- ===================================================== FILL -->
+<h2 id="fill">Fill Terrain &amp; Clear</h2>
+<p><span class="ui">Fill Terrain</span> scatters the selected props over the <b>whole</b> terrain, using each item's own rules — its density, allowed ground textures, slope, height and clusters. It <b>replaces</b> their current instances. <span class="ui">Clear</span> removes every instance of the selected props. Both act on the selected props only (not Grass), and both are one undoable step.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/05-foliage-grass/17-fill-terrain.mp4" poster="media/05-foliage-grass/17-fill-terrain.png" data-autoplay></video><figcaption>Fill Terrain with Pine: trees appear everywhere the Pine rules allow, including the flat top of the terraced hill.</figcaption></figure>
+  <figure class="clip"><video src="media/05-foliage-grass/18-clear.mp4" poster="media/05-foliage-grass/18-clear.png" data-autoplay></video><figcaption>Clear removes every Pine instance.</figcaption></figure>
+</div>
+
+<div class="chooser" id="paint-vs-fill">
+  <b>Painting or Fill Terrain?</b> Pick what you want to do:
+  <div>
+    <button data-a="paint">Place a grove exactly here</button>
+    <button data-a="fill">Cover the whole island naturally</button>
+    <button data-a="rules">Keep trees off sand &amp; cliffs</button>
+    <button data-a="redo">Reroll a forest I don't like</button>
+  </div>
+  <div class="ans" aria-live="polite">…</div>
+</div>
+
+<div class="callout warn"><span class="label">Painting ignores the item's rules</span><p>When you <b>paint</b>, props go where your brush goes (filtered only by the strip's Slope Min/Max and Density). The item's ground textures, height and cluster rules only apply to <b>Fill Terrain</b>.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox has nothing like Fill Terrain — it's a one-click procedural scatter of the whole map. The closest habit is running a plugin that populates trees; here it's built in, and undoable.</p></div>
+
+<!-- ===================================================== UNDO -->
+<h2 id="undo">Undo</h2>
+<p>Every action is one undoable step (<kbd>Ctrl</kbd>+<kbd>Z</kbd>): paint, erase, Fill Terrain, Clear, materialising a "+", and adding or removing an item.</p>
+<figure class="clip"><video src="media/05-foliage-grass/62-undo.mp4" poster="media/05-foliage-grass/62-undo.png" data-autoplay></video><figcaption>Paint a rock cluster, then <kbd>Ctrl</kbd>+<kbd>Z</kbd> removes it in one step.</figcaption></figure>
+
+<div class="callout tip"><span class="label">Props follow the terrain</span><p>Reshape the ground after you've planted it and the props ride along: paint a cluster, switch to the <b>Brush</b> tool (<a href="03-terrain-sculpting.html">Sculpting</a>), raise the ground under it, and the props stay planted on the new surface. Grass re-drapes too. In Roblox you'd have to re-place every tree after editing terrain.</p></div>
+
+<!-- ===================================================== GRASS -->
+<h2 id="grass">Grass blades</h2>
+<p>Grass here is automatic decoration: small blade tufts that grow on any ground texture with <span class="ui">Grass</span> ticked in the Paint tool's Textures panel (see <a href="04-terrain-painting.html#slots">texture slots</a>). The <b>Grass</b> palette entry paints a <i>mask</i> on top of that: where blades are allowed.</p>
+<ol class="steps" data-id="foliage-grass">
+  <li>Click <b>Grass</b> in the palette.</li>
+  <li><b>RMB-drag</b> over a grassy area: the tufts disappear (the ground stays green — only blades are removed).</li>
+  <li><b>LMB-drag</b> to paint blades back.</li>
+</ol>
+<figure class="clip"><video src="media/05-foliage-grass/14-grass-mask.mp4" poster="media/05-foliage-grass/14-grass-mask.png" data-autoplay></video><figcaption>Grass selected: RMB erases a patch of blades, LMB paints them back.</figcaption></figure>
+<div class="compare" data-before="Tufts on" data-after="Tufts erased"><img src="media/05-foliage-grass/14b-grass-mask-on.png" alt="A grassy hillside dotted with grass tufts around a rock outcrop."><img src="media/05-foliage-grass/14b-grass-mask-off.png" alt="The same hillside with the tufts erased; the green ground remains."></div>
+<div class="callout warn"><span class="label">Watch out</span><p>Painting Grass on a texture <b>without</b> the Grass tick does nothing. If grass won't appear, check the slot in the <a href="04-terrain-painting.html#slots">Paint tool's Textures panel</a>, and that the terrain's master <span class="ui">Grass</span> switch is on.</p></div>
+
+<h3 id="grass-onoff">The master Grass switch</h3>
+<p>The terrain's <span class="ui">Grass</span> checkbox (Inspector ▸ Look ▸ Grass, or Settings ▸ Grass) turns <b>all</b> blades on or off at once. The ground colour doesn't change.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/05-foliage-grass/22-grass-enabled.mp4" poster="media/05-foliage-grass/22-grass-enabled.png" data-autoplay></video><figcaption>Toggling Grass: every tuft vanishes and returns.</figcaption></figure>
+  <div class="compare" data-before="Grass on" data-after="Grass off"><img src="media/05-foliage-grass/22b-grass-enabled-on.png" alt="The hex island with grass blades on the slopes."><img src="media/05-foliage-grass/22b-grass-enabled-off.png" alt="The same island with grass turned off; the ground colour is unchanged."></div>
+</div>
+
+<h3 id="grass-look">Grass look settings</h3>
+<p>The grass look lives on the terrain node, in two places showing the same values: the <b>Inspector ▸ Look ▸ Grass</b> group, and the <b>Settings</b> tool (<kbd>9</kbd>) ▸ <b>Grass</b> page (tabs: Grid · New Chunks · <b>Grass</b> · Display · LOD &amp; Nature · Storage).</p>
+<div class="pair">
+  <figure class="shot"><img src="media/05-foliage-grass/20-inspector-grass.png" alt="Inspector Look, Grass group: Turf Stuff with a green shader preview, Grass Pixel Size 1, Grass Outline unticked labelled On, Ledge Cutoff 0.5, Min Height 1.2."><figcaption>Inspector ▸ Look ▸ Grass.</figcaption></figure>
+  <figure class="shot"><img src="media/05-foliage-grass/21-settings-grass.png" alt="The Settings tool's Grass page: page tabs Grid, New Chunks, Grass, Display, LOD and Nature, Storage; fields Grass ticked, Animation FPS 0, Subdivisions 2, Grass Size x 0.56 y 0.66, Ledge Cutoff 0.5, Min Height 0.6."><figcaption>Settings ▸ Grass (adds Animation FPS).</figcaption></figure>
+</div>
+<div class="tablewrap"><table class="ref">
+  <tr><th>Setting</th><th>Where</th><th>Range · default</th><th>What it does</th></tr>
+  <tr><td>Grass</td><td>Inspector, Settings</td><td>on/off · on</td><td>All grass blades on/off. "Grow grass on slots with 'Has grass'."</td></tr>
+  <tr><td>Animation FPS</td><td>Settings</td><td>≥ 0 · 0</td><td>&gt; 0 animates the grass at a limited fps (choppy, pixel-art style); 0 = smooth wind. Stored on the Turf Stuff shader; undoable.</td></tr>
+  <tr><td>Subdivisions</td><td>Inspector, Settings</td><td>1 – 8 · 2</td><td>Blades per cell = subdivisions². 2 → 4 blades, 4 → 16.</td></tr>
+  <tr><td>Grass Size</td><td>Inspector, Settings</td><td>x, y · ≈(0.56, 0.66) on hex_island</td><td>Blade width and height. Type into the x/y fields.</td></tr>
+  <tr><td>Grass Texture</td><td>Inspector</td><td>Texture2D</td><td>Optional override for the blade sprite.</td></tr>
+  <tr><td>Turf Stuff</td><td>Inspector</td><td>ShaderMaterial</td><td>The grass shader material (<code>mst_grass.gdshader</code>); holds Animation FPS.</td></tr>
+  <tr><td>Grass Pixel Size</td><td>Inspector</td><td>1 – 16+ · 1</td><td>Pixel-size multiplier for blades in the pixel renderer. Bigger = chunkier blocks.</td></tr>
+  <tr><td>Grass Outline</td><td>Inspector</td><td>On · off</td><td>Draw a pixel outline around blades.</td></tr>
+  <tr><td>Ledge Cutoff</td><td>Inspector, Settings</td><td>0 – 1 · 0.5</td><td>"Grass is not planted on cliff-edge bands stronger than this." Keeps grass off cliff tops.</td></tr>
+  <tr><td>Min Height</td><td>Inspector, Settings</td><td>float · 1.2 (02_island), 0.6 (hex_island)</td><td>"No grass below this height (e.g. your water level)."</td></tr>
+</table></div>
+
+<div class="scrubber" data-label="Grass Pixel Size" data-start="1"
+  data-frames='[{"v":"1","src":"media/05-foliage-grass/33-grass-pixel-1.png","note":"Default: fine blades at the renderer pixel size."},{"v":"2","src":"media/05-foliage-grass/33-grass-pixel-2.png","note":"Slightly chunkier."},{"v":"4","src":"media/05-foliage-grass/33-grass-pixel-3.png","note":"Clearly blocky tufts."},{"v":"8","src":"media/05-foliage-grass/33-grass-pixel-4.png","note":"Big square blocks of grass colour — a strong retro look."}]'></div>
+<p>Grass Pixel Size works together with the scene's pixel-art renderer; see <a href="07-pixelizer.html">The pixelizer</a>.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like Roblox Terrain's Grass material, the blades are automatic — you don't place them. But here you control which textures grow them, their size, density (Subdivisions), chunkiness and animation, and you can erase or add them with a brush.</p></div>
+
+<!-- ===================================================== SCATTER ITEM -->
+<h2 id="scatter-item">Editing a prop: the PixelScatterItem</h2>
+<p>Each prop kind is a <b>PixelScatterItem</b> resource. Select it in the palette and click <span class="ui">Edit</span> (or double-click it): its settings open in the Inspector. Changes apply to every copy of that prop. The five built-in presets live in <code>addons/MarchingSquaresTerrain/scatter_presets/</code> (rock, bush, tree, pine, flowers).</p>
+<div class="pair">
+  <figure class="shot narrow-shot"><img src="media/05-foliage-grass/40-scatter-item.png" alt="Inspector for the Rock PixelScatterItem: Display Name Rock, Form Rock, Shape Seed 7, Cage empty, Scene empty, Tint white, and collapsed groups Placement (6 changes), Filters (1 change), Color (1 change), Pixel, Collision (3 changes)."><figcaption>The Rock item: top fields and the five groups.</figcaption></figure>
+  <figure class="shot narrow-shot"><img src="media/05-foliage-grass/41-scatter-placement.png" alt="The Placement group expanded: Density 0.026, Scale Min 0.45, Scale Max 1.21, Random Yaw 360, Align Norm 0.8, Y Offset -0.12, Per Cell Max 1, Small Hexes off, then Texture1 to Texture6 checkboxes with 1, 2 and 4 ticked."><figcaption>Placement expanded, with the <b>Ground Slots</b> ticks (Texture1–16).</figcaption></figure>
+</div>
+
+<h3 id="item-ref">PixelScatterItem reference</h3>
+<p>Type to filter (try "slope", "cluster", "wind" or "collision").</p>
+<input class="filter-box" data-target="#item-ref-list" placeholder="Filter PixelScatterItem fields…">
+<div id="item-ref-list">
+  <div class="control"><h4>Display Name <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>The label in the palette.</p><dl><dt>Type</dt><dd>text</dd></dl></div>
+  <div class="control"><h4>Form <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>The built-in procedural shape. Set to <b>Custom</b> when you supply your own Cage or Scene.</p><dl><dt>Options</dt><dd>Custom, Rock, Bush, Tree, Pine, Flowers</dd></dl></div>
+  <div class="control"><h4>Shape Seed <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>Varies the procedural shape. Change it to get a differently shaped rock or tree.</p><dl><dt>Type</dt><dd>integer</dd></dl></div>
+  <div class="control"><h4>Cage <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>Your own <b>mesh</b> for the prop. Bare meshes (<code>.mesh / .tres / .res / .obj</code>) land here. <a href="#own-models">More</a>.</p><dl><dt>Type</dt><dd>Mesh</dd></dl></div>
+  <div class="control"><h4>Scene <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>Your own <b>scene or model</b> for the prop (<code>.tscn / .glb / .gltf / .blend / .fbx</code>). <a href="#own-models">More</a>.</p><dl><dt>Type</dt><dd>PackedScene</dd></dl></div>
+  <div class="control"><h4>Tint <span class="grp">top</span></h4><div class="where">PixelScatterItem</div><p>Colour for the prop.</p><dl><dt>Type</dt><dd>Color</dd></dl></div>
+
+  <div class="control"><h4>Density <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>The item's own density — used by <b>Fill Terrain</b> (not by brush painting).</p><dl><dt>Range</dt><dd>0.0015 – 4</dd></dl></div>
+  <div class="control"><h4>Scale Min / Scale Max <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Each copy gets a random size between these.</p><dl><dt>Range</dt><dd>0.05 – 8</dd></dl></div>
+  <div class="control"><h4>Random Yaw <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Random spin around the vertical axis, so copies don't all face the same way.</p><dl><dt>Range</dt><dd>0 – 360°</dd></dl></div>
+  <div class="control"><h4>Align Norm <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Align to normal: how much the prop tilts to match the ground. 0 = upright (trees), 1 = flat on the slope (rocks).</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+  <div class="control"><h4>Y Offset <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Raise or sink the prop. Negative sinks it into the ground (rocks use −0.12).</p></div>
+  <div class="control"><h4>Per Cell Max <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Maximum copies in one cell.</p><dl><dt>Range</dt><dd>1 – 16</dd></dl></div>
+  <div class="control"><h4>Small Hexes <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>An on/off placement option of the item.</p><dl><dt>Type</dt><dd>bool</dd></dl></div>
+  <div class="control"><h4>Ground Slots <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Texture1…Texture16 ticks: which <a href="04-terrain-painting.html#slots">painted ground textures</a> this prop may grow on. Untick Sand to keep trees off beaches.</p></div>
+  <div class="control"><h4>Seed <span class="grp">Placement</span></h4><div class="where">PixelScatterItem ▸ Placement</div><p>Random seed for placement. Change it and Fill Terrain again for a different layout.</p></div>
+
+  <div class="control"><h4>Slope Min / Slope Max <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Steepness the item accepts during Fill Terrain.</p><dl><dt>Range</dt><dd>0 – 90°</dd></dl></div>
+  <div class="control"><h4>Height Min / Height Max <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Terrain heights the item accepts during Fill Terrain — e.g. keep reeds low near the water, or pines high on the hills.</p></div>
+  <div class="control"><h4>Cluster Size <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Clumps props together using noise; larger = bigger clumps. 0 = no clumping.</p><dl><dt>Range</dt><dd>0 – 256 (accepts more)</dd></dl></div>
+  <div class="control"><h4>Threshold <span class="grp">Filters</span></h4><div class="where">PixelScatterItem ▸ Filters</div><p>Works with Cluster Size: how much of the noise counts as "inside a clump". Higher = fewer, tighter clumps.</p><dl><dt>Range</dt><dd>−1 – 1</dd></dl></div>
+
+  <div class="control"><h4>Hue Jitter <span class="grp">Color</span></h4><div class="where">PixelScatterItem ▸ Color</div><p>Random hue variation per copy.</p><dl><dt>Range</dt><dd>0 – 0.5</dd></dl></div>
+  <div class="control"><h4>Value Jitter <span class="grp">Color</span></h4><div class="where">PixelScatterItem ▸ Color</div><p>Random brightness variation per copy.</p><dl><dt>Range</dt><dd>0 – 0.5</dd></dl></div>
+
+  <div class="control"><h4>Pixel Size <span class="grp">Pixel</span></h4><div class="where">PixelScatterItem ▸ Pixel</div><p>Pixel-size multiplier for this prop in the pixel renderer.</p><dl><dt>Range</dt><dd>1 – 16</dd></dl></div>
+  <div class="control"><h4>Outline / Outline Id <span class="grp">Pixel</span></h4><div class="where">PixelScatterItem ▸ Pixel</div><p>Draw a pixel outline, and which outline style (0–7).</p></div>
+  <div class="control"><h4>Cast Shadows <span class="grp">Pixel</span></h4><div class="where">PixelScatterItem ▸ Pixel</div><p>Whether copies cast shadows.</p><dl><dt>Type</dt><dd>bool</dd></dl></div>
+  <div class="control"><h4>Wind Sway <span class="grp">Pixel</span></h4><div class="where">PixelScatterItem ▸ Pixel</div><p>How much the prop sways in the wind.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+
+  <div class="control"><h4>Collision <span class="grp">Collision</span></h4><div class="where">PixelScatterItem ▸ Collision</div><p>Whether players bump into the prop, and its shape.</p><dl><dt>Options</dt><dd>None, Cylinder, Box</dd></dl></div>
+  <div class="control"><h4>Collision Size <span class="grp">Collision</span></h4><div class="where">PixelScatterItem ▸ Collision</div><p>Size of the collision shape.</p><dl><dt>Type</dt><dd>Vector3 (x, y, z)</dd></dl></div>
+  <div class="control"><h4>Impact Stratum <span class="grp">Collision</span></h4><div class="where">PixelScatterItem ▸ Collision</div><p>Physics layers the collision lives on (like Roblox CollisionGroups).</p></div>
+  <div class="control"><h4>Collision Min Scale <span class="grp">Collision</span></h4><div class="where">PixelScatterItem ▸ Collision</div><p>The smallest copy scale that still gets collision.</p></div>
+</div>
+
+<h3 id="preset-values">The five built-in presets</h3>
+<div class="tablewrap"><table class="ref">
+  <tr><th>Preset</th><th>Form</th><th>Density</th><th>Slope Max</th><th>Cluster Size</th><th>Notes</th></tr>
+  <tr><td>Tree</td><td>Tree</td><td>0.02</td><td>25°</td><td>22</td><td></td></tr>
+  <tr><td>Pine</td><td>Pine</td><td>0.026</td><td>32°</td><td>18</td><td>Tolerates steeper ground than Tree.</td></tr>
+  <tr><td>Bush</td><td>Bush</td><td>0.04</td><td>30°</td><td>14</td><td></td></tr>
+  <tr><td>Flowers</td><td>Flowers</td><td>0.08</td><td>25°</td><td>9</td><td>Threshold 0.25: small tight patches.</td></tr>
+  <tr><td>Rock</td><td>Rock</td><td>0.03</td><td>55°</td><td>—</td><td>Align Norm 0.8, Y Offset −0.12: lies on slopes, slightly sunk.</td></tr>
+</table></div>
+
+<!-- ===================================================== OWN MODELS -->
+<h2 id="own-models">Your own models as foliage (short version)</h2>
+<p>Want your own tree, mushroom or crate as a paintable prop? Click <span class="ui">Add Mesh / Scene…</span> under the palette. An <b>Open a File</b> dialog appears, listing your project (<code>res://</code>) and showing only the file types it accepts. Pick a file and it becomes a new PixelScatterItem, named after the file (underscores become spaces), already selected and ready to paint:</p>
+<ul>
+  <li>A <b>scene or model</b> — <code>.tscn / .scn / .glb / .gltf / .blend / .fbx</code> — goes into the item's <span class="ui">Scene</span> slot.</li>
+  <li>A <b>bare mesh</b> — <code>.mesh / .tres / .res / .obj</code> — goes into the item's <span class="ui">Cage</span> slot.</li>
+  <li>Either way, <span class="ui">Form</span> is set to <b>Custom</b>.</li>
+</ul>
+<p>You can also do it by hand: <span class="ui">Edit</span> an item, set Form to Custom and drag a file into Scene or Cage. Getting models into the project, and making them look right as props, is covered step by step in <a href="12-using-models.html">Using models: tiles, foliage &amp; props</a> (and importing in <a href="11-importing-models.html">Importing models</a>).</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>It's like turning a Toolbox model into a brush. Scene ≈ a Roblox Model (several parts); Cage ≈ a single MeshPart's mesh.</p></div>
+
+<!-- ===================================================== WILD FLOWERS -->
+<h2 id="wild-flowers">Wild Flowers: a meadow in one click</h2>
+<p><b>MarchingSquaresWildFlowers</b> is a separate node you add under the terrain. It plants whole meadows of wild flowers in one go, using a simple climate model: slope, how wet the ground is, shade from trees and distance from water.</p>
+
+<h3 id="wf-add">Adding the node</h3>
+<div class="tabs">
+  <div class="panel" data-tab="From Settings (easiest)">
+    <ol class="steps" data-id="foliage-wf-add">
+      <li>Select the terrain, press <kbd>9</kbd> for <b>Settings</b>, open the <b>LOD &amp; Nature</b> page.</li>
+      <li>Click <span class="ui">Add</span> on the <b>Wild Flowers</b> row. It creates the child node, wires its <span class="ui">Terrain</span> to this terrain, and selects it.</li>
+    </ol>
+    <figure class="shot"><img src="media/05-foliage-grass/50-lod-nature.png" alt="The Settings tool's LOD and Nature page: LOD Distance 48, LOD In Editor, and Add buttons for Erosion and Wild Flowers."><figcaption>Settings ▸ LOD &amp; Nature. The other <span class="ui">Add</span> creates a droplet-Erosion child (see <a href="03-terrain-sculpting.html">Sculpting</a>).</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="By hand">
+    <ol>
+      <li>Right-click the terrain in the Scene dock → <span class="ui">Add Child Node</span> → <code>MarchingSquaresWildFlowers</code>.</li>
+      <li>Drag the terrain node into the new node's <span class="ui">Terrain</span> slot in the Inspector.</li>
+    </ol>
+    <p>Until you do, a warning icon says: "Assign the Terrain to plant: without one, Scatter Wild Flowers does nothing."</p>
+  </div>
+</div>
+
+<h3 id="wf-use">Scatter and Clear</h3>
+<div class="pair">
+  <figure class="shot"><img src="media/05-foliage-grass/51-wildflowers-inspector.png" alt="The MarchingSquaresWildFlowers Inspector: Terrain set to MarchingSquaresTerrain, Scatter Wild Flowers and Clear Wild Flowers buttons, Species Array of PixelScatterItem, Seed 0, and collapsed Placement and Ground water groups."><figcaption>The node's Inspector: Terrain, the two buttons, Species, Seed.</figcaption></figure>
+  <div>
+    <p>Press <span class="ui">Scatter Wild Flowers</span> (or <span class="ui">Scatter</span> in its strip): flowers bloom across the whole terrain as one undoable action ("scatter wild flowers"), gathering toward the water's edge. <span class="ui">Clear</span> removes them ("clear wild flowers").</p>
+    <p><span class="ui">Species</span> is a list of PixelScatterItems, auto-filled on the first scatter with about nine built-in wild species (Wild Yarrow, Foxglove, Cowslip, Harebell, Mallow…). Change <span class="ui">Seed</span> for a different layout.</p>
+  </div>
+</div>
+<div class="pair">
+  <figure class="clip"><video src="media/05-foliage-grass/53-wildflowers-scatter.mp4" poster="media/05-foliage-grass/53-wildflowers-scatter.png" data-autoplay></video><figcaption>Scatter: a wild-flower meadow blooms, clustered near the pond shore.</figcaption></figure>
+  <figure class="clip"><video src="media/05-foliage-grass/54-wildflowers-clear.mp4" poster="media/05-foliage-grass/54-wildflowers-clear.png" data-autoplay></video><figcaption>Clear: the wild flowers are removed.</figcaption></figure>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p>Scatter permanently <b>adds</b> its species to the terrain's Scatter Items. They then show up in the Foliage palette — and stay there after Clear — so the palette gets longer. Remove them with <span class="ui">Remove</span> if you don't want them.</p></div>
+
+<h3 id="wf-strip">The Wild Flowers strip</h3>
+<p>With the node selected, a bottom strip titled <b>Wild Flowers</b> appears with two tabs.</p>
+<div class="tabs">
+  <div class="panel" data-tab="Placement">
+    <figure class="shot"><img src="media/05-foliage-grass/52-wildflowers-strip.png" alt="Wild Flowers strip, Placement tab: Scatter and Clear buttons, Seed 0, Density 1.0, Patch Scale 1.0, Threshold 0.1, Max Slope 0.374, Points/Cell 8, Jitter 0.4."><figcaption>Placement: "Scatter / clear and the flower placement."</figcaption></figure>
+    <table class="ref">
+      <tr><th>Control</th><th>Range · default</th><th>What it does</th></tr>
+      <tr><td>Scatter</td><td>button</td><td>Plant the meadow (<code>scatter_flowers()</code>, undoable).</td></tr>
+      <tr><td>Clear</td><td>button</td><td>Remove it (<code>clear_flowers()</code>, undoable).</td></tr>
+      <tr><td>Seed</td><td>int · 0</td><td>Different seed, different meadow.</td></tr>
+      <tr><td>Density</td><td>0 – 2+ · 1.0</td><td>Overall amount of flowers.</td></tr>
+      <tr><td>Patch Scale</td><td>0.05 – 8 · 1.0</td><td>Size of the flower patches.</td></tr>
+      <tr><td>Threshold</td><td>0 – 1 · 0.1</td><td>Bloom threshold: higher = fewer spots qualify.</td></tr>
+      <tr><td>Max Slope</td><td>0 – 1 · 0.374</td><td>Steepest ground flowers grow on.</td></tr>
+      <tr><td>Points/Cell</td><td>2 – 32 · 8</td><td>Candidate spots tested per cell.</td></tr>
+      <tr><td>Jitter</td><td>0 – 1 · 0.4</td><td>Random offset of each spot, so flowers don't sit on a grid.</td></tr>
+    </table>
+  </div>
+  <div class="panel" data-tab="Ground Water">
+    <figure class="shot"><img src="media/05-foliage-grass/52b-wildflowers-groundwater.png" alt="Wild Flowers strip, Ground Water tab: Ground Water 0.25, Variation 0.25, Shore Wet 0.3, Water Level 0.0, Shore Dist. 3.0, Trees Shade ticked."><figcaption>Ground Water: "Ground water that decides where flowers grow."</figcaption></figure>
+    <table class="ref">
+      <tr><th>Control</th><th>Range</th><th>What it does</th></tr>
+      <tr><td>Ground Water</td><td>0 – 1</td><td>Base wetness of the ground.</td></tr>
+      <tr><td>Variation</td><td>0 – 1</td><td>How much wetness varies across the map.</td></tr>
+      <tr><td>Shore Wet</td><td>0 – 1</td><td>Extra wetness near water — flowers gather at the shore.</td></tr>
+      <tr><td>Water Level</td><td>height</td><td>Where the water is.</td></tr>
+      <tr><td>Shore Dist.</td><td>0.01 – 64</td><td>How far from the water the shore wetness reaches.</td></tr>
+      <tr><td>Trees Shade</td><td>on/off</td><td>Fewer flowers under trees.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<div class="gallery">
+  <figure class="shot"><img src="media/05-foliage-grass/70-recipe-rocks-shore.png" alt="Grey rocks lining the edge of a blue pond like a pebble beach."><figcaption><b>Rocks on a shore.</b> Select <b>Rock</b>, moderate Density, LMB-drag <i>along</i> the pond's edge. Props are never planted under water, so the brush can overlap the pond.</figcaption></figure>
+  <figure class="shot"><img src="media/05-foliage-grass/71-recipe-flower-meadow.png" alt="A dense carpet of small colourful flowers covering flat grass beside the pond."><figcaption><b>A flower meadow.</b> Select <b>+ Flowers</b> (or Ctrl+click several Wild species), Density high, LMB-drag back and forth over flat grass.</figcaption></figure>
+  <figure class="shot"><img src="media/05-foliage-grass/72-recipe-forest-edge.png" alt="A thick band of pine trees that thins out into open grass toward the pond."><figcaption><b>A forest edge.</b> <b>+ Pine</b>: several overlapping dense strokes, then one light pass at the margin so the trees thin into open grass.</figcaption></figure>
+</div>
+<div class="callout try"><span class="label">Try it</span><p>Combine all three on hex_island: a forest edge on the hill, a meadow on the flat ground below, rocks along the pond. Then run <b>Wild Flowers ▸ Scatter</b> for natural filler, and switch the grass Animation FPS to 4 for a retro sway.</p></div>
+
+<!-- ===================================================== REFERENCE -->
+<h2 id="reference">Foliage tool reference</h2>
+<input class="filter-box" data-target="#foliage-ref" placeholder="Filter controls…">
+<div id="foliage-ref">
+  <div class="control"><h4>Foliage button</h4><div class="where">Tool column · slot 5</div><p>Activates the Foliage tool; opens the palette and the Foliage strip. Visible only while a terrain is selected.</p><dl><dt>Shortcut</dt><dd><kbd>5</kbd></dd></dl></div>
+  <div class="control"><h4>Palette</h4><div class="where">Right panel</div><p>Grass, the terrain's Scatter Items, and built-in + presets. Click = one, Ctrl/Shift+click = several, double-click = edit.</p></div>
+  <div class="control"><h4>Grass entry</h4><div class="where">Palette · first</div><p>Paints/erases the grass blade mask. Only grows on grass-ticked textures.</p></div>
+  <div class="control"><h4>+ presets</h4><div class="where">Palette</div><p>+ Rock, + Bush, + Tree, + Pine, + Flowers — only the kinds the terrain lacks. First stroke adds the item (undoable).</p></div>
+  <div class="control"><h4>Edit</h4><div class="where">Under the palette</div><p>Show the selected prop's settings (mesh, scale, placement rules, collision…) in the Inspector. Needs a prop selected.</p></div>
+  <div class="control"><h4>Remove</h4><div class="where">Under the palette</div><p>Remove the selected props from the Scatter Items, with every instance (undoable). Needs a prop selected.</p></div>
+  <div class="control"><h4>Add Mesh / Scene…</h4><div class="where">Under the palette</div><p>Add a prop from a mesh (.mesh/.tres/.res/.obj → Cage) or a scene/model (.tscn/.glb/.gltf/.blend/.fbx → Scene), and select it.</p></div>
+  <div class="control"><h4>Size</h4><div class="where">Foliage strip</div><p>Brush diameter in world units; always round.</p><dl><dt>Range</dt><dd>1 – 50 (accepts a little more)</dd><dt>Default</dt><dd>15</dd><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Density</h4><div class="where">Foliage strip</div><p>How full a stroke paints; 1 = props almost touching. Painting only. Re-stroking fills gaps.</p><dl><dt>Range</dt><dd>0.05 – 1.0</dd><dt>Default</dt><dd>0.25</dd></dl></div>
+  <div class="control"><h4>Slope Min</h4><div class="where">Foliage strip</div><p>Only affect terrain at least this steep.</p><dl><dt>Range</dt><dd>0 – 90°, step 0.5</dd><dt>Default</dt><dd>0</dd></dl></div>
+  <div class="control"><h4>Slope Max</h4><div class="where">Foliage strip</div><p>Only affect terrain at most this steep.</p><dl><dt>Range</dt><dd>0 – 90°, step 0.5</dd><dt>Default</dt><dd>90</dd></dl></div>
+  <div class="control"><h4>Erase All</h4><div class="where">Foliage strip</div><p>Erasing removes every prop, not only the selected ones.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+  <div class="control"><h4>Fill Terrain</h4><div class="where">Foliage strip</div><p>Scatter the selected props over the whole terrain with each item's own rules; replaces their instances. Undoable.</p></div>
+  <div class="control"><h4>Clear</h4><div class="where">Foliage strip</div><p>Remove every instance of the selected props. Undoable.</p></div>
+  <div class="control"><h4>LMB-drag</h4><div class="where">3D view</div><p>Paint the selected entries; a click places at least one. Green disc.</p></div>
+  <div class="control"><h4>RMB-drag / Shift+LMB-drag</h4><div class="where">3D view</div><p>Erase the selected entries (or every prop with Erase All). Red/orange disc.</p></div>
+  <div class="control"><h4>Mouse wheel</h4><div class="where">3D view</div><p><kbd>Shift</kbd>+wheel = Size. <kbd>Shift</kbd>/<kbd>Alt</kbd>+wheel never zoom. <kbd>Ctrl</kbd>+wheel and plain wheel zoom the camera.</p></div>
+  <div class="control"><h4>Messages</h4><div class="where">3D view</div><p>"Nothing painted" (spot full / under water / built over / outside slope) and "Nothing erased here".</p></div>
+  <div class="control"><h4>Undo</h4><div class="where">Anywhere</div><p><kbd>Ctrl</kbd>+<kbd>Z</kbd>: paint, erase, fill, clear, + materialise, add/remove item — each one step.</p></div>
+  <div class="control"><h4>Wild Flowers: Add</h4><div class="where">Settings ▸ LOD &amp; Nature</div><p>Create and wire a MarchingSquaresWildFlowers child.</p></div>
+</div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You painted Grass on a sandy beach and nothing happened. Why?</summary><p>Grass only grows on ground textures with <span class="ui">Grass</span> ticked in the Paint tool's Textures panel. Sand isn't ticked by default. Tick it (page 4) or paint a grassy texture first.</p></details>
+<details class="check"><summary>You want to remove only the rocks from a patch full of trees and rocks. How?</summary><p>Select only <b>Rock</b> in the palette, make sure <span class="ui">Erase All</span> is off, and RMB-drag (or Shift+LMB-drag) over the patch.</p></details>
+<details class="check"><summary>Fill Terrain put pines on the beach. Which setting fixes that?</summary><p>Edit the Pine item and untick the sand texture in <b>Placement ▸ Ground Slots</b> (or lower its Height Min / Slope filters), then Fill Terrain again. The strip's Density doesn't affect Fill Terrain.</p></details>
+<details class="check"><summary>Where does a <code>.glb</code> tree land when you use Add Mesh / Scene…?</summary><p>In the new PixelScatterItem's <span class="ui">Scene</span> slot, with Form set to Custom. A bare mesh would go into <span class="ui">Cage</span>. See <a href="12-using-models.html">Using models</a>.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="04-terrain-painting.html">Painting, textures &amp; tint</a> — the Grass tick per texture, and ground textures props can be limited to.</li>
+  <li><a href="03-terrain-sculpting.html">Sculpting terrain</a> — reshape the ground; props and grass follow.</li>
+  <li><a href="12-using-models.html">Using models: tiles, foliage &amp; props</a> — your own models as foliage, in full.</li>
+  <li><a href="11-importing-models.html">Importing models</a> — getting .glb / .blend / .fbx files into the project.</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — the Settings tool pages (Grass, LOD &amp; Nature).</li>
+  <li><a href="07-pixelizer.html">The pixelizer</a> — how Pixel Size and outlines render.</li>
+  <li><a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a> — the water your flowers gather around.</li>
+</ul>
+
+<script>
+(function () {
+  var box = document.getElementById('paint-vs-fill');
+  if (!box) return;
+  var ans = box.querySelector('.ans');
+  var A = {
+    paint: '<b>Paint it.</b> Select the prop, set Size and Density in the strip, and LMB-drag where you want it. Painting goes exactly where your brush goes.',
+    fill: '<b>Fill Terrain.</b> Select the prop and click Fill Terrain: it scatters everywhere using the item’s own density, slope, height, ground-texture and cluster rules.',
+    rules: '<b>Edit the item, then Fill Terrain.</b> Untick Sand/Cliff in Placement ▸ Ground Slots and lower Filters ▸ Slope Max. (Painting ignores those rules; Fill Terrain obeys them.)',
+    redo: '<b>Change the item’s Seed, then Fill Terrain again.</b> Fill replaces the current instances, so you get a fresh layout. Ctrl+Z if you liked the old one better.'
+  };
+  box.querySelectorAll('button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      box.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      ans.innerHTML = A[b.getAttribute('data-a')];
+    });
+  });
+})();
+</script>
+
+</div></main>
+</body>
+</html>

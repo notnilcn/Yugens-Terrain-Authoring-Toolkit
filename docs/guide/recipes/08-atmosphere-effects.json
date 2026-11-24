@@ -1,0 +1,4512 @@
+{
+  "page": "08-atmosphere-effects",
+  "media_dir": "docs/guide/media/08-atmosphere-effects",
+  "session": {
+    "scene": "res://tutorial/04_world_mood.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [],
+  "items": [
+    {
+      "id": "40-daynight-cycle",
+      "kind": "clip",
+      "outputs": [
+        "40-daynight-cycle.mp4",
+        "40-daynight-cycle.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "running",
+            "false",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.26",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "40-daynight-cycle.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "shell": "for t in 0.28 0.31 0.34 0.37 0.40 0.44 0.48 0.52 0.56 0.60 0.64 0.68 0.72 0.76 0.80; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop time_of_day $t --path PixelDayNight >/dev/null; sleep 0.35; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "40-daynight-cycle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "40-daynight-cycle.mp4",
+            "out": "40-daynight-cycle.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "Close island, camera preview; the sky and light sweep dawn -> bright noon -> dusk -> night across the clip (not a far top-down view). No birds, no dust.",
+      "notes": "The orbit clock does not advance in the editor, so time_of_day is stepped manually with set-prop during recording to drive the cycle. Camera distance is set to 55 BEFORE enabling preview (click 355,228); the orbit camera only re-reads distance when preview is (re)enabled."
+    },
+    {
+      "id": "44-storm",
+      "kind": "clip",
+      "outputs": [
+        "44-storm.mp4",
+        "44-storm.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.5",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "transition_seconds",
+            "0",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "strength",
+            "1",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "lightning_enabled",
+            "true",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "5",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "44-storm.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "call",
+            "strike_lightning",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "call",
+            "strike_lightning",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "call",
+            "strike_lightning",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "call",
+            "strike_lightning",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "44-storm.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "44-storm.mp4",
+            "out": "44-storm.png",
+            "at": 5.6
+          }
+        }
+      ],
+      "check": "Close island, dark/overcast stormy downpour with rain streaks and splashes; lightning bolts flash during the clip. Poster is the 5.6 s flash: a visible bolt and bright rainy sky.",
+      "notes": "transition_seconds set to 0 so Storm applies in one frame. strike_lightning() fires bolts on demand. distance 55 set before enabling preview."
+    },
+    {
+      "id": "45-birds",
+      "kind": "clip",
+      "outputs": [
+        "45-birds.mp4",
+        "45-birds.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.45",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "count",
+            "20",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "size",
+            "4.0",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "altitude",
+            "12",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "radius",
+            "22",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "scare_distance",
+            "0",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "land_interval",
+            "600",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "landing",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "separation",
+            "3.5",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "cohesion",
+            "0.4",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "neighbor_distance",
+            "12",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "45-birds.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "45-birds.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "45-birds.mp4",
+            "out": "45-birds.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "A clear spread flock of individual white pixel birds flying over the island (Animate on). Birds are big enough to read, not tiny dots.",
+      "notes": "size 4 scales the birds up (camera-preview gives an active game camera); scare_distance 0 + landing off keep them in frame; separation up / cohesion down spreads the flock. distance 55 before preview."
+    },
+    {
+      "id": "46-fireflies",
+      "kind": "clip",
+      "outputs": [
+        "46-fireflies.mp4",
+        "46-fireflies.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.93",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "count",
+            "220",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "energy",
+            "6",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "size",
+            "0.65",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "night_only",
+            "1",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "46-fireflies.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 15
+          }
+        },
+        {
+          "wait": 11
+        },
+        {
+          "record_stop": {
+            "out": "46-fireflies.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "46-fireflies.mp4",
+            "out": "46-fireflies.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "Dark night island with glowing yellow/white fireflies blinking and wandering as clear specks over the island.",
+      "notes": "time_of_day 0.93 (night) so night_only fireflies fade in; count/energy/size raised so they read. distance 55 before preview."
+    },
+    {
+      "id": "51-particle-dust",
+      "kind": "clip",
+      "outputs": [
+        "51-particle-dust.mp4",
+        "51-particle-dust.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "set-prop",
+            "density",
+            "1.0",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "beam",
+            "0.0",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "370"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "51-particle-dust.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1100",
+            "480"
+          ]
+        },
+        {
+          "wait": 9
+        },
+        {
+          "record_stop": {
+            "out": "51-particle-dust.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "51-particle-dust.mp4",
+            "out": "51-particle-dust.png",
+            "at": 7
+          }
+        }
+      ],
+      "check": "Close view of hex_island's ruin and pond with many pale one-pixel dust motes drifting over the grass (Beam 0, Density 1.0); birds and fireflies hidden so the motes are the only specks.",
+      "notes": "Verified 2026-11-24 on :108/8908. The default field is deliberately faint (Density 0.2, Beam 1 = only inside god-ray shafts). Density 1.0 + Beam 0 makes the motes read, but only up close: at island distance a mote is a single pixel. hex_island opens already framed close on the ruin (the scene's own 3D camera), so no zoom steps are needed. Birds/Fireflies are hidden so their specks are not mistaken for dust.",
+      "scene": "res://demo/hex_island.tscn"
+    },
+    {
+      "id": "47-smoke-fire",
+      "kind": "clip",
+      "outputs": [
+        "47-smoke-fire.mp4",
+        "47-smoke-fire.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.45",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "528"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelSmoke"
+            ],
+            "contains": "Smoke"
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "position",
+            "[48,9,48]",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "fire",
+            "true",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "rate",
+            "28",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "lifetime",
+            "10",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "rise_speed",
+            "5",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "start_size",
+            "1.0",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "end_size",
+            "9",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "spread",
+            "0.6",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "wind_strength",
+            "1.5",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "max_puffs",
+            "256",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "47-smoke-fire.mp4",
+            "rect": [
+              470,
+              168,
+              620,
+              352
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "47-smoke-fire.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "47-smoke-fire.mp4",
+            "out": "47-smoke-fire.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "A tall grey smoke plume rising from the island centre with a dark fire base, fully in frame, drifting with the wind. Plume is big and obvious.",
+      "notes": "Adds a PixelSmoke via the Pixel World panel (Smoke & Fire + Add at 1259,528 with PixelSky selected, no scroll) and moves it onto the island centre (it spawns mid-air at the camera focus). Raise end_size so the plume reads at the far camera; crop top 168 keeps the plume tip in frame without the viewport toolbar. Node is session-only. Preview (355,228) is enabled so the viewport shows the scene Camera's close island view used by the media."
+    },
+    {
+      "id": "48-grass-fire",
+      "kind": "clip",
+      "outputs": [
+        "48-grass-fire.mp4",
+        "48-grass-fire.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.45",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "8"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "366"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelFireSystem"
+            ],
+            "contains": "FireSystem"
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "spread_rate",
+            "6",
+            "--path",
+            "FireSystem"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "flame_rate",
+            "30",
+            "--path",
+            "FireSystem"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "burn_time",
+            "20",
+            "--path",
+            "FireSystem"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[36,3,48]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[60,3,48]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[48,3,36]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[48,3,60]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[38,3,38]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[58,3,58]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[38,3,58]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "call",
+            "ignite",
+            "[58,3,38]",
+            "6.0",
+            "--path",
+            "FireSystem",
+            "--type",
+            "Vector3"
+          ]
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "48-grass-fire.mp4",
+            "rect": [
+              470,
+              166,
+              620,
+              354
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "wait": 12
+        },
+        {
+          "record_stop": {
+            "out": "48-grass-fire.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "48-grass-fire.mp4",
+            "out": "48-grass-fire.png",
+            "at": 2
+          }
+        }
+      ],
+      "check": "Fire spreading across the island's grass with orange flames and charring the ground, over the clip. Fire is big and obvious.",
+      "notes": "Adds a PixelFireSystem under the terrain (Grass Fire + Add, panel scrolled down 8). ignite(pos, radius) must hit grass (ring positions, not the bare central mesa, which returns 0 cells). Record immediately after igniting so the active spread is captured. Node is session-only."
+    },
+    {
+      "id": "121-52-lightvolume-night",
+      "kind": "still+clip",
+      "outputs": [
+        "121-lightvolume-night.png",
+        "52-lightvolume-night.mp4",
+        "52-lightvolume-night.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "open-scene",
+            "res://addons/MarchingSquaresTerrain/effects/pixel_light_volume.tscn"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "c",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "open-scene",
+            "res://tutorial/04_world_mood.tscn"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "WorldMood"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "v",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "OmniLight3D"
+            ],
+            "contains": "Light"
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "position",
+            "[40,8,52]",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "energy",
+            "20",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pool_energy",
+            "2.5",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pool_scale",
+            "1.5",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "radius",
+            "14",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "flicker",
+            "0.6",
+            "--path",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.95",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "121-lightvolume-night.png",
+            "crop": [
+              582,
+              270,
+              360,
+              220
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/121-lightvolume-night.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "record_start": {
+            "out": "52-lightvolume-night.mp4",
+            "rect": [
+              582,
+              270,
+              360,
+              220
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "52-lightvolume-night.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "52-lightvolume-night.mp4",
+            "out": "52-lightvolume-night.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "Night island (Time 0.95), close crop: a warm dithered lamp pool with a glowing core on the grass; the clip shows it flickering. 121 is the 2x still, 52 the clip + poster.",
+      "notes": "Merged still+clip so the copy/paste rig setup runs once per session (the editor clipboard does not survive a session restart, so this must not be split across fresh_session items). Pixel World + Add creates a PixelLightVolume with no Light/Volume children, so the item copies the root of res://addons/MarchingSquaresTerrain/effects/pixel_light_volume.tscn and pastes it under WorldMood. Energy 20 / Pool Energy 2.5 / Pool Scale 1.5 / Radius 14, Flicker 0.6."
+    },
+    {
+      "id": "01-hero-workspace",
+      "kind": "series",
+      "outputs": [
+        "01-hero.png",
+        "01-atmosphere-workspace.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.73",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "01-hero.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "01-atmosphere-workspace.png"
+          }
+        }
+      ],
+      "check": "Dusk island hero crop and a full 1600x900 editor workspace with the Day/Night strip open.",
+      "notes": "Hero is the viewport crop; workspace is the whole window."
+    },
+    {
+      "id": "10-12-daynight-tabs",
+      "kind": "series",
+      "outputs": [
+        "10-daynight-time.png",
+        "11-daynight-sunfog.png",
+        "12-daynight-rimlight.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Time"
+            ],
+            "contains": "Time"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Time"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "10-daynight-time.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/10-daynight-time.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Sun & Fog"
+            ],
+            "contains": "Sun & Fog"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Sun & Fog"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "11-daynight-sunfog.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/11-daynight-sunfog.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Rim Light"
+            ],
+            "contains": "Rim Light"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rim Light"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "12-daynight-rimlight.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/12-daynight-rimlight.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "PixelDayNight tab shots: 10-daynight-time.png, 11-daynight-sunfog.png, 12-daynight-rimlight.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "13-tod-series",
+      "kind": "series",
+      "outputs": [
+        "13-tod-000.png",
+        "13-tod-025.png",
+        "13-tod-050.png",
+        "13-tod-075.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.0",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "13-tod-000.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.25",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "13-tod-025.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.50",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "13-tod-050.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.75",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "13-tod-075.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        }
+      ],
+      "check": "Same island view at Time 0.00/0.25/0.50/0.75 (night, dawn, noon, dusk).",
+      "notes": "Time set with set-prop."
+    },
+    {
+      "id": "20-weather-strip",
+      "kind": "series",
+      "outputs": [
+        "20-weather-strip.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "20-weather-strip.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/20-weather-strip.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "PixelWeather tab shots: 20-weather-strip.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "21-weather-gallery",
+      "kind": "series",
+      "outputs": [
+        "20-weather-strip.png",
+        "21-weather-clear.png",
+        "21-weather-cloudy.png",
+        "21-weather-foggy.png",
+        "21-weather-rain.png",
+        "21-weather-snow.png",
+        "21-weather-storm.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "0",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-clear.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "1",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-cloudy.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "2",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-foggy.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "3",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-rain.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "4",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-snow.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "5",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "21-weather-storm.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        }
+      ],
+      "check": "The six weather types as 719x350 viewport shots.",
+      "notes": "set-prop weather 0..5; weather snaps in one frame."
+    },
+    {
+      "id": "22-26-weather-tabs",
+      "kind": "series",
+      "outputs": [
+        "22-weather-snowtab.png",
+        "23-weather-particles.png",
+        "24-weather-raintab.png",
+        "25-weather-lightning.png",
+        "26-weather-colors.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Snow"
+            ],
+            "contains": "Snow"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Snow"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "22-weather-snowtab.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/22-weather-snowtab.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Particles"
+            ],
+            "contains": "Particles"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Particles"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "23-weather-particles.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/23-weather-particles.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Rain"
+            ],
+            "contains": "Rain"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-weather-raintab.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/24-weather-raintab.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Lightning"
+            ],
+            "contains": "Lightning"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Lightning"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-weather-lightning.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/25-weather-lightning.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Colors"
+            ],
+            "contains": "Colors"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Colors"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "26-weather-colors.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/26-weather-colors.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "PixelWeather tab shots: 22-weather-snowtab.png, 23-weather-particles.png, 24-weather-raintab.png, 25-weather-lightning.png, 26-weather-colors.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "30-sky-strip",
+      "kind": "series",
+      "outputs": [
+        "30-sky-strip.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "30-sky-strip.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/30-sky-strip.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "PixelSky tab shots: 30-sky-strip.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "60-63-particle-tabs",
+      "kind": "series",
+      "outputs": [
+        "60-particle-field.png",
+        "61-particle-layers.png",
+        "62-particle-flipbook.png",
+        "63-particle-look.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Field"
+            ],
+            "contains": "Field"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Field"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "60-particle-field.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/60-particle-field.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Layers"
+            ],
+            "contains": "Layers"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Layers"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "61-particle-layers.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/61-particle-layers.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Flipbook"
+            ],
+            "contains": "Flipbook"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Flipbook"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "62-particle-flipbook.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/62-particle-flipbook.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Look"
+            ],
+            "contains": "Look"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Look"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "63-particle-look.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/63-particle-look.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Dust tab shots: 60-particle-field.png, 61-particle-layers.png, 62-particle-flipbook.png, 63-particle-look.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "70-73-bird-tabs",
+      "kind": "series",
+      "outputs": [
+        "70-birds-flock.png",
+        "71-birds-steering.png",
+        "72-birds-landing.png",
+        "73-birds-look.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Flock"
+            ],
+            "contains": "Flock"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Flock"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "70-birds-flock.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/70-birds-flock.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Steering"
+            ],
+            "contains": "Steering"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Steering"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "71-birds-steering.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/71-birds-steering.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Landing"
+            ],
+            "contains": "Landing"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Landing"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "72-birds-landing.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/72-birds-landing.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Look"
+            ],
+            "contains": "Look"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Look"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "73-birds-look.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/73-birds-look.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Birds tab shots: 70-birds-flock.png, 71-birds-steering.png, 72-birds-landing.png, 73-birds-look.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "80-fireflies-strip",
+      "kind": "series",
+      "outputs": [
+        "80-fireflies-strip.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Fireflies"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "80-fireflies-strip.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/80-fireflies-strip.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Fireflies tab shots: 80-fireflies-strip.png. Full tab row and rows, nothing clipped.",
+      "notes": "Strip crops at x332 w714 in the 1600x900 layout, a few px above the section label, then 2x NEAREST."
+    },
+    {
+      "id": "90-add-before-after",
+      "kind": "series",
+      "outputs": [
+        "90-add-before.png",
+        "90-add-after.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Smoke & Fire"
+            ],
+            "contains": "+ Add"
+          }
+        },
+        {
+          "shot": {
+            "out": "90-add-before.png",
+            "crop": [
+              1055,
+              495,
+              280,
+              90
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "528"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "90-add-after.png",
+            "crop": [
+              1055,
+              495,
+              280,
+              90
+            ]
+          }
+        }
+      ],
+      "check": "Pixel World panel: Smoke & Fire row reads + Add before, Select after.",
+      "notes": "Fresh session so the Smoke & Fire row is definitely + Add before the click; crop is the Smoke & Fire row plus the row above."
+    },
+    {
+      "id": "100-103-smoke-tabs",
+      "kind": "series",
+      "outputs": [
+        "100-smoke-emission.png",
+        "101-smoke-firelight.png",
+        "102-smoke-options.png",
+        "103-smoke-colors.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "528"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Smoke"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Emission"
+            ],
+            "contains": "Emission"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Emission"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "100-smoke-emission.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/100-smoke-emission.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Fire Light"
+            ],
+            "contains": "Fire Light"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Fire Light"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "101-smoke-firelight.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/101-smoke-firelight.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Options"
+            ],
+            "contains": "Options"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Options"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "102-smoke-options.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/102-smoke-options.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Colors"
+            ],
+            "contains": "Colors"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Colors"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "103-smoke-colors.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/103-smoke-colors.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "The four Smoke & Fire tabs.",
+      "notes": "Adds a session-only Smoke via the panel."
+    },
+    {
+      "id": "110-114-fire-tabs",
+      "kind": "series",
+      "outputs": [
+        "110-fire-fire.png",
+        "111-fire-spread.png",
+        "112-fire-windrain.png",
+        "113-fire-regrowth.png",
+        "114-fire-look.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "8"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "366"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelFireSystem"
+            ],
+            "contains": "FireSystem"
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "FireSystem"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Fire"
+            ],
+            "contains": "Fire"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Fire"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "110-fire-fire.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/110-fire-fire.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Spread"
+            ],
+            "contains": "Spread"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Spread"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "111-fire-spread.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/111-fire-spread.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Wind & Rain"
+            ],
+            "contains": "Wind & Rain"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Wind & Rain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "112-fire-windrain.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/112-fire-windrain.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Regrowth"
+            ],
+            "contains": "Regrowth"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Regrowth"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "113-fire-regrowth.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/113-fire-regrowth.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Look"
+            ],
+            "contains": "Look"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Look"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "114-fire-look.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/114-fire-look.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "The five Grass Fire tabs.",
+      "notes": "Adds a FireSystem under the terrain (panel scrolled down 8)."
+    },
+    {
+      "id": "120-lightvolume-strip",
+      "kind": "still",
+      "outputs": [
+        "120-lightvolume-strip.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "open-scene",
+            "res://addons/MarchingSquaresTerrain/effects/pixel_light_volume.tscn"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "PixelLightVolume"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "120-lightvolume-strip.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/120-lightvolume-strip.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Light Volumes strip: Radius, Color, Energy, Flicker, Shadows, Glow, pool/glow fields, Night Boost.",
+      "notes": "Opens the shipped PixelLightVolume scene to show its strip."
+    },
+    {
+      "id": "130-sunshafts-strip",
+      "kind": "still",
+      "outputs": [
+        "130-sunshafts-strip.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1259",
+            "259"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelSunShafts"
+            ],
+            "contains": "SunShafts"
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "SunShafts"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "130-sunshafts-strip.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/130-sunshafts-strip.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Sun Shafts strip: Sheets, Depth, Size, Follow Cam, Tint, Alpha, Start Depth, Shaft Steps, Dither, Edge Fade, Fade Height, Surface Fade.",
+      "notes": "Adds Sun Shafts via the Pixel World panel scrolled down 6 steps (the Sun Shafts + Add lands at 1227,410)."
+    },
+    {
+      "id": "131-sunshafts-raised",
+      "kind": "still",
+      "outputs": [
+        "131-sunshafts-raised.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.78",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "alpha",
+            "1.0",
+            "--path",
+            "SunShafts"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "131-sunshafts-raised.png",
+            "crop": [
+              287,
+              165,
+              719,
+              350
+            ]
+          }
+        }
+      ],
+      "check": "Dusk viewport with a bright sun shaft streaming from the low sun across the water.",
+      "notes": "Continues from 130: Sun Shafts exists, Time 0.78, Alpha 1.0."
+    },
+    {
+      "id": "41-water-waves",
+      "kind": "clip",
+      "outputs": [
+        "41-water-waves.mp4",
+        "41-water-waves.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Dust"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.5",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "41-water-waves.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "41-water-waves.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "41-water-waves.mp4",
+            "out": "41-water-waves.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "41-water-waves: island viewport clip with the effect visible in motion; poster mid-effect.",
+      "notes": "Same close island framing as the other clips; preview through the scene Camera (355,228) and the smoke/dust/birds hidden where they distract."
+    },
+    {
+      "id": "42-rain",
+      "kind": "clip",
+      "outputs": [
+        "42-rain.mp4",
+        "42-rain.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "transition_seconds",
+            "0",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "strength",
+            "1",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "3",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "42-rain.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "42-rain.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "42-rain.mp4",
+            "out": "42-rain.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "42-rain: island viewport clip with the effect visible in motion; poster mid-effect.",
+      "notes": "Same close island framing as the other clips; preview through the scene Camera (355,228) and the smoke/dust/birds hidden where they distract."
+    },
+    {
+      "id": "43-snow",
+      "kind": "clip",
+      "outputs": [
+        "43-snow.mp4",
+        "43-snow.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "transition_seconds",
+            "0",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "strength",
+            "1",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "weather",
+            "4",
+            "--path",
+            "PixelWeather"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "visible",
+            "false",
+            "--path",
+            "Birds"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "43-snow.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "43-snow.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "43-snow.mp4",
+            "out": "43-snow.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "43-snow: island viewport clip with the effect visible in motion; poster mid-effect.",
+      "notes": "Same close island framing as the other clips; preview through the scene Camera (355,228) and the smoke/dust/birds hidden where they distract."
+    },
+    {
+      "id": "49-clouds-drift",
+      "kind": "clip",
+      "outputs": [
+        "49-clouds-drift.mp4",
+        "49-clouds-drift.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.45",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "49-clouds-drift.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "wait": 10
+        },
+        {
+          "record_stop": {
+            "out": "49-clouds-drift.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "49-clouds-drift.mp4",
+            "out": "49-clouds-drift.png",
+            "at": 5
+          }
+        }
+      ],
+      "check": "49-clouds-drift: island viewport clip with the effect visible in motion; poster mid-effect.",
+      "notes": "Same close island framing as the other clips; preview through the scene Camera (355,228) and the smoke/dust/birds hidden where they distract."
+    },
+    {
+      "id": "50-lighting-presets",
+      "kind": "clip",
+      "outputs": [
+        "50-lighting-presets.mp4",
+        "50-lighting-presets.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "distance",
+            "55",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "355",
+            "228"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "750"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "50-lighting-presets.mp4",
+            "rect": [
+              470,
+              180,
+              620,
+              340
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dawn"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Noon"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dusk"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Night"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "50-lighting-presets.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "50-lighting-presets.mp4",
+            "out": "50-lighting-presets.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "Clicking Dawn \u2192 Noon \u2192 Dusk \u2192 Night: the world recolours each time.",
+      "notes": "Lighting preset buttons live in the Pixel World panel (they are visible without scrolling at 1600x900)."
+    },
+    {
+      "id": "50-56-water-tabs",
+      "kind": "series",
+      "outputs": [
+        "50-water-surface.png",
+        "51-water-waves.png",
+        "52-water-light.png",
+        "53-water-caustics.png",
+        "54-water-foam.png",
+        "55-water-colors.png",
+        "56-water-waterfalls.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelWater"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Surface"
+            ],
+            "contains": "Surface"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Surface"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "50-water-surface.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/50-water-surface.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Waves"
+            ],
+            "contains": "Waves"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Waves"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "51-water-waves.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/51-water-waves.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Light"
+            ],
+            "contains": "Light"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Light"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "52-water-light.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/52-water-light.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Caustics"
+            ],
+            "contains": "Caustics"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Caustics"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "53-water-caustics.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/53-water-caustics.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Foam"
+            ],
+            "contains": "Foam"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Foam"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "54-water-foam.png",
+            "crop": [
+              332,
+              515,
+              714,
+              115
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/54-water-foam.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Colors"
+            ],
+            "contains": "Colors"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Colors"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "55-water-colors.png",
+            "crop": [
+              332,
+              550,
+              714,
+              80
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/55-water-colors.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Waterfalls"
+            ],
+            "contains": "Waterfalls"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Waterfalls"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "56-water-waterfalls.png",
+            "crop": [
+              332,
+              480,
+              714,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/56-water-waterfalls.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "The seven Water tabs on hex_island; Waterfalls shows real values.",
+      "notes": "hex_island has waterfalls, so Fall Levels/Fall Speed are non-zero."
+    },
+    {
+      "id": "140-141-presets",
+      "kind": "series",
+      "outputs": [
+        "140-lighting-presets-panel.png",
+        "141-preset-dawn.png",
+        "141-preset-noon.png",
+        "141-preset-dusk.png",
+        "141-preset-night.png",
+        "141-preset-storm.png",
+        "141-preset-snow.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "560",
+            "down",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "140-lighting-presets-panel.png",
+            "crop": [
+              1065,
+              330,
+              235,
+              130
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Dawn"
+            ],
+            "contains": "Dawn"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dawn"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-dawn.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Noon"
+            ],
+            "contains": "Noon"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Noon"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-noon.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Dusk"
+            ],
+            "contains": "Dusk"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dusk"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-dusk.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Night"
+            ],
+            "contains": "Night"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Night"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-night.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Storm"
+            ],
+            "contains": "Storm"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Storm"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-storm.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Snow"
+            ],
+            "contains": "Snow"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Snow"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "141-preset-snow.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        }
+      ],
+      "check": "Lighting Preset buttons and the six preset moods.",
+      "notes": "Presets clicked by label in the scrolled Pixel World panel; each recolours the same viewport crop."
+    },
+    {
+      "id": "150-undo-sequence",
+      "kind": "series",
+      "outputs": [
+        "150-undo-before.png",
+        "150-undo-dusk.png",
+        "150-undo-after.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "set-prop",
+            "time_of_day",
+            "0.5",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "150-undo-before.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "560",
+            "down",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dusk"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "150-undo-dusk.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "150-undo-after.png",
+            "crop": [
+              420,
+              210,
+              560,
+              235
+            ]
+          }
+        }
+      ],
+      "check": "Before (Time 0.5 daylight) -> Dusk preset -> one Ctrl+Z restores the daylight look (Animate on so the sky refreshes).",
+      "notes": "The Dusk preset is one undo step."
+    }
+  ]
+}

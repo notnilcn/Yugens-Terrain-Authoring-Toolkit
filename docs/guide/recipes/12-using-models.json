@@ -1,0 +1,984 @@
+{
+  "page": "12-using-models",
+  "media_dir": "docs/guide/media/12-using-models",
+  "session": {
+    "scene": "res://demo/hex_island.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [],
+  "items": [
+    {
+      "id": "palette-grey-vs-coloured",
+      "kind": "still",
+      "outputs": [
+        "10-palette-grey-vs-colored.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "321",
+            "1071"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "5"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "FoliagePalette"
+            ],
+            "contains": "FoliagePalette"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Add Mesh / Scene...",
+            "--exact",
+            "--no-scroll"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "207"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            854,
+            300
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1150",
+            "860"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "shell": "python3 -c \"import json,os,subprocess,sys;o=json.loads(subprocess.run([sys.executable,'qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],'prop','scatter_items','--path','HexIsland/MarchingSquaresTerrain'],capture_output=True,text=True).stdout);n=len(o['value']);print('scatter-items:',n);sys.exit(0 if n>=7 else 1)\""
+        },
+        {
+          "drive": [
+            "shot",
+            "/tmp/recap-palette.png"
+          ]
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('/tmp/recap-palette.png'); c=im.crop((1383,318,1633,990)); c=c.resize((c.width*2,c.height*2), Image.LANCZOS); c.save('$OUT/10-palette-grey-vs-colored.png')\""
+        }
+      ],
+      "check": "The whole Foliage palette, nothing cropped at the top: Grass, Tree, Pine, Bush, Rock, Flowers and Pebbles (small hexes) all grey, then round tree (selected, green) and the + Bush / + Flowers / + Pine / + Tree presets in colour.",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921). The shipped still was captured on a 1920x1080 editor with the bottom Output dock collapsed, so this item resizes the 1600x900 session to 1920x1080 and clicks the collapsed 'Output' bottom-panel tab (321,1071) first: only then does the Foliage palette (ScrollContainer 1383..1633 x 132..1033) show every row down to +Tree/Add Mesh without scrolling. The crop (1383,318,1633,990) is that column from the ItemList top. Import comes from the file dialog's Path field (the File field drops the first characters typed); round_tree.glb is the 3rd tile in assets/courtyard. The scene is not saved (the added scatter item is session-only)."
+    },
+    {
+      "id": "stone-boulders",
+      "kind": "series",
+      "outputs": [
+        "24-stone-boulders-after.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "321",
+            "1071"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "BuilderRuin/Ruin"
+          ]
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "546"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "900",
+            "546",
+            "down",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "546"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "5"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "FoliagePalette"
+            ],
+            "contains": "FoliagePalette"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Add Mesh / Scene...",
+            "--exact",
+            "--no-scroll"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "207"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/rocks"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "650",
+            "290"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1150",
+            "860"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "shell": "python3 -c \"import json,os,subprocess,sys;o=json.loads(subprocess.run([sys.executable,'qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],'prop','scatter_items','--path','HexIsland/MarchingSquaresTerrain'],capture_output=True,text=True).stdout);n=len(o['value']);print('scatter-items:',n);sys.exit(0 if n>=7 else 1)\""
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "650",
+            "600",
+            "760",
+            "640",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "570",
+            "740",
+            "600",
+            "--duration",
+            "1.0"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "shot",
+            "/tmp/recap-boulders.png"
+          ]
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('/tmp/recap-boulders.png'); c=im.crop((620,500,1160,925)); c=c.resize((c.width*2,c.height*2), Image.NEAREST); c.save('$OUT/24-stone-boulders-after.png')\""
+        }
+      ],
+      "check": "Close-up of the pale stone_largeA boulders painted on the grass beside the ruin, with the hint bar reading 'Painting stone largeA'.",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921). Same 1920x1080 resize + collapsed Output dock as palette-grey-vs-coloured: collapsing puts AddFile (1387,949) on screen (the old recipe's wheel-scroll + click (1499,786) cannot reach it, the button sits under the dock). The camera is deliberately frame-only: `f` on BuilderRuin/Ruin with the pointer over the viewport centre (900,546) then 4 wheel-down notches at the same point - zoom happens around the cursor, so the ruin stays centred and the shot no longer depends on the editor's previous camera. The crop is 540x425 from (620,500) (the taller, dock-collapsed viewport) so the ruin's base, the painted stone_largeA field and the hint bar all fit. stone_largeA is the first tile of assets/rocks; brush size 15 / density 0.253 are the tool defaults. Nothing is saved."
+    },
+    {
+      "id": "builder-prop-paint",
+      "kind": "clip",
+      "outputs": [
+        "61-paint-builder-foliage.mp4",
+        "61-paint-builder-foliage.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/model_uses.tscn",
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "MarchingSquaresTerrain"
+            ],
+            "contains": "MarchingSquaresTerrain"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Foliage"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "expect": {
+            "drive": [
+              "view3d"
+            ],
+            "contains": "640.0"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Fill Terrain"
+            ],
+            "contains": "Fill Terrain"
+          }
+        },
+        {
+          "wait": 4
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "click",
+            "1147",
+            "480"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "drag",
+            "513",
+            "571",
+            "610",
+            "571",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "400",
+            "down",
+            "--times",
+            "1"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "record_start": {
+            "out": "61-paint-builder-foliage.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 40
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "640",
+            "400"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "640",
+            "400"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "440",
+            "900",
+            "430",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "drag",
+            "930",
+            "410",
+            "1010",
+            "405",
+            "--duration",
+            "1.5"
+          ]
+        },
+        {
+          "wait": 8
+        },
+        {
+          "drive": [
+            "move",
+            "990",
+            "480"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "61-paint-builder-foliage.mp4"
+          }
+        },
+        {
+          "shell": "/tmp/opencode/qa/tools/ffmpeg -hide_banner -loglevel error -y -ss 8 -t 18 -i \"$OUT/61-paint-builder-foliage.mp4\" -c:v libx264 -pix_fmt yuv420p -crf 20 -movflags +faststart \"$OUT/61-trim.mp4\" && mv \"$OUT/61-trim.mp4\" \"$OUT/61-paint-builder-foliage.mp4\""
+        },
+        {
+          "poster": {
+            "video": "61-paint-builder-foliage.mp4",
+            "out": "61-paint-builder-foliage.png",
+            "at": 16.5
+          }
+        }
+      ],
+      "check": "61: bright green modelled-prop copies pop up under the brush on the model_uses hill (three big boxes, hint bar 'Painting modelled prop'). 63: one Fill Terrain click covers the whole hill with the green builder props.",
+      "notes": "Verified 2026-11-24 on :108/8908 and :118/8918. The palette entry, Fill Terrain button and left Foliage button are custom-drawn/open the palette, so they are pixel/click-text steps ('modelled prop' at 1147,480 at the 1600x900 session). Strip Density is left at the default 0.253; slider drags are unreliable under XTEST and three clicks already place three large props. The clip is recorded long and trimmed with ffmpeg because at ~2 fps the paint lands 4-6 s after the click."
+    },
+    {
+      "id": "builder-fill",
+      "kind": "clip",
+      "outputs": [
+        "63-fill-terrain-builder.mp4",
+        "63-fill-terrain-builder.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/model_uses.tscn",
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Foliage"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "expect": {
+            "drive": [
+              "view3d"
+            ],
+            "contains": "640.0"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Fill Terrain"
+            ],
+            "contains": "Fill Terrain"
+          }
+        },
+        {
+          "wait": 4
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "click",
+            "1147",
+            "480"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "wait": 3
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_start": {
+            "out": "63-fill-terrain-builder.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 40
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Fill Terrain"
+          ]
+        },
+        {
+          "wait": 12
+        },
+        {
+          "drive": [
+            "wheel",
+            "700",
+            "350",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 6
+        },
+        {
+          "record_stop": {
+            "out": "63-fill-terrain-builder.mp4"
+          }
+        },
+        {
+          "shell": "/tmp/opencode/qa/tools/ffmpeg -hide_banner -loglevel error -y -ss 1 -t 14 -i \"$OUT/63-fill-terrain-builder.mp4\" -c:v libx264 -pix_fmt yuv420p -crf 20 -movflags +faststart \"$OUT/63-trim.mp4\" && mv \"$OUT/63-trim.mp4\" \"$OUT/63-fill-terrain-builder.mp4\""
+        },
+        {
+          "poster": {
+            "video": "63-fill-terrain-builder.mp4",
+            "out": "63-fill-terrain-builder.png",
+            "at": 7
+          }
+        }
+      ],
+      "check": "One Fill Terrain click at strip Density 0.25 scatters the modelled prop over the whole model_uses hill (a few dozen big green boxes), then the view zooms out to show the island.",
+      "notes": "Verified 2026-11-24 on :118/8918. Fresh session: the strip Density is editor state, so running Fill after the paint take (Density raised) produces thousands of copies. Fill Terrain is clicked by label; the viewport is recorded 1026x458 and trimmed to 14 s."
+    },
+    {
+      "id": "f6-run",
+      "kind": "clip",
+      "outputs": [
+        "58-f6-run-game.mp4",
+        "58-f6-run-game.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/model_uses.tscn",
+      "steps": [
+        {
+          "drive": [
+            "resize",
+            "1920",
+            "1080"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PlayerRig"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "position",
+            "[9,0,14]",
+            "--path",
+            "PlayerRig"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "jump_velocity",
+            "9.0",
+            "--path",
+            "PlayerRig/Pixel/Player"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "s",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 5
+        },
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 20
+        },
+        {
+          "record_start": {
+            "out": "58-f6-run-game.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY --window-match 'Marching Squares Terrain (DEBUG)' click 700 500"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY --window-match 'Marching Squares Terrain (DEBUG)' key w --hold 1.8"
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "shell": "(python3 qa/drive.py --port $PORT --display $DISPLAY --window-match 'Marching Squares Terrain (DEBUG)' key w --hold 0.45 >/dev/null 2>&1 &); sleep 0.1; python3 qa/drive.py --port $PORT --display $DISPLAY --window-match 'Marching Squares Terrain (DEBUG)' key space --hold 0.3"
+        },
+        {
+          "wait": 5
+        },
+        {
+          "record_stop": {
+            "out": "58-f6-run-game.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "58-f6-run-game.mp4",
+            "out": "58-f6-run-game.png",
+            "at": 6
+          }
+        }
+      ],
+      "check": "The F6 game runs embedded; the fox walks to stone_tallB2, jumps, and stands clearly ON its top with the stone visible underneath; pixel look live.",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921) from a cold session. F6 opens a SEPARATE X window 'Marching Squares Terrain (DEBUG)' at screen (320,180), 1280x720 - that is the recording rect, so the session must be 1920x1080 (the resize step) and every game key/click must pass --window-match 'Marching Squares Terrain (DEBUG)': drive.py's default 'Godot Engine' match focuses the editor, and the game then ignores the input entirely (this is what made earlier replays look dead). The scene's own follow camera frames the shot; the old priority-0 / root-Camera-current set-props are dropped - they were never needed and are what triggered the 'foreign scene' worry. Only two session-only overrides: PlayerRig at (9,0,14) and jump_velocity 9.0; Ctrl+S is required because F6 runs the saved file. Timing matters: walk W for 1.8 s so the fox is pressed against the 2.5 m stone, then jump with a SHORT 0.45 s W hold - holding W longer carries it over the far edge. Poster at 6 s: the fox stands on the pale stone, courtyard left, green builder prop bottom-right, as in the shipped PNG."
+    },
+    {
+      "id": "pass1-foliage",
+      "kind": "clip",
+      "outputs": [
+        "01-grey-placeholder-props.png",
+        "02-custom-vs-grey.mp4",
+        "02-custom-vs-grey.png",
+        "03-custom-vs-grey-after.png",
+        "11-paint-custom-foliage.mp4",
+        "11-paint-custom-foliage.png",
+        "12-custom-foliage-after.png",
+        "13-fill-terrain-custom.mp4",
+        "13-fill-terrain-custom.png",
+        "14-erase-custom.mp4",
+        "14-erase-custom.png",
+        "15-undo-paint.mp4",
+        "15-undo-paint.png",
+        "16-scale-yaw-variation.png",
+        "18-multiselect-paint.mp4",
+        "18-multiselect-paint.png",
+        "19-pixel-look-toggle.mp4",
+        "19-pixel-look-toggle.png",
+        "20-add-mesh-dialog.png",
+        "21-scatter-item-custom-inspector.png",
+        "22-scatter-item-filters.png",
+        "23-paint-stone-boulders.mp4",
+        "23-paint-stone-boulders.png",
+        "30-placed-prop-scene-tree.png",
+        "31-pixelobject-inspector.png",
+        "40-roblox-ui-ribbon.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "shell": "echo 'backfill item: see notes'"
+        }
+      ],
+      "check": "Backfill placeholder - the hex_island foliage flow: grey placeholders, the round-tree import, painting/filling/erasing/undo, the scatter-item Inspector and Filters, the Roblox ribbon and the placed-prop structure.",
+      "notes": "NOT GREEN \u2014 placeholder kept this pass. These 26/24 outputs are a multi-scene tour of hex_island and model_uses (paint/erase/undo/fill/multiselect/pixel toggle, then instancing/collision/run/orbit on the placed props); reproducing them needs the individual pixel positions of the old ~4 fps sessions and several separate runs. The media itself is valid and still used by the page."
+    },
+    {
+      "id": "pass2-placed-props",
+      "kind": "series",
+      "outputs": [
+        "50-scene-overview-orbit.mp4",
+        "50-scene-overview-orbit.png",
+        "51-instance-scene-dialog.png",
+        "52-placed-prop-floating.png",
+        "53-placed-prop-seated.png",
+        "55-add-node-dialog.png",
+        "56-collision-setup.png",
+        "56-collision-scene-tree.png",
+        "57-pixel-look-off.png",
+        "57-pixel-look-on.png",
+        "59-instance-builder-prop.mp4",
+        "59-instance-builder-prop.png",
+        "59-builder-prop-placed.png",
+        "60-add-mesh-scene-dialog.png",
+        "60-save-branch-menu.png",
+        "62-builder-scatter-item-inspector.png",
+        "64-paint-round-tree.mp4",
+        "64-paint-round-tree.png",
+        "64-round-tree-grove.png",
+        "65-erase-foliage.mp4",
+        "65-erase-foliage.png",
+        "66-fill-terrain-trees.mp4",
+        "66-fill-terrain-trees.png",
+        "66-fill-terrain-trees-after.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/guide/model_uses.tscn",
+      "steps": [
+        {
+          "shell": "echo 'backfill item: see notes'"
+        }
+      ],
+      "check": "Backfill placeholder - the model_uses placed-prop flow (instancing, seating, collision nodes, pixel-look toggle, builder-prop instance) and the round-tree paint/fill clips.",
+      "notes": "NOT GREEN \u2014 placeholder kept this pass. These 26/24 outputs are a multi-scene tour of hex_island and model_uses (paint/erase/undo/fill/multiselect/pixel toggle, then instancing/collision/run/orbit on the placed props); reproducing them needs the individual pixel positions of the old ~4 fps sessions and several separate runs. The media itself is valid and still used by the page."
+    }
+  ]
+}

@@ -1,0 +1,8106 @@
+{
+  "page": "09-builder-greybox",
+  "media_dir": "docs/guide/media/09-builder-greybox",
+  "session": {
+    "scene": "res://demo/hex_island.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [
+    {
+      "wait": 6
+    },
+    {
+      "drive": [
+        "select",
+        "--path",
+        "BuilderRuin/Ruin"
+      ]
+    },
+    {
+      "wait": 2
+    },
+    {
+      "shell": "python3 qa/drive.py --display $DISPLAY --port $PORT ui --root all --filter 'Insert part' | grep -q 'Insert part' || { python3 qa/drive.py --display $DISPLAY --port $PORT click-text 'Roblox UI'; sleep 3; }"
+    },
+    {
+      "wait": 2
+    },
+    {
+      "expect": {
+        "drive": [
+          "ui",
+          "--root",
+          "all",
+          "--filter",
+          "Insert part"
+        ],
+        "contains": "Insert part"
+      }
+    },
+    {
+      "wait": 1
+    }
+  ],
+  "items": [
+    {
+      "id": "10-insert-shapes",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "10-insert-shapes.mp4",
+        "10-insert-shapes.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-16,13.5,-0.8]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -12 13.7 -3 --dist 11 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "10-insert-shapes.mp4",
+            "rect": [
+              287,
+              196,
+              896,
+              428
+            ],
+            "fps": 12,
+            "max": 40
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Sphere"
+            ],
+            "contains": "Sphere"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "340"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-13.3,14,-2.3]",
+              "--path",
+              "Sphere"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "380"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-10.7,13.5,-3.7]",
+              "--path",
+              "Ramp"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "458"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-8,14,-5.2]",
+              "--path",
+              "Cylinder"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "10-insert-shapes.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "10-insert-shapes.mp4",
+            "out": "10-insert-shapes.png",
+            "at": 15
+          }
+        }
+      ],
+      "check": "Four solid Medium-Stone-Grey shapes - box (centre), sphere, wedge and cylinder - inserted from Insert Part and Part \u25be, each nudged out from the view centre so all four read separately. Parts are opaque grey.",
+      "notes": "Box is placed and the camera framed on it (F + 5 wheel steps) before recording; the clip then inserts Sphere / Wedge / Cylinder from Part \u25be and moves each 4 m out with set-prop so they sit around the box without overlapping. Node names: Box, Sphere, Ramp (wedge), Cylinder."
+    },
+    {
+      "id": "18-intersect",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "18-intersect.mp4",
+        "18-intersect.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-13,14.5,-2.6]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -13.5 13.5 -2.8 --dist 7 --azimuth 208.6 --elev 35"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "18-intersect.mp4",
+            "rect": [
+              287,
+              270,
+              896,
+              353
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "421",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Intersect"
+            ],
+            "contains": "Intersect"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "i",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "record_stop": {
+            "out": "18-intersect.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "18-intersect.mp4",
+            "out": "18-intersect.png",
+            "at": 8
+          }
+        }
+      ],
+      "check": "Two overlapping solid-grey boxes, then Intersect (ribbon button) leaves only the shared volume; HUD reads 'Intersection done'.",
+      "notes": "Select tool clicked first so F works. Both parts are 4x2x2 (default box resized) at (-14,13.5,-3) and (-12,13.5,-2.6) so the shared volume is a clear 2x2x1.6 block. Multi-select: select Box2, then Ctrl+click the Box row in the Scene dock."
+    },
+    {
+      "id": "19-union-separate",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "19-union-separate.mp4",
+        "19-union-separate.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-13,14.5,-2.6]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -13.5 13.5 -2.8 --dist 7 --azimuth 208.6 --elev 35"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "19-union-separate.mp4",
+            "rect": [
+              287,
+              270,
+              896,
+              353
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "421",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Union"
+            ],
+            "contains": "Union"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "g",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2.8
+        },
+        {
+          "drive": [
+            "key",
+            "u",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 2.8
+        },
+        {
+          "record_stop": {
+            "out": "19-union-separate.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "19-union-separate.mp4",
+            "out": "19-union-separate.png",
+            "at": 6
+          }
+        }
+      ],
+      "check": "Two overlapping boxes -> Union merges them ('Union done') -> Separate restores the two originals ('Separate: 2 parts restored').",
+      "notes": "Same two 4x2x2 boxes and multi-select as 18-intersect. Union at 357,296 and Separate at 437,296 with both parts selected."
+    },
+    {
+      "id": "40-doorway-02-union",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "40-doorway-02-union.mp4",
+        "40-doorway-02-union.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "3"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1.5"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "477",
+            "296"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "prop",
+              "metadata/mst_negate",
+              "--path",
+              "Box2"
+            ],
+            "contains": "true"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 14.5 -5.5 --dist 9 --azimuth 208.6 --elev 22"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "40-doorway-02-union.mp4",
+            "rect": [
+              287,
+              270,
+              896,
+              353
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 3.5
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "421",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Union"
+            ],
+            "contains": "Union"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "g",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "record_stop": {
+            "out": "40-doorway-02-union.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "40-doorway-02-union.mp4",
+            "out": "40-doorway-02-union.png",
+            "at": 9.5
+          }
+        }
+      ],
+      "check": "A grey wall (8x4x1) with the magenta NEGATED door box (2x3x1.5) in it, then Union subtrahes the negated box leaving a doorway hole ('Union done').",
+      "notes": "Door box is Negated first (button 477,296 with one part selected) -> magenta ghost. Wall + negated door are multi-selected in the Scene dock and Union (357,296) cuts the doorway. Size values typed into the Part inspector Size fields (click 1320/1414/1508, y=362)."
+    },
+    {
+      "id": "21-tower-floor",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "21-tower-floor.mp4",
+        "21-tower-floor.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 12.5 -3 --dist 8 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "700",
+            "500"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "21-tower-floor.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "21-tower-floor.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "21-tower-floor.mp4",
+            "out": "21-tower-floor.png",
+            "at": 8
+          }
+        }
+      ],
+      "check": "A single solid-grey floor slab sized 8x1x6 via the Part inspector Size fields (visible on the right of the crop). Watchtower build 1/4.",
+      "notes": "Crop 287,318,1300,305 = full viewport (HUD not clipped) + the Inspector Size fields. Camera: F on the box + 3 wheel steps; inspector fields clicked at x=1320 (X) / 1508 (Z), y=362."
+    },
+    {
+      "id": "22-tower-walls",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "22-tower-walls.mp4",
+        "22-tower-walls.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-vfov.py --fov 40"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 14.5 -3 --dist 11.5 --azimuth 125 --elev 30"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "move",
+            "700",
+            "450"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "22-tower-walls.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 45
+          }
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box3"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-17.5,14.5,-3]",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box3"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "22-tower-walls.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "22-tower-walls.mp4",
+            "out": "22-tower-walls.png",
+            "at": 17
+          }
+        }
+      ],
+      "check": "Floor slab with two solid-grey walls rising on it (back wall 8x4x1, side wall 1x4x6), both lit faces visible; Size fields on the right. Watchtower build 2/4.",
+      "notes": "Floor built silently, then two walls inserted/sized on camera. Camera orbits after F (drag 500,470 -> 800,470 then 32 px more: ~-83 deg azimuth) so it looks from the sunlit south-west side (+Z and -X faces lit) instead of the shadowed east side that made the earlier clips' walls read black. Camera: Perspective VFOV lowered to 40 and dist 11.5 so the tower fills the frame (was dist 17/FOV 70)."
+    },
+    {
+      "id": "23-tower-roof",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "23-tower-roof.mp4",
+        "23-tower-roof.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box3"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-17.5,14.5,-3]",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box3"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-vfov.py --fov 40"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 15.5 -3 --dist 11.5 --azimuth 125 --elev 30"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "700",
+            "450"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "23-tower-roof.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 35
+          }
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "380"
+          ]
+        },
+        {
+          "wait": 1.7
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,17.5,-3]",
+              "--path",
+              "Ramp"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Ramp"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "23-tower-roof.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "23-tower-roof.mp4",
+            "out": "23-tower-roof.png",
+            "at": 12
+          }
+        }
+      ],
+      "check": "Floor + two walls (pre-built) plus a Wedge roof (8x2x6) placed on top via Part \u25be -> Wedge. Watchtower build 3/4.",
+      "notes": "Floor and walls built silently; the clip adds the wedge roof and sizes it. Same south-west camera as 22-tower-walls. Camera: Perspective VFOV lowered to 40 and dist 11.5 so the tower fills the frame (was dist 17/FOV 70)."
+    },
+    {
+      "id": "24-tower-final",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "24-tower-final.mp4",
+        "24-tower-final.png",
+        "30-build-03-final.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box2"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box3"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-17.5,14.5,-3]",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box3"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "950",
+            "380"
+          ]
+        },
+        {
+          "wait": 1.7
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,17.5,-3]",
+              "--path",
+              "Ramp"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Ramp"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.45
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-vfov.py --fov 40"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 15.5 -3 --dist 11.5 --azimuth 125 --elev 30"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "420",
+            "340"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "24-tower-final.mp4",
+            "rect": [
+              287,
+              318,
+              896,
+              304
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "470",
+            "640",
+            "470",
+            "--button",
+            "middle",
+            "--duration",
+            "3.0"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "640",
+            "470",
+            "760",
+            "470",
+            "--button",
+            "middle",
+            "--duration",
+            "3.0"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "24-tower-final.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "24-tower-final.mp4",
+            "out": "24-tower-final.png",
+            "at": 4
+          }
+        },
+        {
+          "shell": "cp \"$OUT/24-tower-final.png\" \"$OUT/30-build-03-final.png\""
+        }
+      ],
+      "check": "The finished watchtower block-out (floor slab + two walls + wedge roof, all solid grey) on the terrain, camera slowly orbiting it. Watchtower build 4/4.",
+      "notes": "Whole tower built silently, deselected by clicking empty sky, then a short left-right orbit (~20 deg each way) from the sunlit south-west side so no face reads black. Camera: Perspective VFOV lowered to 40 and dist 11.5 so the tower fills the frame (was dist 17/FOV 70). The same finished-tower frame is copied to 30-build-03-final.png (the goal still at the top of the page)."
+    },
+    {
+      "id": "01-toolbar-toggle",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "01-toolbar-toggle-off.png",
+        "01-toolbar-toggle-on.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "01-toolbar-toggle-off.png",
+            "crop": [
+              640,
+              96,
+              200,
+              70
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "01-toolbar-toggle-on.png",
+            "crop": [
+              640,
+              96,
+              200,
+              70
+            ]
+          }
+        }
+      ],
+      "check": "Two close-ups of the 3D toolbar row (Builder | Pixel Preview | Animate | Pixel World | Roblox UI): dot left = off, dot right = on.",
+      "notes": "Crop is the switch plus a little of the row; upscale 2x with PIL before shipping if the text is too small. The switch rect in this layout is [668,115,118,44]."
+    },
+    {
+      "id": "02-editor-overview",
+      "kind": "still",
+      "outputs": [
+        "02-editor-overview.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "02-editor-overview.png",
+            "crop": [
+              0,
+              0,
+              1600,
+              900
+            ]
+          }
+        }
+      ],
+      "check": "Whole editor in Roblox mode: ribbon under the 3D menu bar, viewport, Scene dock, Part inspector.",
+      "notes": "Full-window orientation shot; no crop.",
+      "fresh_session": true
+    },
+    {
+      "id": "03-ribbon",
+      "kind": "still",
+      "outputs": [
+        "03-ribbon-model-tab.png",
+        "03b-ribbon-tabs.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "03-ribbon-model-tab.png",
+            "crop": [
+              283,
+              128,
+              882,
+              192
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "03b-ribbon-tabs.png",
+            "crop": [
+              295,
+              165,
+              120,
+              32
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; p='$OUT/03-ribbon-model-tab.png'; im=Image.open(p); im.resize((im.width*2,im.height*2),Image.LANCZOS).save(p); p='$OUT/03b-ribbon-tabs.png'; im=Image.open(p); im.resize((im.width*3,im.height*3),Image.LANCZOS).save(p)\""
+        }
+      ],
+      "check": "The Model tab ribbon: two wrapped rows of icon groups (Tools, Snap, Pivot, Insert, Appearance, Model; Align, Solid Modeling) and the Model/Edit tab buttons.",
+      "notes": "Crop 283,128,882,192 = toolbar row + Model/Edit tabs + both ribbon rows (row 2 clipped at the bottom); upscaled 2x with PIL to 1764x384 to match the shipped media. 03b is the tabs close-up (crop 295,165,120,32) upscaled 3x to 360x96.",
+      "fresh_session": true
+    },
+    {
+      "id": "11-part-menu",
+      "kind": "still",
+      "outputs": [
+        "11-part-menu.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "11-part-menu.png",
+            "crop": [
+              855,
+              270,
+              230,
+              250
+            ]
+          }
+        }
+      ],
+      "check": "Part \u25be menu: Block, Sphere, Wedge, Corner Wedge, Cylinder, separator, More Shapes \u25b8.",
+      "notes": "Menu opens at ~(870,285) with 230x250; crop includes the whole menu. Popup items are not Controls, so there is no ui-based check for the menu; the shot is the check.",
+      "fresh_session": true
+    },
+    {
+      "id": "12-more-shapes-menu",
+      "kind": "still",
+      "outputs": [
+        "12-more-shapes-menu.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "869",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "down",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "right"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "12-more-shapes-menu.png",
+            "crop": [
+              856,
+              266,
+              365,
+              560
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; p='$OUT/12-more-shapes-menu.png'; im=Image.open(p); im.resize((584,891),Image.LANCZOS).save(p)\""
+        }
+      ],
+      "check": "Part \u25be with the More Shapes submenu open listing Prism \u2026 Trim.",
+      "notes": "Part \u25be at 869,236; the More Shapes submenu is opened with keyboard nav (6x Down, Right) because synthetic hover does not reliably open it. Popup rects: Part menu (862,274,193,245), submenu (1055,478,162,340). Crop 856,266,365,560 upscaled to the shipped 584x891.",
+      "fresh_session": true
+    },
+    {
+      "id": "13-dragmode-menu",
+      "kind": "still",
+      "outputs": [
+        "13-dragmode-menu.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Geometric"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "13-dragmode-menu.png",
+            "crop": [
+              375,
+              235,
+              430,
+              300
+            ]
+          }
+        }
+      ],
+      "check": "Drag-mode menu: Geometric, Surface, separator, Collisions, Snap: Use Bounding Boxes, Snap to Parts, Snap to Terrain Cells.",
+      "notes": "The drag-mode MenuButton is the one showing 'Geometric' at ~(470,219).",
+      "fresh_session": true
+    },
+    {
+      "id": "14-group-menu",
+      "kind": "still",
+      "outputs": [
+        "14-group-menu.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1032",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "14-group-menu.png",
+            "crop": [
+              1019,
+              268,
+              190,
+              99
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; p='$OUT/14-group-menu.png'; im=Image.open(p); im.resize((im.width*2,im.height*2),Image.LANCZOS).save(p)\""
+        }
+      ],
+      "check": "Group \u25be menu: Group as Model, Group as Folder, Ungroup.",
+      "notes": "Group \u25be popup at (1024,274,179,87); crop 1019,268,190,99 upscaled 2x to the shipped 380x198.",
+      "fresh_session": true
+    },
+    {
+      "id": "20-24-handles",
+      "kind": "still",
+      "outputs": [
+        "20-handles-move.png",
+        "21-handles-scale.png",
+        "22-handles-rotate.png",
+        "23-handles-transform.png",
+        "24-handles-pivot.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "910",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "448"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "760",
+            "450"
+          ]
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "drive": [
+            "click",
+            "335",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "20-handles-move.png",
+            "crop": [
+              287,
+              318,
+              633,
+              285
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "385",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "21-handles-scale.png",
+            "crop": [
+              287,
+              318,
+              633,
+              285
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "425",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "22-handles-rotate.png",
+            "crop": [
+              287,
+              318,
+              633,
+              285
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "465",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "23-handles-transform.png",
+            "crop": [
+              287,
+              318,
+              633,
+              285
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "730",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "24-handles-pivot.png",
+            "crop": [
+              287,
+              318,
+              633,
+              285
+            ]
+          }
+        }
+      ],
+      "check": "Five shots of the same grey part with Move arrows, Scale balls, Rotate rings, the combined Transform gizmo and the Pivot marker.",
+      "notes": "The box is given the Built-in Grid material (Material 910,236 -> first Built-in row 960,448) so it matches the white grid box in the media; HUD then reads 'Grid applied to 6 faces'. Camera frame helper dist 3.2 az 208.6 elev 28 (media is a close-up). Tool buttons in this layout: Move 335, Scale 385, Rotate 425, Transform 465, Pivot 730 (36 px wide, 4 px gaps, Select at 287). Crop 287,318,633,285 = the shipped media size.",
+      "fresh_session": true
+    },
+    {
+      "id": "15-material-picker",
+      "kind": "still",
+      "outputs": [
+        "15-material-picker.png",
+        "15b-material-builtin-list.png",
+        "15c-material-grid-view.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "910",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "click",
+            "1005",
+            "397"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "shot": {
+            "out": "15-material-picker.png",
+            "crop": [
+              885,
+              265,
+              372,
+              520
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "1096",
+            "397"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "1215",
+            "362"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "15b-material-builtin-list.png",
+            "crop": [
+              885,
+              265,
+              372,
+              520
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "1168",
+            "362"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shot": {
+            "out": "15c-material-grid-view.png",
+            "crop": [
+              885,
+              265,
+              372,
+              520
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "Material picker: Project shelf first, then Built-in in List and Grid views (Grid, Checker, No Draw, Collider, Trigger, Textures).",
+      "notes": "Material button 910,236 with BuilderRuin/Ruin selected. The picker's shelf is sticky in this build, so the recipe explicitly clicks the Project tab (1005,397) before the first shot, then Built-in (1096,397), List (1215,362), Grid (1168,362). Crop 885,265,345,520 = the popover at this build's UI scale; the shipped media (704x520) is a larger-scale capture of the same content, so it is not pixel-identical.",
+      "fresh_session": true
+    },
+    {
+      "id": "16-color-palette",
+      "kind": "still",
+      "outputs": [
+        "16-color-palette.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "954",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "shot": {
+            "out": "16-color-palette.png",
+            "crop": [
+              890,
+              270,
+              330,
+              400
+            ]
+          }
+        }
+      ],
+      "check": "Color palette: honeycomb of preset colours, greys row, 'Click object to apply color' switch, custom ColorPickerButton with Apply.",
+      "notes": "Color button = ribbon 936..972,198..274 (click 954,236).",
+      "fresh_session": true
+    },
+    {
+      "id": "17-align-panel",
+      "kind": "still",
+      "outputs": [
+        "17-align-panel.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "296"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "shot": {
+            "out": "17-align-panel.png",
+            "crop": [
+              285,
+              310,
+              303,
+              244
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; p='$OUT/17-align-panel.png'; im=Image.open(p); im.resize((606,472),Image.LANCZOS).save(p)\""
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "Align panel: Mode (Min/Center/Max), Align In (World/Local), Axes X/Y/Z, Relative To, Align button.",
+      "notes": "Align is the first button of ribbon row 2 in this layout: 305,296 (button rect 287,278,36,36). The popover opens at 295,310 size 295x225; crop 285,310,303,244 resized to the shipped 606x472 (media is a 2x capture).",
+      "fresh_session": true
+    },
+    {
+      "id": "50-part-inspector",
+      "kind": "still",
+      "outputs": [
+        "50-part-inspector.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "50-part-inspector.png",
+            "crop": [
+              1185,
+              180,
+              415,
+              470
+            ]
+          }
+        }
+      ],
+      "check": "Part inspector: Part \u2014 Appearance (Color/Material/Transparency), Part \u2014 Transform (Size/Position/Orientation/Pivot Offset), Part (Shape/Locked/Anchored), Behavior (Collision), then Mesh.",
+      "notes": "Scroll the inspector to the top first so the sections are all visible; crop keeps the Part sections. The Color swatch is the current build's default Medium Stone Grey (the old media showed the pre-fix orange).",
+      "fresh_session": true
+    },
+    {
+      "id": "51-ribbon-nothing-selected",
+      "kind": "still",
+      "outputs": [
+        "51-ribbon-nothing-selected.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "420",
+            "340"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shot": {
+            "out": "51-ribbon-nothing-selected.png",
+            "crop": [
+              283,
+              128,
+              882,
+              192
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; p='$OUT/51-ribbon-nothing-selected.png'; im=Image.open(p); im.resize((im.width*2,im.height*2),Image.LANCZOS).save(p)\""
+        }
+      ],
+      "check": "Ribbon with nothing selected: Solid Modeling buttons greyed and Align disabled.",
+      "notes": "Sky click at 420,340 clears the selection. Crop 283,128,882,192 (same as 03-ribbon) upscaled 2x to 1764x384.",
+      "fresh_session": true
+    },
+    {
+      "id": "52-builder-preferences",
+      "kind": "still",
+      "outputs": [
+        "52-builder-preferences.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Builder"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Preferences"
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Pixel Builder Preferences"
+          }
+        },
+        {
+          "shot": {
+            "out": "52-builder-preferences.png",
+            "crop": [
+              566,
+              150,
+              472,
+              620
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "Builder Preferences dialog: Vertex/Handle size, Grid step, Rotate snap, Roblox rotate step, Grid snap and the Roblox compact ribbon checkbox.",
+      "notes": "Builder menu (291,159,252,349); Preferences\u2026 is the 2nd item, so Down x2 then Enter (one Down highlights item 1, a second highlights Preferences). Verified with popups/windows contains. Dialog (558,119,484,661); crop 566,150,472,620 keeps all rows. The shipped 637x588 media is a larger-UI-scale capture; same rows/values.",
+      "fresh_session": true
+    },
+    {
+      "id": "60-edit-tab",
+      "kind": "still",
+      "outputs": [
+        "60-edit-tab.png"
+      ],
+      "steps": [
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "362",
+            "178"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "60-edit-tab.png",
+            "crop": [
+              287,
+              168,
+              896,
+              160
+            ]
+          }
+        }
+      ],
+      "check": "The Edit tab: mode buttons Object/Face/Edge/Vertex, Extrude/Inset/Bevel/Loop Cut/Bridge/Merge/Delete, Select \u25be, Pivot to Sel., UV.",
+      "notes": "Edit tab button at ~362,178. Details belong to page 10.",
+      "fresh_session": true
+    },
+    {
+      "id": "04-roblox-ui-toggle",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "04-roblox-ui-toggle.mp4",
+        "04-roblox-ui-toggle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Mode"
+            ],
+            "contains": "Mode"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "BuilderRuin/Ruin"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -6 11 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "04-roblox-ui-toggle.mp4",
+            "rect": [
+              288,
+              100,
+              900,
+              320
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "137"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "04-roblox-ui-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "04-roblox-ui-toggle.mp4",
+            "out": "04-roblox-ui-toggle.png",
+            "at": 7
+          }
+        }
+      ],
+      "check": "Clicking the Roblox UI switch: the tooltip shows, then the Model-tab ribbon appears under the 3D menu bar.",
+      "notes": "Starts by toggling Roblox UI OFF (the shared setup leaves it on) so the clip begins in the saved MST layout; hover the switch at 650,137 and click it on - the ribbon appears at ~6 s. Media 04 is 900x320 (rect 288,100,900,320); poster at 7 s shows the ribbon."
+    },
+    {
+      "id": "05-select-tool",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "05-select-tool.mp4",
+        "05-select-tool.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "910",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "448"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "760",
+            "450"
+          ]
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "drive": [
+            "key",
+            "Escape"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_start": {
+            "out": "05-select-tool.mp4",
+            "rect": [
+              287,
+              318,
+              896,
+              304
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "Escape"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "05-select-tool.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "05-select-tool.mp4",
+            "out": "05-select-tool.png",
+            "at": 2.0
+          }
+        }
+      ],
+      "check": "Select tool: click a part -> thin blue selection box with no handles; press Esc -> deselect; click again -> reselect.",
+      "notes": "Box gets the Built-in Grid material first (Material 910,236 -> row 960,448; picker closed by clicking the Select button 305,236). Camera: frame helper dist 4.6 az 208.6 elev 28. The deselect is done with Esc (which clears the selection without the PixelWater click that would switch the 3D view to the Pixel World water workspace). Record rect 287,318,896,304 = the viewport."
+    },
+    {
+      "id": "06-08-09-snap",
+      "kind": "clip",
+      "outputs": [
+        "08-snap-step.mp4",
+        "08-snap-step.png",
+        "09-snap-onoff.mp4",
+        "09-snap-onoff.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 8 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "08-snap-step.mp4",
+            "rect": [
+              287,
+              196,
+              694,
+              428
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "bracketright"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "key",
+            "bracketleft"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "bracketleft"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "bracketleft"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "08-snap-step.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "08-snap-step.mp4",
+            "out": "08-snap-step.png",
+            "at": 2
+          }
+        },
+        {
+          "record_start": {
+            "out": "09-snap-onoff.mp4",
+            "rect": [
+              287,
+              196,
+              694,
+              428
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "588",
+            "216"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "09-snap-onoff.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "09-snap-onoff.mp4",
+            "out": "09-snap-onoff.png",
+            "at": 2
+          }
+        }
+      ],
+      "check": "08: the Grid step field walks 1.0 -> 0.25 m as ] and [ are pressed. 09: the grid-snap checkbox ticks off (the field grey-out is visible).",
+      "notes": "[ / ] are bracketleft/bracketright; the Grid snap checkbox is at 588,216 (rect 574,198,28,36), not 761,242. Record rect 287,196,694,428 = the shipped media size. 08 shows the step walking 1.0 -> 2.0 -> 0.25 m; 09 ticks the Grid snap checkbox off.",
+      "fresh_session": true
+    },
+    {
+      "id": "11-apply-material",
+      "kind": "clip",
+      "outputs": [
+        "11-apply-material.mp4",
+        "11-apply-material.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "910",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "1096",
+            "397"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_start": {
+            "out": "11-apply-material.mp4",
+            "rect": [
+              487,
+              196,
+              765,
+              428
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "1146",
+            "479"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1146",
+            "479"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "11-apply-material.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "11-apply-material.mp4",
+            "out": "11-apply-material.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "Material picker on the Built-in shelf; clicking Checker turns the selected grey box into a checkerboard.",
+      "notes": "Built-in shelf: the picker opens on Built-in for a new Box; clicking row 2 (y=480) applies Checker, row 1 (y=448) is Grid. Camera dist 4.6 so the part fills the left of the frame like the media. Record rect 487,196,765,428 keeps the ribbon row and the picker.",
+      "fresh_session": true
+    },
+    {
+      "id": "12-apply-color",
+      "kind": "clip",
+      "outputs": [
+        "12-apply-color.mp4",
+        "12-apply-color.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "954",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "record_start": {
+            "out": "12-apply-color.mp4",
+            "rect": [
+              487,
+              270,
+              800,
+              352
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "990",
+            "420"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "990",
+            "420"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "12-apply-color.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "12-apply-color.mp4",
+            "out": "12-apply-color.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "Color palette opens (honeycomb, greys, click-to-apply switch, custom colour + Apply); clicking a swatch tints the selected part.",
+      "notes": "Color button 954,236 opens the palette; camera dist 4.6 (media part ~200 px). The click on the honeycomb at 990,420 (first swatch area) tints the part; move the mouse over the palette before clicking so the palette stays open.",
+      "fresh_session": true
+    },
+    {
+      "id": "13-undo-move",
+      "kind": "clip",
+      "outputs": [
+        "13-undo-move.mp4",
+        "13-undo-move.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "335",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "13-undo-move.mp4",
+            "rect": [
+              287,
+              318,
+              696,
+              282
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "drag",
+            "780",
+            "470",
+            "860",
+            "470",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "record_stop": {
+            "out": "13-undo-move.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "13-undo-move.mp4",
+            "out": "13-undo-move.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "A Move-arrow drag slides the box, then Ctrl+Z puts it back in one step.",
+      "notes": "Media is the old translucent part; the current build renders new parts solid Medium Stone Grey, so the fill differs but the move+undo state is the same. Camera dist 4.6; drag starts on the X arrow at 780,470 (the box ends ~730 at this distance).",
+      "fresh_session": true
+    },
+    {
+      "id": "14-group-ungroup",
+      "kind": "clip",
+      "outputs": [
+        "14-group-ungroup.mp4",
+        "14-group-ungroup.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-15,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-13,13.5,-2.6]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "443",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 5 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "14-group-ungroup.mp4",
+            "rect": [
+              0,
+              120,
+              1120,
+              504
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "1032",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "down"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "1032",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "14-group-ungroup.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "14-group-ungroup.mp4",
+            "out": "14-group-ungroup.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "Two parts selected -> Group creates a Model node (visible in the Scene dock) -> Group \u25be -> Ungroup removes it.",
+      "notes": "Two boxes at (-15,13.5,-3) and (-13,13.5,-2.6); multi-select via Scene dock (Box row 420, Ctrl+click Box2 row 443), then Group \u25be (1032,236) -> Group as Model (Down+Enter) and again -> Ungroup (Down x3 + Enter). Popup rects: Group menu (1024,274,179,87). Crop 0,120,1120,504 keeps the Scene dock hierarchy. Media shows the old translucent parts; current parts are solid grey.",
+      "fresh_session": true
+    },
+    {
+      "id": "15-lock",
+      "kind": "clip",
+      "outputs": [
+        "15-lock.mp4",
+        "15-lock.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "15-lock.mp4",
+            "rect": [
+              287,
+              196,
+              896,
+              428
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "1059",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "drag",
+            "735",
+            "470",
+            "800",
+            "470",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "15-lock.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "15-lock.mp4",
+            "out": "15-lock.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "Locking the selected part: handles vanish, a yellow locked outline is drawn, and a drag over it does nothing.",
+      "notes": "Lock button 1060,236 (Model group). Camera dist 4.6. The media also shows a second teal part at the right that the recipe does not create; the lock state (no handles, drag does nothing) is the subject.",
+      "fresh_session": true
+    },
+    {
+      "id": "16-anchor",
+      "kind": "clip",
+      "outputs": [
+        "16-anchor.mp4",
+        "16-anchor.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,18,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 9 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "16-anchor.mp4",
+            "rect": [
+              287,
+              196,
+              694,
+              428
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "1110",
+            "236"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "16-anchor.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "16-anchor.mp4",
+            "out": "16-anchor.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "A part lifted above the terrain is seated onto its terrain cell by Anchor (terrain anchor, not physics).",
+      "notes": "Anchor button ~1110,236. The part is lifted to y=18 first so the drop is visible.",
+      "fresh_session": true
+    },
+    {
+      "id": "17-align",
+      "kind": "clip",
+      "outputs": [
+        "17-align.mp4",
+        "17-align.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-16,14,-4]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-13,12,-3]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box3"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-10,13.5,-2]",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Box"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "420",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "442",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -13 13 -3 --dist 12 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "296"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_start": {
+            "out": "17-align.mp4",
+            "rect": [
+              287,
+              300,
+              896,
+              302
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "458",
+            "447"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "465",
+            "372"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "438",
+            "505"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "17-align.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "17-align.mp4",
+            "out": "17-align.png",
+            "at": 1.5
+          }
+        }
+      ],
+      "check": "Align panel with three parts selected: Axes Y + Mode Center + Align snaps all three to the same height.",
+      "notes": "Three boxes at (-16,14,-4), (-13,12,-3), (-10,13.5,-2); multi-select via the Scene dock: select Box, Ctrl+click Box2 row 95,420 and Box3 row 95,442 (rows measured at y=393/420/442). Align button 305,296 opens the panel at 295,310; panel buttons by pixel: Mode Center 465,372, Axes Y 458,447, Align 438,505 (click-text is unsafe - it can hit ribbon controls). Record rect 287,300,896,302 keeps the panel and boxes; poster at 1.5 shows the panel before Align is applied.",
+      "fresh_session": true
+    },
+    {
+      "id": "20-size-fields",
+      "kind": "clip",
+      "outputs": [
+        "20-size-fields.mp4",
+        "20-size-fields.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 12.5 -3 --dist 8 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "20-size-fields.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "20-size-fields.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "20-size-fields.mp4",
+            "out": "20-size-fields.png",
+            "at": 3
+          }
+        }
+      ],
+      "check": "The Part inspector Size X field goes 4 -> 8 and the box grows live in the viewport.",
+      "notes": "Scroll the inspector to the top first: the Size row sits at y~360 in this layout (fields at x 1320/1414/1508).",
+      "fresh_session": true
+    },
+    {
+      "id": "25-28-handle-drags",
+      "kind": "clip",
+      "outputs": [
+        "25-scale-extrude.mp4",
+        "25-scale-extrude.png",
+        "26-scale-symmetric.mp4",
+        "26-scale-symmetric.png",
+        "27-move-drag.mp4",
+        "27-move-drag.png",
+        "28-rotate-drag.mp4",
+        "28-rotate-drag.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "390",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "25-scale-extrude.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-grip.py --path Box --kind scale-ball --axis x --dx 80 --dy 4"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "25-scale-extrude.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "25-scale-extrude.mp4",
+            "out": "25-scale-extrude.png",
+            "at": 6.0
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "call",
+              "get_aabb",
+              "--path",
+              "Box"
+            ],
+            "contains": "S: (5.0, 1.0, 2.0)"
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_start": {
+            "out": "26-scale-symmetric.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-grip.py --path Box --kind scale-ball --axis x --mod ctrl --dx 80 --dy 4"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "26-scale-symmetric.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "26-scale-symmetric.mp4",
+            "out": "26-scale-symmetric.png",
+            "at": 6.0
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "call",
+              "get_aabb",
+              "--path",
+              "Box"
+            ],
+            "contains": "S: (6.0, 1.0, 2.0)"
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "335",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "27-move-drag.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-grip.py --path Box --kind move-arrow --axis x --dx 80"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "27-move-drag.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "27-move-drag.mp4",
+            "out": "27-move-drag.png",
+            "at": 6.0
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "prop",
+              "position",
+              "--path",
+              "Box"
+            ],
+            "contains": "-13.0"
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "425",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "28-rotate-drag.mp4",
+            "rect": [
+              287,
+              318,
+              1300,
+              305
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-grip.py --path Box --kind rotate-ring --axis x --px 60 --near 750,540"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "28-rotate-drag.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "28-rotate-drag.mp4",
+            "out": "28-rotate-drag.png",
+            "at": 8.0
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "prop",
+              "rotation",
+              "--path",
+              "Box"
+            ],
+            "contains": "0.785"
+          }
+        }
+      ],
+      "check": "Four controlled handle clips on one grey part, with the Part inspector in frame: Scale drag (Size X 4 -> 5), Ctrl+Scale (4 -> 6, centre fixed), Move arrow (Position X -14 -> -13), Rotate ring (Orientation X -45 deg / 0.785 rad).",
+      "notes": "Current build makes new parts solid Medium Stone Grey. docs/guide/recipes/09-grip.py computes each Roblox handle from the part's AABB/camera, so the handle is grabbed even when the frame helper's centring drifts: Scale +X ball dragged 80 px (4 -> 5 m), Ctrl+Scale 80 px (4 -> 6 m, centre fixed), Move +X arrow 80 px (1 m = one grid step), Rotate X ring 60 px (-45 deg). Each drag is followed by Ctrl+Z so the next clip starts from size 4 at position -14. The record rect keeps the viewport and the Part inspector's Transform fields, so the numeric readout (Size/Position/Orientation) is visible; the helper holds the button for 1.5 s and the clip waits 3 s before stopping so the slow editor rebuild lands inside the recording.",
+      "fresh_session": true
+    },
+    {
+      "id": "30-build-stills",
+      "kind": "still",
+      "outputs": [
+        "30-build-01-floor.png",
+        "30-build-02-walls.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,12,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "910",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "448"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "drive": [
+            "click",
+            "305",
+            "236"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 12.5 -3 --dist 5 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "30-build-01-floor.png",
+            "crop": [
+              287,
+              318,
+              723,
+              285
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box3"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-17.5,14.5,-3]",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box3"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "6"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 14.5 -3 --dist 5 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "30-build-02-walls.png",
+            "crop": [
+              287,
+              318,
+              723,
+              285
+            ]
+          }
+        }
+      ],
+      "check": "Two build stills: the Grid floor slab, then the floor with the two grey walls.",
+      "notes": "Floor gets the Built-in Grid material (Material 910,236 -> row 1 960,448) so it reads white with grid lines like the media; camera dist 5 for both stills.",
+      "fresh_session": true
+    },
+    {
+      "id": "40-doorway-stills",
+      "kind": "still",
+      "outputs": [
+        "40-doorway-01-negate.png",
+        "40-doorway-03-result.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,14.5,-5.5]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "move",
+            "1300",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "1300",
+            "400",
+            "up",
+            "--times",
+            "15"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "4"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box2"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-5.5]",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "1320",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1414",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "3"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "1508",
+            "362"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "1.5"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "click",
+            "477",
+            "296"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "prop",
+              "metadata/mst_negate",
+              "--path",
+              "Box2"
+            ],
+            "contains": "true"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 14.5 -5.5 --dist 9 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "40-doorway-01-negate.png",
+            "crop": [
+              287,
+              318,
+              896,
+              304
+            ]
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box2"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "95",
+            "421"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "95",
+            "421",
+            "--mod",
+            "ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Union"
+            ],
+            "contains": "Union"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "g",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Union"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.9 -5.5 --dist 7 --azimuth 208.6 --elev 16"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "650",
+            "450"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "40-doorway-03-result.png",
+            "crop": [
+              287,
+              318,
+              896,
+              304
+            ]
+          }
+        }
+      ],
+      "check": "The wall with the magenta negated door box in it, then the Union result: the same grey wall with a door-shaped hole cut through it, no selection outline.",
+      "notes": "Same build and 896x304 crop as 40-doorway-02-union, without the recording. Negate is the ribbon button (477,296). Multi-select: select Box2, Ctrl+click the Box row in the Scene dock at 95,421; the mouse must be over the 3D view before Ctrl+Shift+G (the 650,450 move), otherwise the Union never applies (that was the old failure). Esc over the view deselects, then the frame helper zooms the same view in to dist 7 / elev 16 so the doorway reads big (the negate still stays at dist 9 / elev 28). The current build paints new parts solid Medium Stone Grey, so the wall now matches the shipped greybox (the old media was the pre-fix orange).",
+      "fresh_session": true
+    },
+    {
+      "id": "06-07-transform-pivot",
+      "kind": "clip",
+      "outputs": [
+        "06-transform-gizmo.mp4",
+        "06-transform-gizmo.png",
+        "07-pivot-move.mp4",
+        "07-pivot-move.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "840",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "expect": {
+            "drive": [
+              "set-prop",
+              "position",
+              "[-14,13.5,-3]",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "735",
+            "470"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target -14 13.5 -3 --dist 4.6 --azimuth 208.6 --elev 28"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "move",
+            "760",
+            "450"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "465",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_start": {
+            "out": "06-transform-gizmo.mp4",
+            "rect": [
+              287,
+              318,
+              896,
+              304
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-grip.py --path Box --kind corner --corner max,max,min --dx 27 --dy 22"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "06-transform-gizmo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "06-transform-gizmo.mp4",
+            "out": "06-transform-gizmo.png",
+            "at": 4.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "\"ok\": true"
+          }
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click",
+            "730",
+            "236"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "07-pivot-move.mp4",
+            "rect": [
+              287,
+              318,
+              896,
+              304
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "drag",
+            "742",
+            "468",
+            "800",
+            "468",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "07-pivot-move.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "07-pivot-move.mp4",
+            "out": "07-pivot-move.png",
+            "at": 2
+          }
+        }
+      ],
+      "check": "06: the Transform gizmo (corner cubes, grid plane, arcs, plane cone, # button) with a corner-cube drag showing the W x H x D readout. 07: the Pivot marker on the node origin, dragged so the pivot moves and the mesh stays put.",
+      "notes": "Transform 465,236 and Pivot 730,236. Camera dist 4.6. 06 uses 09-grip.py to grab the +X/-Z top corner cube and drag it 27x22 px (size X 4 -> 5); the poster at 2.6 s is mid-drag, so the W x H x D readout is visible. After the undo the selection is lost, so the recipe re-selects Box before clicking Pivot; the pivot dot sits at the box centre (~742,468) and dragging it moves only the pivot.",
+      "fresh_session": true
+    }
+  ]
+}

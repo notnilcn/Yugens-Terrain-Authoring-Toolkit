@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Importing Models – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .tall img { max-height: 620px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 1em 0; }
+  .flow span.box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--card, transparent); }
+  .flow span.arrow { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Importing models</h1>
+<p class="lede">Bring a 3D model file — a <code>.glb</code> from Blender or an <code>.obj</code> exported from Roblox Studio — into your Godot project, tune how it's imported, and drop it into a scene.</p>
+<div class="meta-row"><span class="pill">⏱ 40 min</span><span class="pill">Beginner</span><span class="pill">Scene: tutorial/guide/imported_models.tscn</span></div>
+
+<figure class="shot"><img src="media/11-importing-models/01-imported-models-hero.png" alt="A Godot 3D view showing an imported low-poly round tree with a dark green canopy and brown trunk, and beside it a small textured fox character, over the editor grid with red, green and blue axis lines."><figcaption>The follow-along scene <code>res://tutorial/guide/imported_models.tscn</code>: the addon's <code>round_tree.glb</code> and the textured, rigged <code>fox.glb</code>, both imported and instanced.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>The key idea: in Godot a model is a <b>file in your project folder</b> that Godot re-imports whenever it changes.</li>
+  <li>Which <a href="#formats">file formats</a> work (glTF/GLB recommended, OBJ for Roblox exports) and which need extra setup.</li>
+  <li>The <a href="#filesystem">FileSystem dock</a>, the <a href="#import-dock">Import dock</a> and the <a href="#advanced">Advanced Import Settings</a> window — every option.</li>
+  <li>Six walkthroughs: <a href="#wa">import a GLB</a>, <a href="#wb">fix the size with Root Scale</a>, <a href="#wc">Roblox Studio → OBJ → Godot</a>, <a href="#wd">export round-trip</a>, <a href="#we">edit a material</a>, <a href="#wf">convert to a builder mesh</a>.</li>
+  <li><a href="#troubleshooting">Troubleshooting</a>: wrong size, missing textures, dark faces, wrong up-axis.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in a scene, like an Instance in Roblox. A <code>MeshInstance3D</code> node draws one mesh.</dd>
+  <dt><b>Scene / <code>.tscn</code></b></dt><dd>A saved tree of nodes. An imported model also becomes a little scene you can place many times — like a Roblox Model in the Toolbox.</dd>
+  <dt><b>Instance (verb)</b></dt><dd>Placing a copy of a scene inside another scene. Edits to the source flow into every copy — like a Roblox Package.</dd>
+  <dt><b><code>res://</code></b></dt><dd>"The project folder on disk". <code>res://models/tree.glb</code> is the file <code>models/tree.glb</code> inside your project.</dd>
+  <dt><b>Dock</b></dt><dd>A panel docked at the edge of the editor: Scene, Import, FileSystem, Inspector…</dd>
+  <dt><b>Inspector</b></dt><dd>The right-hand panel listing the selected node's properties — Roblox's <b>Properties</b>.</dd>
+  <dt><b>Resource / material</b></dt><dd>A reusable data file. A <code>StandardMaterial3D</code> is a material resource: colour, roughness, textures.</dd>
+</dl>
+<p>New to the editor itself? Start with <a href="01-godot-for-roblox.html">Godot for Roblox builders</a>; every term is also in the <a href="14-shortcuts-glossary.html#godot-terms">glossary</a>.</p>
+
+<h2 id="big-idea">The big idea: models are files Godot watches</h2>
+<p>In <b>Roblox Studio</b> a mesh lives <i>inside</i> your place file. You bring it in with the Toolbox or "Import 3D", and after that it's just data in the game.</p>
+<p>In <b>Godot</b> a model is a <b>file that stays on disk</b> in your project folder (<code>res://…/thing.glb</code>). Godot watches that file and, whenever it changes, <b>re-imports</b> it: it reads the file and bakes a Godot scene (meshes, materials, skeleton, animations) into a hidden cache (<code>.godot/imported/</code>). You never edit the cache. You change the <b>import settings</b> or the source file, and Godot rebuilds. A small text file — <code>thing.glb.import</code> — sits next to every model and stores your settings, so they travel with the project.</p>
+<div class="flow"><span class="box">1 · Put the file in the project folder</span><span class="arrow">→</span><span class="box">2 · Set import options (Import dock)</span><span class="arrow">→</span><span class="box">3 · Instance it into your scene</span></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>There's no in-app Toolbox here. Your "toolbox" is the <b>FileSystem dock</b> — a view of the project folder. Drop a file into the folder and it shows up there, already imported. Tuning happens in the <b>Import dock</b>, which Studio doesn't really have.</p></div>
+
+<!-- ===================================================== FORMATS -->
+<h2 id="formats">Supported formats</h2>
+<table class="ref">
+  <thead><tr><th>Format</th><th>Imports as</th><th>Works here?</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>glTF <code>.gltf</code> / <code>.glb</code></td><td>Scene</td><td>✅ Yes — <b>recommended</b></td><td>The addon's own models are <code>.glb</code>. Meshes, materials, textures, skeleton and animations. Full Import dock + Advanced window.</td></tr>
+    <tr><td>OBJ <code>.obj</code></td><td>"OBJ as Mesh" (a Mesh resource)</td><td>✅ Yes</td><td>A different importer: Generate Tangents / LODs / Shadow / Lightmap UV2, <b>Scale Mesh</b>, <b>Offset Mesh</b>. Reads a <code>.mtl</code> beside it for colours. Dragging it in makes a <code>MeshInstance3D</code>. You can switch Import As to "OBJ as Scene". <b>This is the Roblox export format.</b></td></tr>
+    <tr><td>FBX <code>.fbx</code></td><td>Scene (via converter)</td><td>⚠️ Only if configured</td><td>Godot shows a "Configure FBX Importer" dialog: FBX needs the external <b>FBX2glTF</b> tool set in <b>Editor → Editor Settings → FBX</b>. Until then FBX won't import — prefer glTF/OBJ.</td></tr>
+    <tr><td>Blender <code>.blend</code></td><td>Scene</td><td>⚠️ Only if Blender is installed</td><td>Needs <b>Editor Settings → FileSystem → Import → Blender → Enabled</b> plus the path to Blender. Not set up by default.</td></tr>
+    <tr><td>Collada <code>.dae</code>, STL, PLY</td><td>Scene / Mesh</td><td>✅ / ➖</td><td><code>.dae</code> imports as a Scene. The addon can <i>export</i> STL/PLY, but importing them is niche.</td></tr>
+  </tbody>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Studio, select your model and use <b>Export Selection</b> → <code>.obj</code>. Drop the <code>.obj</code> and its <code>.mtl</code> into <code>res://models/</code> and it imports as a mesh (<a href="#wc">Walkthrough C</a>). For rigs, animation or PBR materials, convert to <b>glTF</b> first.</p></div>
+
+<!-- ===================================================== FILESYSTEM -->
+<h2 id="filesystem">The FileSystem dock — where files live</h2>
+<p>Bottom-left of the editor. Everything under <code>res://</code> is your project. The addon ships real models under <code>res://addons/MarchingSquaresTerrain/assets/</code>: <code>characters/fox/fox.glb</code>, <code>courtyard/</code> (<code>round_tree.glb</code>, <code>stone_ring.glb</code>, <code>fountain.glb</code>, <code>pillar.glb</code>) and about 40 <code>rocks/stone_*.glb</code> boulders.</p>
+<div class="pair">
+  <div class="hotspots"><img src="media/11-importing-models/02-filesystem-assets.png" alt="The FileSystem dock navigated to res://addons/MarchingSquaresTerrain/assets/courtyard, listing fountain.glb, pillar.glb, round_tree.glb and stone_ring.glb, with characters and rocks folders nearby.">
+    <button class="spot" style="left:7%;top:10%" data-title="◀ ▶ Back / Forward" data-text="Go to previous / next selected folder or file.">1</button>
+    <button class="spot" style="left:55%;top:10%" data-title="Path field" data-text="The current folder. Type a res:// path and press Enter to jump there.">2</button>
+    <button class="spot" style="left:92%;top:10%" data-title="Change Split Mode" data-text="Toggle between a single tree and a tree + file grid.">3</button>
+    <button class="spot" style="left:40%;top:16%" data-title="Filter Files" data-text="Live-filter the listing by name.">4</button>
+    <button class="spot" style="left:92%;top:16%" data-title="Sort files" data-text="Change the order files are listed in (name, type, date…).">5</button>
+    <button class="spot" style="left:18%;top:24%" data-title="Favorites" data-text="Folders you've starred, always at the top.">6</button>
+    <button class="spot" style="left:55%;top:59%" data-title=".glb files" data-text="Model files show a filmstrip/mesh icon. Expand one to see the scene it imports to.">7</button>
+  </div>
+  <div>
+    <p><b>Right-click menus:</b></p>
+    <ul>
+      <li>On a folder: <b>Create New ▸ Folder… / Scene… / Script…</b></li>
+      <li>On a file: <b>Rename, Move, Duplicate, Delete, Open in External Program, Copy Path, Show in FileSystem</b>.</li>
+    </ul>
+    <figure class="shot"><img src="media/11-importing-models/03-create-folder-menu.png" alt="The right-click Create New submenu listing Folder..., Scene..., Script..., Resource... and TextFile...."><figcaption>Right-click → <b>Create New</b>.</figcaption></figure>
+    <figure class="shot"><img src="media/11-importing-models/04-create-folder-dialog.png" alt="The Create Folder dialog with Base path res:// and a Name field."><figcaption>The Create Folder dialog.</figcaption></figure>
+  </div>
+</div>
+
+<!-- ===================================================== IMPORT DOCK -->
+<h2 id="import-dock">The Import dock</h2>
+<p>Click a model file once in FileSystem, then click the <b>Import</b> tab at the top-left, next to <b>Scene</b>. The dock fills with every setting Godot uses to bake that file. For a glTF/GLB, <span class="ui">Import As</span> is <b>Scene</b>.</p>
+<figure class="shot"><img src="media/11-importing-models/09-scene-import-tabs.png" alt="The top-left tab bar with Scene and Import tabs; Import is active."><figcaption>The <b>Scene / Import</b> tab switcher.</figcaption></figure>
+
+<div class="callout tip"><span class="label">The import loop</span><p>You never edit the baked result directly. Change a setting here (or edit the source file), press <span class="ui">Reimport</span>, and Godot rebuilds — every instance in every scene updates.</p></div>
+
+<p>The dock is one tall scrolling list. Tour it top to bottom:</p>
+<div class="tabs">
+  <div class="panel" data-tab="Import As + Nodes">
+    <div class="hotspots tall"><img src="media/11-importing-models/10-import-dock-nodes.png" alt="Import dock top: Import As Scene with a Preset button; Nodes section with Root Type, Root Name, Root Script empty, Apply Root Scale On, Root Scale 1.0, Import as Skeleton off, Use Name Suffixes On, Use Node Types On; Meshes Ensure Tangents On; Advanced... and Reimport buttons at the bottom.">
+      <button class="spot" style="left:38%;top:12%" data-title="Import As" data-text="Scene for glTF/GLB. (OBJ defaults to OBJ as Mesh.)">1</button>
+      <button class="spot" style="left:87%;top:12%" data-title="Preset" data-text="Save or load a set of import options.">2</button>
+      <button class="spot" style="left:75%;top:27%" data-title="Root Type" data-text="Node type at the top of the imported scene. Empty = Node3D.">3</button>
+      <button class="spot" style="left:75%;top:34%" data-title="Root Name" data-text="Name of the top node. Empty = file name.">4</button>
+      <button class="spot" style="left:75%;top:41%" data-title="Root Script" data-text="Attach a script on import (advanced).">5</button>
+      <button class="spot" style="left:78%;top:47%" data-title="Apply Root Scale" data-text="Multiply the whole model by Root Scale on import.">6</button>
+      <button class="spot" style="left:78%;top:54%" data-title="Root Scale" data-text="Uniform scale baked into the model — the fix for 'my model is huge / tiny'.">7</button>
+      <button class="spot" style="left:78%;top:61%" data-title="Import as Skeleton" data-text="Force the root to be a Skeleton3D (rigged imports).">8</button>
+      <button class="spot" style="left:78%;top:68%" data-title="Use Name Suffixes" data-text="Honour -col, -noimp, -rigid … suffixes on mesh names.">9</button>
+      <button class="spot" style="left:78%;top:75%" data-title="Use Node Types" data-text="Let glTF node extensions pick the Godot node type.">10</button>
+      <button class="spot" style="left:31%;top:95%" data-title="Advanced…" data-text="Opens the Advanced Import Settings window.">11</button>
+      <button class="spot" style="left:73%;top:95%" data-title="Reimport" data-text="Re-bake the file with the current settings.">12</button>
+    </div>
+  </div>
+  <div class="panel" data-tab="Meshes + Skins">
+    <div class="hotspots tall"><img src="media/11-importing-models/11-import-dock-meshes.png" alt="Import dock scrolled to Meshes: Ensure Tangents On, Generate LODs On, Create Shadow Meshes On, Light Baking Static, Force Disable Compression off; Skins: Use Named Skins On; Animation: Import On.">
+      <button class="spot" style="left:78%;top:37%" data-title="Ensure Tangents" data-text="Generate tangents — needed for normal maps.">1</button>
+      <button class="spot" style="left:78%;top:45%" data-title="Generate LODs" data-text="Build lower-detail versions for distance.">2</button>
+      <button class="spot" style="left:78%;top:52%" data-title="Create Shadow Meshes" data-text="A cheaper mesh used only for shadows.">3</button>
+      <button class="spot" style="left:78%;top:60%" data-title="Light Baking" data-text="Disabled / Static / Static Lightmaps / Dynamic.">4</button>
+      <button class="spot" style="left:78%;top:67%" data-title="Force Disable Compression" data-text="Turn off mesh compression (compatibility).">5</button>
+      <button class="spot" style="left:78%;top:80%" data-title="Use Named Skins" data-text="Keep skin names for rigged meshes.">6</button>
+      <button class="spot" style="left:78%;top:93%" data-title="Animation › Import" data-text="Import animations at all.">7</button>
+    </div>
+  </div>
+  <div class="panel" data-tab="Animation · Materials · glTF">
+    <div class="hotspots tall"><img src="media/11-importing-models/12-import-dock-materials-gltf.png" alt="Import dock scrolled further: Import Rest as RESET off; Import Script Path; Materials Extract Keep Internal, Extract Format Text (*.tres), Extract Path; glTF Naming Version Godot 4.5 or later, Embedded Image Handling Extract Textures, Texture Map Mode Remap to Standard.">
+      <button class="spot" style="left:78%;top:24%" data-title="Import Rest as RESET" data-text="Animation option for rigs. Off by default.">1</button>
+      <button class="spot" style="left:78%;top:37%" data-title="Import Script › Path" data-text="A .gd script that post-processes the scene. Advanced; usually empty.">2</button>
+      <button class="spot" style="left:78%;top:51%" data-title="Materials › Extract" data-text="Keep Internal, or Extract each material to its own editable file.">3</button>
+      <button class="spot" style="left:78%;top:58%" data-title="Extract Format" data-text="Text (.tres) or Binary (.res).">4</button>
+      <button class="spot" style="left:78%;top:66%" data-title="Extract Path" data-text="Folder to write extracted materials into.">5</button>
+      <button class="spot" style="left:78%;top:79%" data-title="Naming Version" data-text="Node-naming scheme for compatibility.">6</button>
+      <button class="spot" style="left:78%;top:86%" data-title="Embedded Image Handling" data-text="Extract Textures: pull embedded textures out as image files.">7</button>
+      <button class="spot" style="left:78%;top:94%" data-title="Texture Map Mode" data-text="Remap to Standard: map glTF textures onto StandardMaterial3D.">8</button>
+    </div>
+  </div>
+  <div class="panel" data-tab="Buttons">
+    <figure class="shot tall"><img src="media/11-importing-models/13-import-dock-reimport-buttons.png" alt="The Import dock with the Advanced... and Reimport buttons at its bottom edge."><figcaption><span class="ui">Advanced…</span> opens the big window; <span class="ui">Reimport</span> applies your changes.</figcaption></figure>
+  </div>
+</div>
+
+<div class="callout warn"><span class="label">Labels cut off?</span><p>In a narrow editor window the dock truncates labels ("Apply Root Scal", "Import as Skele"…). The <a href="#advanced">Advanced Import Settings</a> window shows the same options with full labels.</p></div>
+
+<h3 id="import-ref">Import option reference</h3>
+<input class="filter-box" data-target="#import-ref-cards" placeholder="Filter import options (e.g. scale, LOD, material)…">
+<div id="import-ref-cards">
+  <div class="control"><h4>Import As</h4><div class="where">Import dock · top</div><p>What Godot turns the file into. glTF/GLB/DAE → <b>Scene</b>; OBJ → <b>OBJ as Mesh</b> (can switch to OBJ as Scene). The <span class="ui">Preset</span> button saves/loads option sets.</p></div>
+  <div class="control"><h4>Root Type</h4><div class="where">Import dock · Nodes</div><p>The node at the top of the imported scene.</p><dl><dt>Default</dt><dd>empty = Node3D</dd></dl></div>
+  <div class="control"><h4>Root Name</h4><div class="where">Import dock · Nodes</div><p>Name of the top node.</p><dl><dt>Default</dt><dd>empty = file name</dd></dl></div>
+  <div class="control"><h4>Root Script</h4><div class="where">Import dock · Nodes</div><p>Attach a script to the root on import (advanced).</p><dl><dt>Default</dt><dd>&lt;empty&gt;</dd></dl></div>
+  <div class="control"><h4>Apply Root Scale</h4><div class="where">Import dock · Nodes</div><p>Multiply the whole model by Root Scale on import.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Root Scale</h4><div class="where">Import dock · Nodes</div><p>A uniform scale baked into the model. <b>The fix for "my model is huge / tiny"</b> — every instance gets the right size (<a href="#wb">Walkthrough B</a>).</p><dl><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Import as Skeleton</h4><div class="where">Import dock · Nodes</div><p>Force the root to be a <code>Skeleton3D</code> (rigged imports).</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Use Name Suffixes</h4><div class="where">Import dock · Nodes</div><p>Honour suffixes like <code>-col</code>, <code>-noimp</code>, <code>-rigid</code> on mesh names (e.g. auto-collision).</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Use Node Types</h4><div class="where">Import dock · Nodes</div><p>Let glTF node extensions pick the Godot node type.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Ensure Tangents</h4><div class="where">Import dock · Meshes</div><p>Generate tangents (needed for normal maps).</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Generate LODs</h4><div class="where">Import dock · Meshes</div><p>Build lower-detail versions used at a distance (automatic performance).</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Create Shadow Meshes</h4><div class="where">Import dock · Meshes</div><p>A cheaper mesh used only for casting shadows.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Light Baking</h4><div class="where">Import dock · Meshes</div><p>How the mesh takes part in baked lightmaps.</p><dl><dt>Values</dt><dd>Disabled, Static, Static Lightmaps, Dynamic</dd><dt>Default</dt><dd>Static</dd></dl></div>
+  <div class="control"><h4>Force Disable Compression</h4><div class="where">Import dock · Meshes</div><p>Turn off mesh compression (compatibility).</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Use Named Skins</h4><div class="where">Import dock · Skins</div><p>Keep skin names for rigged meshes.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Animation: Import · FPS · Trimming · Remove Immutable Tracks · Import Rest as RESET</h4><div class="where">Import dock · Animation</div><p>Whether and how animations are baked. Do nothing for a static prop; they matter for a rigged character like the fox.</p><dl><dt>Defaults</dt><dd>Import On · FPS 30 · Trimming Off · Remove Immutable Tracks On · Import Rest as RESET Off</dd></dl></div>
+  <div class="control"><h4>Import Script › Path</h4><div class="where">Import dock · Import Script</div><p>A <code>.gd</code> script that post-processes the imported scene. Advanced; usually empty.</p></div>
+  <div class="control"><h4>Materials › Extract</h4><div class="where">Import dock · Materials</div><p><b>Keep Internal</b> = materials live inside the imported scene. <b>Extract</b> writes each material as its own file you can edit.</p><dl><dt>Default</dt><dd>Keep Internal</dd></dl></div>
+  <div class="control"><h4>Materials › Extract Format</h4><div class="where">Import dock · Materials</div><p>File type when extracting.</p><dl><dt>Values</dt><dd>Text (*.tres), Binary (*.res)</dd><dt>Default</dt><dd>Text (*.tres)</dd></dl></div>
+  <div class="control"><h4>Materials › Extract Path</h4><div class="where">Import dock · Materials</div><p>Folder for extracted materials.</p><dl><dt>Default</dt><dd>empty</dd></dl></div>
+  <div class="control"><h4>glTF › Naming Version</h4><div class="where">Import dock · glTF</div><p>Node-naming scheme, for compatibility with older projects.</p><dl><dt>Default</dt><dd>Godot 4.5 or later</dd></dl></div>
+  <div class="control"><h4>glTF › Embedded Image Handling</h4><div class="where">Import dock · glTF</div><p>Pull textures baked inside a <code>.glb</code> out into image files.</p><dl><dt>Default</dt><dd>Extract Textures</dd></dl></div>
+  <div class="control"><h4>glTF › Texture Map Mode</h4><div class="where">Import dock · glTF</div><p>How glTF texture maps map onto Godot's <code>StandardMaterial3D</code>.</p><dl><dt>Default</dt><dd>Remap to Standard</dd></dl></div>
+  <div class="control"><h4>OBJ: Generate Tangents / LODs / Shadow / Lightmap UV2</h4><div class="where">Import dock · OBJ as Mesh</div><p>The OBJ importer's mesh options — same ideas as the glTF Meshes section. Lightmap UV2 is off by default.</p></div>
+  <div class="control"><h4>OBJ: Scale Mesh</h4><div class="where">Import dock · OBJ as Mesh</div><p>x / y / z scale baked into the mesh — OBJ's equivalent of Root Scale.</p><dl><dt>Default</dt><dd>1.0, 1.0, 1.0</dd></dl></div>
+  <div class="control"><h4>OBJ: Offset Mesh</h4><div class="where">Import dock · OBJ as Mesh</div><p>x / y / z offset baked into the mesh (move its pivot).</p><dl><dt>Default</dt><dd>0, 0, 0</dd></dl></div>
+  <div class="control"><h4>OBJ: Force Disable Mesh Compression</h4><div class="where">Import dock · OBJ as Mesh</div><p>Turn off compression.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Advanced… / Reimport</h4><div class="where">Import dock · bottom</div><p><b>Advanced…</b> opens the Advanced Import Settings window. <b>Reimport</b> re-bakes the file with the current settings — press it after any change.</p></div>
+</div>
+
+<!-- ===================================================== ADVANCED -->
+<h2 id="advanced">The Advanced Import Settings window</h2>
+<p>Press <span class="ui">Advanced…</span> in the Import dock, or <b>double-click the model file</b> in FileSystem. A big window opens, titled <i>"Advanced Import Settings for Scene '&lt;file&gt;'"</i>.</p>
+<div class="hotspots"><img src="media/11-importing-models/20-advanced-import-scene.png" alt="Advanced Import Settings for Scene round_tree.glb: Actions button top-left; Scene, Meshes and Materials tabs over a node tree (Scene, Tree, Icosphere … Leaves, Stem); a large 3D preview of the low-poly tree in the centre; the import inspector on the right with Nodes, Meshes, Skins, Animation sections; Close and Reimport buttons at the bottom.">
+  <button class="spot" style="left:3%;top:5%" data-title="Actions…" data-text="Extract Materials, Set Animation Save Paths, Set Mesh Save Paths — bulk versions of the per-item options.">1</button>
+  <button class="spot" style="left:3%;top:9.5%" data-title="Scene tab" data-text="The node tree. Select a node for per-node settings (Skip Import, Generate Physics…).">2</button>
+  <button class="spot" style="left:8%;top:9.5%" data-title="Meshes tab" data-text="Flat list of every mesh; per-mesh Save to File, Generate, LODs.">3</button>
+  <button class="spot" style="left:14%;top:9.5%" data-title="Materials tab" data-text="The model's materials; per-material Use External.">4</button>
+  <button class="spot" style="left:12%;top:35%" data-title="Tree" data-text="For round_tree.glb: Scene ▸ Tree ▸ Icosphere…Icosphere_003 ▸ Leaves ▸ Stem.">5</button>
+  <button class="spot" style="left:50%;top:50%" data-title="3D preview" data-text="Drag to orbit around the model.">6</button>
+  <button class="spot" style="left:78%;top:13%" data-title="Preview buttons" data-text="Spin the preview light / toggle the preview sun.">7</button>
+  <button class="spot" style="left:88%;top:40%" data-title="Import inspector" data-text="The same settings as the dock, with complete labels.">8</button>
+  <button class="spot" style="left:32%;top:96%" data-title="Close" data-text="Discard changes.">9</button>
+  <button class="spot" style="left:67%;top:96%" data-title="Reimport" data-text="Apply changes and re-bake.">10</button>
+</div>
+<div class="pair">
+  <figure class="clip"><video src="media/11-importing-models/21-advanced-import-preview.mp4" poster="media/11-importing-models/21-advanced-import-preview.png" data-autoplay></video><figcaption>Orbiting the 3D preview by dragging.</figcaption></figure>
+  <figure class="shot"><img src="media/11-importing-models/27-advanced-actions-menu.png" alt="The Actions menu open: Extract Materials, Set Animation Save Paths, Set Mesh Save Paths."><figcaption>The <span class="ui">Actions…</span> menu.</figcaption></figure>
+</div>
+
+<h3 id="adv-tabs">The three tabs</h3>
+<div class="tabs">
+  <div class="panel" data-tab="Scene tab">
+    <p>Select a node in the tree to see its <b>per-node</b> settings.</p>
+    <ul>
+      <li><b>A group node</b> (e.g. <code>Tree</code>): <b>Node</b> (Node Type, Script) and <b>Import ▸ Skip Import</b> (leave this node out).</li>
+      <li><b>A mesh node</b> (e.g. <code>Icosphere</code>): Import ▸ Skip Import; <b>Generate ▸ Physics</b> (checkbox), <b>NavMesh</b>, <b>Occluder</b>; and <b>Mesh Instance</b> (render Layers, Visibility Range, Cast Shadow). <b>This is the per-mesh collision control.</b></li>
+    </ul>
+    <div class="pair">
+      <figure class="shot tall"><img src="media/11-importing-models/23-advanced-node-generate.png" alt="Per-node settings for a mesh: Node Script, Import Skip Import off, Generate Physics off, NavMesh Disabled, Occluder Disabled, Mesh Instance Layers, Visibility Range fields and Cast Shadow On."><figcaption>A mesh node: Generate ▸ Physics / NavMesh / Occluder.</figcaption></figure>
+      <div class="hotspots tall"><img src="media/11-importing-models/24-advanced-physics-collision.png" alt="Same panel with Physics ticked, revealing a Physics section: Body Type StaticBody3D, Shape Type Automatic, Physics Material empty, Layer and Mask grids with 1 selected.">
+        <button class="spot" style="left:70%;top:13%" data-title="Skip Import" data-text="Leave this node out of the import.">1</button>
+        <button class="spot" style="left:70%;top:20%" data-title="Generate ▸ Physics" data-text="Turn on to make the mesh solid. Reveals the Physics section.">2</button>
+        <button class="spot" style="left:70%;top:24%" data-title="NavMesh" data-text="Disabled / … — generate navigation data.">3</button>
+        <button class="spot" style="left:70%;top:28%" data-title="Occluder" data-text="Disabled / … — generate an occluder.">4</button>
+        <button class="spot" style="left:70%;top:35%" data-title="Body Type" data-text="StaticBody3D / RigidBody3D / Area3D / …">5</button>
+        <button class="spot" style="left:70%;top:39%" data-title="Shape Type" data-text="Automatic / Trimesh / Convex / Box / Sphere / Capsule / …">6</button>
+        <button class="spot" style="left:70%;top:43%" data-title="Physics Material" data-text="Friction / bounce resource.">7</button>
+        <button class="spot" style="left:40%;top:53%" data-title="Layer" data-text="Which collision layers this body is on.">8</button>
+        <button class="spot" style="left:40%;top:66%" data-title="Mask" data-text="Which layers it collides with.">9</button>
+        <button class="spot" style="left:40%;top:80%" data-title="Mesh Instance ▸ Layers" data-text="Render layers, plus Visibility Range and Cast Shadow below.">10</button>
+      </div>
+    </div>
+    <div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Studio every Part collides unless you untick <b>CanCollide</b>. An imported Godot mesh has <b>no collision</b> until you turn on <b>Generate ▸ Physics</b> here. <b>Shape Type</b> plays the role of a MeshPart's <b>CollisionFidelity</b>: a simple Box or Convex hull is cheap, Trimesh follows the exact surface.</p></div>
+  </div>
+  <div class="panel" data-tab="Meshes tab">
+    <p>A flat list of every mesh. Select one for <b>per-mesh</b> settings.</p>
+    <figure class="shot tall"><img src="media/11-importing-models/22-advanced-per-mesh.png" alt="Per-mesh settings: Save to File Enabled off; Generate Shadow Meshes Default, Lightmap UV Default, LODs Default; LODs Normal Merge Angle 20 degrees."><figcaption>Per-mesh: Save to File, Generate (Shadow Meshes / Lightmap UV / LODs) and LOD Normal Merge Angle.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Materials tab">
+    <p>Lists the model's materials — for the tree, <b>Leaves</b> and <b>Wood</b>. Select one to preview it on a sphere and see <b>Use External ▸ Enabled</b>: turn it on to replace the baked-in material with your own <code>.tres</code> / <code>.material</code> file (a Path field appears).</p>
+    <div class="pair">
+      <figure class="shot tall"><img src="media/11-importing-models/25-advanced-materials-list.png" alt="The Materials tab listing the tree's materials, Leaves and Wood."><figcaption>The Materials list.</figcaption></figure>
+      <figure class="shot tall"><img src="media/11-importing-models/26-advanced-material-external.png" alt="Per-material settings showing Use External with an Enabled checkbox."><figcaption><b>Use External ▸ Enabled</b>.</figcaption></figure>
+    </div>
+    <figure class="shot"><img src="media/11-importing-models/28-material-preview-sphere.png" alt="The Advanced window's centre preview showing the green Leaves material on a large sphere."><figcaption>The <b>Leaves</b> material previewed on a sphere.</figcaption></figure>
+  </div>
+</div>
+
+<input class="filter-box" data-target="#adv-ref" placeholder="Filter Advanced window options…">
+<div id="adv-ref">
+  <div class="control"><h4>Skip Import</h4><div class="where">Advanced · Scene tab · any node</div><p>Leave this node (and its children) out of the imported scene.</p></div>
+  <div class="control"><h4>Node Type / Script</h4><div class="where">Advanced · Scene tab · group node</div><p>Change what kind of node this becomes, or attach a script.</p></div>
+  <div class="control"><h4>Generate ▸ Physics</h4><div class="where">Advanced · Scene tab · mesh node</div><p>Generate a collision body for this mesh. Reveals Body Type, Shape Type, Physics Material, Layer, Mask.</p></div>
+  <div class="control"><h4>Body Type</h4><div class="where">Advanced · Physics</div><p>StaticBody3D (doesn't move — walls, rocks), RigidBody3D (falls and tumbles), Area3D (a trigger zone), …</p></div>
+  <div class="control"><h4>Shape Type</h4><div class="where">Advanced · Physics</div><p>Automatic, Trimesh (exact, static only), Convex (wrapped hull), Box, Sphere, Capsule, …</p></div>
+  <div class="control"><h4>Physics Material / Layer / Mask</h4><div class="where">Advanced · Physics</div><p>Friction/bounce, which collision layers the body sits on, and which it collides with.</p></div>
+  <div class="control"><h4>Generate ▸ NavMesh / Occluder</h4><div class="where">Advanced · Scene tab · mesh node</div><p>Generate navigation or occlusion data for the mesh.</p><dl><dt>Default</dt><dd>Disabled</dd></dl></div>
+  <div class="control"><h4>Mesh Instance (Layers, Visibility Range, Cast Shadow)</h4><div class="where">Advanced · Scene tab · mesh node</div><p>Render layers, distance-based fade in/out, and whether it casts shadows.</p></div>
+  <div class="control"><h4>Save to File ▸ Enabled</h4><div class="where">Advanced · Meshes tab</div><p>Write this mesh as its own <code>.res</code>/<code>.tres</code> file.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Generate ▸ Shadow Meshes / Lightmap UV / LODs</h4><div class="where">Advanced · Meshes tab</div><p>Per-mesh override of the dock-wide options.</p><dl><dt>Values</dt><dd>Default, Enabled, Disabled</dd></dl></div>
+  <div class="control"><h4>LODs ▸ Normal Merge Angle</h4><div class="where">Advanced · Meshes tab</div><p>How aggressively LOD generation merges faces.</p><dl><dt>Default</dt><dd>20°</dd></dl></div>
+  <div class="control"><h4>Use External ▸ Enabled</h4><div class="where">Advanced · Materials tab</div><p>Replace the baked-in material with an external <code>.tres</code>/<code>.material</code>; a Path field appears.</p></div>
+  <div class="control"><h4>Actions… ▸ Extract Materials / Set Animation Save Paths / Set Mesh Save Paths</h4><div class="where">Advanced · top-left</div><p>Bulk versions of the per-item save/extract options.</p></div>
+  <div class="control"><h4>Close / Reimport</h4><div class="where">Advanced · bottom</div><p>Close discards; Reimport applies and re-bakes.</p></div>
+</div>
+
+<!-- ===================================================== INSTANCING -->
+<h2 id="instancing">Putting a model into a scene</h2>
+<p>An imported <code>.glb</code> becomes a <b>scene</b> you can drop into your own scene — like dragging a Model out of Roblox's Toolbox. Four ways:</p>
+<ol>
+  <li><b>Drag from FileSystem into the 3D viewport</b> — the model lands where you drop it, snapped onto the surface under the cursor.</li>
+  <li><b>Drag from FileSystem onto a node in the Scene tree</b> — it becomes a child of that node, at that node's origin.</li>
+  <li><b>Scene dock ▸ Instantiate Child Scene…</b> — the chain-link icon in the Scene dock toolbar.</li>
+  <li><b>Double-click the file</b> to open the imported scene (read-only), or <b>Scene ▸ New Inherited Scene…</b> to make an editable scene that inherits the model, so changes to the source still flow through.</li>
+</ol>
+<div class="tabs">
+  <div class="panel" data-tab="Into the viewport">
+    <figure class="clip"><video src="media/11-importing-models/30-drag-into-viewport.mp4" poster="media/11-importing-models/30-drag-into-viewport.png" data-autoplay></video><figcaption>Dragging <code>round_tree.glb</code> from FileSystem into the 3D view.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Onto the Scene tree">
+    <figure class="clip"><video src="media/11-importing-models/42-drag-into-tree.mp4" poster="media/11-importing-models/42-drag-into-tree.png"></video><figcaption>Dropping a model onto a node in the Scene tree makes it a child at that node's origin.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Scene menu">
+    <div class="pair">
+      <figure class="shot"><img src="media/11-importing-models/40-scene-menu.png" alt="The Scene menu: New Scene, New Inherited Scene..., Open Scene..., Reopen Closed Scene, Open Recent, Save Scene, Save Scene As..., Save All Scenes, Quick Open entries."><figcaption>The <b>Scene</b> menu: <b>New Inherited Scene…</b> near the top, <b>Export As…</b> further down.</figcaption></figure>
+      <figure class="shot"><img src="media/11-importing-models/41-create-root-node.png" alt="A new empty scene's Scene dock: the Create Root Node list shows 2D Scene, 3D Scene, User Interface and Other Node inline below the dock's Add and Instantiate buttons."><figcaption>A new empty scene: the <b>Create Root Node</b> choices appear right in the Scene dock — pick <b>3D Scene</b> as the root, then drag models in.</figcaption></figure>
+    </div>
+  </div>
+</div>
+<p>The instanced model appears as a node (e.g. <code>round_tree</code>) whose children are the actual <code>MeshInstance3D</code> parts (<code>Tree ▸ Stem</code>, <code>Leaves</code>, …).</p>
+<figure class="shot"><img src="media/11-importing-models/43-instanced-tree.png" alt="The low-poly round tree instanced alone in a clean, lit 3D scene over the editor grid."><figcaption>The tree instanced into a fresh, lit scene.</figcaption></figure>
+
+<div class="callout warn"><span class="label">Why does my tree look microscopic?</span><p>The addon's demo terrain scenes are built at a very large unit scale (hundreds of units across), so a real-size 3 m tree looks tiny there. That's scale, not a broken import. Fix it with <b>Root Scale</b> (bake a bigger size into the model) or by scaling the instance.</p></div>
+
+<h3 id="transform">Moving, rotating and scaling an instance</h3>
+<p>An imported model is a normal <code>Node3D</code>, so the editor's transform tools apply — the same as Studio's Move / Rotate / Scale:</p>
+<table class="ref">
+  <thead><tr><th>Key</th><th>Tool</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>W</kbd></td><td>Move</td><td>Hover the 3D view first. Drag the coloured arrows.</td></tr>
+    <tr><td><kbd>E</kbd></td><td>Rotate</td><td>Drag the coloured rings.</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Scale</td><td>Drag one axis handle, or a plane/centre handle to scale uniformly.</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Focus</td><td>Frame the selected node; scroll to zoom.</td></tr>
+    <tr><td>Inspector</td><td>Transform</td><td>Type exact Position / Rotation / Scale — like Studio's Properties.</td></tr>
+    <tr><td>Magnet icons</td><td>Snapping</td><td>Toggle snap in the 3D toolbar.</td></tr>
+  </tbody>
+</table>
+<figure class="clip"><video src="media/11-importing-models/44-scale-gizmo.mp4" poster="media/11-importing-models/44-scale-gizmo.png"></video><figcaption>Scale tool (<kbd>R</kbd>): dragging the green Y handle makes the tree taller (scale Y 1.0 → 2.2).</figcaption></figure>
+
+<!-- ===================================================== WALKTHROUGHS -->
+<h2 id="walkthroughs">Walkthroughs</h2>
+<p>Follow along in your own project, or open the finished scene <code>res://tutorial/guide/imported_models.tscn</code> (a <code>Node3D</code> named <b>ImportedModels</b> with instanced <code>round_tree</code> and <code>fox</code>, using only addon assets).</p>
+
+<h3 id="wa">A · Import a GLB and put it in a scene (the core loop)</h3>
+<ol class="steps" data-id="import-wa">
+  <li><b>Find the model.</b> In FileSystem open <code>res://addons/MarchingSquaresTerrain/assets/courtyard/</code> — you'll see <code>round_tree.glb</code> and friends. (For your own files, drag a <code>.glb</code> from your file manager onto this dock, or copy it into the project folder — see C.)</li>
+  <li><b>Check the import settings.</b> Click <code>round_tree.glb</code> once, then the <b>Import</b> tab next to <b>Scene</b>. Leave the defaults for now.</li>
+  <li><b>Peek inside (optional).</b> Double-click the file (or press <span class="ui">Advanced…</span>). Orbit the preview, then <span class="ui">Close</span>.</li>
+  <li><b>Instance it.</b> Switch to a 3D scene and drag <code>round_tree.glb</code> into the viewport. A <code>round_tree</code> node appears.</li>
+  <li><b>Frame it.</b> Select the node, hover the 3D view and press <kbd>F</kbd>. Scroll to zoom.</li>
+  <li><b>Scale / move it.</b> Press <kbd>R</kbd> and drag a handle, or type values in <b>Inspector ▸ Transform</b>.</li>
+</ol>
+
+<h3 id="wb">B · Change an import setting and Reimport (fix the size)</h3>
+<ol class="steps" data-id="import-wb">
+  <li>Select <code>round_tree.glb</code> → <b>Import</b> tab.</li>
+  <li>Double-click <span class="ui">Root Scale</span>, type <code>2.0</code>, press <kbd>Enter</kbd>.</li>
+  <li>Click <span class="ui">Reimport</span>. Godot rebuilds the model and <b>every instance in every scene doubles in size</b>.</li>
+  <li>Set it back to <code>1.0</code> and Reimport to undo.</li>
+</ol>
+<figure class="clip"><video src="media/11-importing-models/54-reimport-root-scale.mp4" poster="media/11-importing-models/54-reimport-root-scale.png" data-autoplay></video><figcaption>Root Scale 1 → 2, Reimport: every instance grows live.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>Fix "wrong size" with <b>Root Scale</b> (or <b>Scale Mesh</b> for OBJ), not by scaling every copy — then every future instance is right too.</p></div>
+
+<h3 id="wc">C · From Roblox Studio to Godot (the OBJ path)</h3>
+<ol class="steps" data-id="import-wc">
+  <li><b>Export from Studio.</b> Select your model and use <b>Export Selection</b> → save an <code>.obj</code> (Studio writes a <code>.mtl</code> beside it).</li>
+  <li><b>Make a models folder.</b> In FileSystem right-click <code>res://</code> → <b>Create New ▸ Folder…</b>, name it <code>models</code>, OK.</li>
+  <li><b>Copy the files in.</b> Put the <code>.obj</code> <b>and</b> its <code>.mtl</code> into the project's <code>models/</code> folder. Godot detects and imports them; the <code>.obj</code> shows a mesh icon.
+    <figure class="shot"><img src="media/11-importing-models/05-models-folder-imported.png" alt="FileSystem showing a models folder containing exported_tree.glb with a scene icon and roblox_house.obj with a mesh icon."><figcaption><code>res://models/</code> with an imported <code>roblox_house.obj</code> (mesh icon) and <code>exported_tree.glb</code> (scene icon).</figcaption></figure></li>
+  <li><b>Read its import settings.</b> Select the <code>.obj</code> → Import tab. It says <b>OBJ as Mesh</b>, with Scale/Offset Mesh.
+    <div class="hotspots tall"><img src="media/11-importing-models/51-obj-import-dock.png" alt="Import dock for roblox_house.obj: Import As OBJ as Mesh; Generate Tangents On, Generate LODs On, Generate Shadow On, Generate Lightmap UV2 off; Scale Mesh 1.0 1.0 1.0; Offset Mesh 0.0 0.0 0.0; Force Disable Mesh Compression off; Reimport button.">
+      <button class="spot" style="left:40%;top:17%" data-title="Import As: OBJ as Mesh" data-text="OBJ imports as a Mesh, not a Scene. Switch to OBJ as Scene if you want a scene.">1</button>
+      <button class="spot" style="left:75%;top:32%" data-title="Generate Tangents / LODs / Shadow / Lightmap" data-text="Mesh options, like the glTF Meshes section.">2</button>
+      <button class="spot" style="left:50%;top:58%" data-title="Scale Mesh" data-text="Bake a size into the mesh — the OBJ version of Root Scale.">3</button>
+      <button class="spot" style="left:50%;top:70%" data-title="Offset Mesh" data-text="Bake an offset (move the pivot).">4</button>
+      <button class="spot" style="left:50%;top:95%" data-title="Reimport" data-text="Apply. (No Advanced… button for OBJ as Mesh.)">5</button>
+    </div></li>
+  <li><b>Instance it.</b> Drag the <code>.obj</code> into the viewport — a <code>MeshInstance3D</code> (here <code>RobloxHouse</code>) appears.</li>
+</ol>
+<div class="pair">
+  <figure class="clip"><video src="media/11-importing-models/52-obj-instance.mp4" poster="media/11-importing-models/52-obj-instance.png"></video><figcaption>Dragging the Roblox OBJ into the viewport.</figcaption></figure>
+  <figure class="shot"><img src="media/11-importing-models/53-obj-house-and-tree.png" alt="A small dark-brown box-shaped house selected with its move gizmo, standing beside the low-poly tree."><figcaption>The imported OBJ house beside the GLB tree.</figcaption></figure>
+</div>
+<div class="callout tip"><span class="label">Harmless warning</span><p>The Output panel may say <i>"OBJ: Ambient light for material 'Walls' is ignored in PBR"</i>. That's the <code>.mtl</code>'s ambient (<code>Ka</code>) colour being dropped — Godot uses the diffuse (<code>Kd</code>) colour. Expected, not an error.</p></div>
+
+<h3 id="wd">D · Export from Godot and re-import (round-trip)</h3>
+<ol class="steps" data-id="import-wd">
+  <li>Open or make a scene with a model (e.g. the tree).</li>
+  <li><b>Scene ▸ Export As… ▸ glTF 2.0 Scene…</b>, choose <code>res://models/exported_tree.glb</code>.</li>
+  <li>An <b>Export Settings</b> dialog appears (Copyright, Bake FPS, Image Format, Root Node Mode). Click <b>OK</b>. The <code>.glb</code> is written <b>and</b> auto-imported.
+    <figure class="shot"><img src="media/11-importing-models/50-gltf-export-settings.png" alt="Export Settings dialog with Copyright (placeholder text), Bake FPS 30.0, Image Format PNG, Root Node Mode Single Root."><figcaption>The Export Settings dialog for a glTF export.</figcaption></figure></li>
+  <li>Drag it from <code>res://models/</code> back into a scene — a full export → import round-trip.</li>
+</ol>
+<figure class="clip"><video src="media/11-importing-models/55-instance-reimported-glb.mp4" poster="media/11-importing-models/55-instance-reimported-glb.png"></video><figcaption>Instancing the Godot-exported <code>exported_tree.glb</code>.</figcaption></figure>
+<p>The addon's <b>Builder</b> can likewise export a <code>.glb</code> / <code>.obj</code> / <code>.stl</code> / <code>.ply</code> of a mesh you model — re-import it the same way (see <a href="10-builder-modeller.html">Modelling</a>). The terrain itself can be exported as a GLB too (<a href="06-chunks-settings.html#storage">Chunks, settings &amp; saving</a>).</p>
+
+<h3 id="we">E · Edit an imported model's material</h3>
+<ol class="steps" data-id="import-we">
+  <li>Select one mesh part of an instance, e.g. <code>round_tree/Tree/Leaves</code>.</li>
+  <li>In the Inspector expand <b>Surface Material Override</b> and set slot <b>0</b> to <b>New StandardMaterial3D</b>.</li>
+  <li>Click the material to open its properties: Albedo, Metallic, Roughness, Emission, Normal Map…</li>
+  <li>Expand <b>Albedo</b>, click <b>Color</b> and pick a colour — that part recolours.</li>
+</ol>
+<div class="pair">
+  <div class="hotspots tall"><img src="media/11-importing-models/70-standardmaterial3d-inspector.png" alt="Inspector for a MeshInstance3D: Editable Mesh section with a Make Editable button; Mesh preview; Surface Material Override slot 0 with a white StandardMaterial3D sphere preview; sections Transparency, Shading, Vertex Color, Albedo, Metallic, Roughness, and toggles Emission, Normal Map, Bent Normal Map, Rim, Clearcoat.">
+    <button class="spot" style="left:48%;top:11.5%" data-title="Make Editable" data-text="Convert to an editable builder mesh (Walkthrough F).">1</button>
+    <button class="spot" style="left:70%;top:26%" data-title="Mesh" data-text="The imported mesh resource.">2</button>
+    <button class="spot" style="left:40%;top:35.5%" data-title="Surface Material Override" data-text="Override the material per surface slot without touching the import.">3</button>
+    <button class="spot" style="left:75%;top:41.5%" data-title="Slot 0" data-text="New StandardMaterial3D goes here.">4</button>
+    <button class="spot" style="left:25%;top:73%" data-title="Albedo" data-text="Base colour / texture — Roblox's Color.">5</button>
+    <button class="spot" style="left:25%;top:76.7%" data-title="Metallic" data-text="How metal-like the surface is.">6</button>
+    <button class="spot" style="left:27%;top:80.2%" data-title="Roughness" data-text="Shiny (low) to matte (high).">7</button>
+    <button class="spot" style="left:22%;top:85%" data-title="Emission · Normal Map · …" data-text="Glow, bumpy detail, rim light, clearcoat — tick to enable.">8</button>
+  </div>
+  <div>
+    <figure class="clip"><video src="media/11-importing-models/71-material-albedo.mp4" poster="media/11-importing-models/71-material-albedo.png"></video><figcaption>Typing an Albedo colour: the leaf mesh recolours.</figcaption></figure>
+    <figure class="shot"><img src="media/11-importing-models/72-albedo-color-changed.png" alt="The material inspector with the Albedo Color set to orange and the preview sphere orange."><figcaption>Albedo Color set to orange.</figcaption></figure>
+  </div>
+</div>
+<div class="callout warn"><span class="label">One part at a time</span><p>glTF models are split into several <code>MeshInstance3D</code> parts (the tree = Stem + several Icosphere canopy pieces + Leaves). An override recolours <b>one</b> part. To edit the model's <b>own</b> baked material, use <b>Materials ▸ Extract</b> in the Import dock or <b>Use External</b> in the Advanced window's Materials tab, then edit the extracted <code>.tres</code>. Or recolour after converting with the Builder (F).</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Studio's <b>Color</b> and <b>Material</b> properties map to <code>StandardMaterial3D</code>: <b>Albedo</b> = Color, plus <b>Metallic</b>, <b>Roughness</b> and texture slots — same idea, edited in the Inspector.</p></div>
+
+<h3 id="wf">F · Convert an imported mesh into an editable Builder mesh</h3>
+<ol class="steps" data-id="import-wf">
+  <li>Select an imported <code>MeshInstance3D</code> (e.g. the OBJ <code>RobloxHouse</code>). The Pixel Builder tools appear (a tool column on the left of the 3D view and an option strip along the bottom), and the bottom strip says <i>"Mesh / CSG selected: Convert makes it an editable builder mesh; the shape tool draws new ones"</i>.</li>
+  <li>Click the <span class="ui">Convert</span> button in the Builder's left tool column (hover the icons to read their tooltips), or use Inspector ▸ <span class="ui">Make Editable</span>. The <b>Convert to builder mesh</b> dialog opens.</li>
+  <li>Choose options and click <span class="ui">Convert</span>. The mesh becomes an editable <code>PixelBuilderMesh</code> you can extrude, inset and bevel (see <a href="10-builder-modeller.html">Modelling</a>).</li>
+</ol>
+<div class="pair">
+  <div class="hotspots"><img src="media/11-importing-models/60-convert-to-builder-dialog.png" alt="Convert to builder mesh dialog: Merge triangles into N-gons, Keep materials ticked, Keep smoothing unticked, Smoothing angle 0, Cancel and Convert buttons.">
+    <button class="spot" style="left:75%;top:24%" data-title="Merge triangles into" data-text="Triangles, Quads or N-gons — how imported triangles are merged into faces.">1</button>
+    <button class="spot" style="left:8%;top:40%" data-title="Keep materials" data-text="Keep the model's materials on the new faces.">2</button>
+    <button class="spot" style="left:8%;top:55%" data-title="Keep smoothing" data-text="Keep smooth shading.">3</button>
+    <button class="spot" style="left:60%;top:70%" data-title="Smoothing angle°" data-text="Edges sharper than this stay hard.">4</button>
+    <button class="spot" style="left:72%;top:88%" data-title="Convert" data-text="Make it an editable PixelBuilderMesh.">5</button>
+  </div>
+  <figure class="clip"><video src="media/11-importing-models/61-convert-to-builder.mp4" poster="media/11-importing-models/61-convert-to-builder.png"></video><figcaption>Convert: the OBJ house becomes an editable builder mesh.</figcaption></figure>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>A Studio MeshPart is locked once imported. Here you can turn an import into an editable builder mesh and keep modelling it — something Studio can't do.</p></div>
+
+<!-- ===================================================== TEXTURED FOX -->
+<h2 id="fox">A textured, rigged model: the fox</h2>
+<p><code>fox.glb</code> shows the pattern for textured models: the image files sit <b>right next to</b> the model.</p>
+<div class="pair">
+  <figure class="shot"><img src="media/11-importing-models/80-textures-next-to-model.png" alt="FileSystem showing the fox folder: fox.glb alongside fox_Diffuse.png, fox_Normal.png and other texture images."><figcaption><code>fox.glb</code> with its textures beside it.</figcaption></figure>
+  <figure class="shot"><img src="media/11-importing-models/81-fox-textured.png" alt="Close-up of the imported fox character, textured with orange fur and a green hood, holding a sword and standing clear of the tree."><figcaption>The imported, textured fox close up, framed clear of the tree.</figcaption></figure>
+</div>
+<figure class="clip"><video src="media/11-importing-models/82-scene-orbit.mp4" poster="media/11-importing-models/82-scene-orbit.png" data-autoplay></video><figcaption>Orbiting the finished scene: the GLB round tree and the textured fox beside it.</figcaption></figure>
+
+<!-- ===================================================== TROUBLESHOOTING -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+<input class="filter-box" data-target="#trouble" placeholder="Filter problems…">
+<div id="trouble">
+  <div class="control"><h4>Model too big / too small</h4><div class="where">Import dock</div><p>Use <b>Root Scale</b> (glTF) or <b>Scale Mesh</b> (OBJ), then <b>Reimport</b> (<a href="#wb">B</a>). The addon's terrain demos use very large world units, so a real-size model looks tiny there — scale the model or the instance up.</p></div>
+  <div class="control"><h4>Missing textures / looks untextured or white</h4><div class="where">FileSystem</div><p>Textures must sit <b>next to the model file</b> (glTF can also embed them). If you move a <code>.glb</code> without its textures, the colour goes flat/white. For OBJ, keep the <code>.mtl</code> beside the <code>.obj</code>.</p></div>
+  <div class="control"><h4>Renders dark / faces look inside-out</h4><div class="where">Source app or Builder</div><p>Faces with reversed winding/normals shade black. Re-export from the source app with consistent normals, or Convert (<a href="#wf">F</a>) and use <b>Flip normals</b> / <b>Conform normals</b> in the Builder.</p></div>
+  <div class="control"><h4>Lies on its side (wrong up-axis)</h4><div class="where">Inspector / exporter</div><p>glTF is <b>Y-up</b>; models from Z-up tools can arrive rotated. Rotate the instance −90° on X, or set a Root Type and rotate on import. Many exporters have a "Y-up" option — prefer that.</p></div>
+  <div class="control"><h4>FBX won't import</h4><div class="where">Editor Settings</div><p>FBX needs FBX2glTF configured in <b>Editor → Editor Settings → FBX</b>. Easier: export glTF from your 3D app.</p></div>
+  <div class="control"><h4>.blend won't import</h4><div class="where">Editor Settings</div><p>Enable <b>FileSystem → Import → Blender</b> and set the Blender path, or export glTF from Blender.</p></div>
+  <div class="control"><h4>Imported prop has no collision</h4><div class="where">Advanced window</div><p>Select the mesh node in the Scene tab, tick <b>Generate ▸ Physics</b>, pick Body / Shape Type, Reimport.</p></div>
+  <div class="control"><h4>Recolour changed only part of the model</h4><div class="where">Inspector</div><p>glTF models are several mesh parts; an override hits one. See <a href="#we">E</a>.</p></div>
+  <div class="control"><h4>"Ambient light … ignored in PBR" warning</h4><div class="where">Output panel</div><p>Harmless: the OBJ's <code>.mtl</code> ambient colour is dropped.</p></div>
+</div>
+
+<!-- ===================================================== BRIDGES -->
+<h2 id="bridges">Roblox → Godot cheat sheet</h2>
+<table class="ref">
+  <thead><tr><th>Roblox Studio</th><th>Godot</th></tr></thead>
+  <tbody>
+    <tr><td>Toolbox / Import 3D</td><td>Put the file in the project folder; manage it in FileSystem; tune it in the Import dock.</td></tr>
+    <tr><td>Export Selection → .obj</td><td>Drop <code>.obj</code> + <code>.mtl</code> into <code>res://models/</code>; imports as a mesh.</td></tr>
+    <tr><td>MeshPart</td><td>An imported scene you instance — and can convert to an editable builder mesh.</td></tr>
+    <tr><td>Properties → Color / Material</td><td><code>StandardMaterial3D</code>: Albedo, Metallic, Roughness, textures.</td></tr>
+    <tr><td>Move / Scale / Rotate</td><td><kbd>W</kbd> / <kbd>R</kbd> / <kbd>E</kbd> gizmos, or exact Transform values in the Inspector; bake a size with Root Scale.</td></tr>
+    <tr><td>CanCollide / CollisionFidelity</td><td>Advanced window ▸ Generate ▸ Physics, Shape Type.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You imported a tree and every copy is twice too big. What's the cleanest fix?</summary><p>Select the file → Import dock → set <b>Root Scale</b> to <code>0.5</code> → <b>Reimport</b>. Every instance updates.</p></details>
+<details class="check"><summary>Your Roblox OBJ imported, but it's untextured grey. What did you probably forget?</summary><p>The <code>.mtl</code> file (and any textures) must sit beside the <code>.obj</code> in the project folder.</p></details>
+<details class="check"><summary>Why does the Import dock look different for an .obj than a .glb?</summary><p>OBJ imports as a <b>Mesh</b> ("OBJ as Mesh": Scale / Offset Mesh), glTF as a <b>Scene</b> (Nodes, Meshes, Materials, glTF sections, plus Advanced…).</p></details>
+<details class="check"><summary>How do you make an imported rock solid so the player can't walk through it?</summary><p>Open the Advanced window, select the mesh node in the Scene tab, tick <b>Generate ▸ Physics</b> (StaticBody3D), then Reimport.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="12-using-models.html">Using models: tiles, foliage &amp; props</a> — <b>next</b>: put your imported models to work as foliage, props and tiles.</li>
+  <li><a href="10-builder-modeller.html">Modelling: faces, edges &amp; vertices</a> — edit a converted builder mesh; export from the Builder.</li>
+  <li><a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a>.</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — export the terrain itself as a GLB.</li>
+  <li><a href="01-godot-for-roblox.html">Godot for Roblox builders</a> — the editor basics.</li>
+  <li><a href="13-playtest-export.html">Playtesting &amp; exporting</a>.</li>
+  <li><a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

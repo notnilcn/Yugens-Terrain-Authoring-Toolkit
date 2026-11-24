@@ -13,10 +13,6 @@
 [ext_resource type="Shader" uid="uid://cugwmjqey3kvm" path="res://demo/xray_mask.gdshader" id="26_5o5n5"]
 [ext_resource type="Shader" uid="uid://dg5gmfelj1puq" path="res://demo/xray_silhouette.gdshader" id="27_bx2jk"]
 [ext_resource type="PackedScene" uid="uid://cbpsgle077y8d" path="res://demo/assets/characters/Knight.fbx" id="28_pvuxt"]
-[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/render/pixel_pipeline.tscn" id="29_pipeline"]
-[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/debug/pixel_diagnostics_overlay.tscn" id="30_overlay"]
-[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/effects/pixel_water.tscn" id="31_water"]
-[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/effects/pixel_light_volume.tscn" id="32_lamp"]
 [ext_resource type="Texture2D" uid="uid://d1rdb7yfek625" path="res://addons/MarchingSquaresTerrain/textures/grass_blade.png" id="mst_grass_sprite"]
 [ext_resource type="Texture2D" uid="uid://pw7r4s5gqgpl" path="res://addons/MarchingSquaresTerrain/textures/ground/clay.png" id="mst_ground_clay"]
 [ext_resource type="Texture2D" uid="uid://5lw2huhld0sf" path="res://addons/MarchingSquaresTerrain/textures/ground/cliff.png" id="mst_ground_cliff"]
@@ -32,6 +28,10 @@
 [ext_resource type="Texture2D" uid="uid://8gl6vsoro8t4" path="res://addons/MarchingSquaresTerrain/textures/ground/sand.png" id="mst_ground_sand"]
 [ext_resource type="Texture2D" uid="uid://xyd1i4e24hvp" path="res://addons/MarchingSquaresTerrain/textures/ground/snow.png" id="mst_ground_snow"]
 [ext_resource type="Texture2D" uid="uid://c2h7gapfc7rg5" path="res://addons/MarchingSquaresTerrain/textures/ground/void.png" id="mst_ground_void"]
+[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/render/pixel_pipeline.tscn" id="29_pipeline"]
+[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/debug/pixel_diagnostics_overlay.tscn" id="30_overlay"]
+[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/effects/pixel_water.tscn" id="31_water"]
+[ext_resource type="PackedScene" path="res://addons/MarchingSquaresTerrain/effects/pixel_light_volume.tscn" id="32_lamp"]
 
 [sub_resource type="Environment" id="Environment_052rw"]
 background_mode = 1
@@ -440,7 +440,6 @@ time_of_day = 0.4
 day_length_seconds = 1080.0
 sun = NodePath("../Sun")
 environment = NodePath("../WorldEnvironment")
-process_priority = -10
 
 [node name="Characters" type="PixelObject" parent="." unique_id=1958540450]
 snap_to_texel = true
@@ -543,6 +542,8 @@ near = 0.1
 far = 400.0
 
 [node name="PhantomCameraHost" type="PhantomCameraHost" parent="PlayerRig/MainCamera3D" unique_id=1845393031 node_paths=PackedStringArray("camera_3d")]
+process_priority = 300
+process_physics_priority = 300
 camera_3d = NodePath("..")
 
 [node name="Lantern" parent="." unique_id=986444803 instance=ExtResource("32_lamp")]
@@ -575,13 +576,11 @@ pipeline_scene = ExtResource("29_pipeline")
 [node name="PixelDiagnostics" type="PixelDiagnostics" parent="." unique_id=687209648 node_paths=PackedStringArray("renderer")]
 overlay_scene = ExtResource("30_overlay")
 renderer = NodePath("../PixelRenderer")
-visible = false
 
 [node name="Weather" type="PixelWeather" parent="." unique_id=1500700001 node_paths=PackedStringArray("sun", "environment", "terrain")]
 sun = NodePath("../Sun")
 environment = NodePath("../WorldEnvironment")
 terrain = NodePath("../MarchingSquaresTerrain")
-process_priority = -20
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
 
 [node name="Birds" type="PixelBirds" parent="." unique_id=1500700002 node_paths=PackedStringArray("terrain", "pixel_renderer")]

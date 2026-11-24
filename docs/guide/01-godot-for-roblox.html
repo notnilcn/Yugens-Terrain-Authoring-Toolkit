@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Godot for Roblox builders – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+  .trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: start; }
+  .trio figure { margin-top: 0; }
+  figure.narrow { max-width: 340px; }
+  figure.mid { max-width: 640px; }
+  table.map td:first-child { font-weight: 600; white-space: nowrap; }
+  table.keys td:first-child { white-space: nowrap; font-weight: 600; }
+  .area { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .78rem; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .chips button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 99px; padding: 3px 12px; font: inherit; font-size: .88rem; cursor: pointer; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .axis-x { color: #e5484d; font-weight: 700; } .axis-y { color: #30a46c; font-weight: 700; } .axis-z { color: #3e63dd; font-weight: 700; }
+  .countline { font-size: .88rem; color: var(--ink-2); margin: 4px 0 0; }
+  .quiz { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 12px 16px; margin: 1em 0; }
+  .quiz .q { font-weight: 600; margin: 0 0 8px; }
+  .quiz .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .quiz .opts button { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 8px; padding: 5px 12px; font: inherit; cursor: pointer; }
+  .quiz .opts button.right { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .quiz .opts button.wrong { text-decoration: line-through; opacity: .6; }
+  .quiz .fb { margin: 8px 0 0; font-size: .92rem; min-height: 1.2em; }
+  .quiz .score { float: right; font-size: .85rem; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Godot for Roblox builders</h1>
+<p class="lede">You know Roblox Studio. This page shows where each Studio habit lives in Godot: where things are on screen, how to move the camera, what nodes and scenes are, how to run your world, and where the terrain addon is installed.</p>
+<div class="meta-row"><span class="pill">⏱ 25 min</span><span class="pill">Absolute beginner</span><span class="pill">Example scene: res://tutorial/01_flat_playground.tscn</span></div>
+
+<figure class="shot"><img src="media/01-godot-for-roblox/00-orientation.png" alt="The whole Godot editor with red boxes around each region: the main-screen buttons (2D, 3D, Script, Game, Asset Store) at the top centre, the play buttons at the top right, the Scene dock listing Playground and its children at the left, the FileSystem dock under it, the two viewport toolbar rows above the 3D view, the 3D view in the centre showing a small pixel-art island, the Inspector on the right and the Output panel at the bottom."><figcaption>The Godot editor with each region boxed in red. There are about ten regions, and this page goes through them one at a time.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>A <a href="#tour">clickable tour of the whole editor</a>, with the Roblox Studio window that matches each part.</li>
+  <li>How to <a href="#camera">move the 3D camera</a>: orbit, pan, zoom, fly, focus and the side views. Each one has a clip.</li>
+  <li>What <a href="#nodes">nodes and scenes</a> are, and how to add, rename, reparent, hide and lock them.</li>
+  <li>Godot's <a href="#gizmo">Move / Rotate / Scale gizmo</a> (W / E / R), plus <a href="#undo">undo and the History dock</a>.</li>
+  <li>How to <a href="#run">run your world</a> (F6) and stop it (F8).</li>
+  <li>The <a href="#roblox-ui">Roblox UI switch</a>, which adds a Studio-style ribbon.</li>
+  <li><a href="#addon">Where the addon lives</a>, and why the Plugins tab is empty.</li>
+  <li>A <a href="#map">filterable Roblox → Godot dictionary</a>, a <a href="#keys">shortcut list</a> and a <a href="#quiz">short quiz</a>.</li>
+</ul>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Most of what you know still applies. The <b>Explorer</b> is now called the <b>Scene dock</b>, the <b>Properties</b> window is the <b>Inspector</b>, <b>Play</b> is <kbd>F6</kbd>, and Move / Rotate / Scale are <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd>. Two things really are new: the camera controls are a little different, and everything in your world is a <b>node</b>. Both are explained below.</p></div>
+
+<h2 id="words">Five Godot words to know first</h2>
+<p>Godot uses a few words that Roblox doesn't. You'll see them on every page of this guide:</p>
+<dl>
+  <dt><b>Node</b></dt><dd>One thing in your world: a light, a camera, a terrain, a mesh. <em>Everything</em> is a node. It's the same idea as a Roblox <b>Instance</b> (a Part, a Model, a Script…).</dd>
+  <dt><b>Scene</b> (<code>.tscn</code> file)</dt><dd>A tree of nodes saved as one file. The node at the top is the <b>scene root</b>. A scene is like a Roblox place, or a Model you can reuse many times.</dd>
+  <dt><b>Dock</b></dt><dd>A panel attached to the side of the editor (Scene, Inspector, FileSystem…). In Roblox these would be the Explorer and Properties windows.</dd>
+  <dt><b>Viewport</b></dt><dd>The big 3D view in the middle, where you see and build the world.</dd>
+  <dt><b><code>res://</code></b></dt><dd>Short for "the project folder". <code>res://tutorial/guide/first_world.tscn</code> means "the file <code>first_world.tscn</code> inside the <code>tutorial/guide</code> folder of this project".</dd>
+</dl>
+
+<h2 id="tutorial">A quick first tour (10 minutes)</h2>
+<p>Open the example scene and try each step. Nothing here changes anything for good: you can undo all of it, or close the scene without saving. Tick each step as you finish it.</p>
+<ol class="steps" data-id="tour">
+  <li><b>Open the playground.</b> In the <span class="ui">FileSystem</span> dock (bottom left), open <code>tutorial</code> and double-click <code>01_flat_playground.tscn</code>. It opens as a new tab above the 3D view.</li>
+  <li><b>Look around.</b> With the mouse over the 3D view: <b>middle-drag</b> to orbit, <kbd>Shift</kbd>+middle-drag to pan, the <b>wheel</b> to zoom. See <a href="#camera">Moving the camera</a>.</li>
+  <li><b>Fly.</b> Hold the <b>right mouse button</b> and press <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> (<kbd>Q</kbd> goes down, <kbd>E</kbd> goes up). Move the mouse to look around while you hold it.</li>
+  <li><b>Focus.</b> Click <span class="ui">MarchingSquaresTerrain</span> in the Scene dock, move the mouse over the 3D view and press <kbd>F</kbd>. The camera moves to frame the terrain.</li>
+  <li><b>Add a node.</b> Press <kbd>Ctrl</kbd>+<kbd>A</kbd>, type <code>Camera3D</code> and click <span class="ui">Create</span>. Then press <kbd>F2</kbd> and rename it <code>PlayerCamera</code>. See <a href="#nodes">Nodes &amp; scenes</a>.</li>
+  <li><b>Move it.</b> Press <kbd>W</kbd> and drag the <span class="axis-x">red arrow</span>. Then press <kbd>Ctrl</kbd>+<kbd>Z</kbd> to undo the move.</li>
+  <li><b>Run it.</b> With the mouse over the 3D view, press <kbd>F6</kbd>. A game window opens and shows the pixel island. Press <kbd>F8</kbd> to stop.</li>
+  <li><b>Feel at home.</b> Select the terrain and click <span class="ui">Roblox UI</span> in the second toolbar row. A Studio-style Model / Edit ribbon appears.</li>
+</ol>
+<div class="callout tip"><span class="label">Tip</span><p>Close the scene without saving when you're done (<span class="ui">Scene</span> → close the tab and answer "Don't Save"). The playground stays clean for the next page.</p></div>
+
+<!-- ============================================================ TOUR -->
+<h2 id="tour">The editor at a glance</h2>
+<p>Click a numbered marker (or a name in the list under the picture) to see what that part of the editor does. The rest of this section covers each region in more detail.</p>
+
+<div class="hotspots"><img src="media/01-godot-for-roblox/01-editor-clean.png" alt="The Godot editor with the flat playground scene open: menus at the top left, 2D/3D/Script/Game/Asset Store at the top centre, play buttons at the top right, the Scene dock at the left, the FileSystem dock below it, two toolbar rows above the 3D view, the pixel-art island in the 3D view, the Inspector at the right and the Output panel at the bottom.">
+  <button class="spot" style="left:42%;top:2.4%" data-title="Main-screen buttons" data-text="Switch the whole centre area between <b>2D</b>, <b>3D</b>, <b>Script</b>, <b>Game</b> (the running-game view) and the online <b>Asset Store</b>. This guide always uses <b>3D</b>. These are like the big mode tabs in Studio.">1</button>
+  <button class="spot" style="left:93%;top:2.4%" data-title="Play buttons" data-text="▶ Run Project (<kbd>F5</kbd>), ⏸ Pause, ⏹ Stop (<kbd>F8</kbd>), then Run Current Scene (<kbd>F6</kbd>, the one we use), Run Specific Scene, and a movie/record icon. These are Roblox's Play and Stop.">2</button>
+  <button class="spot" style="left:32%;top:6.6%" data-title="Scene tabs" data-text="Each open scene gets a tab. Click a tab to switch scenes. <code>(*)</code> after a name means it has unsaved changes.">3</button>
+  <button class="spot" style="left:34%;top:10.7%" data-title="Viewport toolbar, row 1" data-text="Select / Move / Rotate / Scale gizmo modes, selection helpers, the snap toggle, and the <b>Transform</b> and <b>View</b> menus.">4</button>
+  <button class="spot" style="left:31%;top:15.2%" data-title="Viewport toolbar, row 2 (addon)" data-text="The terrain addon's buttons: <b>Pixel Preview</b>, <b>Animate</b>, <b>Pixel World</b> and <b>Roblox UI</b>. Later pages cover each one.">5</button>
+  <button class="spot" style="left:22%;top:21.2%" data-title="Perspective menu" data-text="Camera presets (Top, Front, Right…), Perspective or Orthogonal, and display modes such as Wireframe.">6</button>
+  <button class="spot" style="left:8.9%;top:28.6%" data-title="Scene dock" data-text="The scene tree: every node in the open scene. You add, rename, reparent, hide and lock nodes here. This is Roblox's <b>Explorer</b>.">7</button>
+  <button class="spot" style="left:79%;top:23.8%" data-title="View gizmo (nav cube)" data-text="The small coloured X/Y/Z ball. Click an axis to snap to that side view.">8</button>
+  <button class="spot" style="left:50%;top:43.3%" data-title="3D viewport" data-text="Your 3D editing camera. This is where you see and build the world.">9</button>
+  <button class="spot" style="left:91%;top:44.4%" data-title="Inspector" data-text="Every property of the <b>selected</b> node. This is Roblox's <b>Properties</b> window.">10</button>
+  <button class="spot" style="left:8.9%;top:76.2%" data-title="FileSystem dock" data-text="Your project's files, starting at <code>res://</code>. Double-click a scene to open it, or drag files into the world. It's roughly the Toolbox, except it holds your own files.">11</button>
+  <button class="spot" style="left:50%;top:84.4%" data-title="Output panel" data-text="Engine messages and errors. This is the Output window in Studio.">12</button>
+</div>
+
+<h3 id="menus">The main menu bar</h3>
+<p>The very top-left of the window has five menus: <span class="ui">Scene</span>, <span class="ui">Project</span>, <span class="ui">Debug</span>, <span class="ui">Editor</span>, <span class="ui">Help</span>. You'll use two of them most:</p>
+<ul>
+  <li><span class="ui">Scene</span> has <b>New Scene</b>, <b>Open Scene</b> and <b>Save</b>, like Roblox's File menu.</li>
+  <li><span class="ui">Project</span> has <b>Project Settings</b> (used <a href="#addon">below</a>) and exporting the game.</li>
+</ul>
+
+<h3 id="main-buttons">Main-screen buttons and play buttons</h3>
+<div class="pair">
+  <figure class="shot"><img src="media/01-godot-for-roblox/45-main-buttons.png" alt="Close-up of the main-screen buttons: 2D, 3D (highlighted blue), Script, Game, Asset Store."><figcaption>The main-screen buttons. <b>3D</b> is lit up because that's the mode we work in.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/46-play-buttons.png" alt="Close-up of the play buttons: a play triangle, pause, stop square, then two clapperboard icons for running scenes and a film-reel record icon."><figcaption>Run (<kbd>F5</kbd>), Pause, Stop (<kbd>F8</kbd>), Run Current Scene (<kbd>F6</kbd>), Run Specific Scene, and Record.</figcaption></figure>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p>If the centre of the window suddenly turns into a code editor or a flat 2D canvas, you've clicked <span class="ui">Script</span> or <span class="ui">2D</span>. Click <span class="ui">3D</span> to go back.</p></div>
+
+<h3 id="docks">The docks: Scene, Inspector, FileSystem, Output</h3>
+<div class="trio">
+  <figure class="shot"><img src="media/01-godot-for-roblox/40-scene-dock.png" alt="The Scene dock: a + button, a chain-link button, a Filter Nodes box, then the tree Playground with children WorldEnvironment, Sun, MarchingSquaresTerrain, PixelWater, Camera, PixelRenderer, PixelSky and PixelDayNight, most with an eye icon on the right."><figcaption><b>Scene dock</b>, the same idea as Roblox's Explorer. <code>Playground</code> is the scene root and everything under it is a child node.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/43-filesystem.png" alt="The FileSystem dock rooted at res:// with folders addons, build, demo, qa_tmp, tools, tutorial and files like CREDITS.md and README.md."><figcaption><b>FileSystem</b>: your project folder, <code>res://</code>. The tutorial scenes are in <code>tutorial/</code>.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/41-inspector-empty.png" alt="The Inspector dock with Inspector and Signals tabs, an empty Filter Properties box, and nothing else."><figcaption><b>Inspector</b> with nothing selected. It stays empty until you click a node.</figcaption></figure>
+</div>
+<p>When you click a node, the Inspector fills with that node's properties. Every kind of node shows different properties:</p>
+<div class="pair">
+  <figure class="shot narrow"><img src="media/01-godot-for-roblox/42-inspector-mst.png" alt="The Inspector for MarchingSquaresTerrain: Contents, Grid Type Square, Chunk Size 32, Cell Size 2.0 by 2.0, Tex Assign Marching, then collapsible Grid and Look groups with Terrain and Grass sub-groups, Turf Stuff, Grass Pixel Size 1 and Grass Outline On."><figcaption>A <b>MarchingSquaresTerrain</b> selected: grid type, chunk size, cell size, textures, grass…</figcaption></figure>
+  <figure class="shot narrow"><img src="media/01-godot-for-roblox/42b-inspector-camera.png" alt="The Inspector for a Camera3D: a Camera Preview image showing blue sky over water, then Keep Aspect, Cull Mask layer grid 1 to 10, Environment, Attributes, Compositor, H Offset, V Offset, Doppler Tracking, Projection Perspective and Current."><figcaption>A <b>Camera3D</b> selected: it even shows a little Camera Preview of what it sees.</figcaption></figure>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The Inspector works like the Properties window. Click a thing, edit its values. The <span class="ui">Filter Properties</span> box at the top works like the Properties search bar. Grey arrows (▸) fold groups open and closed.</p></div>
+<figure class="shot"><img src="media/01-godot-for-roblox/44-output-panel.png" alt="The bottom Output panel showing Inspect-terrain tool messages (each line gives a cell's height, floor, wall and grass) and a Filter Messages box, with tabs Output, Debugger, Audio, Animation and Shader Editor along the bottom."><figcaption>The bottom panel. Its <b>Output</b> tab shows engine messages and errors (the Inspect terrain tool also prints here). The other tabs are Debugger, Audio, Animation and Shader Editor.</figcaption></figure>
+
+<h3 id="toolbars">The two viewport toolbar rows</h3>
+<figure class="shot"><img src="media/01-godot-for-roblox/47-toolbar-transform.png" alt="Viewport toolbar row 1: select, move, rotate, scale and selection-mode icons, lock and group icons, snap and other toggles, then Transform and View menus."><figcaption><b>Row 1</b> is Godot's own: Select / Move / Rotate / Scale, selection helpers, lock, the <b>snap</b> toggle, and the <span class="ui">Transform</span> and <span class="ui">View</span> menus.</figcaption></figure>
+<figure class="shot mid"><img src="media/01-godot-for-roblox/48-toolbar-pixelrow.png" alt="Viewport toolbar row 2: Pixel Preview, Animate, Pixel World, and a Roblox UI toggle switch."><figcaption><b>Row 2</b> comes from the terrain addon: <span class="ui">Pixel Preview</span>, <span class="ui">Animate</span>, <span class="ui">Pixel World</span> and the <span class="ui">Roblox UI</span> switch.</figcaption></figure>
+<p>Row 2's buttons have their own pages: Pixel Preview on <a href="07-pixelizer.html">The pixelizer</a>, Pixel World on <a href="02-first-world.html">Your first world</a> and <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a>, and Roblox UI on <a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a>.</p>
+
+<!-- ============================================================ CAMERA -->
+<h2 id="camera">Moving the 3D camera</h2>
+<p>All of these work while the mouse pointer is <b>over the 3D view</b>. Pick a gesture to watch its clip.</p>
+
+<div class="tabs">
+  <div class="panel" data-tab="Orbit">
+    <figure class="clip"><video src="media/01-godot-for-roblox/10-orbit.mp4" poster="media/01-godot-for-roblox/10-orbit.png" data-autoplay></video><figcaption><b>Middle-mouse drag</b> orbits (tumbles) the camera around the point you're looking at.</figcaption></figure>
+    <p>Roblox orbits with a right-drag. In Godot, hold the <b>middle button</b> (press the wheel down) and drag.</p>
+  </div>
+  <div class="panel" data-tab="Pan">
+    <figure class="clip"><video src="media/01-godot-for-roblox/11-pan.mp4" poster="media/01-godot-for-roblox/11-pan.png" data-autoplay></video><figcaption><kbd>Shift</kbd> + <b>middle-mouse drag</b> slides the view sideways and up/down without turning it.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Zoom">
+    <figure class="clip"><video src="media/01-godot-for-roblox/12-zoom.mp4" poster="media/01-godot-for-roblox/12-zoom.png" data-autoplay></video><figcaption>The <b>mouse wheel</b> zooms (dollies) in and out. A distance ruler ("… m") flashes on the left while you zoom.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Fly">
+    <figure class="clip"><video src="media/01-godot-for-roblox/13-fly.mp4" poster="media/01-godot-for-roblox/13-fly.png" data-autoplay></video><figcaption><b>Hold right mouse</b> + <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> flies like a first-person camera. <kbd>Q</kbd> goes down, <kbd>E</kbd> goes up.</figcaption></figure>
+    <p>This is the closest match to Studio's right-drag + WASD. While you hold the right button, moving the mouse <b>turns</b> the camera to look around. (The clip mostly shows the flying, not the turning. In practice you steer with the mouse as you fly.)</p>
+  </div>
+  <div class="panel" data-tab="Focus (F)">
+    <figure class="clip"><video src="media/01-godot-for-roblox/14-focus-f.mp4" poster="media/01-godot-for-roblox/14-focus-f.png" data-autoplay></video><figcaption>Select a node, then press <kbd>F</kbd> with the mouse over the 3D view. The camera snaps to frame it.</figcaption></figure>
+    <p>If you get lost ("where did my world go?"), select the terrain in the Scene dock and press <kbd>F</kbd>.</p>
+  </div>
+  <div class="panel" data-tab="Nav cube">
+    <figure class="clip"><video src="media/01-godot-for-roblox/15-viewgizmo.mp4" poster="media/01-godot-for-roblox/15-viewgizmo.png" data-autoplay></video><figcaption>Click an axis ball on the view gizmo (top-right of the 3D view) to look straight down that axis.</figcaption></figure>
+    <div class="callout warn"><span class="label">Watch out</span><p>Snapping to an axis also switches the view to <b>Orthogonal</b> (flat, no perspective). The label says, for example, "Right Orthogonal [auto]". To get a normal 3D view back, press <kbd>Kp 5</kbd> (5 on the number pad) or choose <span class="ui">Perspective</span> in the Perspective menu.</p></div>
+  </div>
+  <div class="panel" data-tab="Perspective menu">
+    <figure class="clip"><video src="media/01-godot-for-roblox/17-perspective-menu.mp4" poster="media/01-godot-for-roblox/17-perspective-menu.png" data-autoplay></video><figcaption>The <span class="ui">Perspective</span> menu (the label at the top-left of the 3D view). The clip opens the View menu first, then this one.</figcaption></figure>
+    <p>It lists every camera preset. See the <a href="#cam-ref">reference</a> below for the full list.</p>
+  </div>
+  <div class="panel" data-tab="View menu">
+    <figure class="clip"><video src="media/01-godot-for-roblox/16-view-menu.mp4" poster="media/01-godot-for-roblox/16-view-menu.png" data-autoplay></video><figcaption>The <span class="ui">View</span> menu at the end of toolbar row 1: how many viewports, gizmos, origin, grid.</figcaption></figure>
+  </div>
+</div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The big change is that <b>orbit uses the middle button</b>, not the right button. The right button is for <b>flying</b> (hold it with WASD). If you keep right-dragging to orbit, the camera will turn in place instead.</p></div>
+
+<h3 id="cam-ref">Camera reference</h3>
+<input class="filter-box" data-target="#cam-ref-list" placeholder="Filter camera controls… (try “ortho”, “grid”, “Kp”)">
+<div id="cam-ref-list">
+  <div class="control"><h4>Orbit</h4><div class="where">3D view</div><p>Tumble around the view's pivot.</p><dl><dt>Gesture</dt><dd>Middle-mouse drag</dd><dt>Roblox</dt><dd>Right-drag</dd></dl></div>
+  <div class="control"><h4>Pan</h4><div class="where">3D view</div><p>Slide the view without rotating it.</p><dl><dt>Gesture</dt><dd><kbd>Shift</kbd> + middle-mouse drag</dd><dt>Roblox</dt><dd>Middle-drag</dd></dl></div>
+  <div class="control"><h4>Zoom</h4><div class="where">3D view</div><p>Move the camera closer or further. A distance ruler flashes on the left.</p><dl><dt>Gesture</dt><dd>Mouse wheel</dd><dt>Roblox</dt><dd>Scroll</dd></dl></div>
+  <div class="control"><h4>Fly / free-look</h4><div class="where">3D view</div><p>First-person movement. The mouse turns the camera while the right button is held.</p><dl><dt>Gesture</dt><dd>Hold RMB + <kbd>W</kbd>/<kbd>A</kbd>/<kbd>S</kbd>/<kbd>D</kbd>, <kbd>Q</kbd> down, <kbd>E</kbd> up</dd><dt>Roblox</dt><dd>Right-drag + WASD</dd></dl></div>
+  <div class="control"><h4>Focus selection</h4><div class="where">3D view, with a node selected</div><p>Frame the selected node.</p><dl><dt>Key</dt><dd><kbd>F</kbd></dd></dl></div>
+  <div class="control"><h4>View gizmo (nav cube)</h4><div class="where">Top-right of the 3D view</div><p>Click an axis to snap to that side. Switches to Orthogonal ("[auto]").</p></div>
+  <div class="control"><h4>Top / Bottom View</h4><div class="where">Perspective menu</div><p>Look straight down / up.</p><dl><dt>Keys</dt><dd><kbd>Kp 7</kbd> / <kbd>Alt</kbd>+<kbd>Kp 7</kbd></dd></dl></div>
+  <div class="control"><h4>Left / Right View</h4><div class="where">Perspective menu</div><dl><dt>Keys</dt><dd><kbd>Alt</kbd>+<kbd>Kp 3</kbd> / <kbd>Kp 3</kbd></dd></dl></div>
+  <div class="control"><h4>Front / Rear View</h4><div class="where">Perspective menu</div><dl><dt>Keys</dt><dd><kbd>Kp 1</kbd> / <kbd>Alt</kbd>+<kbd>Kp 1</kbd></dd></dl></div>
+  <div class="control"><h4>Switch Perspective / Orthogonal View</h4><div class="where">Perspective menu</div><p>Toggle between normal 3D (perspective) and flat technical (orthogonal) views. Use it to get back to 3D after the nav cube.</p><dl><dt>Key</dt><dd><kbd>Kp 5</kbd></dd></dl></div>
+  <div class="control"><h4>Perspective · Orthogonal</h4><div class="where">Perspective menu</div><p>Pick one projection directly.</p></div>
+  <div class="control"><h4>Auto Orthogonal Enabled</h4><div class="where">Perspective menu (checkbox)</div><p>When on, snapping to a side view switches to Orthogonal automatically. That's what the "[auto]" label means.</p></div>
+  <div class="control"><h4>Lock View Rotation</h4><div class="where">Perspective menu (checkbox)</div><p>Stops the view from being rotated.</p></div>
+  <div class="control"><h4>Display Normal / Wireframe / Overdraw / Lighting / Unshaded</h4><div class="where">Perspective menu</div><p>How the 3D view draws things. Normal is the usual look; Wireframe shows the mesh lines. Display Advanced… has more modes.</p></div>
+  <div class="control"><h4>View Environment / Gizmos / Transform Gizmo / Grid</h4><div class="where">Perspective menu (checkboxes)</div><p>Show or hide the sky/environment, node icons, the move handles and the grid in this viewport.</p></div>
+  <div class="control"><h4>1 / 2 / 3 / 4 Viewports</h4><div class="where">View menu</div><p>Split the 3D area into several views (with "Alt" layouts for 2 and 3).</p><dl><dt>Keys</dt><dd><kbd>Ctrl</kbd>+<kbd>1</kbd> … <kbd>Ctrl</kbd>+<kbd>4</kbd> (Alt layouts: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>2</kbd>/<kbd>3</kbd>)</dd></dl></div>
+  <div class="control"><h4>Gizmos ▸</h4><div class="where">View menu</div><p>Submenu to show/hide each kind of node icon (lights, cameras…).</p></div>
+  <div class="control"><h4>View Origin · View Grid</h4><div class="where">View menu (checkboxes)</div><p>Show the world origin lines and the floor grid.</p><dl><dt>Key</dt><dd><kbd>#</kbd> toggles the grid</dd></dl></div>
+  <div class="control"><h4>Preview Translation ▸ · Settings…</h4><div class="where">View menu</div><p>Preview Translation is a submenu; Settings… opens the viewport settings.</p></div>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p>While a <b>terrain</b> node is selected, the number keys <kbd>1</kbd>–<kbd>9</kbd> switch terrain tools, and shortcuts like <kbd>Ctrl</kbd>+<kbd>1</kbd> (1 Viewport) don't reach the editor. If the view is stuck in four viewports, click a non-terrain node (for example the scene root) first, then press <kbd>Ctrl</kbd>+<kbd>1</kbd>.</p></div>
+
+<!-- ============================================================ NODES -->
+<h2 id="nodes">Nodes &amp; scenes</h2>
+<p>A <b>scene</b> is a tree of <b>nodes</b>, saved as a <code>.tscn</code> file. The top node is the <b>scene root</b>. In the playground the root is <code>Playground</code>, and every other node is its <b>child</b>, indented under it. A child moves with its parent, exactly like a Part inside a Model.</p>
+<figure class="shot"><img src="media/01-godot-for-roblox/54-hex-island-scene.png" alt="The hex_island example scene in the 3D view: a lush pixel-art island with layered cliffs, grass, scattered rocks, a stone ruin and a blue lake."><figcaption>A bigger scene, <code>hex_island</code>. No matter how detailed a world gets, it is still one tree of nodes in one <code>.tscn</code> file.</figcaption></figure>
+
+<div class="tabs">
+  <div class="panel" data-tab="Add">
+    <figure class="clip"><video src="media/01-godot-for-roblox/18-add-node.mp4" poster="media/01-godot-for-roblox/18-add-node.png" data-autoplay></video><figcaption>Click <b>+</b> (or press <kbd>Ctrl</kbd>+<kbd>A</kbd>), search "Camera3D", click Create.</figcaption></figure>
+    <figure class="shot mid"><img src="media/01-godot-for-roblox/30-create-node-dialog.png" alt="The Create New Node dialog: Favorites and Recent lists on the left, a search box at the top, a Matches tree with Node, Viewport, Window, Node3D, Control, AnimationPlayer, MarchingSquaresErosion, MarchingSquaresWildFlowers, MstSavePresetDialog and others, a Description panel, and Cancel / Create buttons."><figcaption>The <b>Create New Node</b> dialog: a search box, a tree of every node type (the addon's own types are in it too: you can see <code>MarchingSquaresErosion</code>, <code>MarchingSquaresWildFlowers</code> and <code>MstSavePresetDialog</code> here, and <code>MarchingSquaresTerrain</code> is inside the folded <code>Node3D</code> branch; typing its name in the search box finds it), a Description panel, Favorites and Recent.</figcaption></figure>
+    <p>The new node is added as a child of whatever node is selected. Select the scene root first if you want it at the top level.</p>
+  </div>
+  <div class="panel" data-tab="Rename">
+    <figure class="clip narrow"><video src="media/01-godot-for-roblox/19-rename-node.mp4" poster="media/01-godot-for-roblox/19-rename-node.png" data-autoplay></video><figcaption>Select the node and press <kbd>F2</kbd> (or double-click it), type the new name and press <kbd>Enter</kbd>.</figcaption></figure>
+    <p>Names must be <b>unique among siblings</b> (two children of the same parent can't share a name). Godot adds a number if you try.</p>
+  </div>
+  <div class="panel" data-tab="Reparent">
+    <figure class="clip narrow"><video src="media/01-godot-for-roblox/20-reparent.mp4" poster="media/01-godot-for-roblox/20-reparent.png" data-autoplay></video><figcaption>Drag <code>PlayerCamera</code> onto <code>MarchingSquaresTerrain</code>. It becomes a child and shows indented under it.</figcaption></figure>
+    <p>This works just like dragging an object into a Model in the Explorer.</p>
+  </div>
+  <div class="panel" data-tab="Hide (eye)">
+    <figure class="clip"><video src="media/01-godot-for-roblox/21-eye-toggle.mp4" poster="media/01-godot-for-roblox/21-eye-toggle.png" data-autoplay></video><figcaption>Clicking the <b>Sun</b>'s eye icon: the island goes dark, then lights up again.</figcaption></figure>
+    <p>The eye at the right of each 3D node's row hides or shows it in the viewport.</p>
+    <div class="callout warn"><span class="label">Watch out</span><p>Clicking the eye on <b>MarchingSquaresTerrain</b> does <em>not</em> visibly hide the terrain. The pixel renderer draws the terrain surface through its own pipeline. That's why the clip demonstrates with the Sun instead.</p></div>
+  </div>
+  <div class="panel" data-tab="Lock">
+    <figure class="clip"><video src="media/01-godot-for-roblox/22-lock-node.mp4" poster="media/01-godot-for-roblox/22-lock-node.png" data-autoplay></video><figcaption>The padlock button in the toolbar locks the selected node; a padlock badge appears on its row. Click again to unlock.</figcaption></figure>
+    <p>A locked node can't be picked by clicking in the 3D view, so you can't nudge it by accident. Shortcuts: <kbd>Ctrl</kbd>+<kbd>L</kbd> to lock, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> to unlock.</p>
+  </div>
+  <div class="panel" data-tab="Scene tabs">
+    <figure class="clip"><video src="media/01-godot-for-roblox/23-scene-tabs.mp4" poster="media/01-godot-for-roblox/23-scene-tabs.png" data-autoplay></video><figcaption>Switching to the <code>hex_island</code> tab and back. <code>01_flat_playground(*)</code> has unsaved changes.</figcaption></figure>
+    <p>Open a scene by double-clicking its <code>.tscn</code> in the FileSystem, or with <span class="ui">Scene → Open Scene</span>. <kbd>Ctrl</kbd>+<kbd>S</kbd> saves the current tab. <span class="ui">Scene → New Scene</span> starts a blank one. <a href="02-first-world.html">Your first world</a> shows this step by step.</p>
+  </div>
+</div>
+
+<h3 id="node-ref">Scene dock reference</h3>
+<input class="filter-box" data-target="#node-ref-list" placeholder="Filter Scene dock controls…">
+<div id="node-ref-list">
+  <div class="control"><h4>Add Child Node (+)</h4><div class="where">Scene dock, top-left</div><p>Opens Create New Node. The new node goes under the selected node.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>A</kbd></dd><dt>Roblox</dt><dd>Insert Object (the + next to an Explorer item)</dd></dl></div>
+  <div class="control"><h4>Instance Child Scene (chain icon)</h4><div class="where">Scene dock, next to +</div><p>Drops a whole saved scene in as a child (an <b>instance</b>). Edit the original and every copy updates.</p><dl><dt>Roblox</dt><dd>Inserting a Model / Package</dd></dl></div>
+  <div class="control"><h4>Filter Nodes</h4><div class="where">Scene dock, search box</div><p>Type to show only matching nodes in a big tree.</p></div>
+  <div class="control"><h4>Rename</h4><div class="where">Scene dock</div><p>Inline name edit. Sibling names must be unique.</p><dl><dt>Shortcut</dt><dd><kbd>F2</kbd> or double-click</dd></dl></div>
+  <div class="control"><h4>Reparent</h4><div class="where">Scene dock</div><p>Drag a node onto another node to make it a child.</p></div>
+  <div class="control"><h4>Visibility (eye)</h4><div class="where">Right end of each 3D node's row</div><p>Hide/show in the viewport. Doesn't visibly hide the pixel-rendered terrain surface.</p></div>
+  <div class="control"><h4>Lock</h4><div class="where">Toolbar row 1 padlock</div><p>"Lock selected node, preventing selection…". Adds a padlock badge.</p><dl><dt>Shortcuts</dt><dd><kbd>Ctrl</kbd>+<kbd>L</kbd> lock · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> unlock</dd><dt>Roblox</dt><dd>Locked property / Lock tool</dd></dl></div>
+  <div class="control"><h4>Scene tabs</h4><div class="where">Row above the viewport</div><p>One tab per open scene; <code>(*)</code> = unsaved. The <b>+</b> at the end opens a new empty tab.</p></div>
+  <div class="control"><h4>New / Open / Save Scene</h4><div class="where">Scene menu</div><p>Create, open or save a <code>.tscn</code>. Double-click a scene in FileSystem to open it.</p><dl><dt>Save</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd></dd></dl></div>
+  <div class="control"><h4>Remote / Local</h4><div class="where">Scene dock, only while the game runs</div><p>Remote shows the live tree of the running game; Local is your editable scene.</p></div>
+</div>
+
+<!-- ============================================================ GIZMO -->
+<h2 id="gizmo">Move, rotate &amp; scale (the gizmo)</h2>
+<p>Select any 3D node and a coloured <b>gizmo</b> (handles) appears on it: <span class="axis-x">red = X</span>, <span class="axis-y">green = Y (up)</span>, <span class="axis-z">blue = Z</span>, the same colours as Roblox. Pick the mode in toolbar row 1 or with a key, then drag a handle.</p>
+<div class="tabs">
+  <div class="panel" data-tab="W · Move">
+    <figure class="clip mid"><video src="media/01-godot-for-roblox/24-gizmo-move.mp4" poster="media/01-godot-for-roblox/24-gizmo-move.png" data-autoplay></video><figcaption><kbd>W</kbd>: three arrows (plus small squares for moving on a plane). Dragging the red X arrow.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="E · Rotate">
+    <figure class="clip mid"><video src="media/01-godot-for-roblox/25-gizmo-rotate.mp4" poster="media/01-godot-for-roblox/25-gizmo-rotate.png" data-autoplay></video><figcaption><kbd>E</kbd>: three coloured rings. Drag a ring to spin around that axis.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="R · Scale">
+    <figure class="clip mid"><video src="media/01-godot-for-roblox/26-gizmo-scale.mp4" poster="media/01-godot-for-roblox/26-gizmo-scale.png" data-autoplay></video><figcaption><kbd>R</kbd>: axis handles with box ends. Drag one to stretch along that axis.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Exact numbers">
+    <figure class="shot narrow"><img src="media/01-godot-for-roblox/52-transform-fields.png" alt="The Inspector's Transform section for a Node3D: Position x 0.0 m y 0.0 m z 0.0 m, Rotation 0 degrees on each axis, Scale 1.0 1.0 1.0 with a chain-link icon, Rotation Edit Mode Euler, Rotation Order YXZ."><figcaption>The Inspector's <b>Transform</b> section: type exact Position / Rotation / Scale values. Rotation Edit Mode = Euler, Rotation Order = YXZ.</figcaption></figure>
+  </div>
+</div>
+<table class="keys">
+  <thead><tr><th>Key</th><th>Mode</th><th>Handles</th><th>Roblox</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Q</kbd></td><td>Select</td><td>none, just picks things</td><td>Select (Ctrl+1)</td></tr>
+    <tr><td><kbd>W</kbd></td><td>Move</td><td>3 arrows + plane squares</td><td>Move (Ctrl+2)</td></tr>
+    <tr><td><kbd>E</kbd></td><td>Rotate</td><td>3 rings</td><td>Rotate (Ctrl+4)</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Scale</td><td>3 box-ended handles</td><td>Scale (Ctrl+3)</td></tr>
+  </tbody>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Stud and degree snapping are the <b>snap</b> toggle (magnet-style icon) in toolbar row 1. Like Roblox, it rounds moves and turns to fixed steps. If you'd rather have Studio's own layout, switch on <a href="#roblox-ui">Roblox UI</a>: its ribbon has Move / Scale / Rotate plus <b>1.0 m</b> and <b>45°</b> snap boxes.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>On a terrain, the letter keys may belong to terrain tools while a tool is active. If <kbd>W</kbd> doesn't seem to do anything, click the mode button in toolbar row 1 instead.</p></div>
+
+<!-- ============================================================ UNDO -->
+<h2 id="undo">Undo, redo &amp; the History dock</h2>
+<div class="pair">
+  <figure class="clip"><video src="media/01-godot-for-roblox/27-undo-redo.mp4" poster="media/01-godot-for-roblox/27-undo-redo.png" data-autoplay></video><figcaption>Move the camera node, <kbd>Ctrl</kbd>+<kbd>Z</kbd> puts it back, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> does it again.</figcaption></figure>
+  <figure class="shot narrow"><img src="media/01-godot-for-roblox/51-history-dock.png" alt="The History dock with Scene and Global checkboxes, listing from newest at top: Translate, Unlock Selected, Lock Selected, Unlock Selected, Lock Selected, several Toggle Visible entries, Reparent Node, Rename Node, Create Node, The Beginning."><figcaption>The <b>History</b> tab (next to FileSystem) lists every action, newest at the top, down to "The Beginning".</figcaption></figure>
+</div>
+<ul>
+  <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> = Undo, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> = Redo. Each gizmo drag is one step.</li>
+  <li>The History dock's <span class="ui">Scene</span> and <span class="ui">Global</span> checkboxes choose which actions it lists: this scene's, editor-wide ones, or both.</li>
+</ul>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same keys as Studio, with one difference: Redo is <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> here. Studio has no list like the History dock, so use it to see what you've done so far.</p></div>
+
+<!-- ============================================================ RUN -->
+<h2 id="run">Running your world</h2>
+<figure class="clip"><video src="media/01-godot-for-roblox/28-run-game.mp4" poster="media/01-godot-for-roblox/28-run-game.png" data-autoplay></video><figcaption>Press <kbd>F6</kbd>: a separate game window opens, shows the Godot splash for a moment, then the playground as a pixel-art island (a grass plateau with a soft mound in the middle, surrounded by teal pixel water with foam edges).</figcaption></figure>
+<table class="keys">
+  <thead><tr><th>Key</th><th>Button</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>F6</kbd></td><td>Run Current Scene</td><td>Runs the scene in the active tab. <b>This is the one you'll use.</b></td></tr>
+    <tr><td><kbd>F5</kbd></td><td>▶ Run Project</td><td>Runs the project's <i>main</i> scene, whichever tab is open.</td></tr>
+    <tr><td><kbd>F8</kbd></td><td>⏹ Stop</td><td>Closes the game window and returns to editing.</td></tr>
+    <tr><td>—</td><td>⏸ Pause</td><td>Freezes the running game.</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>The game window is titled <b>"Marching Squares Terrain (DEBUG)"</b>. It's a real window that you can move and resize.</li>
+  <li>While the game runs, the Scene dock shows a <b>Remote / Local</b> switch. Remote lets you inspect the live game's tree.</li>
+  <li>Stopping prints <code>--- Debugging process stopped ---</code> in the Output. That's normal, not an error.</li>
+</ul>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p><kbd>F6</kbd> is <b>Play</b> and <kbd>F8</kbd> is <b>Stop</b>. Unlike Studio, the game runs in its <b>own window</b>, and changes you make in the editor while it runs don't carry into that window. Stop, edit, and run again.</p></div>
+
+<!-- ============================================================ ROBLOX UI -->
+<h2 id="roblox-ui">The Roblox UI switch</h2>
+<p>If Godot's toolbars still look unfamiliar, the addon has a switch that brings back Studio's layout. Select the terrain (or a builder node) and flip <span class="ui">Roblox UI</span> in toolbar row 2. A ribbon appears with <b>Model</b> and <b>Edit</b> tabs and Select, <b>Move</b>, <b>Scale</b>, <b>Rotate</b>, a pivot tool, a <b>Geometric</b> group with a move-snap <b>1.0 m</b> box and a rotate-snap <b>45°</b> box, then snap, duplicate, mirror and anchor buttons. It's laid out like Studio's Model tab.</p>
+<div class="compare" data-before="Roblox UI off" data-after="Roblox UI on"><img src="media/01-godot-for-roblox/56-robloxui-off.png" alt="Toolbar area with Roblox UI off: the Pixel Preview / Animate / Pixel World / Roblox UI row and the terrain tool column, no ribbon."><img src="media/01-godot-for-roblox/57-robloxui-on.png" alt="The same area with Roblox UI on: a Model / Edit ribbon with select, move, scale and rotate tools, a Geometric group with 1.0 m and 45 degree snap boxes, and more tool icons."></div>
+<p class="countline">Drag across the picture to compare off and on.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/01-godot-for-roblox/29-robloxui-toggle.mp4" poster="media/01-godot-for-roblox/29-robloxui-toggle.png" data-autoplay></video><figcaption>Clicking <span class="ui">Roblox UI</span> makes the ribbon appear and disappear.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/55-roblox-ui-ribbon.png" alt="Close-up of the Roblox-style ribbon: Model and Edit tabs, select/move/scale/rotate icons, a Geometric group with checked 1.0 m and 45 degree snap fields, and icons for snapping, duplicating, mirroring and anchoring."><figcaption>The ribbon close up. It's covered button by button on <a href="09-builder-greybox.html">Greyboxing</a> and <a href="10-builder-modeller.html">Modelling</a>.</figcaption></figure>
+</div>
+<div class="callout tip"><span class="label">Tip</span><p>Leaving it on is fine. It doesn't change your scene, only which buttons you see.</p></div>
+
+<!-- ============================================================ ADDON -->
+<h2 id="addon">Where the addon lives</h2>
+<p>The terrain, the pixel look and the builder all come from one addon, <b>MarchingSquaresTerrain</b>. Its files are in the <code>addons</code> folder:</p>
+<figure class="shot narrow"><img src="media/01-godot-for-roblox/49-addon-filesystem.png" alt="FileSystem with the addons folder open, showing MarchingSquaresTerrain and phantom_camera_rust inside it."><figcaption><code>res://addons/</code> holds <code>MarchingSquaresTerrain/</code> (and <code>phantom_camera_rust/</code>, a camera helper).</figcaption></figure>
+<p>It's written in Rust and loaded as a <b>GDExtension</b>, a native add-on that Godot loads when the editor starts. That means it does <b>not</b> appear where Godot's usual script plugins go:</p>
+<div class="pair">
+  <figure class="shot"><img src="media/01-godot-for-roblox/50-project-settings-plugins.png" alt="Project Settings, Plugins tab: the Installed Plugins table has columns Enabled, Name, Version, Author, Edit, and no rows."><figcaption><span class="ui">Project → Project Settings → Plugins</span>: <b>empty</b>. This is normal.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/50b-gdextension.png" alt="Project Settings, GDExtension tab: Installed GDExtensions listing res://addons/MarchingSquaresTerrain/marching_squares_terrain.gdextension, res://addons/phantom_camera_rust/phantom_camera_rust.gdextension and res://demo/mst_demo.gdextension, each with Min Version 4.7."><figcaption><span class="ui">Project Settings → GDExtension</span>: <code>res://addons/MarchingSquaresTerrain/marching_squares_terrain.gdextension</code> (Min Version 4.7), plus <code>phantom_camera_rust</code> and <code>res://demo/mst_demo.gdextension</code>.</figcaption></figure>
+</div>
+<div class="callout warn"><span class="label">Don't worry</span><p>Many Godot tutorials say "enable the plugin in Project Settings → Plugins". That doesn't apply here: there's nothing to tick. If the terrain's nodes show up in Create New Node, the addon is loaded.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is less like a Toolbox plugin you install and more like a feature built into Studio. It's on as soon as the project opens.</p></div>
+
+<!-- ============================================================ MAP -->
+<h2 id="map">Roblox → Godot dictionary</h2>
+<p>Type a Roblox word (or a Godot one) to find its partner. The chips narrow the list by topic.</p>
+<input class="filter-box" id="map-filter" data-target="#map-table" placeholder="Filter… (try “Explorer”, “snap”, “Play”, “Model”)">
+<div class="chips" id="map-chips">
+  <button type="button" class="on" data-chip="">All</button>
+  <button type="button" data-chip="windows">Windows</button>
+  <button type="button" data-chip="objects">Objects</button>
+  <button type="button" data-chip="tools">Tools</button>
+  <button type="button" data-chip="camera">Camera</button>
+  <button type="button" data-chip="testing">Testing</button>
+  <button type="button" data-chip="files">Files</button>
+</div>
+<table class="map" id="map-table">
+  <thead><tr><th>Roblox Studio</th><th>Godot / this addon</th><th>Notes</th><th>Topic</th></tr></thead>
+  <tbody>
+    <tr><td>Explorer</td><td><b>Scene dock</b> (scene tree)</td><td>Left side. Add, rename, reparent, hide, lock. <a href="#nodes">↗</a></td><td><span class="area">windows</span></td></tr>
+    <tr><td>Properties</td><td><b>Inspector</b></td><td>Right side. Shows the selected node's properties. <a href="#docks">↗</a></td><td><span class="area">windows</span></td></tr>
+    <tr><td>Output window</td><td><b>Output</b> bottom panel</td><td>Engine messages and errors. <a href="#docks">↗</a></td><td><span class="area">windows</span></td></tr>
+    <tr><td>Big mode tabs (Home / Model…)</td><td><b>Main-screen buttons</b> 2D · 3D · Script · Game · Asset Store</td><td>Switch the centre area. Stay in 3D. <a href="#main-buttons">↗</a></td><td><span class="area">windows</span></td></tr>
+    <tr><td>Model tab ribbon</td><td><b>Roblox UI</b> switch → Model / Edit ribbon</td><td>Addon feature, toolbar row 2. <a href="#roblox-ui">↗</a></td><td><span class="area">windows</span></td></tr>
+    <tr><td>Workspace / the place</td><td>The <b>scene</b> and its <b>root node</b> (<code>.tscn</code>)</td><td>One scene = one file. <a href="#nodes">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Instance (Part, Model…)</td><td><b>Node</b></td><td>Everything in a scene is a node. <a href="#words">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Part</td><td>A <code>MeshInstance3D</code>, or the addon's <code>PixelBuilderMesh</code></td><td>Builder parts are on <a href="09-builder-greybox.html">page 9</a>.</td><td><span class="area">objects</span></td></tr>
+    <tr><td>Model / grouping</td><td>A <code>Node3D</code> holding children, or a saved <b>scene</b> you instance</td><td>Drag nodes under it to group. <a href="#nodes">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Inserting a Model / Package</td><td><b>Instance Child Scene</b> (chain icon)</td><td>Next to + in the Scene dock. <a href="#node-ref">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Insert Object</td><td><b>Add Child Node</b> (+, <kbd>Ctrl</kbd>+<kbd>A</kbd>)</td><td>Opens Create New Node. <a href="#nodes">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Visible / Transparency toggle</td><td>The <b>eye</b> icon on a node's row</td><td>Doesn't visibly hide the pixel-rendered terrain. <a href="#nodes">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Lock</td><td><b>Lock</b> (padlock, <kbd>Ctrl</kbd>+<kbd>L</kbd>)</td><td>Unlock: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>. <a href="#node-ref">↗</a></td><td><span class="area">objects</span></td></tr>
+    <tr><td>Terrain Editor</td><td>Select a <b>MarchingSquaresTerrain</b> node → terrain toolbar</td><td>See <a href="03-terrain-sculpting.html">Sculpting</a>.</td><td><span class="area">tools</span></td></tr>
+    <tr><td>Move / Scale / Rotate tools</td><td>Gizmo <kbd>W</kbd> / <kbd>R</kbd> / <kbd>E</kbd>, or the Roblox UI ribbon</td><td>Note E = rotate, R = scale. <a href="#gizmo">↗</a></td><td><span class="area">tools</span></td></tr>
+    <tr><td>Select tool</td><td><kbd>Q</kbd> Select mode</td><td>Toolbar row 1. <a href="#gizmo">↗</a></td><td><span class="area">tools</span></td></tr>
+    <tr><td>Stud / degree snapping</td><td>Gizmo <b>snap</b> toggle; ribbon <b>1.0 m</b> / <b>45°</b> boxes</td><td><a href="#roblox-ui">↗</a></td><td><span class="area">tools</span></td></tr>
+    <tr><td>Position / Orientation / Size fields</td><td>Inspector <b>Transform</b>: Position / Rotation / Scale</td><td>Scale is a multiplier, not a size in studs. <a href="#gizmo">↗</a></td><td><span class="area">tools</span></td></tr>
+    <tr><td>Undo / Redo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> + <b>History</b> dock</td><td><a href="#undo">↗</a></td><td><span class="area">tools</span></td></tr>
+    <tr><td>Right-drag orbit</td><td><b>Middle-drag</b> orbit</td><td>The biggest habit to relearn. <a href="#camera">↗</a></td><td><span class="area">camera</span></td></tr>
+    <tr><td>Middle-drag pan</td><td><kbd>Shift</kbd> + middle-drag</td><td><a href="#camera">↗</a></td><td><span class="area">camera</span></td></tr>
+    <tr><td>Right-drag + WASD fly</td><td>Hold <b>RMB</b> + WASD (Q/E down/up)</td><td><a href="#camera">↗</a></td><td><span class="area">camera</span></td></tr>
+    <tr><td>Scroll zoom</td><td>Mouse wheel</td><td><a href="#camera">↗</a></td><td><span class="area">camera</span></td></tr>
+    <tr><td>Zoom to selection (F)</td><td><kbd>F</kbd> Focus</td><td>Same key. <a href="#camera">↗</a></td><td><span class="area">camera</span></td></tr>
+    <tr><td>Play</td><td><kbd>F6</kbd> Run Current Scene (<kbd>F5</kbd> runs the main scene)</td><td>Opens a separate window. <a href="#run">↗</a></td><td><span class="area">testing</span></td></tr>
+    <tr><td>Stop</td><td><kbd>F8</kbd> / ⏹</td><td><a href="#run">↗</a></td><td><span class="area">testing</span></td></tr>
+    <tr><td>Toolbox / where assets live</td><td><b>FileSystem</b> dock (<code>res://</code>) + <b>Asset Store</b></td><td>Your own files. <a href="#docks">↗</a></td><td><span class="area">files</span></td></tr>
+    <tr><td>Saving the place (File → Save)</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd> saves the scene as a <code>.tscn</code></td><td><a href="02-first-world.html">Page 2</a> walks through it.</td><td><span class="area">files</span></td></tr>
+    <tr><td>Plugins / Manage Plugins</td><td><b>GDExtension</b> tab in Project Settings (Plugins tab is empty)</td><td><a href="#addon">↗</a></td><td><span class="area">files</span></td></tr>
+  </tbody>
+</table>
+<p class="countline" id="map-count"></p>
+<p>A longer version with every page's terms is on <a href="14-shortcuts-glossary.html">Shortcuts &amp; glossary</a>.</p>
+
+<!-- ============================================================ KEYS -->
+<h2 id="keys">Shortcuts from this page</h2>
+<table class="keys">
+  <thead><tr><th>Keys</th><th>What it does</th><th>Where the mouse must be</th></tr></thead>
+  <tbody>
+    <tr><td>Middle-drag</td><td>Orbit</td><td>3D view</td></tr>
+    <tr><td><kbd>Shift</kbd>+middle-drag</td><td>Pan</td><td>3D view</td></tr>
+    <tr><td>Wheel</td><td>Zoom</td><td>3D view</td></tr>
+    <tr><td>RMB + <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>Q</kbd> <kbd>E</kbd></td><td>Fly / down / up</td><td>3D view</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Focus selected</td><td>3D view</td></tr>
+    <tr><td><kbd>Kp 7</kbd> / <kbd>Kp 1</kbd> / <kbd>Kp 3</kbd></td><td>Top / Front / Right view (add <kbd>Alt</kbd> for the opposite side)</td><td>3D view</td></tr>
+    <tr><td><kbd>Kp 5</kbd></td><td>Perspective ↔ Orthogonal</td><td>3D view</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>4</kbd></td><td>1–4 viewports (deselect the terrain first)</td><td>Anywhere</td></tr>
+    <tr><td><kbd>#</kbd></td><td>Toggle grid</td><td>3D view</td></tr>
+    <tr><td><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd></td><td>Select / Move / Rotate / Scale</td><td>3D view</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Add Child Node</td><td>Anywhere</td></tr>
+    <tr><td><kbd>F2</kbd></td><td>Rename node</td><td>Scene dock</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td>Lock / unlock</td><td>Anywhere</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo / redo</td><td>Anywhere</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save scene</td><td>Anywhere</td></tr>
+    <tr><td><kbd>F6</kbd> / <kbd>F5</kbd> / <kbd>F8</kbd></td><td>Run scene / run project / stop</td><td>Anywhere</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ TIPS -->
+<h2 id="tips">Tips for the first week</h2>
+<ul>
+  <li><b>Lost in the void?</b> Select the terrain in the Scene dock and press <kbd>F</kbd> over the 3D view.</li>
+  <li><b>View looks flat and weird?</b> You probably clicked the nav cube and you're in Orthogonal. Press <kbd>Kp 5</kbd>.</li>
+  <li><b>Screen split into four?</b> Click a non-terrain node, then press <kbd>Ctrl</kbd>+<kbd>1</kbd>.</li>
+  <li><b>Something's red in the Output?</b> Read the top line. It usually names the node involved. <a href="15-troubleshooting.html">Troubleshooting</a> lists common ones.</li>
+  <li><b>The editor camera doesn't stay put.</b> Reopening a scene doesn't restore where the editor camera was. Press <kbd>F</kbd> on the terrain to find it again.</li>
+  <li><b>Experimenting?</b> Work in a copy, or close without saving. The tabs' <code>(*)</code> tells you what's unsaved.</li>
+</ul>
+
+<!-- ============================================================ CHECK -->
+<h2 id="quiz">Check yourself</h2>
+<div class="quiz" id="quiz"><span class="score"></span>
+  <div class="item"><p class="q">1. You want to orbit around the island. Which mouse button do you hold?</p><div class="opts"><button data-a="0">Right</button><button data-a="1">Middle</button><button data-a="0">Left</button></div><p class="fb" data-ok="Right. The middle button orbits; the right button is for flying." data-no="Not quite. Orbit is the middle button. Right is fly, left is select."></p></div>
+  <div class="item"><p class="q">2. Where do you change a node's properties (Roblox's Properties window)?</p><div class="opts"><button data-a="0">Scene dock</button><button data-a="0">FileSystem</button><button data-a="1">Inspector</button></div><p class="fb" data-ok="Yes. The Inspector, on the right." data-no="It's the Inspector. The Scene dock is the Explorer, and FileSystem holds your files."></p></div>
+  <div class="item"><p class="q">3. Which key runs the scene you're looking at?</p><div class="opts"><button data-a="0">F5</button><button data-a="1">F6</button><button data-a="0">F8</button></div><p class="fb" data-ok="Correct. F6 is Run Current Scene. F8 stops it." data-no="F6 runs the current scene. F5 runs the main scene and F8 stops."></p></div>
+  <div class="item"><p class="q">4. Project Settings → Plugins is empty. Is the terrain addon broken?</p><div class="opts"><button data-a="0">Yes, enable it</button><button data-a="1">No, it's a GDExtension</button></div><p class="fb" data-ok="Right. Look under the GDExtension tab instead." data-no="No. It's a GDExtension, so it's listed under the GDExtension tab and is always on."></p></div>
+  <div class="item"><p class="q">5. Which key is <b>Scale</b>?</p><div class="opts"><button data-a="0">E</button><button data-a="1">R</button><button data-a="0">W</button></div><p class="fb" data-ok="Yes. W move, E rotate, R scale." data-no="R is scale. E is rotate and W is move."></p></div>
+</div>
+
+<details class="check"><summary>I snapped to a side view with the nav cube and now everything looks flat. How do I get 3D back?</summary><p>Snapping switched to <b>Orthogonal</b> (the label says "… Orthogonal [auto]"). Press <kbd>Kp 5</kbd>, or open the Perspective menu and choose <span class="ui">Perspective</span>.</p></details>
+<details class="check"><summary>What's the difference between a node and a scene?</summary><p>A <b>node</b> is one thing (a light, a terrain). A <b>scene</b> is a whole tree of nodes saved as one <code>.tscn</code> file. You can drop one scene into another as an <b>instance</b>, like inserting a Model.</p></details>
+<details class="check"><summary>I clicked the terrain's eye icon and the terrain is still there. Why?</summary><p>The pixel renderer draws the terrain surface through its own pipeline, so the eye on <b>MarchingSquaresTerrain</b> doesn't visibly hide it. Toggling other nodes, like the Sun, does show a change.</p></details>
+<details class="check"><summary>How do I make a node a child of another one?</summary><p>Drag it onto the other node in the Scene dock. It becomes indented under it and will move with it.</p></details>
+
+<h2 id="next">Where next</h2>
+<div class="cards">
+  <a class="card" href="02-first-world.html"><img src="media/02-first-world/11-run-game.png" alt="The finished first world: a green pixel-art island in a blue sea."><div><b>2 · Your first world</b><span>Build and run a pixel island from an empty scene.</span></div></a>
+  <a class="card" href="03-terrain-sculpting.html"><img src="media/02-first-world/04-sculpt-hill.png" alt="Raising a hill with the Brush tool."><div><b>3 · Sculpting terrain</b><span>Every sculpt tool in depth.</span></div></a>
+  <a class="card" href="09-builder-greybox.html"><img src="media/01-godot-for-roblox/57-robloxui-on.png" alt="The Roblox-style ribbon."><div><b>9 · Greyboxing with the Roblox UI</b><span>Parts, Move/Scale/Rotate, Union and Negate, laid out like Studio.</span></div></a>
+  <a class="card" href="14-shortcuts-glossary.html"><img src="media/01-godot-for-roblox/47-toolbar-transform.png" alt="The viewport toolbar."><div><b>14 · Shortcuts &amp; glossary</b><span>Every key and term in one place.</span></div></a>
+</div>
+
+</div></main>
+<script>
+(function () {
+  // Topic chips for the Roblox -> Godot table (combine with the text filter).
+  var chips = document.querySelectorAll('#map-chips button');
+  var box = document.getElementById('map-filter');
+  var rows = document.querySelectorAll('#map-table tbody tr');
+  var count = document.getElementById('map-count');
+  var topic = '';
+  function apply() {
+    var q = (box.value || '').toLowerCase(), n = 0;
+    rows.forEach(function (r) {
+      var t = r.textContent.toLowerCase();
+      var ok = (!q || t.indexOf(q) >= 0) && (!topic || r.querySelector('.area').textContent === topic);
+      r.style.display = ok ? '' : 'none'; if (ok) n++;
+    });
+    count.textContent = n + ' of ' + rows.length + ' terms shown';
+  }
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      topic = c.dataset.chip; chips.forEach(function (x) { x.classList.toggle('on', x === c); }); apply();
+    });
+  });
+  box.addEventListener('input', function () { setTimeout(apply, 0); });
+  apply();
+  // Quiz
+  var quiz = document.getElementById('quiz'), score = quiz.querySelector('.score'), right = 0, done = 0;
+  quiz.querySelectorAll('.item').forEach(function (it) {
+    var fb = it.querySelector('.fb'), answered = false;
+    it.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ok = b.dataset.a === '1';
+        b.classList.add(ok ? 'right' : 'wrong');
+        fb.textContent = ok ? fb.dataset.ok : fb.dataset.no;
+        if (!answered) { answered = true; done++; if (ok) right++; score.textContent = right + ' / ' + done + ' right first time'; }
+        if (ok) it.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

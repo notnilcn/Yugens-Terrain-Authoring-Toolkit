@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chunks, Settings &amp; Saving – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .legend-dot { display: inline-block; width: .85em; height: .85em; border-radius: 50%; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
+  .lock { font-size: .8rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); margin-left: 6px; vertical-align: 2px; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Chunks, settings &amp; saving</h1>
+<p class="lede">Grow or shrink your map one tile at a time, tune every terrain-wide setting from a friendly six-tab strip, and understand exactly where your terrain is saved on disk.</p>
+<div class="meta-row"><span class="pill">⏱ 35 min</span><span class="pill">Beginner</span><span class="pill">Scenes: tutorial/02_island.tscn · demo/hex_island.tscn</span></div>
+
+<figure class="shot"><img src="media/06-chunks-settings/03-chunks-overview.png" alt="The tutorial island from above with the Chunks tool active: a 3 by 3 grid of chunks outlined in white, and round green discs with a white plus sign on every empty neighbouring tile around the edge."><figcaption>The Chunks tool: nine chunks in a 3×3 grid (white borders) and green <b>+</b> markers where you can add more.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>What a <b>chunk</b> is, and how it compares with Roblox terrain regions and the Terrain Editor's <b>Generate</b> tab.</li>
+  <li>The <a href="#chunks-tool">Chunks tool</a>: add, remove and select chunks, per-chunk Merge Mode, and dragging single terrain points with Vertex Handles.</li>
+  <li>All six pages of the <a href="#settings">Settings tool</a>: Grid, New Chunks, Grass, Display, LOD &amp; Nature, Storage.</li>
+  <li>The <a href="#inspector">terrain's Inspector groups</a> — the full property list behind the Settings tool.</li>
+  <li><a href="#storage">Storage</a>: Save Data, Import MST, Bake Meshes and Export GLB — and <a href="#on-disk">where your data lives on disk</a>.</li>
+  <li>Which settings <a href="#locks">lock on purpose</a> once your map has chunks.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in your scene, like an Instance in Roblox. The terrain is a node called <code>MarchingSquaresTerrain</code>.</dd>
+  <dt><b>Scene / <code>.tscn</code></b></dt><dd>A saved scene file — roughly a Roblox place. <code>res://</code> means "the project folder".</dd>
+  <dt><b>Scene dock</b></dt><dd>The tree of nodes at the top-left, like Roblox's <b>Explorer</b>.</dd>
+  <dt><b>Inspector</b></dt><dd>The panel on the right listing every property of the selected node, like Roblox's <b>Properties</b>.</dd>
+  <dt><b>Resource / <code>.res</code></b></dt><dd>A bundle of data saved as its own file. Your terrain's heights and paint live in one of these.</dd>
+  <dt><b>FileSystem / History docks</b></dt><dd>Tabs at the bottom-left. FileSystem lists your project's files (a bit like Roblox's Asset Manager); History lists every undo step by name, and clicking an earlier line jumps back to it.</dd>
+  <dt><b>Viewport / 3D view</b></dt><dd>The big picture of your world in the middle of the editor.</dd>
+  <dt><b>Cell</b> and <b>chunk</b></dt><dd>A cell is one square of the terrain grid. A chunk is a block of cells (32×32 by default) — one "tile" of the map.</dd>
+</dl>
+
+<h2 id="what-is-a-chunk">What is a chunk?</h2>
+<p>The terrain is a grid of square <b>cells</b>. Cells are grouped into square <b>chunks</b> — by default 32×32 cells each (the <span class="ui">Chunk Size</span> setting). A chunk is the unit the terrain loads, builds a mesh for, and saves. The tutorial island <code>02_island</code> has <b>9 chunks</b> laid out 3×3, named <code>Chunk (0, 0)</code> … <code>Chunk (2, 2)</code> (column, row).</p>
+<p>The whole world is <i>only</i> the chunks that exist. The empty space around them holds no data at all until you add a chunk there.</p>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox terrain is one huge voxel volume — you can sculpt anywhere. Here the world is built from <b>chunks</b>, fixed-size tiles that you place explicitly. There's no infinite canvas: you <b>add</b> map area by clicking green <b>+</b> markers and <b>remove</b> area by deleting chunks. Think of a chunk as a Roblox terrain <i>region</i> that you place by hand.</p></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox's Terrain Editor has a <b>Generate</b> tab that fills a region with procedural hills. The equivalent here is the noise fields on the <a href="#settings">Settings tool</a>'s <b>New Chunks</b> tab: set Noise Amp / Freq / Seed (or a Noise Hmap) and every chunk you add afterwards is shaped by that noise instead of being flat.</p></div>
+
+<h2 id="where">Where these tools live</h2>
+<p>The terrain tools only appear <b>while the <code>MarchingSquaresTerrain</code> node is selected</b> — in the Scene dock or by clicking the terrain in the 3D view. If the toolbar disappears, you clicked away: select the terrain again. Click the dots:</p>
+<div class="hotspots"><img src="media/06-chunks-settings/01-toolbar-location.png" alt="The full Godot editor with 02_island open. MarchingSquaresTerrain is selected in the Scene dock; a red box surrounds the left icon toolbar listing Brush 1, Level 2, Smooth 3, Bridge 4, Foliage 5, Paint 6, Inspect 7, Chunks 8 and Settings 9; below the viewport is the Brush strip; the Inspector on the right shows the terrain's properties.">
+  <button class="spot" style="left:8%;top:22%" data-title="Select the terrain" data-text="Click MarchingSquaresTerrain in the Scene dock (Roblox's Explorer). The terrain tools only show while it is selected.">1</button>
+  <button class="spot" style="left:21%;top:20%" data-title="Collapse" data-text="Shrinks the toolbar down to icons only.">2</button>
+  <button class="spot" style="left:21%;top:40%" data-title="Tool toolbar" data-text="Brush 1, Level 2, Smooth 3, Bridge 4, Foliage 5, Paint 6, Inspect 7, Chunks 8, Settings 9 — then Stamp, Gradient, Select. Press the number key (with the mouse over the 3D view) or click the icon.">3</button>
+  <button class="spot" style="left:24%;top:52%" data-title="Chunks (8)" data-text="Chunk Management Tool — used to create, delete and change chunks.">4</button>
+  <button class="spot" style="left:24%;top:56%" data-title="Settings (9)" data-text="Terrain Settings Tool — used to tweak global terrain settings, as six tabs in the bottom strip.">5</button>
+  <button class="spot" style="left:52%;top:62%" data-title="Bottom attribute strip" data-text="Changes per tool. Chunks shows the chunk controls; Settings shows a six-tab page of fields.">6</button>
+  <button class="spot" style="left:90%;top:35%" data-title="Inspector" data-text="Always shows the terrain node's own properties, grouped (Grid, Look, Overlay, Advanced, Tools, Surroundings). The Settings tool is a friendlier subset of these.">7</button>
+</div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Studio the terrain tools live on a ribbon tab that's always there. Here they're tied to the terrain node: select <code>MarchingSquaresTerrain</code> in the Scene dock first, exactly like selecting an object in Explorer before using its tools.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Guided tutorial: grow, trim and tune your island</h2>
+<p>About 15 minutes, on <code>res://tutorial/02_island.tscn</code>. Every step can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
+<ol class="steps" data-id="chunks-tutorial">
+  <li><b>Open the island.</b> In the FileSystem dock (bottom-left) open <code>tutorial</code> and double-click <code>02_island.tscn</code>. Click <code>MarchingSquaresTerrain</code> in the Scene dock.</li>
+  <li><b>Open the Chunks tool.</b> Hover the 3D view and press <kbd>8</kbd> (or click <span class="ui">Chunks</span>). White chunk borders and green <b>+</b> discs appear. The strip reads <span class="ui">9 chunks</span>.</li>
+  <li><b>Add a chunk.</b> Hover a green <b>+</b> (it brightens; the hint names its chunk coordinates) and left-click. The count becomes 10.
+    <figure class="clip"><video src="media/06-chunks-settings/04-add-chunk.mp4" poster="media/06-chunks-settings/04-add-chunk.png" data-autoplay></video><figcaption>Clicking a green + adds a flat chunk beside the island (9 → 10).</figcaption></figure></li>
+  <li><b>Undo it.</b> Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> — one step, named "add chunk" in the History dock.</li>
+  <li><b>Try a noisy chunk.</b> Press <kbd>9</kbd>, open the <span class="ui">New Chunks</span> tab and raise <span class="ui">Noise Amp</span> above 0. Back in the Chunks tool (<kbd>8</kbd>), add a chunk: it arrives as rolling bumps instead of flat ground.
+    <figure class="clip"><video src="media/06-chunks-settings/80-new-chunk-noise.mp4" poster="media/06-chunks-settings/80-new-chunk-noise.png" data-autoplay></video><figcaption>With New-Chunk noise above zero, a freshly added chunk is generated with hills.</figcaption></figure></li>
+  <li><b>Select without deleting.</b> Hold <kbd>Ctrl</kbd> and left-click a chunk. It gets a blue outline, the <span class="ui">Chunk:</span> dropdown jumps to it, and <span class="ui">Remove Chunk</span> lights up.</li>
+  <li><b>Remove it.</b> Click <span class="ui">Remove Chunk</span>. Then <kbd>Ctrl</kbd>+<kbd>Z</kbd> to bring it back.</li>
+  <li><b>Tour the Settings.</b> Press <kbd>9</kbd> and click through the six tabs. On <span class="ui">Display</span>, raise <span class="ui">Pixel Size</span>, flip <span class="ui">Debug View</span> and tick <span class="ui">Editor Fog</span>. Undo each with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</li>
+  <li><b>Save.</b> Press <kbd>Ctrl</kbd>+<kbd>S</kbd>. Saving the scene also saves the terrain's data file (see <a href="#on-disk">where data lives</a>).</li>
+</ol>
+
+<div class="callout warn"><span class="label">Watch out</span><p>A <b>plain left-click on a chunk removes it</b>. To <i>select</i> a chunk you must hold <kbd>Ctrl</kbd>. If you deleted one by accident, <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings it straight back.</p></div>
+
+<!-- ===================================================== CHUNKS TOOL -->
+<h2 id="chunks-tool">The Chunks tool (Chunk Manager) — key <kbd>8</kbd></h2>
+<p>Tooltip: <i>"Chunk Management Tool [8] — Used to create, delete and change chunks."</i> Selecting it draws a <b>chunk overlay</b> on the terrain and shows the chunk strip at the bottom. The viewport caption reads <i>"LMB on a green +: add a chunk · LMB on a chunk: remove it · Ctrl+LMB: select a chunk."</i> A second line shows what's under the mouse, e.g. <code>Chunk Manager | height -0.54 cell (43, 41) chunk (1, 1)</code>.</p>
+
+<h3 id="overlay">Reading the overlay</h3>
+<div class="pair">
+  <figure class="shot"><img src="media/06-chunks-settings/03-chunks-overview.png" alt="Chunk overlay: white borders around each of the nine chunks, green discs with white plus signs on every empty tile touching the island."><figcaption><span class="legend-dot" style="background:#fff"></span>White border = an existing chunk. <span class="legend-dot" style="background:#3a7a3a"></span>Green <b>+</b> = empty neighbour; click to add.</figcaption></figure>
+  <figure class="shot"><img src="media/06-chunks-settings/06-chunk-hover-removex.png" alt="One chunk on the right edge of the island is highlighted with a red-orange outline, showing it will be removed if clicked."><figcaption><span class="legend-dot" style="background:#d0603a"></span>Hovering an existing chunk outlines it in red/orange (the remove marker) — a click <b>removes</b> it.</figcaption></figure>
+</div>
+<ul>
+  <li><b>New chunks must touch an existing chunk.</b> Clicking a + that isn't adjacent warns "new chunks must touch an existing chunk." With zero chunks, the cell under your mouse becomes the first +.</li>
+  <li>A <b>selected</b> chunk (<kbd>Ctrl</kbd>+click, or chosen in the dropdown) gets a <b>blue</b> outline.</li>
+</ul>
+
+<h3 id="chunks-strip">The chunk strip</h3>
+<div class="hotspots"><img src="media/06-chunks-settings/02-chunks-strip.png" alt="The Chunk Manager strip: Chunk dropdown showing Chunk (0, 0), the label 9 chunks, a Remove Chunk button; Merge Mode dropdown set to Polyhedron with an Apply Mode to All Chunks button; a Vertex Handles checkbox and the hint LMB +: add chunk · LMB chunk: remove · Ctrl+LMB: select.">
+  <button class="spot" style="left:12%;top:18%" data-title="Chunk Manager" data-text="The strip title — just the tool label.">1</button>
+  <button class="spot" style="left:50%;top:18%" data-title="Chunk: dropdown" data-text="The active chunk, by name Chunk (x, y). Merge Mode, Vertex Handles and Remove act on it. Ctrl+LMB a chunk in the viewport also sets it.">2</button>
+  <button class="spot" style="left:70%;top:18%" data-title="N chunks" data-text="Live chunk count (reads '1 chunk' when singular).">3</button>
+  <button class="spot" style="left:89%;top:18%" data-title="Remove Chunk" data-text="Removes the selected chunk (undoable). Disabled when no chunk is selected.">4</button>
+  <button class="spot" style="left:35%;top:49%" data-title="Merge Mode" data-text="The selected chunk's merge mode: Cubic, Polyhedron, Rounded Polyhedron, Semi Round, Spherical.">5</button>
+  <button class="spot" style="left:73%;top:49%" data-title="Apply Mode to All Chunks" data-text="Copies the current merge mode to every chunk of this terrain, as one undo step.">6</button>
+  <button class="spot" style="left:23%;top:79%" data-title="Vertex Handles" data-text="Draggable height handles on every sample of the selected chunk. One undo step per drag.">7</button>
+  <button class="spot" style="left:63%;top:79%" data-title="Hint" data-text="Reminder of the mouse gestures: LMB + adds, LMB chunk removes, Ctrl+LMB selects.">8</button>
+</div>
+
+<input class="filter-box" data-target="#chunks-ref" placeholder="Filter chunk controls…">
+<div id="chunks-ref">
+  <div class="control"><h4>Chunk: dropdown</h4><div class="where">Chunks strip · row 1</div>
+    <p>Picks the "active" chunk by name, <code>Chunk (x, y)</code>. Its merge mode, vertex handles and Remove act on this chunk. Lists every chunk of the terrain.</p>
+    <dl><dt>Tooltip</dt><dd>"Chunk to edit: its merge mode, vertex handles and Remove act on it (or Ctrl+LMB a chunk in the viewport)."</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+LMB a chunk</dd></dl>
+    <figure class="shot"><img src="media/06-chunks-settings/08-chunk-dropdown.png" alt="The Chunk dropdown open, listing Chunk (0, 0) through Chunk (2, 2)."><figcaption>The dropdown lists every chunk by column and row.</figcaption></figure></div>
+  <div class="control"><h4>N chunks</h4><div class="where">Chunks strip · row 1</div>
+    <p>A live count of chunks ("9 chunks").</p>
+    <dl><dt>Note</dt><dd>After undoing an add/remove, the label can briefly show the old number until the strip rebuilds. The chunk data itself is correct.</dd></dl></div>
+  <div class="control"><h4>Remove Chunk</h4><div class="where">Chunks strip · row 1</div>
+    <p>Removes the selected chunk. Undoable ("remove chunk"). Disabled until you select a chunk.</p>
+    <dl><dt>Tooltip</dt><dd>"Removes the selected chunk (undoable). In the viewport: LMB a chunk (red X) removes it, LMB a green + adds one."</dd></dl></div>
+  <div class="control"><h4>Merge Mode</h4><div class="where">Chunks strip · row 2</div>
+    <p>Sets the <b>selected</b> chunk's merge mode — how the terrain joins neighbouring heights. The effect is visible mainly on triangle/hex grids with stepped heights; on a square grid it is near-invisible.</p>
+    <dl><dt>Values</dt><dd>Cubic, Polyhedron, Rounded Polyhedron, Semi Round, Spherical</dd><dt>Undo</dt><dd>"chunk merge mode"</dd></dl>
+    <figure class="shot"><img src="media/06-chunks-settings/09-merge-mode-dropdown.png" alt="The Merge Mode dropdown open, showing Cubic, Polyhedron (checked), Rounded Polyhedron, Semi Round and Spherical."><figcaption>The five merge modes.</figcaption></figure></div>
+  <div class="control"><h4>Apply Mode to All Chunks</h4><div class="where">Chunks strip · row 2</div>
+    <p>Applies the current merge mode to <b>every</b> chunk, as one undo step ("chunk merge mode"). New chunks take their merge mode from Merge Mode on the <a href="#settings">Settings tool</a>'s <b>Grid</b> tab instead.</p></div>
+  <div class="control"><h4>Vertex Handles</h4><div class="where">Chunks strip · row 3</div>
+    <p>Turns on draggable height handles on every sample of the selected chunk. Drag one up or down to move that terrain point. One undo step per drag ("move terrain point"). Same as the Inspector's <span class="ui">Tools → Handles</span>.</p>
+    <dl><dt>Caveat</dt><dd>A 32-cell chunk has about 33×33 = 1089 handles, so they form a dense grey cluster that's hard to target. Easier on a smaller chunk.</dd></dl></div>
+  <div class="control"><h4>Add chunk (gesture)</h4><div class="where">3D view · green +</div>
+    <p>Left-click a green +. The new chunk is flat, or shaped by the noise on the <a href="#settings">Settings tool</a>'s New Chunks tab when Noise Amp &gt; 0.</p><dl><dt>Undo</dt><dd>"add chunk"</dd></dl></div>
+  <div class="control"><h4>Remove chunk (gesture)</h4><div class="where">3D view · red X</div>
+    <p>Left-click an existing chunk (it shows red with an X). Or select it and press Remove Chunk.</p><dl><dt>Undo</dt><dd>"remove chunk"</dd></dl></div>
+  <div class="control"><h4>Select chunk (gesture)</h4><div class="where">3D view</div>
+    <p><kbd>Ctrl</kbd>+left-click a chunk: blue outline, dropdown updates, Remove Chunk enables.</p></div>
+  <div class="control"><h4>Undo / Redo</h4><div class="where">Anywhere</div>
+    <p>Every chunk action is a single step: "add chunk", "remove chunk", "chunk merge mode", "move terrain point".</p>
+    <dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dd></dl></div>
+</div>
+
+<h3 id="chunks-clips">Chunk actions in motion</h3>
+<div class="tabs">
+  <div class="panel" data-tab="Remove (viewport)">
+    <figure class="clip"><video src="media/06-chunks-settings/05-remove-chunk.mp4" poster="media/06-chunks-settings/05-remove-chunk.png"></video><figcaption>Hover a chunk until it turns red with an X, then click: removed (back to 9).</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Ctrl-select">
+    <figure class="clip"><video src="media/06-chunks-settings/07-ctrl-select-chunk.mp4" poster="media/06-chunks-settings/07-ctrl-select-chunk.png"></video><figcaption><kbd>Ctrl</kbd>+click selects a chunk: blue outline, dropdown updates, Remove Chunk enables.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Remove (button)">
+    <figure class="clip"><video src="media/06-chunks-settings/09-remove-chunk-button.mp4" poster="media/06-chunks-settings/09-remove-chunk-button.png"></video><figcaption>Select a chunk, then click <span class="ui">Remove Chunk</span>.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Vertex handle">
+    <figure class="clip"><video src="media/06-chunks-settings/10-vertex-handle-drag.mp4" poster="media/06-chunks-settings/10-vertex-handle-drag.png"></video><figcaption>With Vertex Handles on, dragging one handle moves a single terrain point.</figcaption></figure>
+    <figure class="clip"><video src="media/06-chunks-settings/11-undo-handle.mp4" poster="media/06-chunks-settings/11-undo-handle.png"></video><figcaption><kbd>Ctrl</kbd>+<kbd>Z</kbd> reverts the drag in one step.</figcaption></figure>
+    <figure class="shot"><img src="media/06-chunks-settings/12-vertex-handles-field.png" alt="A selected chunk covered by a tight block of grey vertex handles, with one red handle at the corner."><figcaption>On a 32-cell chunk the ~1089 handles render as a tight cluster — fiddly, but working.</figcaption></figure>
+  </div>
+</div>
+
+<!-- ===================================================== SETTINGS -->
+<h2 id="settings">The Settings tool (Terrain Settings) — key <kbd>9</kbd></h2>
+<p>Tooltip: <i>"Terrain Settings Tool [9] — Used to tweak global terrain settings."</i> The bottom strip turns into a <b>six-tab page</b> — a friendlier, hand-picked subset of the terrain's Inspector. Tabs: <b>Grid · New Chunks · Grass · Display · LOD &amp; Nature · Storage</b>.</p>
+<ul>
+  <li>The strip wraps its fields into as many columns as fit your window, so the layout shifts with window size — the fields are the same.</li>
+  <li>Every change applies live and is <b>one undo step</b> named <code>terrain setting &lt;label&gt;</code> (e.g. "terrain setting pixel size").</li>
+</ul>
+
+<div class="tabs">
+<!-- ---------- GRID -->
+<div class="panel" data-tab="Grid">
+  <p id="tab-grid"><i>"Grid type, chunk and cell size, blending, merge mode, collision."</i></p>
+  <div class="hotspots"><img src="media/06-chunks-settings/20-settings-page-grid.png" alt="Settings Grid tab on a square terrain: Grid Type Square, Chunk Size 32, Cell Size x 2.0 y 2.0; Blend Mode Smooth, Merge Mode Polyhedron, Extra Collision Layer None.">
+    <button class="spot" style="left:24%;top:15%" data-title="Tab row" data-text="Grid · New Chunks · Grass · Display · LOD &amp; Nature · Storage.">1</button>
+    <button class="spot" style="left:46%;top:39%" data-title="Grid Type" data-text="Square, Triangle, Hex, Hex Rings.">2</button>
+    <button class="spot" style="left:48%;top:62%" data-title="Chunk Size" data-text="Cells per chunk edge, 2–64 (default 32). Fixed once chunks exist.">3</button>
+    <button class="spot" style="left:43%;top:85%" data-title="Cell Size" data-text="Cell size in world units (x, y). Scales the whole terrain.">4</button>
+    <button class="spot" style="left:80%;top:39%" data-title="Blend Mode" data-text="Smooth, Hard Squares, Hard Vertices.">5</button>
+    <button class="spot" style="left:80%;top:62%" data-title="Merge Mode" data-text="Merge mode given to newly added chunks.">6</button>
+    <button class="spot" style="left:80%;top:85%" data-title="Extra Collision Layer" data-text="None or one extra physics layer, 9–32.">7</button>
+  </div>
+  <p>On a hex terrain the Grid page shows extra fields. Notice <span class="ui">Ring Radius</span> and <span class="ui">Wrap Chunks</span> greyed out — they're locked because hex-ring chunks already exist:</p>
+  <div class="hotspots"><img src="media/06-chunks-settings/71-settings-grid-hex.png" alt="Grid tab on the hex island: Grid Type Hex Rings, Ring Radius 2 greyed out, Cell Size 2.0 2.0, Wrap Chunks 0 0 greyed out, Blend Mode Smooth; Merge Mode Polyhedron, Edge Style Hex Prism, Instanced ticked, Extra Collision Layer None.">
+    <button class="spot" style="left:50%;top:10%" data-title="Grid Type: Hex Rings" data-text="Hex Rings replaces Chunk Size with Ring Radius.">1</button>
+    <button class="spot" style="left:52%;top:28%" data-title="Ring Radius (locked)" data-text="Radius of the hex disk each chunk owns (1–16). Greyed: remove every chunk to change it.">2</button>
+    <button class="spot" style="left:52%;top:68%" data-title="Wrap Chunks (locked)" data-text="Torus wrap in chunks (0–128, 0 = no wrap). Greyed once hex-ring chunks exist.">3</button>
+    <button class="spot" style="left:86%;top:28%" data-title="Edge Style" data-text="Flat Walls, Terraces, Slopes, Hex Prism. Non-square grids only.">4</button>
+    <button class="spot" style="left:68%;top:48%" data-title="Instanced" data-text="Hex + Hex Prism: draw columns as GPU instances. Its checkbox sits at the far right of the row (just cut off in this picture).">5</button>
+  </div>
+  <input class="filter-box" data-target="#grid-ref" placeholder="Filter Grid fields…">
+  <div id="grid-ref">
+    <div class="control"><h4>Grid Type</h4><div class="where">Settings · Grid</div>
+      <p><b>Square</b> = marching squares over vertex heights (smooth). <b>Triangle / Hex / Hex Rings</b> = flat cells. Changing it clears the selection and rebuilds.</p><dl><dt>Values</dt><dd>Square, Triangle, Hex, Hex Rings</dd><dt>Default</dt><dd>Square</dd></dl>
+      <figure class="shot"><img src="media/06-chunks-settings/70-hex-grid-terrain.png" alt="The hex island demo: a pixel-art hilly island with stacked prism cliffs, rocks and a blue pond."><figcaption>A Hex Rings terrain (<code>demo/hex_island.tscn</code>) for contrast with the square island.</figcaption></figure></div>
+    <div class="control"><h4>Chunk Size <span class="lock">locks</span></h4><div class="where">Settings · Grid (non-Hex-Rings)</div>
+      <p>Cells per chunk edge (the original addon called it "Dimensions"). <b>Fixed once chunks exist</b> for this grid type: the change is ignored with a warning "chunk_size is fixed once chunks exist … (clear the data or switch grid type first)". Set it on an empty terrain.</p><dl><dt>Range</dt><dd>2 – 64</dd><dt>Default</dt><dd>32</dd></dl></div>
+    <div class="control"><h4>Ring Radius <span class="lock">locks</span></h4><div class="where">Settings · Grid (Hex Rings only)</div>
+      <p>Radius of the hex disk each chunk owns; replaces Chunk Size. Greyed out once hex-ring chunks exist ("Fixed once hex-ring chunks exist: remove every chunk to change it").</p><dl><dt>Range</dt><dd>1 – 16</dd></dl></div>
+    <div class="control"><h4>Cell Size</h4><div class="where">Settings · Grid</div>
+      <p>Cell size in world units; hex and triangle grids use X only. Scales the whole terrain; changing it rebuilds all chunks.</p><dl><dt>Range</dt><dd>0.1005 – 64 (min clamp 0.0505)</dd><dt>Default</dt><dd>2.0, 2.0</dd></dl></div>
+    <div class="control"><h4>Wrap Chunks <span class="lock">locks</span></h4><div class="where">Settings · Grid (Hex Rings)</div>
+      <p>Torus wrap in chunks (x columns, y rows) — walk off one edge, appear at the other. 0 = no wrap. Locked once hex-ring chunks exist.</p><dl><dt>Range</dt><dd>0 – 128</dd><dt>Default</dt><dd>0, 0</dd></dl></div>
+    <div class="control"><h4>Blend Mode</h4><div class="where">Settings · Grid</div>
+      <p>How textures blend between paint slots.</p><dl><dt>Values</dt><dd>Smooth, Hard Squares, Hard Vertices</dd><dt>Default</dt><dd>Smooth</dd></dl></div>
+    <div class="control"><h4>Merge Mode (default)</h4><div class="where">Settings · Grid</div>
+      <p>The merge mode given to <b>newly added</b> chunks. Per-chunk merge mode is set in the <a href="#chunks-strip">Chunks tool</a>.</p><dl><dt>Values</dt><dd>Cubic, Polyhedron, Rounded Polyhedron, Semi Round, Spherical</dd><dt>Default</dt><dd>Polyhedron</dd></dl></div>
+    <div class="control"><h4>Edge Style</h4><div class="where">Settings · Grid (Grid Type ≠ Square)</div>
+      <p>How height steps render on triangle/hex grids: ramps (Flat Walls / Slopes), stepped terraces (Terraces) or stacked prism columns (Hex Prism). See the <a href="#edge-style">Edge Style scrubber</a>.</p><dl><dt>Values</dt><dd>Flat Walls, Terraces, Slopes, Hex Prism</dd><dt>Default</dt><dd>Hex Prism (hex scenes)</dd></dl></div>
+    <div class="control"><h4>Instanced</h4><div class="where">Settings · Grid (Hex and up)</div>
+      <p>Hex + Hex Prism only: draw columns as GPU MultiMesh instances instead of one meshed chunk, so height edits only re-upload the cell map.</p></div>
+    <div class="control"><h4>Extra Collision Layer</h4><div class="where">Settings · Grid</div>
+      <p>Adds one extra physics layer (9–32) to the terrain's collision, so other objects can test against it separately.</p><dl><dt>Values</dt><dd>None, 9 … 32</dd><dt>Default</dt><dd>None</dd></dl></div>
+  </div>
+</div>
+
+<!-- ---------- NEW CHUNKS -->
+<div class="panel" data-tab="New Chunks">
+  <p id="tab-newchunks"><i>"Textures and noise given to newly added chunks."</i> Nothing here changes existing chunks — it only shapes the next chunk you add.</p>
+  <div class="hotspots"><img src="media/06-chunks-settings/21-settings-page-newchunks.png" alt="New Chunks tab: Floor Slot 1. Grass, Wall Slot 6. Cliff, Noise Amp 0.0, Noise Freq 0.051; Noise Seed 1, Noise Hmap empty, Noise Height 32.0.">
+    <button class="spot" style="left:45%;top:29%" data-title="Floor Slot" data-text="Floor texture of new chunks (default 1. Grass).">1</button>
+    <button class="spot" style="left:45%;top:49%" data-title="Wall Slot" data-text="Wall texture of new chunks (default 6. Cliff).">2</button>
+    <button class="spot" style="left:52%;top:70%" data-title="Noise Amp" data-text="Height of the noise, 0–256. 0 = flat.">3</button>
+    <button class="spot" style="left:52%;top:90%" data-title="Noise Freq" data-text="How busy the bumps are, 0–4.">4</button>
+    <button class="spot" style="left:91%;top:29%" data-title="Noise Seed" data-text="Pick a different number for different hills.">5</button>
+    <button class="spot" style="left:84%;top:49%" data-title="Noise Hmap" data-text="Optional Noise resource; overrides Amp / Freq.">6</button>
+    <button class="spot" style="left:91%;top:70%" data-title="Noise Height" data-text="Height range of the Noise Hmap, 0–1024.">7</button>
+  </div>
+  <div class="pair">
+    <figure class="shot"><img src="media/06-chunks-settings/81-noisy-chunk-result.png" alt="A newly added chunk next to the island covered in small grassy bumps and islets rising from teal water."><figcaption>The result: a bumpy, noise-generated chunk.</figcaption></figure>
+    <figure class="clip"><video src="media/06-chunks-settings/80-new-chunk-noise.mp4" poster="media/06-chunks-settings/80-new-chunk-noise.png"></video><figcaption>Adding a chunk with Noise Amp &gt; 0.</figcaption></figure>
+  </div>
+  <input class="filter-box" data-target="#newchunks-ref" placeholder="Filter New Chunks fields…">
+  <div id="newchunks-ref">
+    <div class="control"><h4>Floor Slot</h4><div class="where">Settings · New Chunks</div><p>Floor texture of newly added chunks (pick by slot name; see <a href="04-terrain-painting.html">Painting</a>).</p><dl><dt>Range</dt><dd>Slots 0 – 15</dd><dt>Default</dt><dd>1. Grass</dd></dl></div>
+    <div class="control"><h4>Wall Slot</h4><div class="where">Settings · New Chunks</div><p>Wall (cliff side) texture of newly added chunks.</p><dl><dt>Range</dt><dd>Slots 0 – 15</dd><dt>Default</dt><dd>6. Cliff</dd></dl></div>
+    <div class="control"><h4>Noise Amp</h4><div class="where">Settings · New Chunks</div><p>Height amplitude of the fractal noise for new chunks. 0 = flat chunk; above 0 = rolling bumps.</p><dl><dt>Range</dt><dd>0 – 256</dd><dt>Default</dt><dd>0.0</dd></dl></div>
+    <div class="control"><h4>Noise Freq</h4><div class="where">Settings · New Chunks</div><p>Frequency of the new-chunk noise: higher = smaller, busier bumps.</p><dl><dt>Range</dt><dd>0 – 4</dd><dt>Default</dt><dd>0.051</dd></dl></div>
+    <div class="control"><h4>Noise Seed</h4><div class="where">Settings · New Chunks</div><p>Seed of the noise. Same seed = same hills.</p><dl><dt>Range</dt><dd>Any 32-bit integer</dd><dt>Default</dt><dd>1</dd></dl></div>
+    <div class="control"><h4>Noise Hmap</h4><div class="where">Settings · New Chunks</div><p>A <code>Noise</code> resource for new chunks (heights = noise × Noise Height). <b>Overrides Noise Amp / Freq</b> when set.</p><dl><dt>Default</dt><dd>&lt;empty&gt;</dd></dl></div>
+    <div class="control"><h4>Noise Height</h4><div class="where">Settings · New Chunks</div><p>Height range applied to Noise Hmap.</p><dl><dt>Range</dt><dd>0 – 1024</dd><dt>Default</dt><dd>32.0</dd></dl></div>
+  </div>
+</div>
+
+<!-- ---------- GRASS -->
+<div class="panel" data-tab="Grass">
+  <p id="tab-grass"><i>"Grass growth, animation and blade size."</i> Grass grows on paint slots marked "Has grass" — see <a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a>.</p>
+  <div class="hotspots"><img src="media/06-chunks-settings/22-settings-page-grass.png" alt="Grass tab: Grass ticked, Animation FPS 0, Subdivisions 2; Grass Size x 0.56 y 0.66, Ledge Cutoff 0.5 slider, Min Height 1.2.">
+    <button class="spot" style="left:50%;top:40%" data-title="Grass" data-text="Grow grass on slots marked Has grass.">1</button>
+    <button class="spot" style="left:46%;top:63%" data-title="Animation FPS" data-text="0 = smooth wind; above 0 = choppy, limited-fps sway.">2</button>
+    <button class="spot" style="left:46%;top:87%" data-title="Subdivisions" data-text="Blades per cell = subdivisions².">3</button>
+    <button class="spot" style="left:80%;top:40%" data-title="Grass Size" data-text="Blade width and height.">4</button>
+    <button class="spot" style="left:85%;top:63%" data-title="Ledge Cutoff" data-text="No grass on cliff-edge bands stronger than this.">5</button>
+    <button class="spot" style="left:85%;top:87%" data-title="Min Height" data-text="No grass below this height — e.g. your water level.">6</button>
+  </div>
+  <input class="filter-box" data-target="#grass-ref" placeholder="Filter Grass fields…">
+  <div id="grass-ref">
+    <div class="control"><h4>Grass</h4><div class="where">Settings · Grass</div><p>Grow grass on slots marked "Has grass".</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+    <div class="control"><h4>Animation FPS</h4><div class="where">Settings · Grass</div><p>Above 0 animates grass at a limited frame rate (a retro, steppy sway); 0 = smooth wind. Undo step "terrain grass animation fps".</p><dl><dt>Range</dt><dd>0 – 60</dd><dt>Default</dt><dd>0</dd></dl></div>
+    <div class="control"><h4>Subdivisions</h4><div class="where">Settings · Grass</div><p>Grass blades per cell = subdivisions² (2 → 4 blades, 3 → 9).</p><dl><dt>Range</dt><dd>1 – 8</dd><dt>Default</dt><dd>2</dd></dl></div>
+    <div class="control"><h4>Grass Size</h4><div class="where">Settings · Grass</div><p>Blade size (width, height).</p><dl><dt>Range</dt><dd>0.0505 – 16</dd><dt>Default</dt><dd>0.56, 0.66</dd></dl></div>
+    <div class="control"><h4>Ledge Cutoff</h4><div class="where">Settings · Grass</div><p>Grass isn't planted on cliff-edge bands stronger than this value.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.5</dd></dl></div>
+    <div class="control"><h4>Min Height</h4><div class="where">Settings · Grass</div><p>No grass below this height — set it to your water level so grass doesn't grow underwater.</p><dl><dt>Range</dt><dd>−1024 – 1024</dd><dt>Default</dt><dd>1.2</dd></dl></div>
+  </div>
+</div>
+
+<!-- ---------- DISPLAY -->
+<div class="panel" data-tab="Display">
+  <p id="tab-display"><i>"Pixel size, grid overlay, fog and debug views."</i> These change how the terrain is <i>shown</i>, not its shape.</p>
+  <div class="hotspots"><img src="media/06-chunks-settings/23-settings-page-display.png" alt="Display tab: Pixel Size 1, Editor Grid unticked; Chunk Lines unticked, Editor Fog unticked; Debug View Off.">
+    <button class="spot" style="left:39%;top:39%" data-title="Pixel Size" data-text="Bigger = chunkier pixel blocks.">1</button>
+    <button class="spot" style="left:44%;top:63%" data-title="Editor Grid" data-text="Cell lines on the terrain while editing.">2</button>
+    <button class="spot" style="left:65%;top:39%" data-title="Chunk Lines" data-text="The grid overlay also draws chunk borders.">3</button>
+    <button class="spot" style="left:65%;top:63%" data-title="Editor Fog" data-text="Show the fog of war while editing. Dramatic.">4</button>
+    <button class="spot" style="left:86%;top:39%" data-title="Debug View" data-text="Off, Slope, Height Contours, Slot Ids, Chunk Borders, Cell Ids, Cell Data.">5</button>
+  </div>
+  <input class="filter-box" data-target="#display-ref" placeholder="Filter Display fields…">
+  <div id="display-ref">
+    <div class="control"><h4>Pixel Size</h4><div class="where">Settings · Display</div><p>Pixel-size multiplier in the pixel renderer: bigger = chunkier blocks. A clearly visible effect — try the <a href="#pixel-size">scrubber</a>. The pixel renderer itself is covered on <a href="07-pixelizer.html">The pixelizer</a>.</p><dl><dt>Range</dt><dd>1 – 16 (or greater)</dd><dt>Default</dt><dd>1</dd></dl></div>
+    <div class="control"><h4>Editor Grid</h4><div class="where">Settings · Display</div><p>Draws cell lines on the terrain while editing (in game it's <span class="ui">Show Grid</span>). Subtle on a busy texture — clearest zoomed in.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+    <div class="control"><h4>Chunk Lines</h4><div class="where">Settings · Display</div><p>The grid overlay also draws chunk borders. Chunk borders read more clearly than cell lines.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+    <div class="control"><h4>Editor Fog</h4><div class="where">Settings · Display</div><p>Shows the fog of war (cell data) while editing. With no revealed cells, the terrain goes dark under fog.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+    <div class="control"><h4>Debug View</h4><div class="where">Settings · Display</div><p>A terrain debug shader. All seven views look clearly different — see the <a href="#debug-view">scrubber</a>.</p><dl><dt>Values</dt><dd>Off, Slope, Height Contours, Slot Ids, Chunk Borders, Cell Ids, Cell Data</dd><dt>Default</dt><dd>Off</dd></dl></div>
+  </div>
+</div>
+
+<!-- ---------- LOD & NATURE -->
+<div class="panel" data-tab="LOD &amp; Nature">
+  <p id="tab-lod"><i>"Distant low-detail ring; droplet erosion and wild flowers (child nodes with their own strip)."</i></p>
+  <div class="hotspots"><img src="media/06-chunks-settings/24-settings-page-lod-nature.png" alt="LOD and Nature tab: LOD Distance 0, LOD In Editor unticked; Erosion Add button, Wild Flowers Add button.">
+    <button class="spot" style="left:44%;top:39%" data-title="LOD Distance" data-text="0 = off. Far chunks get a cheap, low-detail look.">1</button>
+    <button class="spot" style="left:49%;top:63%" data-title="LOD In Editor" data-text="Also use the LOD ring in the editor.">2</button>
+    <button class="spot" style="left:74%;top:39%" data-title="Erosion" data-text="Add / Select the terrain's erosion child.">3</button>
+    <button class="spot" style="left:74%;top:63%" data-title="Wild Flowers" data-text="Add / Select the terrain's wild-flowers child.">4</button>
+  </div>
+  <input class="filter-box" data-target="#lod-ref" placeholder="Filter LOD &amp; Nature fields…">
+  <div id="lod-ref">
+    <div class="control"><h4>LOD Distance</h4><div class="where">Settings · LOD &amp; Nature</div><p>A distant low-detail ring: chunks far from the LOD focus and camera get flat cell tops, plain walls, no grass and no drawn props (collision stays). 0 = off.</p><dl><dt>Range</dt><dd>0 – 4000 (or greater)</dd><dt>Default</dt><dd>0</dd></dl></div>
+    <div class="control"><h4>LOD In Editor</h4><div class="where">Settings · LOD &amp; Nature</div><p>Apply the distant LOD ring in the editor too. Off = the editor always shows full detail.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+    <div class="control"><h4>Erosion (Add / Select)</h4><div class="where">Settings · LOD &amp; Nature</div><p>Selects this terrain's <code>MarchingSquaresErosion</code> child, adding one if there is none (undoable). Hydraulic droplet erosion with its own strip — see <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a>.</p></div>
+    <div class="control"><h4>Wild Flowers (Add / Select)</h4><div class="where">Settings · LOD &amp; Nature</div><p>Selects this terrain's <code>MarchingSquaresWildFlowers</code> child, adding one if none (undoable). Clustered meadow flowers.</p></div>
+  </div>
+</div>
+
+<!-- ---------- STORAGE -->
+<div class="panel" data-tab="Storage">
+  <p id="tab-storage"><i>"Where the terrain data lives; save, import, bake and export."</i> The page changes with <span class="ui">Storage Mode</span>.</p>
+  <div class="hotspots"><img src="media/06-chunks-settings/25-settings-page-storage-resource.png" alt="Storage tab in Resource mode: Storage Mode Resource, Import MST with an Import... button; Bake Meshes with a Bake button, Export GLB with an Export button.">
+    <button class="spot" style="left:52%;top:40%" data-title="Storage Mode" data-text="Resource / Baked / Runtime.">1</button>
+    <button class="spot" style="left:58%;top:63%" data-title="Import MST" data-text="Import the original MarchingSquaresTerrain's data.">2</button>
+    <button class="spot" style="left:90%;top:40%" data-title="Bake Meshes" data-text="Make a frozen static copy of the terrain beside it.">3</button>
+    <button class="spot" style="left:90%;top:63%" data-title="Export GLB" data-text="Write every chunk to a .glb model with a baked texture atlas.">4</button>
+  </div>
+  <p>Switch <span class="ui">Storage Mode</span> to <b>Baked</b> or <b>Runtime</b> and more fields appear:</p>
+  <div class="pair">
+    <figure class="shot"><img src="media/06-chunks-settings/26-storage-mode-dropdown.png" alt="The Storage Mode dropdown open with Resource, Baked and Runtime."><figcaption>Storage Mode: Resource / Baked / Runtime.</figcaption></figure>
+    <div class="hotspots"><img src="media/06-chunks-settings/27-settings-page-storage-baked.png" alt="Storage tab in Baked mode: Storage Mode Baked, Bake Grass ticked, Bake Collision ticked, Data Directory showing (generated on save); Save Data Save, Import MST Import..., Bake Meshes Bake, Export GLB Export.">
+      <button class="spot" style="left:60%;top:15%" data-title="Storage Mode: Baked" data-text="One file per chunk, with meshes stored for fast loading.">1</button>
+      <button class="spot" style="left:64%;top:38%" data-title="Bake Grass" data-text="Baked only: also store grass.">2</button>
+      <button class="spot" style="left:64%;top:62%" data-title="Bake Collision" data-text="Baked only: also store collision faces.">3</button>
+      <button class="spot" style="left:52%;top:86%" data-title="Data Directory" data-text="Folder of per-chunk files. Empty = generated next to the scene on save.">4</button>
+      <button class="spot" style="left:92%;top:15%" data-title="Save Data" data-text="Write changed chunks now.">5</button>
+    </div>
+  </div>
+  <p>Full details for each Storage field are in <a href="#storage">Storage, baking &amp; exporting</a> below.</p>
+</div>
+</div>
+
+<div class="callout tip"><span class="label">Tip</span><p>Lost track of what you changed? Every Settings field is a single undo step named "terrain setting …" — open the <b>History</b> dock (next to FileSystem, bottom-left) to see them and click an earlier line to jump back.</p></div>
+
+<!-- ===================================================== VISUAL KNOBS -->
+<h2 id="display-visuals">Display settings, visually</h2>
+
+<h3 id="pixel-size">Pixel Size</h3>
+<div class="scrubber" data-label="Pixel Size" data-start="0"
+  data-frames='[{"v":"1","src":"media/06-chunks-settings/41-pixel-size-1.png","note":"Default: finest pixels"},{"v":"2","src":"media/06-chunks-settings/41-pixel-size-2.png","note":"Blocks double"},{"v":"3","src":"media/06-chunks-settings/41-pixel-size-3.png"},{"v":"4","src":"media/06-chunks-settings/41-pixel-size-4.png","note":"Clearly retro"},{"v":"6","src":"media/06-chunks-settings/41-pixel-size-6.png"},{"v":"8","src":"media/06-chunks-settings/41-pixel-size-8.png","note":"Very chunky blocks"}]'></div>
+<figure class="clip"><video src="media/06-chunks-settings/42-pixel-size-change.mp4" poster="media/06-chunks-settings/42-pixel-size-change.png"></video><figcaption>Pixel Size animating up and back down, live.</figcaption></figure>
+
+<h3 id="debug-view">Debug View</h3>
+<p>Seven debug shaders that recolour the terrain to show hidden information. Handy when something looks wrong — e.g. <b>Chunk Borders</b> to see exactly where one chunk ends.</p>
+<div class="scrubber" data-label="Debug View" data-start="0"
+  data-frames='[{"v":"Off","src":"media/06-chunks-settings/40-debug-0-off.png","note":"Normal look"},{"v":"Slope","src":"media/06-chunks-settings/40-debug-1-slope.png","note":"Shades by steepness"},{"v":"Height Contours","src":"media/06-chunks-settings/40-debug-2-height-contours.png","note":"Contour lines at height steps"},{"v":"Slot Ids","src":"media/06-chunks-settings/40-debug-3-slot-ids.png","note":"Each paint slot in its own colour"},{"v":"Chunk Borders","src":"media/06-chunks-settings/40-debug-4-chunk-borders.png","note":"Chunk edges highlighted"},{"v":"Cell Ids","src":"media/06-chunks-settings/40-debug-5-cell-ids.png","note":"Per-cell id colours"},{"v":"Cell Data","src":"media/06-chunks-settings/40-debug-6-cell-data.png","note":"Per-cell data (e.g. fog/reveal)"}]'></div>
+<figure class="clip"><video src="media/06-chunks-settings/73-debug-view-cycle.mp4" poster="media/06-chunks-settings/73-debug-view-cycle.png"></video><figcaption>Cycling Debug View on the hex island, with the Grid page visible below.</figcaption></figure>
+
+<h3 id="grid-overlay">Editor Grid</h3>
+<div class="compare" data-before="Editor Grid off" data-after="Editor Grid on"><img src="media/06-chunks-settings/31-editor-grid-off.png" alt="Close-up of terrain with no grid lines."><img src="media/06-chunks-settings/31-editor-grid-on.png" alt="The same close-up with thin cell lines drawn over the terrain."></div>
+<figure class="clip"><video src="media/06-chunks-settings/30-editor-grid-toggle.mp4" poster="media/06-chunks-settings/30-editor-grid-toggle.png"></video><figcaption>Toggling Editor Grid. The lines are subtle on the busy pixel texture — zoom in to see them best.</figcaption></figure>
+
+<h3 id="fog">Editor Fog</h3>
+<div class="compare" data-before="Editor Fog off" data-after="Editor Fog on"><img src="media/06-chunks-settings/44-editor-fog-off.png" alt="The island fully visible."><img src="media/06-chunks-settings/44-editor-fog-on.png" alt="The same view with the terrain darkened under fog of war."></div>
+<figure class="clip"><video src="media/06-chunks-settings/43-editor-fog-toggle.mp4" poster="media/06-chunks-settings/43-editor-fog-toggle.png"></video><figcaption>Editor Fog toggling the fog of war on and off.</figcaption></figure>
+
+<h3 id="edge-style">Edge Style (hex terrain)</h3>
+<p>Only on Triangle / Hex / Hex Rings grids. Differences are subtle on gentle terrain like this island — they matter most on steep cliffs with distinct height levels.</p>
+<div class="scrubber" data-label="Edge Style" data-start="3"
+  data-frames='[{"v":"Flat Walls","src":"media/06-chunks-settings/72-edge-style-0-flat-walls.png","note":"Ramps"},{"v":"Terraces","src":"media/06-chunks-settings/72-edge-style-1-terraces.png","note":"Stepped terraces"},{"v":"Slopes","src":"media/06-chunks-settings/72-edge-style-2-slopes.png","note":"Sloped ramps"},{"v":"Hex Prism","src":"media/06-chunks-settings/72-edge-style-3-hex-prism.png","note":"Stacked prism columns (hex default)"}]'></div>
+
+<!-- ===================================================== INSPECTOR -->
+<h2 id="inspector">The terrain's Inspector (full property set)</h2>
+<p>The Settings tool is a curated subset. The <b>Inspector</b> on the right shows <i>everything</i>: a few top-level fields first, then collapsible groups.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The Inspector is Studio's <b>Properties</b> window. The groups (Grid, Look, Overlay, Advanced, Tools) are like Properties' collapsible category headers. Grey "(1 change)" notes mean something in that group differs from its default.</p></div>
+
+<div class="pair">
+  <div class="hotspots"><img src="media/06-chunks-settings/50b-inspector-groups-collapsed.png" alt="Inspector for MarchingSquaresTerrain with groups collapsed: Contents, Grid Type Square, Chunk Size 32, Cell Size 2.0 2.0, Tex Assign Marching, then Grid, Look (5 changes), Overlay, Advanced, and an expanded Tools group with Export Path and Export GLB.">
+    <button class="spot" style="left:50%;top:12%" data-title="Contents" data-text="The MarchingSquaresTerrainData resource — the file your chunk data lives in.">1</button>
+    <button class="spot" style="left:55%;top:20%" data-title="Grid Type" data-text="Same as Settings → Grid.">2</button>
+    <button class="spot" style="left:55%;top:28%" data-title="Chunk Size" data-text="Same as Settings → Grid. Locks once chunks exist.">3</button>
+    <button class="spot" style="left:55%;top:39%" data-title="Cell Size" data-text="Same as Settings → Grid.">4</button>
+    <button class="spot" style="left:55%;top:52%" data-title="Tex Assign" data-text="A MarchingSquaresTexturePreset — the texture set (page 4).">5</button>
+    <button class="spot" style="left:12%;top:59%" data-title="Grid group" data-text="Hex Rings, Levels, Hex Edges, Blending, Defaults, New Chunk Noise.">6</button>
+    <button class="spot" style="left:12%;top:65%" data-title="Look group" data-text="Terrain, Grass, Foliage.">7</button>
+    <button class="spot" style="left:13%;top:71%" data-title="Overlay group" data-text="Grid, Debug Views, Fog Of War, Highlight.">8</button>
+    <button class="spot" style="left:14%;top:78%" data-title="Advanced group" data-text="Storage, Regions, Distant LOD, Hex Maps, Collision, Integration, Change Detection.">9</button>
+    <button class="spot" style="left:12%;top:84%" data-title="Tools group" data-text="Export / import paths and the Export GLB, Rebuild Meshes, Import MST Data and Bake Static Meshes buttons.">10</button>
+  </div>
+  <figure class="shot"><img src="media/06-chunks-settings/50-inspector-overview.png" alt="The terrain Inspector with the Look group expanded, showing Terrain and Grass subgroups, Turf Stuff material, Grass Pixel Size, Grass Outline, Ledge Cutoff, Min Height, then Foliage, Overlay, Advanced and Tools."><figcaption>Look expanded: Terrain, Grass and Foliage subgroups.</figcaption></figure>
+</div>
+<div class="pair">
+  <figure class="shot"><img src="media/06-chunks-settings/51-inspector-grid-group.png" alt="The Grid group expanded with subgroups Levels, Blending, Defaults and New Chunk Noise; Look also expanded below."><figcaption>Grid expanded on a square grid: Levels, Blending, Defaults, New Chunk Noise. (Hex Rings / Hex Edges subgroups are hidden on Square.)</figcaption></figure>
+  <figure class="shot"><img src="media/06-chunks-settings/52-inspector-advanced-group.png" alt="The Advanced group expanded with subgroups Storage, Regions, Distant LOD, and fields Impact Active On, Impact Stratum layer grid, Impact Sieve."><figcaption>Advanced expanded: Storage, Regions, Distant LOD, and Collision fields.</figcaption></figure>
+</div>
+
+<input class="filter-box" data-target="#insp-ref" placeholder="Filter Inspector properties (e.g. fog, lod, export)…">
+<div id="insp-ref">
+  <div class="control"><h4>Top level</h4><div class="where">Inspector · ungrouped</div><p><b>Contents</b> (the <code>MarchingSquaresTerrainData</code> resource — where chunk data lives), <b>Grid Type</b>, <b>Chunk Size</b>, <b>Cell Size</b>, <b>Tex Assign</b> (a <code>MarchingSquaresTexturePreset</code>).</p></div>
+  <div class="control"><h4>Grid › Hex Rings</h4><div class="where">Inspector · Grid (hex only)</div><p>Ring Radius, Wrap Chunks, Wrap Period.</p></div>
+  <div class="control"><h4>Grid › Levels</h4><div class="where">Inspector · Grid</div><p>Level Height.</p></div>
+  <div class="control"><h4>Grid › Hex Edges</h4><div class="where">Inspector · Grid (hex only)</div><p>Hex Edge Style (= Edge Style), Hex Edge Instanced (= Instanced), Hex Edge Grooves.</p></div>
+  <div class="control"><h4>Grid › Blending</h4><div class="where">Inspector · Grid</div><p>Blend Mode.</p></div>
+  <div class="control"><h4>Grid › Defaults</h4><div class="where">Inspector · Grid</div><p>Default Merge Mode, Default Floor Slot, Default Wall Slot (Settings: Merge Mode, Floor Slot, Wall Slot).</p></div>
+  <div class="control"><h4>Grid › New Chunk Noise</h4><div class="where">Inspector · Grid</div><p>Amplitude, frequency, seed, Noise Hmap, Noise Hmap Height (Settings → New Chunks).</p></div>
+  <div class="control"><h4>Look › Terrain</h4><div class="where">Inspector · Look</div><p>Land Stuff (shader material), Pixel Size, Outline, Outline ID, render Layers, Cast Shadows.</p></div>
+  <div class="control"><h4>Look › Grass</h4><div class="where">Inspector · Look</div><p>Grass enabled, Subdivisions, Grass Size, Grass Texture, Turf Stuff (material), Grass Pixel Size, Grass Outline, Ledge Threshold (Settings: Ledge Cutoff), Min Height.</p></div>
+  <div class="control"><h4>Look › Foliage</h4><div class="where">Inspector · Look</div><p>Scatter Items, Scatter Group Tiles, Scatter Body Quiet ms, Scatter Follow Interval ms. Covered on <a href="05-foliage-grass.html">page 5</a>.</p></div>
+  <div class="control"><h4>Overlay › Grid</h4><div class="where">Inspector · Overlay</div><p>Show Grid, Show Grid In Editor (= Editor Grid); Grid Color, Grid Width, Grid Fade Distance, Grid Chunk Lines (= Chunk Lines).</p></div>
+  <div class="control"><h4>Overlay › Debug Views</h4><div class="where">Inspector · Overlay</div><p>Shader Cursor, Debug View, Contour Step.</p></div>
+  <div class="control"><h4>Overlay › Fog Of War</h4><div class="where">Inspector · Overlay</div><p>Fog Enabled, Fog In Editor (= Editor Fog), Fog Transition, Fog Color, Fog Color Alt; <i>Hidden Cells</i>: Fog Hidden Dim, Fog Hidden Saturation; Fog Hatch, Fog Softness.</p></div>
+  <div class="control"><h4>Overlay › Highlight</h4><div class="where">Inspector · Overlay</div><p>Highlight Width.</p></div>
+  <div class="control"><h4>Advanced › Storage</h4><div class="where">Inspector · Advanced</div><p>Storage Mode, Bake Grass, Bake Impact (= Bake Collision), Data Directory, <b>Save Terrain Data</b> (button).</p></div>
+  <div class="control"><h4>Advanced › Regions</h4><div class="where">Inspector · Advanced</div><p>Region Collision Cells, Region Mesh Cells, Region Max Chunks.</p></div>
+  <div class="control"><h4>Advanced › Distant LOD</h4><div class="where">Inspector · Advanced</div><p>LOD Distance, LOD Focus (a Node3D the ring is measured from), LOD In Editor, LOD Refresh Interval.</p></div>
+  <div class="control"><h4>Advanced › Hex Maps</h4><div class="where">Inspector · Advanced</div><p>Map Window Radius, Map Window Focus, Map Window Margin, Map Window Refresh Interval.</p></div>
+  <div class="control"><h4>Advanced › Collision</h4><div class="where">Inspector · Advanced</div><p>Impact Active, Impact Stratum (physics layers), Impact Sieve (mask), Collision Rebuild Delay ms.</p></div>
+  <div class="control"><h4>Advanced › Integration</h4><div class="where">Inspector · Advanced</div><p>Publish Height Texture, Publish Sea Pad, Publish Sea Falloff, Publish Height Interval ms.</p></div>
+  <div class="control"><h4>Advanced › Change Detection</h4><div class="where">Inspector · Advanced</div><p>Look Poll Interval.</p></div>
+  <div class="control"><h4>Tools</h4><div class="where">Inspector · Tools</div><p>Export Path (<code>*.glb</code>), <b>Export GLB</b> (button), <b>Rebuild Meshes</b> (button), Import Path (<code>*.tscn,*.res</code>), <b>Import MST Data</b> (button), Bake Parent (a Node), <b>Bake Static Meshes</b> (button), Export Atlas Max Size (256 – 16384), Handles (= Vertex Handles).</p></div>
+  <div class="control"><h4>Surroundings</h4><div class="where">Inspector · Surroundings</div><p>Waters (array of <code>PixelWater</code>), Builder Meshes (array of <code>PixelBuilderMesh</code>).</p></div>
+</div>
+
+<!-- ===================================================== STORAGE -->
+<h2 id="storage">Storage, baking &amp; exporting</h2>
+<input class="filter-box" data-target="#storage-ref" placeholder="Filter Storage fields…">
+<div id="storage-ref">
+  <div class="control"><h4>Storage Mode</h4><div class="where">Settings · Storage · Inspector › Advanced › Storage</div>
+    <p><b>Resource</b> (default) = all chunks live in the data resource (the <code>.res</code> next to the scene). <b>Baked</b> / <b>Runtime</b> = one file per chunk in Data Directory, written on scene save (only changed chunks); <b>Baked</b> also stores meshes for fast loading.</p><dl><dt>Values</dt><dd>Resource, Baked, Runtime</dd></dl></div>
+  <div class="control"><h4>Bake Grass</h4><div class="where">Settings · Storage (Baked)</div><p>Also store the grass multimeshes in the baked files.</p></div>
+  <div class="control"><h4>Bake Collision</h4><div class="where">Settings · Storage (Baked)</div><p>Also store the collision faces.</p></div>
+  <div class="control"><h4>Data Directory</h4><div class="where">Settings · Storage (Baked / Runtime)</div><p>Folder for the per-chunk files. Empty (shows "(generated on save)") = a folder generated next to the scene on save. Press <kbd>Enter</kbd> to apply what you type.</p></div>
+  <div class="control"><h4>Save Data</h4><div class="where">Settings · Storage (Baked / Runtime) · Inspector: Save Terrain Data</div><p>"Save" writes the terrain data now (changed chunks only).</p></div>
+  <div class="control"><h4>Import MST</h4><div class="where">Settings · Storage · Inspector: Import MST Data</div>
+    <p>"Import..." reads the data of the <b>original</b> MarchingSquaresTerrain addon (the non-Rust version). The file dialog is filtered to <code>*.tscn</code> (an original scene — reads grid settings + its data_directory) or <code>*.res</code> (MSTChunkData / metadata.res). You can also pick its data folder with <span class="ui">Select This Folder</span>.</p>
+    <figure class="shot"><img src="media/06-chunks-settings/60-import-mst-dialog.png" alt="An 'Open a File or Directory' dialog showing project folders, with the filter dropdown set to All Recognized (*.tscn, *.res) and Cancel / Select This Folder buttons."><figcaption>The Import MST dialog, filtered to <code>*.tscn</code> and <code>*.res</code>. Pick the original scene, its data folder, or a <code>metadata.res</code>.</figcaption></figure></div>
+  <div class="control"><h4>Bake Meshes</h4><div class="where">Settings · Storage · Inspector: Bake Static Meshes</div>
+    <p>"Bake" creates a sibling <code>Node3D</code> named <code>&lt;Terrain&gt;Baked</code> with one <code>MeshInstance3D</code> per chunk (<code>Chunk_x_y</code>). Each has a <code>StaticBody3D</code> → <code>CollisionShape3D</code> (when collision is on) and a <code>Grass</code> <code>MultiMeshInstance3D</code> where grass exists. It's a frozen static copy you can keep or export. Undoable ("Bake terrain static meshes"). With no <b>Bake Parent</b> set it warns "no Bake Parent assigned; the baked meshes are placed beside the terrain."</p>
+    <figure class="shot"><img src="media/06-chunks-settings/61-bake-meshes-result.png" alt="Scene dock after baking: Island contains MarchingSquaresTerrain and a new MarchingSquaresTerrainBaked node with Chunk_0_0, Chunk_0_1, Chunk_0_2 children, each holding Body, Shape and Grass."><figcaption>After Bake: <code>MarchingSquaresTerrainBaked</code> → <code>Chunk_x_y</code> → Body / Shape / Grass.</figcaption></figure></div>
+  <div class="control"><h4>Export GLB</h4><div class="where">Settings · Storage · Inspector: Tools › Export GLB</div>
+    <p>"Export" runs the geometry baker: bakes a texture atlas, then writes every chunk to the <b>Export Path</b> as a <code>.glb</code> model. A progress row appears in the strip; the editor pauses a few seconds to write the file. For scale: the 9-chunk tutorial island exports as a GLB of about 7 MB.</p>
+    <figure class="shot"><img src="media/06-chunks-settings/62-export-glb-progress.png" alt="A progress row reading 78% with the text 'Baking; the editor will pause to write the file' and a Cancel button."><figcaption>The export progress row with its Cancel button.</figcaption></figure></div>
+</div>
+
+<div class="callout warn"><span class="label">Watch out — Export GLB crash risk</span><p>With the <b>Compatibility</b> renderer <i>and</i> multi-threaded import on, exporting a GLB with two or more textures <b>into the project folder</b> can crash the editor when Godot re-imports it — and again on every start until the file is removed. The addon shows an <span class="ui">Export Anyway / Cancel</span> confirmation in that case. Safer options: export <b>outside the project</b> (or to a folder containing a <code>.gdignore</code> file), turn off <b>Project Settings → Editor → Import → Use Multiple Threads</b>, or switch the renderer to Forward+ / Mobile. This project ships with the Compatibility renderer, so the guard can appear here.</p></div>
+
+<h3 id="on-disk">Where your terrain lives on disk</h3>
+<table class="ref">
+  <thead><tr><th>Mode</th><th>What's on disk</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Resource (default)</td><td>All chunk data inside one <code>MarchingSquaresTerrainData</code> resource — a <code>.res</code> file shown in the <span class="ui">Contents</span> field. It sits next to the scene, sometimes in a sibling <code>data/</code> folder. Saving the scene saves it.</td><td><code>02_island</code> → <code>res://tutorial/data/02_island.res</code><br><code>hex_island</code> → <code>res://demo/hex_island_data.res</code></td></tr>
+    <tr><td>Baked</td><td>One file per chunk in <span class="ui">Data Directory</span>, plus stored meshes (optionally grass / collision) for fast loading. Only changed chunks are rewritten on save.</td><td>Data Directory, or a folder generated next to the scene</td></tr>
+    <tr><td>Runtime</td><td>One file per chunk in Data Directory — data only, no meshes.</td><td>Same as Baked</td></tr>
+  </tbody>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox saves terrain inside the place file automatically. Here the terrain data is a separate <b>resource file</b> (<code>.res</code>) next to your scene — or per-chunk files in a folder. Press <kbd>Ctrl</kbd>+<kbd>S</kbd> to save the scene and its data together. If you copy a scene to another project, bring its <code>.res</code> too.</p></div>
+
+<!-- ===================================================== LOCKS -->
+<h2 id="locks">Settings that lock on purpose</h2>
+<p>These are <b>by design</b>, not bugs — changing them would scramble data that already exists.</p>
+<table class="ref">
+  <thead><tr><th>Setting</th><th>Locks when</th><th>How to change it</th></tr></thead>
+  <tbody>
+    <tr><td>Chunk Size</td><td>Chunks exist for the current grid type. The change is ignored with the warning "chunk_size is fixed once chunks exist …".</td><td>Set it on an empty terrain, or clear the data / switch grid type first.</td></tr>
+    <tr><td>Ring Radius</td><td>Hex-ring chunks exist (field greyed).</td><td>Remove every chunk, then change it.</td></tr>
+    <tr><td>Wrap Chunks</td><td>Hex-ring chunks exist (field greyed).</td><td>Remove every chunk, then change it.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip"><span class="label">Roblox UI toggle</span><p>The <span class="ui">Roblox UI</span> switch at the top of the 3D view changes the <b>Builder</b> to a Studio-style ribbon. It does <b>not</b> change the Chunks or Settings strips — they look the same either way. See <a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a>.</p></div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<div class="tabs">
+  <div class="panel" data-tab="Bigger island">
+    <ol class="steps" data-id="chunks-recipe-grow">
+      <li>Select the terrain, press <kbd>8</kbd>.</li>
+      <li>Click green <b>+</b> markers around the edge — each adds one chunk. New chunks must touch an existing one.</li>
+      <li>Sculpt the new flat ground (<a href="03-terrain-sculpting.html">Sculpting terrain</a>) and paint it (<a href="04-terrain-painting.html">Painting</a>).</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Generated hills">
+    <ol class="steps" data-id="chunks-recipe-noise">
+      <li>Press <kbd>9</kbd> → <span class="ui">New Chunks</span>.</li>
+      <li>Set <span class="ui">Noise Amp</span> (e.g. above 0), adjust <span class="ui">Noise Freq</span>, try different <span class="ui">Noise Seed</span> values.</li>
+      <li>Press <kbd>8</kbd> and add chunks — each arrives pre-shaped. Not happy? <kbd>Ctrl</kbd>+<kbd>Z</kbd>, change the seed, add again.</li>
+      <li>Set Noise Amp back to 0 when you want flat chunks again.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Change chunk size">
+    <ol class="steps" data-id="chunks-recipe-size">
+      <li>Chunk Size only works on an <b>empty</b> terrain. Start a new terrain (or remove every chunk).</li>
+      <li>Press <kbd>9</kbd> → Grid → set <span class="ui">Chunk Size</span> (2–64).</li>
+      <li>Press <kbd>8</kbd>; with zero chunks the cell under your mouse shows the first <b>+</b>. Click to place it.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Freeze to meshes">
+    <ol class="steps" data-id="chunks-recipe-bake">
+      <li>Press <kbd>9</kbd> → <span class="ui">Storage</span> → <span class="ui">Bake</span>.</li>
+      <li>A <code>MarchingSquaresTerrainBaked</code> node appears with one <code>Chunk_x_y</code> mesh per chunk.</li>
+      <li>Optional: set <span class="ui">Bake Parent</span> in Inspector → Tools to choose where it goes. Undo removes it.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Export as a model">
+    <ol class="steps" data-id="chunks-recipe-export">
+      <li>Inspector → <b>Tools</b> → set <span class="ui">Export Path</span> to a <code>.glb</code> <b>outside the project</b>.</li>
+      <li>Settings → Storage → <span class="ui">Export</span>. Watch the progress row; the editor pauses briefly.</li>
+      <li>Use the GLB in Blender or another engine — or re-import it (see <a href="11-importing-models.html">Importing models</a>).</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Debug a seam">
+    <ol class="steps" data-id="chunks-recipe-debug">
+      <li>Press <kbd>9</kbd> → Display → <span class="ui">Debug View</span> → <b>Chunk Borders</b> (or tick <span class="ui">Chunk Lines</span>).</li>
+      <li>See exactly where each chunk ends. Try <b>Slope</b> or <b>Height Contours</b> to read the shape.</li>
+      <li>Set Debug View back to <b>Off</b>.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You wanted to select a chunk, clicked it, and it vanished. What happened, and what should you do?</summary><p>A plain left-click on a chunk <b>removes</b> it. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> to bring it back, then hold <kbd>Ctrl</kbd> while clicking to select.</p></details>
+<details class="check"><summary>You change Chunk Size from 32 to 16 on the island and nothing happens. Why?</summary><p>Chunk Size is fixed once chunks exist (by design). Set it on an empty terrain, or clear the data / switch grid type first.</p></details>
+<details class="check"><summary>How do you make every new chunk arrive with hills, like Roblox's Generate?</summary><p>Settings (<kbd>9</kbd>) → <span class="ui">New Chunks</span> → raise <span class="ui">Noise Amp</span> above 0 (and tune Freq / Seed, or set a Noise Hmap). Then add chunks.</p></details>
+<details class="check"><summary>In Resource mode, where is the island's terrain data saved?</summary><p>In the <code>MarchingSquaresTerrainData</code> resource shown in <span class="ui">Contents</span> — for <code>02_island</code>, <code>res://tutorial/data/02_island.res</code>. Saving the scene saves it.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="02-first-world.html">Your first world (quick start)</a> — the terrain basics this page builds on.</li>
+  <li><a href="03-terrain-sculpting.html">Sculpting terrain</a> — shape the chunks you add.</li>
+  <li><a href="04-terrain-painting.html">Painting, textures &amp; tint</a> — the Floor / Wall slots and Tex Assign.</li>
+  <li><a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a> — grass slots and scatter settings.</li>
+  <li><a href="07-pixelizer.html">The pixelizer</a> — the renderer behind Pixel Size.</li>
+  <li><a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a> — erosion and other effects.</li>
+  <li><a href="11-importing-models.html">Importing models</a> — bring an exported GLB back in.</li>
+  <li><a href="13-playtest-export.html">Playtesting &amp; exporting</a>.</li>
+  <li><a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

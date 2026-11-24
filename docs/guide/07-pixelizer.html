@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Pixelizer – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+  .swatch-key { display: inline-block; width: .9em; height: .9em; border-radius: 2px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
+  .lut img { image-rendering: pixelated; width: 100%; height: 48px; object-fit: fill; }
+  .surface-map { counter-reset: s; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>The pixelizer</h1>
+<p class="lede">Turn your smooth 3D island into crisp, outlined, limited-palette pixel art — and learn every button, tab and slider that controls the look.</p>
+<div class="meta-row"><span class="pill">⏱ 35 min</span><span class="pill">Beginner</span><span class="pill">Scene: tutorial/03_pixel_look.tscn</span></div>
+
+<figure class="shot"><img src="media/07-pixelizer/02-preview-on.png" alt="The tutorial island seen through the pixel renderer: a green hill with chunky pixel edges, dithered grass patches and yellow flower tufts against a muted lavender sky, with the Renderer strip below and the Pixel World panel on the right."><figcaption>The same 3D scene, drawn by the pixelizer: big "art pixels", a dark outline along the hill and a muted colour palette.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>What the pixelizer is, and the three places in the editor where you control it.</li>
+  <li>How to switch <span class="ui">Pixel Preview</span> and <span class="ui">Animate</span> on and off — and why the tutorial scene starts with Pixel Preview already on.</li>
+  <li>Every setting of the <code>PixelRenderer</code>: <a href="#ref-renderer">Renderer</a>, <a href="#ref-outlines">Outlines</a>, <a href="#ref-color">Color / Palette</a>, <a href="#ref-godrays">God Rays</a>, <a href="#ref-debug">Debug Views</a>.</li>
+  <li>Per-prop overrides with <a href="#ref-object">Pixel Object</a>, plus the terrain's <a href="#ref-gridfog">Grid / Fog</a> overlays.</li>
+  <li>The <a href="#panel">Pixel World panel</a>: adding effects, Lighting Presets and <span class="ui">Wire Sun / Env Refs</span>.</li>
+  <li><a href="#palette">Palettes and baking a palette LUT</a>, and the project-wide <a href="#features">feature switches</a>.</li>
+</ul>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox Studio always draws your Parts the same smooth way; you change the mood with <b>Lighting</b> and <b>Post-processing</b> objects. The pixelizer is a bit like a giant post-processing effect that redraws the whole camera view as retro pixel art. It never changes your models — switch it off and everything is exactly as you built it.</p></div>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in your scene — like an Instance in Roblox. A light, a camera, the terrain and the pixel renderer are all nodes.</dd>
+  <dt><b>Scene tree</b></dt><dd>The panel at the top-left listing every node, like Roblox's <b>Explorer</b>.</dd>
+  <dt><b>Dock</b></dt><dd>A panel docked around the edge of the editor, such as FileSystem or History (bottom-left).</dd>
+  <dt><b>Inspector</b></dt><dd>The panel on the right showing every property of the selected node, like Roblox's <b>Properties</b> window.</dd>
+  <dt><b>Resource</b></dt><dd>A reusable bundle of data saved as its own file (e.g. a palette). Think of it like a Roblox asset you can plug into several objects.</dd>
+  <dt><b>3D view / viewport</b></dt><dd>The big picture of your world in the middle of the editor.</dd>
+  <dt><b><code>.tscn</code> / <code>res://</code></b></dt><dd>A <code>.tscn</code> file is a saved scene (like a Roblox place file). <code>res://</code> means "the project folder".</dd>
+</dl>
+<p>New to the editor layout? <a href="01-godot-for-roblox.html">Godot for Roblox users</a> tours it, and the <a href="14-shortcuts-glossary.html">glossary</a> has every term.</p>
+
+<h2 id="big-picture">The big picture: three editor surfaces</h2>
+<p>The pixelizer is driven by a <code>PixelRenderer</code> node. A family of other <code>Pixel*</code> nodes add the sky, weather, water and effects. You control them from three places, all only visible while the <b>3D</b> tab (top centre) is open:</p>
+<ol>
+  <li><b>The 3D-view menu bar</b> — a strip at the top of the viewport with <span class="ui">Pixel Preview</span>, <span class="ui">Animate</span>, <span class="ui">Pixel World</span> and <span class="ui">Roblox UI</span>. Always visible.</li>
+  <li><b>The left icon toolbar + the bottom strip</b> — appear only while a <code>Pixel*</code> node (or the terrain, for Grid / Fog) is selected. One icon per node <i>family</i>; the strip shows that family's settings, split into tabs.</li>
+  <li><b>The Pixel World panel</b> on the right — a list of every pixel-node family with <span class="ui">Select</span> / <span class="ui">+ Add</span> buttons, Lighting Presets and <span class="ui">Wire Sun / Env Refs</span>.</li>
+</ol>
+<p>Click the numbered dots to tour the workspace:</p>
+<div class="hotspots"><img src="media/07-pixelizer/03-workspace-overview.png" alt="The full Godot editor with the pixel workspace open: red boxes mark 1 the menu bar above the viewport, 2 the narrow left icon toolbar, 3 the Renderer strip at the bottom of the viewport, and 4 the Pixel World panel on the right of the viewport. PixelRenderer is selected in the Scene tree.">
+  <button class="spot" style="left:31%;top:15%" data-title="1 · Menu bar" data-text="Pixel Preview, Animate, Pixel World and Roblox UI. Always visible in the 3D view, even with nothing selected. The Mesh menu just to their left belongs to the Builder (page 10), not the pixelizer.">1</button>
+  <button class="spot" style="left:19%;top:44%" data-title="2 · Left toolbar" data-text="One icon per pixel-node family (Renderer, Sky &amp; Clouds, Day / Night …). A dim icon means that family has no node in the scene yet.">2</button>
+  <button class="spot" style="left:44%;top:60%" data-title="3 · Bottom strip" data-text="The selected family's settings, split into tabs across the top of the strip. This is where you do most of your tweaking.">3</button>
+  <button class="spot" style="left:74%;top:44%" data-title="4 · Pixel World panel" data-text="Add effects, apply a lighting preset, wire sun / environment references.">4</button>
+</div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The left toolbar is like the tool groups on Studio's ribbon; the bottom strip is like the <b>Properties</b> panel but showing only the most useful settings; and the Pixel World panel is like <b>Explorer → Insert Object</b>, filtered to pixel effects.</p></div>
+
+<p>The tutorial scene <code>res://tutorial/03_pixel_look.tscn</code> contains: <code>PixelShowcase</code> (the root) → <code>WorldEnvironment</code>, <code>Sun</code> (a directional light), <code>MarchingSquaresTerrain</code>, <code>BuilderRuin</code> (a <b>PixelObject</b>) with its child <code>Ruin</code>, <code>Camera</code>, <code>PixelRenderer</code> (pixel size 2, palette on), <code>PixelSky</code> and <code>PixelDayNight</code>. It has no weather, water or other effects, so those rows show <span class="ui">+ Add</span> and their toolbar icons are dimmed.</p>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Guided tutorial: your first pixel look</h2>
+<p>About 15 minutes. You'll flip the look on and off, make the pixels chunkier, play with outlines and the palette, add god rays, then undo it all.</p>
+
+<ol class="steps" data-id="pixelizer-first-look">
+  <li><b>Open the scene.</b> In the FileSystem dock (bottom-left) open <code>tutorial</code> and double-click <code>03_pixel_look.tscn</code>. Make sure the <b>3D</b> tab at the top is active. The view already looks pixelated — that's expected (see the warning below).</li>
+  <li><b>Find the menu bar.</b> At the top of the viewport, on the row just below <span class="ui">Transform</span> / <span class="ui">View</span>, find <span class="ui">Pixel Preview · Animate · Pixel World · Roblox UI</span>.
+    <figure class="shot"><img src="media/07-pixelizer/01-menu-bar.png" alt="The pixel menu bar: a blue monitor icon with 'Pixel Preview', then 'Animate', 'Pixel World', and a toggle switch labelled 'Roblox UI'."><figcaption>The 3D-view pixel menu bar.</figcaption></figure></li>
+  <li><b>Toggle Pixel Preview.</b> Click <span class="ui">Pixel Preview</span> once: you see the raw, smooth scene with the editor grid and coloured axes. Click again to return to the pixel look (the clip in the <a href="#menu-bar">menu-bar reference</a> shows both clicks). Drag the divider below to compare.
+    <div class="compare" data-before="Preview off" data-after="Preview on"><img src="media/07-pixelizer/02-preview-off.png" alt="Pixel Preview off: smooth green hill, bright blue sky, grey editor grid lines and red/blue axis lines."><img src="media/07-pixelizer/02-preview-on.png" alt="Pixel Preview on: the same hill drawn with chunky pixels, a dark outline, muted lavender sky, grid and axes hidden."></div></li>
+  <li><b>Select the renderer.</b> In the Scene tree click <code>PixelRenderer</code>. The left toolbar, the bottom strip and the Pixel World panel appear. The strip opens on the <span class="ui">Renderer</span> tab.</li>
+  <li><b>Make the pixels chunkier.</b> On the Renderer tab, drag <span class="ui">Pixel Size</span> to the right (or click it and type a number). Use the slider below to preview values 1 → 12.</li>
+  <li><b>Try outlines.</b> Click the <span class="ui">Outlines</span> tab and untick <span class="ui">Outlines</span>, then tick it again. Change <span class="ui">Darken</span> to see the edge get darker.</li>
+  <li><b>Try the palette.</b> Click <span class="ui">Color / Palette</span>, untick <span class="ui">Use Palette</span>: the sky turns bright blue and the greens go smooth. Tick it again.</li>
+  <li><b>Add god rays.</b> Click the <span class="ui">Rays</span> tab, tick <span class="ui">God Rays</span>, and raise <span class="ui">Ray Alpha</span>. Teal light shafts fall from the sun.</li>
+  <li><b>Undo everything.</b> Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> repeatedly. Each change you made is one step in <b>History</b> (next to FileSystem, bottom-left).</li>
+</ol>
+
+<div class="callout warn"><span class="label">Watch out</span><p><b>Pixel Preview is ON the moment this scene opens.</b> The scene's <code>PixelRenderer</code> has <code>studio_prelook</code> turned on, so the first click on <span class="ui">Pixel Preview</span> turns it <i>off</i> and reveals the raw smooth scene. That surprises everyone the first time.</p></div>
+
+<!-- ===================================================== MENU BAR -->
+<h2 id="menu-bar">Reference: the 3D-view menu bar</h2>
+<p>These four controls are always in the 3D view's top strip, even with nothing selected.</p>
+
+<input class="filter-box" data-target="#menu-ref" placeholder="Filter menu-bar controls…">
+<div id="menu-ref">
+  <div class="control"><h4>Pixel Preview</h4><div class="where">3D-view menu bar · toggle button (icon + text)</div>
+    <p>Shows the <b>editor</b> viewport through the pixel renderer — the scene's <code>PixelRenderer</code>, or a default one if the scene has none. While it is on, the editor grid and origin axes are hidden; the move / rotate / scale gizmo and node gizmos still draw on top so you can keep editing.</p>
+    <dl><dt>Default</dt><dd>Off, but <b>on</b> in <code>03_pixel_look.tscn</code> because its renderer has <code>studio_prelook = true</code></dd><dt>Tooltip</dt><dd>"Show the editor viewport through the pixel renderer (the scene's PixelRenderer, or a default one)."</dd></dl></div>
+  <div class="control"><h4>Animate</h4><div class="where">3D-view menu bar · toggle button</div>
+    <p>Runs the effects <b>inside the editor</b>: clouds drift, water waves, grass sways, birds fly, weather and fire move. Off = everything holds still and the editor only redraws when something changes, which is much lighter on your computer. A running game always animates regardless.</p>
+    <dl><dt>Saved in</dt><dd>Editor Settings → <code>marching_squares_terrain/animate_effects_in_editor</code> (your editor, not the project)</dd><dt>Use when</dt><dd>You want to see motion, or a sky / day-night change looks stale</dd></dl></div>
+  <div class="control"><h4>Pixel World (menu)</h4><div class="where">3D-view menu bar · dropdown menu</div>
+    <p>A menu that mirrors the right panel's actions: <b>Add</b> (every pixel-node family with its icon; one-per-scene families grey out once present), <b>Lighting Preset</b> (Dawn / Noon / Dusk / Night / Storm / Snow), <b>Wire Sun / Env Refs</b>, and <b>Project → Features</b> (the feature check-list).</p>
+    <dl><dt>Tooltip</dt><dd>"Add pixel effects to the edited scene (sun / environment / camera refs are wired), apply a lighting preset."</dd></dl></div>
+  <div class="control"><h4>Roblox UI</h4><div class="where">3D-view menu bar · toggle switch</div>
+    <p>Switches the Builder's modelling tools to a Roblox Studio–style ribbon with Roblox handles and shortcuts. It sits here but belongs to the Builder — see <a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a> and <a href="10-builder-modeller.html">Modelling</a>.</p></div>
+</div>
+
+<figure class="clip"><video src="media/07-pixelizer/42-pixel-preview-toggle.mp4" poster="media/07-pixelizer/42-pixel-preview-toggle.png" data-autoplay></video><figcaption><span class="ui">Pixel Preview</span> clicked off, then on again: off shows the raw smooth scene with the editor grid and the coloured origin axes; on brings back the pixel look and hides the grid.</figcaption></figure>
+
+<div class="callout warn"><span class="label">Not pictured</span><p>There is no picture of the <span class="ui">Pixel World</span> dropdown itself. Its contents are listed above; the right-hand <a href="#panel">Pixel World panel</a> offers the same actions and is fully pictured.</p></div>
+
+<h3 id="animate">Animate in action</h3>
+<figure class="clip"><video src="media/07-pixelizer/40-animate.mp4" poster="media/07-pixelizer/40-animate.png" data-autoplay></video><figcaption>Animate on: cloud shadows drift across the pixel hill and the grass sways.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>Leave <span class="ui">Animate</span> off while sculpting or building on a slower computer — the editor stays much smoother. Turn it on only when you want to judge motion. With it off, the Sky and Day / Night look can lag behind a change until something redraws; turn Animate on or nudge any value to refresh. Your settings are always saved correctly — only the preview image lags.</p></div>
+
+<!-- ===================================================== EDITING MODEL -->
+<h2 id="editing">How every strip field works</h2>
+<p>Every section uses the same few field types, so learn them once:</p>
+<ul>
+  <li><b>Spin-slider</b> (numbers): drag left / right to change, or click and type. One whole drag (grab → release) is <b>one</b> undo step. Decimal fields have a step size; whole-number fields step by 1; some are "or greater", meaning you can type past the slider's maximum.</li>
+  <li><b>Checkbox</b> for on/off, <b>dropdown</b> for choices, <b>colour button</b> that opens a colour picker.</li>
+  <li>Hover any field for a tooltip: its label, the real property name (<code>Class.property</code>) and its range.</li>
+  <li>Each change lands in <b>History</b> as <code>Set &lt;Section&gt; &lt;Field&gt;</code> — e.g. "Set Renderer Pixel Size". Undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>.</li>
+  <li>The strip refreshes itself if the value is changed elsewhere (the Inspector, or an undo).</li>
+</ul>
+<figure class="clip"><video src="media/07-pixelizer/60-undo-edit.mp4" poster="media/07-pixelizer/60-undo-edit.png" data-autoplay></video><figcaption>On the Outlines tab, <span class="ui">Outlines</span> is unticked, then one <kbd>Ctrl</kbd>+<kbd>Z</kbd> ticks it again. In the History dock that change is listed as "Set Outlines Outlines".</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same habit as Studio: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change. The difference is that the whole drag of a slider counts as one step, not every tiny tick along the way.</p></div>
+
+<!-- ===================================================== RENDERER STRIP TOUR -->
+<h2 id="strip">The renderer strip and its tabs</h2>
+<p>Select <code>PixelRenderer</code> (Scene tree, or <span class="ui">Renderer → Select</span> in the Pixel World panel). The strip's tabs are: <span class="ui">Renderer · Outlines · Color / Palette · Rays · Sun · Sheets · Clouds · Depth Fade · Debug Views</span>. Rays, Sun, Sheets, Clouds and Depth Fade are the five pages of the God Rays section.</p>
+<div class="hotspots"><img src="media/07-pixelizer/10-strip-renderer.png" alt="The Renderer strip: a title 'Renderer', a row of tabs (Renderer, Outlines, Color / Palette, Rays, Sun, Sheets, Clouds, Depth Fade, Debug Views), then fields Enabled, Mode Anchor, Pixel Size 2, Fixed Height 0, Texel Snap, Sub-texel Scroll, Crisp Edges, Depth Range 200 and Obj. Pixel 1.">
+  <button class="spot" style="left:9%;top:13%" data-title="Section title" data-text="The node family you're editing — here the Renderer.">1</button>
+  <button class="spot" style="left:46%;top:34%" data-title="Tabs" data-text="Click to switch pages of the section: Renderer, Outlines, Color / Palette, the five God Rays pages, and Debug Views.">2</button>
+  <button class="spot" style="left:16%;top:48%" data-title="Checkbox" data-text="Enabled is the master switch for the whole pixel renderer.">3</button>
+  <button class="spot" style="left:47%;top:48%" data-title="Dropdown" data-text="Mode: Anchor (full pipeline) or Low Res (colour only, cheaper).">4</button>
+  <button class="spot" style="left:68%;top:48%" data-title="Spin-slider" data-text="Pixel Size: drag or click to type. The headline knob.">5</button>
+</div>
+<p>The left toolbar icon for a family is dimmed when no node of that family is in the scene; its tooltip tells you why (for example "no PixelWeather in the scene yet. Open it and press Add." or that it "needs a MarchingSquaresTerrain").</p>
+
+<!-- ===================================================== RENDERER -->
+<h2 id="ref-renderer">Reference: Renderer tab</h2>
+<p>The core of the look: how big the art pixels are and how the low-resolution image is built.</p>
+
+<div class="scrubber" data-label="Pixel Size" data-start="1"
+  data-frames='[{"v":"1","src":"media/07-pixelizer/20-pixelsize-1.png","note":"1: close to full resolution — fine detail, tiny steps on the hill edge."},{"v":"2","src":"media/07-pixelizer/20-pixelsize-2.png","note":"2: the tutorial default. Clearly pixel art, still detailed."},{"v":"4","src":"media/07-pixelizer/20-pixelsize-4.png","note":"4: chunky, classic handheld look; the outline becomes a staircase."},{"v":"8","src":"media/07-pixelizer/20-pixelsize-8.png","note":"8: very blocky; small details like flower tufts start to merge."},{"v":"12","src":"media/07-pixelizer/20-pixelsize-12.png","note":"12: big mosaic blocks; only large shapes survive."}]'></div>
+
+<figure class="clip"><video src="media/07-pixelizer/41-pixelsize-drag.mp4" poster="media/07-pixelizer/41-pixelsize-drag.png" data-autoplay></video><figcaption>Scrubbing <span class="ui">Pixel Size</span> on the Renderer tab from 1 up to 12 and back down to 2. The view gets chunkier as the number rises; hovering the field shows its tooltip (<code>PixelRenderer.pixel_size</code>).</figcaption></figure>
+
+<input class="filter-box" data-target="#renderer-ref" placeholder="Filter Renderer fields…">
+<div id="renderer-ref">
+  <div class="control"><h4>Enabled</h4><div class="where">Renderer tab · checkbox · <code>active</code></div><p>Master switch for the whole pixel renderer. Off = the scene renders normally.</p></div>
+  <div class="control"><h4>Mode</h4><div class="where">Renderer tab · dropdown · <code>mode</code></div><p><b>Anchor</b> runs the full pipeline (depth / normal outlines, palette, god rays). <b>Low Res</b> is colour only — cheaper, but no outline or normal pass.</p><dl><dt>Options</dt><dd>Anchor · Low Res</dd><dt>Default</dt><dd>Anchor</dd></dl></div>
+  <div class="control"><h4>Pixel Size</h4><div class="where">Renderer tab · whole number · <code>pixel_size</code></div><p>How many screen pixels make one "art pixel". 1 ≈ full resolution; higher = chunkier. The headline knob.</p><dl><dt>Range</dt><dd>1 – 16, or type higher</dd><dt>Default</dt><dd>2</dd></dl></div>
+  <div class="control"><h4>Fixed Height</h4><div class="where">Renderer tab · whole number · <code>fixed_height</code></div><p>Locks the internal render height to this many pixels (like always rendering at, say, 240 lines tall). 0 = work it out from Pixel Size.</p><dl><dt>Range</dt><dd>0 – 1080</dd><dt>Default</dt><dd>0</dd></dl></div>
+  <div class="control"><h4>Texel Snap</h4><div class="where">Renderer tab · checkbox · <code>texel_snap</code></div><p>Snaps the image to the pixel grid so it doesn't shimmer when the camera moves.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Sub-texel Scroll</h4><div class="where">Renderer tab · checkbox · <code>subtexel_scroll</code></div><p>Scrolls smoothly within a pixel so slow camera pans don't look steppy.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Crisp Edges</h4><div class="where">Renderer tab · checkbox · <code>crisp_edges</code></div><p>Keeps hard pixel edges when the small image is scaled up (no smoothing).</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Depth Range</h4><div class="where">Renderer tab · decimal · <code>depth_range</code></div><p>The depth window used for outline detection and depth precision.</p><dl><dt>Range</dt><dd>1 – 4000</dd><dt>Default</dt><dd>200</dd></dl></div>
+  <div class="control"><h4>Obj. Pixel</h4><div class="where">Renderer tab · whole number · <code>object_pixel_size</code></div><p>The default pixel size for <a href="#ref-object">Pixel Object</a> props whose own Pixel Size is set to Inherit (−1).</p><dl><dt>Range</dt><dd>1 – 16, or type higher</dd><dt>Default</dt><dd>1</dd></dl></div>
+</div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>There's no Roblox equivalent of Pixel Size — the closest habit is lowering the graphics quality slider, except here the "low quality" is the deliberate art style and stays crisp.</p></div>
+
+<!-- ===================================================== OUTLINES -->
+<h2 id="ref-outlines">Reference: Outlines tab</h2>
+<p>The renderer detects edges from depth (how far away things are) and normals (which way surfaces face), then draws dark silhouettes and crease highlights.</p>
+<figure class="shot"><img src="media/07-pixelizer/11-strip-outlines.png" alt="The Outlines tab: Outlines and Background ticked, Depth Thr. 0.35, Normal Thr. 0.5, Darken 0.55, Highlight 0.22, Wide Ids ticked, Id Edges ticked, Obj. Outline ticked, Fold Limit 4.0, Ledge Walls ticked, Auto Id From 1, Auto Focus unticked."><figcaption>The Outlines tab with its default values.</figcaption></figure>
+
+<div class="pair">
+  <div>
+    <p><b>Outlines off vs on</b></p>
+    <div class="compare" data-before="Off" data-after="On"><img src="media/07-pixelizer/21-outlines-off.png" alt="Pixel hill with no outline along its edge."><img src="media/07-pixelizer/21-outlines-on.png" alt="The same hill with a dark pixel outline tracing its silhouette."></div>
+  </div>
+  <div>
+    <p><b>Darken 0 → 1</b></p>
+    <div class="scrubber" data-label="Darken" data-start="2"
+      data-frames='[{"v":"0.0","src":"media/07-pixelizer/22-darken-0.0.png","note":"0: the outline is invisible."},{"v":"0.3","src":"media/07-pixelizer/22-darken-0.3.png","note":"0.3: a soft darker green edge."},{"v":"0.6","src":"media/07-pixelizer/22-darken-0.6.png","note":"0.6: close to the default 0.55 — a clear dark line."},{"v":"1.0","src":"media/07-pixelizer/22-darken-1.0.png","note":"1: solid black outline."}]'></div>
+  </div>
+</div>
+
+<figure class="clip"><video src="media/07-pixelizer/43-outlines-darken.mp4" poster="media/07-pixelizer/43-outlines-darken.png" data-autoplay></video><figcaption>On the <span class="ui">Outlines</span> tab, <span class="ui">Darken</span> scrubbed from 0 to 1: the edges along the hill and plants go from invisible to a heavy dark line.</figcaption></figure>
+
+<input class="filter-box" data-target="#outline-ref" placeholder="Filter Outlines fields…">
+<div id="outline-ref">
+  <div class="control"><h4>Outlines</h4><div class="where">Outlines tab · checkbox · <code>outlines</code></div><p>Master outline switch.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Background</h4><div class="where">Outlines tab · checkbox · <code>outline_background</code></div><p>Also outline shapes against the sky / background.</p><dl><dt>In this scene</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Depth Thr.</h4><div class="where">Outlines tab · decimal · <code>depth_threshold</code></div><p>How big a jump in distance counts as an edge (silhouettes). Lower = more outlines.</p><dl><dt>Range</dt><dd>0.0105 – 10</dd><dt>Default</dt><dd>0.35</dd></dl></div>
+  <div class="control"><h4>Normal Thr.</h4><div class="where">Outlines tab · decimal · <code>normal_threshold</code></div><p>How sharp a change in surface angle counts as a crease edge.</p><dl><dt>Range</dt><dd>0 – 2</dd><dt>Default</dt><dd>0.5</dd></dl></div>
+  <div class="control"><h4>Darken</h4><div class="where">Outlines tab · decimal · <code>outline_darken</code></div><p>How dark the outline is: 0 = invisible, 1 = black. The strength knob.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.55</dd></dl></div>
+  <div class="control"><h4>Highlight</h4><div class="where">Outlines tab · decimal · <code>highlight</code></div><p>A bright highlight on the lit side of a crease.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.22</dd></dl></div>
+  <div class="control"><h4>Wide Ids</h4><div class="where">Outlines tab · checkbox · <code>extended_ids</code></div><p>Uses the extended range of outline ids (more distinct ids available).</p></div>
+  <div class="control"><h4>Id Edges</h4><div class="where">Outlines tab · checkbox · <code>id_edges</code></div><p>Draws edges where two objects with different outline ids meet. Needs the id pass (the <a href="#features">Outline Ids</a> feature).</p></div>
+  <div class="control"><h4>Obj. Outline</h4><div class="where">Outlines tab · checkbox · <code>object_outline</code></div><p>Draws outlines around <a href="#ref-object">Pixel Object</a> props.</p></div>
+  <div class="control"><h4>Fold Limit</h4><div class="where">Outlines tab · decimal · <code>fold_limit</code></div><p>Suppresses false creases on gentle folds below this amount, so smooth hills don't get scribbled lines.</p><dl><dt>Range</dt><dd>0 – 20</dd><dt>Default</dt><dd>4.0</dd></dl></div>
+  <div class="control"><h4>Ledge Walls</h4><div class="where">Outlines tab · checkbox · <code>ledge_walls</code></div><p>Outlines the terrain's ledge walls (the vertical cliff faces).</p></div>
+  <div class="control"><h4>Auto Id From</h4><div class="where">Outlines tab · whole number · <code>auto_id_first</code></div><p>The first id handed out automatically to objects for id edges.</p><dl><dt>Range</dt><dd>1 – 253</dd><dt>In this scene</dt><dd>1</dd></dl></div>
+  <div class="control"><h4>Auto Focus</h4><div class="where">Outlines tab · checkbox · <code>auto_focus</code></div><p>Automatically picks the focus object for id edges.</p><dl><dt>In this scene</dt><dd>Off</dd></dl></div>
+</div>
+
+<h3 id="outline-colors">PixelOutlineColors (Inspector only)</h3>
+<p><code>PixelOutlineColors</code> is a resource you assign on the renderer in the Inspector to colour outlines per outline id. It has no strip of its own.</p>
+<table class="ref"><tr><th>Property</th><th>What it does</th></tr>
+<tr><td><code>silhouette_colors</code></td><td>A list of colours, one per outline id, for silhouette edges.</td></tr>
+<tr><td><code>edge_colors</code></td><td>A list of colours, one per outline id, for inner edges.</td></tr>
+<tr><td><code>modulate_rows</code></td><td>On/off: tint rows by these colours.</td></tr>
+</table>
+<p>By default everything is neutral, except two ids used for <b>Hover</b> (yellow <span class="swatch-key" style="background:rgb(255,237,89)"></span>) and <b>Select</b> (orange <span class="swatch-key" style="background:rgb(255,140,31)"></span>).</p>
+
+<!-- ===================================================== COLOR / PALETTE -->
+<h2 id="ref-color">Reference: Color / Palette tab</h2>
+<p>Snaps colours to a limited palette, adds ordered dithering (the checkerboard blend retro games use), and grades the colour.</p>
+<figure class="shot"><img src="media/07-pixelizer/12-strip-color-palette.png" alt="The Color / Palette tab: Use Palette ticked, Mix 1.0, Dither ticked, Spread 0.03, Matrix Bayer 4, Saturation 1.05, Contrast 1.0, Brightness 0.0."><figcaption>The Color / Palette tab.</figcaption></figure>
+
+<div class="pair">
+  <div>
+    <p><b>Use Palette off vs on</b></p>
+    <div class="compare" data-before="Palette off" data-after="Palette on"><img src="media/07-pixelizer/23-palette-off.png" alt="Palette off: bright blue sky and smooth, saturated greens."><img src="media/07-pixelizer/23-palette-on.png" alt="Palette on: muted lavender sky and a restricted set of olive greens with dithered patches."></div>
+  </div>
+  <div>
+    <p><b>Mix 0 → 1</b></p>
+    <div class="scrubber" data-label="Mix" data-start="3"
+      data-frames='[{"v":"0.0","src":"media/07-pixelizer/24-mix-0.0.png","note":"0: original colours (same as palette off)."},{"v":"0.33","src":"media/07-pixelizer/24-mix-0.33.png","note":"0.33: the blue sky starts to grey out."},{"v":"0.66","src":"media/07-pixelizer/24-mix-0.66.png","note":"0.66: mostly palette, a hint of the original blue."},{"v":"1.0","src":"media/07-pixelizer/24-mix-1.0.png","note":"1: fully snapped to the palette (the default)."}]'></div>
+  </div>
+</div>
+
+<figure class="clip"><video src="media/07-pixelizer/44-palette-mix.mp4" poster="media/07-pixelizer/44-palette-mix.png" data-autoplay></video><figcaption>On the <span class="ui">Color / Palette</span> tab, <span class="ui">Mix</span> scrubbed from 0 to 1: the raw blue sky and bright greens fade into the muted palette colours.</figcaption></figure>
+
+<input class="filter-box" data-target="#color-ref" placeholder="Filter Color / Palette fields…">
+<div id="color-ref">
+  <div class="control"><h4>Use Palette</h4><div class="where">Color / Palette tab · checkbox · <code>palette_enabled</code></div><p>Snaps every colour to the assigned <a href="#palette">PixelPalette</a>. Off = full colour.</p><dl><dt>In this scene</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Mix</h4><div class="where">Color / Palette tab · decimal · <code>palette_mix</code></div><p>Blends between original colour (0) and palette-snapped colour (1). The palette strength knob.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Dither</h4><div class="where">Color / Palette tab · checkbox · <code>dither_enabled</code></div><p>Ordered (Bayer) dithering between neighbouring palette colours — the fine checker pattern you see in the grass.</p></div>
+  <div class="control"><h4>Spread</h4><div class="where">Color / Palette tab · decimal · <code>dither_spread</code></div><p>How far dithering reaches between two palette colours. Higher = more checker pattern.</p><dl><dt>Range</dt><dd>0 – 0.5</dd><dt>Default</dt><dd>0.03</dd></dl></div>
+  <div class="control"><h4>Matrix</h4><div class="where">Color / Palette tab · dropdown · <code>dither_size</code></div><p>The dither pattern size: a 4×4 or 8×8 grid.</p><dl><dt>Options</dt><dd>Bayer 4 · Bayer 8</dd><dt>Default</dt><dd>Bayer 4</dd></dl></div>
+  <div class="control"><h4>Saturation</h4><div class="where">Color / Palette tab · decimal · <code>saturation</code></div><p>Colour grade: how vivid colours are.</p><dl><dt>Range</dt><dd>0 – 2</dd><dt>Default</dt><dd>1.05 in this scene</dd></dl></div>
+  <div class="control"><h4>Contrast</h4><div class="where">Color / Palette tab · decimal · <code>contrast</code></div><p>Colour grade: contrast.</p><dl><dt>Range</dt><dd>0 – 2</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Brightness</h4><div class="where">Color / Palette tab · decimal · <code>brightness</code></div><p>Colour grade: brightness.</p><dl><dt>Range</dt><dd>−1 – 1</dd><dt>Default</dt><dd>0.0</dd></dl></div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Saturation / Contrast / Brightness work just like Roblox's <b>ColorCorrectionEffect</b> in Lighting. The palette is the new part: it forces every colour into a fixed set, like painting with a limited box of crayons.</p></div>
+
+<!-- ===================================================== PALETTE RESOURCE -->
+<h2 id="palette">The PixelPalette resource and baking a LUT</h2>
+<p>The palette itself is a <code>PixelPalette</code> resource assigned to the renderer's <code>palette</code> property. In this scene it's the "Tutorial" palette (visible in the Inspector under <span class="ui">Color → Palette</span>).</p>
+
+<input class="filter-box" data-target="#palette-ref" placeholder="Filter PixelPalette properties…">
+<div id="palette-ref">
+  <div class="control"><h4>Tints</h4><div class="where">Inspector · PixelPalette · <code>tints</code></div><p>The list of palette colours. Starts as a built-in set.</p></div>
+  <div class="control"><h4>Source Image</h4><div class="where">Inspector · PixelPalette · <code>source_image</code></div><p>Read the palette colours from an image instead of the Tints list.</p></div>
+  <div class="control"><h4>Quantize Mode</h4><div class="where">Inspector · PixelPalette · <code>quantize_mode</code></div><p>How "nearest colour" is measured when snapping. Changing it can recolour the whole scene even though the palette's colours stay the same — see <a href="#quantize">the comparison below</a>.</p><dl><dt>Options</dt><dd>Perceptual · Channel · Hue · HueWeighted · Lab · Value</dd><dt>Default</dt><dd>Perceptual</dd><dt>Where</dt><dd>Inspector only (<span class="ui">Color → Palette → Quantize Mode</span>) — not on the bottom strip</dd></dl></div>
+  <div class="control"><h4>Weights</h4><div class="where">Inspector · PixelPalette · <code>weights</code></div><p>Three numbers that only matter when <b>Quantize Mode</b> is <b>HueWeighted</b>: how much a difference in hue (x), saturation (y) and brightness (z) counts when picking the nearest palette colour. Raise x to keep colour families apart; raise z to keep light and dark apart. Default 1.0 / 1.0 / 1.0 (same as plain Hue); every other mode ignores them.</p></div>
+  <div class="control"><h4>Brightness Curve</h4><div class="where">Inspector · PixelPalette · <code>brightness_curve</code></div><p>An optional curve that reshapes brightness before snapping.</p></div>
+  <div class="control"><h4>Lut Image</h4><div class="where">Inspector · PixelPalette · <code>lut_image</code></div><p>Import a ready-made lookup table: a 1024×32 addon LUT or a 1024×1024 colour-cube chart.</p></div>
+  <div class="control"><h4>Output Path</h4><div class="where">Inspector · PixelPalette · <code>output_path</code></div><p>Where the baked LUT PNG is written.</p><dl><dt>Default</dt><dd><code>res://palette_lut.png</code></dd></dl></div>
+  <div class="control"><h4>Bake LUT to PNG</h4><div class="where">Inspector button · also <span class="ui">Project → Tools → Bake PixelPalette LUT to PNG</span></div><p>Writes the palette's lookup texture to Output Path and refreshes the FileSystem. From the Tools menu: if no PixelPalette is selected but the selected renderer has one, that palette is baked; otherwise a warning is printed.</p></div>
+</div>
+
+<h3 id="quantize">Quantize Mode: same palette, different picks</h3>
+<p>The palette is a fixed box of colours; <b>Quantize Mode</b> decides how the renderer picks "the closest one" for each pixel. Each mode measures closeness differently, so the same scene can come out quite differently. Slide through the six modes below — same camera, same palette, only the mode changes.</p>
+<div class="scrubber" data-label="Quantize Mode" data-start="0"
+  data-frames='[{"v":"Perceptual","src":"media/07-pixelizer/80-palette-perceptual.png","note":"Perceptual (default): compares colours the way your eye sees them. Lavender sky, muted olive greens."},{"v":"Channel","src":"media/07-pixelizer/81-palette-channel.png","note":"Channel: compares the red, green and blue amounts directly. The sky turns pale teal and the greens shift."},{"v":"Hue","src":"media/07-pixelizer/82-palette-hue.png","note":"Hue: matches by colour family first (blue-ish, green-ish...). The sky becomes a deeper teal."},{"v":"HueWeighted","src":"media/07-pixelizer/83-palette-hueweighted.png","note":"HueWeighted: the same hue match, but the Weights field (x = hue, y = saturation, z = brightness) sets how much each difference counts. With the default weights 1 / 1 / 1 it is exactly Hue, which is why this frame matches the last one."},{"v":"Lab","src":"media/07-pixelizer/84-palette-lab.png","note":"Lab: uses the Lab colour space, another eye-based measure. Back to a lavender sky, with slightly different greens than Perceptual."},{"v":"Value","src":"media/07-pixelizer/85-palette-value.png","note":"Value: matches by brightness only, ignoring colour. Dramatic: an orange sky and multicoloured stripes on the terrain and plants."}]'></div>
+<p>To change it: select <code>PixelRenderer</code>, and in the <b>Inspector</b> expand <span class="ui">Color</span> → click the <span class="ui">Palette</span> resource to open it → pick from the <span class="ui">Quantize Mode</span> dropdown. It lives on the <code>PixelPalette</code> resource, so you won't find it on the bottom Color / Palette strip.</p>
+<div class="callout tip"><span class="label">Tip</span><p>Start with <b>Perceptual</b> (the default) and switch only if the result looks off — the mode is a one-click experiment, and <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings the old one back. Reach for <b>Value</b> when you want a stylised, posterised look.</p></div>
+
+<div class="pair">
+  <figure class="shot"><img src="media/07-pixelizer/52-pixelpalette-bake-button.png" alt="Inspector showing the PixelPalette's Weights (x 1.0, y 1.0, z 1.0), Brightness Curve empty, Lut Image empty, Output Path res://pale…, and a 'Bake LUT to PNG' button."><figcaption>The PixelPalette in the Inspector with the <span class="ui">Bake LUT to PNG</span> button.</figcaption></figure>
+  <figure class="shot lut"><img src="media/07-pixelizer/53-baked-lut.png" alt="A long thin strip of repeating colour gradient tiles: the baked 1024 by 32 palette lookup texture."><figcaption>The result: a 1024×32 LUT. The Output panel logs "PixelPalette: baked 1024x32 LUT -&gt; res://palette_lut.png".</figcaption></figure>
+</div>
+
+<ol class="steps" data-id="pixelizer-bake-lut">
+  <li>Select <code>PixelRenderer</code>. In the Inspector expand <span class="ui">Color</span> → click the <span class="ui">Palette</span> resource to open it.</li>
+  <li>Check <span class="ui">Output Path</span> (default <code>res://palette_lut.png</code>).</li>
+  <li>Click <span class="ui">Bake LUT to PNG</span> — or use <span class="ui">Project → Tools → Bake PixelPalette LUT to PNG</span>.</li>
+  <li>Find the new PNG in the FileSystem dock.</li>
+</ol>
+<div class="callout tip"><span class="label">Tip</span><p>Want a palette from a reference picture? Drop an image into <span class="ui">Source Image</span> — the palette reads its colours from it.</p></div>
+
+<!-- ===================================================== GOD RAYS -->
+<h2 id="ref-godrays">Reference: God Rays (Rays · Sun · Sheets · Clouds · Depth Fade)</h2>
+<p>World-anchored sun shafts: stacked light "sheets" along the sun beam, lit through the gaps in the PixelSky clouds. The tooltip notes that Ray Alpha 1 is the default look.</p>
+<figure class="shot"><img src="media/07-pixelizer/13-strip-godrays.png" alt="The Rays tab: God Rays checkbox unticked, Ray Alpha 1.0, a yellow Color swatch, Max Sheets 26, Ray Depth 305, Reach 283.4."><figcaption>The Rays page, with God Rays still off.</figcaption></figure>
+
+<div class="pair">
+  <div>
+    <p><b>God rays off vs on</b></p>
+    <div class="compare" data-before="Off" data-after="On"><img src="media/07-pixelizer/26-godrays-off.png" alt="A view facing the sun: rows of pixel plants with yellow flowers on the left, broken teal-and-white clouds across the top, and a plain lavender sky with no light shafts."><img src="media/07-pixelizer/26-godrays-on.png" alt="The same view with God Rays on at the default Ray Alpha 1: two thin dotted teal lines slant down from the sun toward the lower left."></div>
+  </div>
+  <div>
+    <p><b>Ray Alpha</b></p>
+    <div class="scrubber" data-label="Ray Alpha" data-start="2"
+      data-frames='[{"v":"off","src":"media/07-pixelizer/26-godrays-off.png","note":"God Rays unticked: no shafts."},{"v":"0.5","src":"media/07-pixelizer/27-rayalpha-0.5.png","note":"0.5: half strength, deliberately faint. A soft hint of a shaft rather than a beam."},{"v":"1.0","src":"media/07-pixelizer/27-rayalpha-1.0.png","note":"1: the default look. Thin dotted teal lines slant down from the sun."},{"v":"2.0","src":"media/07-pixelizer/27-rayalpha-2.0.png","note":"2: a clear teal beam crossing the plants."},{"v":"4.0","src":"media/07-pixelizer/27-rayalpha-4.0.png","note":"4 (the maximum): a bright, wide shaft with a pale core."}]'></div>
+  </div>
+</div>
+
+<figure class="clip"><video src="media/07-pixelizer/45-godray-alpha.mp4" poster="media/07-pixelizer/45-godray-alpha.png" data-autoplay></video><figcaption>On the <span class="ui">Rays</span> tab with <span class="ui">God Rays</span> ticked, <span class="ui">Ray Alpha</span> scrubbed from 0 up to 4: the teal shafts grow in from the sun.</figcaption></figure>
+<p>All of these pictures use one camera looking up toward the sun through the cloud gaps, so you can compare them directly. Don't worry if 0.5 looks almost like "off" — it is meant to be subtle; the beam builds up from 1 to 4.</p>
+
+<div class="tabs">
+  <div class="panel" data-tab="Rays">
+    <div class="control"><h4>God Rays</h4><div class="where">Rays page · checkbox</div><p>Turns the shafts on.</p></div>
+    <div class="control"><h4>Ray Alpha</h4><div class="where">Rays page · decimal</div><p>Shaft strength. The headline knob.</p><dl><dt>Range</dt><dd>0 – 4</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+    <div class="control"><h4>Color</h4><div class="where">Rays page · colour · <code>beam_tint</code></div><p>Tint of the beam.</p></div>
+    <div class="control"><h4>Max Sheets</h4><div class="where">Rays page · whole number</div><p>The most light sheets stacked along a beam.</p><dl><dt>Range</dt><dd>2 – 52</dd><dt>Default</dt><dd>26</dd></dl></div>
+    <div class="control"><h4>Ray Depth</h4><div class="where">Rays page · decimal</div><p>How deep into the scene shafts are drawn.</p><dl><dt>Range</dt><dd>1 – 4000</dd><dt>Default</dt><dd>305</dd></dl></div>
+    <div class="control"><h4>Reach</h4><div class="where">Rays page · decimal</div><p>How far the shafts reach.</p><dl><dt>Range</dt><dd>0 – 1000</dd><dt>Default</dt><dd>283.4</dd></dl></div>
+  </div>
+  <div class="panel" data-tab="Sun">
+    <div class="control"><h4>Sun Color</h4><div class="where">Sun page · checkbox</div><p>Take the shaft colour from the sun.</p></div>
+    <div class="control"><h4>Day Cycle</h4><div class="where">Sun page · checkbox</div><p>Follow the day / night cycle.</p></div>
+    <div class="control"><h4>Dawn/Dusk</h4><div class="where">Sun page · decimal</div><p>Dawn / dusk response.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+    <div class="control"><h4>Sun Follow</h4><div class="where">Sun page · decimal</div><p>How closely the shafts follow the sun.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+  </div>
+  <div class="panel" data-tab="Sheets">
+    <div class="control"><h4>Bands</h4><div class="where">Sheets page · whole number</div><p>Number of light bands.</p><dl><dt>Range</dt><dd>1 – 16</dd></dl></div>
+    <div class="control"><h4>Gap</h4><div class="where">Sheets page · decimal</div><p>Spacing between sheets.</p><dl><dt>Range</dt><dd>0.05 – 50</dd></dl></div>
+    <div class="control"><h4>Energy</h4><div class="where">Sheets page · decimal</div><p>Brightness of each sheet.</p><dl><dt>Range</dt><dd>0 – 10</dd></dl></div>
+    <div class="control"><h4>Max Stack</h4><div class="where">Sheets page · decimal</div><p>Limit on how much overlapping sheets add up.</p><dl><dt>Range</dt><dd>0 – 10</dd></dl></div>
+    <div class="control"><h4>Falloff</h4><div class="where">Sheets page · decimal</div><p>How quickly sheets fade.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+    <div class="control"><h4>Surface Fade</h4><div class="where">Sheets page · decimal</div><p>Fades sheets near surfaces.</p><dl><dt>Range</dt><dd>0 – 1000</dd></dl></div>
+    <div class="control"><h4>Adaptation</h4><div class="where">Sheets page · decimal · <code>eye_adaptation</code></div><p>Scales the sheet stack so side-on views keep distinct shafts instead of a milky veil.</p><dl><dt>Range</dt><dd>0 – 10</dd><dt>Default</dt><dd>1.6</dd></dl></div>
+  </div>
+  <div class="panel" data-tab="Clouds">
+    <div class="control"><h4>Cloud Soft.</h4><div class="where">Clouds page · decimal</div><p>Softness of the cloud gaps the light passes through.</p><dl><dt>Range</dt><dd>0 – 0.5</dd></dl></div>
+    <div class="control"><h4>Cloud Occl.</h4><div class="where">Clouds page · decimal</div><p>How much clouds block the shafts.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+    <div class="control"><h4>Gap Erode</h4><div class="where">Clouds page · decimal</div><p>Shrinks the cloud gaps.</p><dl><dt>Range</dt><dd>0 – 0.99</dd></dl></div>
+  </div>
+  <div class="panel" data-tab="Depth Fade">
+    <div class="control"><h4>Start Depth</h4><div class="where">Depth Fade page · decimal</div><p>Distance where the shafts start fading.</p><dl><dt>Range</dt><dd>0 – 100</dd></dl></div>
+    <div class="control"><h4>Depth Fade</h4><div class="where">Depth Fade page · decimal</div><p>Length of the fade.</p><dl><dt>Range</dt><dd>0 – 100</dd></dl></div>
+    <div class="control"><h4>Depth Power</h4><div class="where">Depth Fade page · decimal</div><p>Shape of the fade curve.</p><dl><dt>Range</dt><dd>0.05 – 8</dd></dl></div>
+  </div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like Roblox's <b>SunRaysEffect</b>, but the shafts live in the world and pass through cloud gaps, rather than being a glow around the sun on screen.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>The separate <b>Sun Shafts</b> node (added from the Pixel World panel) is a different effect owned by <a href="08-atmosphere-effects.html">page 8</a>. The God Rays pages here are built into the renderer.</p></div>
+
+<!-- ===================================================== DEBUG -->
+<h2 id="ref-debug">Reference: Debug Views tab</h2>
+<p>One dropdown, <span class="ui">View</span> (<code>debug_view</code>), swaps the picture for one of the renderer's behind-the-scenes images. Handy when an outline appears (or vanishes) and you want to know why.</p>
+<figure class="shot"><img src="media/07-pixelizer/14-strip-debug.png" alt="The Debug Views tab with a single View dropdown set to Final."><figcaption>Debug Views: one dropdown.</figcaption></figure>
+<table class="ref"><tr><th>View</th><th>Shows</th></tr>
+<tr><td>Final</td><td>The normal finished image.</td></tr>
+<tr><td>Normals</td><td>Which way each surface faces.</td></tr>
+<tr><td>Depth</td><td>Distance from the camera.</td></tr>
+<tr><td>Pixel Size</td><td>Which pixel size each part of the image uses (e.g. Pixel Object overrides).</td></tr>
+<tr><td>Outline Ids</td><td>Each object's outline id as a colour.</td></tr>
+<tr><td>Raw Color</td><td>The colour before palette and grading.</td></tr>
+<tr><td>Outline Cause</td><td>Why each outline pixel was drawn: <span class="swatch-key" style="background:#e33"></span>red = silhouette, <span class="swatch-key" style="background:#36f"></span>blue = id edge, <span class="swatch-key" style="background:#ec2"></span>yellow = crease, <span class="swatch-key" style="background:#3b5"></span>green = suppressed fold / ledge.</td></tr>
+<tr><td>Shafts</td><td>The god-ray shafts on their own.</td></tr>
+</table>
+<p>Slide through the views below. Every frame uses the same side-on camera: the terrain slope runs up from the lower left, with a row of plants on top against the sky.</p>
+<div class="scrubber" data-label="View" data-start="0"
+  data-frames='[{"v":"Normals","src":"media/07-pixelizer/25-debug-normals.png","note":"Normals: colour = which way a surface faces. The upward-facing ground reads green, the sky blue-violet, and the plant silhouettes stand out against it."},{"v":"Depth","src":"media/07-pixelizer/25-debug-depth.png","note":"Depth: distance from the camera. The terrain and plants are white, the empty sky is black."},{"v":"Pixel Size","src":"media/07-pixelizer/25-debug-pixelsize.png","note":"Pixel Size: everything here is one solid blue because the whole view uses the same pixel size. A Pixel Object with its own size would show in a different colour."},{"v":"Outline Ids","src":"media/07-pixelizer/25-debug-outlineids.png","note":"Outline Ids: the terrain is bright red; the plants and some ground patches are darker red because they carry different outline ids."},{"v":"Outline Cause","src":"media/07-pixelizer/25-debug-outlinecause.png","note":"Outline Cause: the scene is dimmed grey-green and the thin red line along the top of the slope marks a silhouette edge."}]'></div>
+<figure class="clip"><video src="media/07-pixelizer/48-debug-cycle.mp4" poster="media/07-pixelizer/48-debug-cycle.png" data-autoplay></video><figcaption>Cycling the <span class="ui">View</span> dropdown on the <span class="ui">Debug Views</span> tab: Final → Normals → Depth → Pixel Size → Outline Ids → Raw Color → Outline Cause → Shafts → back to Final.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>Debug Views only change what you see — set <span class="ui">View</span> back to <b>Final</b> when you're done.</p></div>
+
+<!-- ===================================================== PIXEL OBJECT -->
+<h2 id="ref-object">Reference: Pixel Object (per-prop overrides)</h2>
+<p>A <code>PixelObject</code> node wraps a prop and lets it look different from the rest of the scene — its own pixel size, outline or palette. In the tutorial scene, <code>BuilderRuin</code> is one.</p>
+<div class="callout warn"><span class="label">Watch out</span><p>Select <b>BuilderRuin</b> (the PixelObject), <b>not</b> its child <b>Ruin</b>. Selecting Ruin opens the Builder modelling tools instead — see <a href="10-builder-modeller.html">page 10</a>.</p></div>
+<figure class="shot"><img src="media/07-pixelizer/15-strip-pixelobject.png" alt="The Pixel Object strip in four rows: Pixel Size -1 and Outline Inherit; Outline Id -1, Palette Inherit, Dither Inherit; Own Color unticked, Outline Col. dark swatch, Texel Snap unticked, Convert ticked; Bands 3, Shade Floor 0.3, Rim 0.0."><figcaption>The Pixel Object strip for <code>BuilderRuin</code>, top row (<span class="ui">Pixel Size</span> · <span class="ui">Outline</span>) through <span class="ui">Bands</span> · <span class="ui">Shade Floor</span> · <span class="ui">Rim</span>.</figcaption></figure>
+
+<div class="compare" data-before="Prop outline off" data-after="Prop outline on"><img src="media/07-pixelizer/16-object-outline-off.png" alt="The ruin's tower and roof edge against the purple sky, with no dark edge traced."><img src="media/07-pixelizer/16-object-outline-on.png" alt="The same view with a hard dark outline traced along the ruin's silhouette and roofline."></div>
+<p>To get this: set the Pixel Object's <span class="ui">Outline</span> to <b>On</b>, and make sure the renderer's <span class="ui">Obj. Outline</span> (Outlines tab) is ticked.</p>
+
+<p><b>−1</b> or <b>Inherit</b> means "use the parent PixelObject's value, or else the renderer's object defaults".</p>
+<input class="filter-box" data-target="#object-ref" placeholder="Filter Pixel Object fields…">
+<div id="object-ref">
+  <div class="control"><h4>Pixel Size</h4><div class="where">Pixel Object strip · whole number</div><p>This prop's own pixel size. −1 = Inherit (falls back to the renderer's <span class="ui">Obj. Pixel</span>).</p><dl><dt>Range</dt><dd>−1 – 16, or type higher</dd></dl></div>
+  <div class="control"><h4>Outline</h4><div class="where">Pixel Object strip · dropdown</div><p>Force this prop's outline on or off.</p><dl><dt>Options</dt><dd>Inherit · Off · On</dd></dl></div>
+  <div class="control"><h4>Outline Id</h4><div class="where">Pixel Object strip · whole number</div><p>The outline id for id edges and <a href="#outline-colors">outline colours</a>. −1 = automatic.</p><dl><dt>Range</dt><dd>−1 – 253</dd><dt>In this scene</dt><dd>−1</dd></dl></div>
+  <div class="control"><h4>Palette</h4><div class="where">Pixel Object strip · dropdown</div><p>Snap this prop to the palette or not.</p><dl><dt>Options</dt><dd>Inherit · Off · On</dd></dl></div>
+  <div class="control"><h4>Dither</h4><div class="where">Pixel Object strip · dropdown</div><p>Dither this prop or not.</p><dl><dt>Options</dt><dd>Inherit · Off · On</dd></dl></div>
+  <div class="control"><h4>Own Color</h4><div class="where">Pixel Object strip · checkbox · <code>supersede_contour_tint</code></div><p>Use this prop's own outline colour (below) instead of the default.</p></div>
+  <div class="control"><h4>Outline Col.</h4><div class="where">Pixel Object strip · colour · <code>contour_tint</code></div><p>The outline colour used when Own Color is ticked.</p></div>
+  <div class="control"><h4>Texel Snap</h4><div class="where">Pixel Object strip · checkbox</div><p>Snap this prop to the pixel grid.</p></div>
+  <div class="control"><h4>Convert</h4><div class="where">Pixel Object strip · checkbox · <code>convert_materials</code></div><p>Convert the prop's materials to the pixel shading.</p><dl><dt>In this scene</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Bands</h4><div class="where">Pixel Object strip · whole number</div><p>Number of shading bands (toon steps) on the prop.</p><dl><dt>Range</dt><dd>1 – 8</dd><dt>In this scene</dt><dd>3</dd></dl></div>
+  <div class="control"><h4>Shade Floor</h4><div class="where">Pixel Object strip · decimal</div><p>How dark the darkest shading band can get.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>In this scene</dt><dd>0.3</dd></dl></div>
+  <div class="control"><h4>Rim</h4><div class="where">Pixel Object strip · decimal</div><p>Rim light strength on the prop's edges.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>In this scene</dt><dd>0.0</dd></dl></div>
+  <div class="control"><h4>Alpha scissor / Profiles</h4><div class="where">Inspector only</div><p><code>alpha_scissor_threshold</code> sets the cut-off for see-through pixels. <code>profiles</code> (a list of <b>PixelObjectProfile</b>) with <code>profile_targets</code> applies reusable overrides (below).</p></div>
+</div>
+
+<h3 id="profile">PixelObjectProfile</h3>
+<p>A reusable override you drop into a PixelObject's <code>profiles</code> list — like saving a "look" and reusing it on many props. It changes something only if at least one value differs from "inherit".</p>
+<table class="ref"><tr><th>Property</th><th>Range / default</th></tr>
+<tr><td><code>active</code></td><td>On/off, default on</td></tr>
+<tr><td><code>pixel_size</code></td><td>−1 – 16</td></tr>
+<tr><td><code>outline</code></td><td>−1 (inherit) · 0 (off) · 1 (on)</td></tr>
+<tr><td><code>outline_id</code></td><td>−2 – 253</td></tr>
+<tr><td><code>palette</code></td><td>−1 – 1</td></tr>
+<tr><td><code>dither</code></td><td>−1 – 1</td></tr>
+<tr><td><code>supersede_contour_tint</code></td><td>On/off</td></tr>
+<tr><td><code>contour_tint</code></td><td>Colour, default very dark navy</td></tr>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>A PixelObject is like grouping Parts into a Model and giving the Model its own <b>Highlight</b> — the settings apply to everything inside. A PixelObjectProfile is like a saved style you can paste onto other Models.</p></div>
+
+<!-- ===================================================== GRID / FOG -->
+<h2 id="ref-gridfog">Reference: Grid / Fog (on the terrain)</h2>
+<p>Reached from the Grid / Fog toolbar icon or by selecting the terrain. These overlays live on the <code>MarchingSquaresTerrain</code> node: cell grid lines, fog of war and terrain debug views. The strip has two tabs, <span class="ui">Grid</span> and <span class="ui">Fog of War</span>.</p>
+<figure class="shot"><img src="media/07-pixelizer/17-strip-gridfog.png" alt="The Grid / Fog strip with Grid and Fog of War tabs: Game Grid and Editor Grid unticked, Grid Color white, Grid Width 0.083, Grid Fade 0, Chunk Lines unticked."><figcaption>The Grid / Fog strip, Grid tab.</figcaption></figure>
+<input class="filter-box" data-target="#grid-ref" placeholder="Filter Grid / Fog fields…">
+<div id="grid-ref">
+  <div class="control"><h4>Game Grid</h4><div class="where">Grid tab · checkbox</div><p>Show cell grid lines in the running game.</p></div>
+  <div class="control"><h4>Editor Grid</h4><div class="where">Grid tab · checkbox</div><p>Show cell grid lines in the editor.</p></div>
+  <div class="control"><h4>Grid Color</h4><div class="where">Grid tab · colour</div><p>Colour of the grid lines.</p></div>
+  <div class="control"><h4>Grid Width</h4><div class="where">Grid tab · decimal</div><p>Line thickness.</p><dl><dt>Range</dt><dd>0.0055 – 2</dd><dt>In this scene</dt><dd>0.083</dd></dl></div>
+  <div class="control"><h4>Grid Fade</h4><div class="where">Grid tab · decimal</div><p>Distance at which the grid fades out.</p><dl><dt>Range</dt><dd>0 – 2000</dd></dl></div>
+  <div class="control"><h4>Chunk Lines</h4><div class="where">Grid tab · checkbox</div><p>Draw lines at chunk borders (see <a href="06-chunks-settings.html">Chunks</a>).</p></div>
+  <div class="control"><h4>Game Fog</h4><div class="where">Fog of War tab · checkbox</div><p>Fog of war in the running game.</p></div>
+  <div class="control"><h4>Editor Fog</h4><div class="where">Fog of War tab · checkbox</div><p>Fog of war in the editor.</p></div>
+  <div class="control"><h4>Fog Fade s</h4><div class="where">Fog of War tab · decimal</div><p>Seconds for fog to fade when revealed.</p><dl><dt>Range</dt><dd>0 – 5</dd></dl></div>
+  <div class="control"><h4>Fog Color</h4><div class="where">Fog of War tab · colour</div><p>Main fog colour.</p></div>
+  <div class="control"><h4>Fog Dither</h4><div class="where">Fog of War tab · colour · <code>fog_color_alt</code></div><p>Second fog colour used in the dither pattern.</p></div>
+  <div class="control"><h4>Hidden Dim</h4><div class="where">Fog of War tab · decimal</div><p>How much hidden areas are dimmed.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+  <div class="control"><h4>Hatch</h4><div class="where">Fog of War tab · decimal</div><p>Strength of the hatch pattern over fog.</p><dl><dt>Range</dt><dd>0 – 1</dd></dl></div>
+  <div class="control"><h4>Softness</h4><div class="where">Fog of War tab · decimal</div><p>Softness of the fog edge.</p><dl><dt>Range</dt><dd>0 – 0.5</dd></dl></div>
+  <div class="control"><h4>Debug View</h4><div class="where">Grid / Fog strip · dropdown</div><p>Terrain debug overlays.</p><dl><dt>Options</dt><dd>Off · Slope · Height Contours · Slot Ids · Chunk Borders · Cell Ids · Cell Data</dd></dl></div>
+</div>
+<div class="callout warn"><span class="label">Unverified</span><p>When this guide was tested, ticking <span class="ui">Editor Grid</span> did not visibly draw a grid in the pixel preview, even with a bright colour and a large width. The toggle and strip work; the visible grid may only show in the running game. That's why there's no before/after picture here.</p></div>
+
+<!-- ===================================================== PIXEL WORLD PANEL -->
+<h2 id="panel">The Pixel World panel</h2>
+<p>The panel on the right of the viewport lists every pixel-node family. Present families show <span class="ui">Select</span>; absent ones are greyed out with <span class="ui">+ Add</span>.</p>
+<div class="pair">
+  <div class="hotspots"><img src="media/07-pixelizer/30-pixelworld-panel-top.png" alt="Top of the Pixel World panel: title, then Renderer, Sky &amp; Clouds and Day / Night with Select buttons, then greyed Weather, Water, Fireflies, Particle Field, Birds, Smoke &amp; Fire, Light Volume and Sun Shafts with + Add buttons.">
+    <button class="spot" style="left:18%;top:6%" data-title="Title" data-text="Pixel World — lists every pixel family. It's a button; its tooltip explains Select-to-cycle.">1</button>
+    <button class="spot" style="left:85%;top:14%" data-title="Select" data-text="Jump to that node. Click again to cycle through duplicates.">2</button>
+    <button class="spot" style="left:30%;top:39%" data-title="Dim row" data-text="Greyed = not in the scene yet.">3</button>
+    <button class="spot" style="left:85%;top:39%" data-title="+ Add" data-text="Insert that effect with its sun / environment / camera references wired. Undoable.">4</button>
+  </div>
+  <div class="hotspots"><img src="media/07-pixelizer/31-pixelworld-panel-presets.png" alt="The panel scrolled down: Smoke &amp; Fire, Light Volume, Sun Shafts, Pixel Object (Select), Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire, then a Lighting Preset header and six buttons Dawn, Noon, Dusk, Night, Storm, Snow.">
+    <button class="spot" style="left:82%;top:29%" data-title="Pixel Object" data-text="Present in this scene (BuilderRuin), so it shows Select.">1</button>
+    <button class="spot" style="left:25%;top:61%" data-title="Terrain-child families" data-text="Erosion, Wild Flowers and Grass Fire need a terrain; + Add puts them under it.">2</button>
+    <button class="spot" style="left:30%;top:80%" data-title="Lighting Preset" data-text="One click sets a whole mood.">3</button>
+    <button class="spot" style="left:80%;top:88%" data-title="Dusk" data-text="Each button applies a bundle of values to Day/Night, Sky, Weather and the renderer's god rays. Undoable.">4</button>
+  </div>
+</div>
+
+<input class="filter-box" data-target="#panel-ref" placeholder="Filter panel items…">
+<div id="panel-ref">
+  <div class="control"><h4>Effect rows</h4><div class="where">Pixel World panel · one row per family</div><p>Renderer, Sky &amp; Clouds, Day / Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke &amp; Fire, Light Volume, Sun Shafts, Pixel Object, Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire. The left button (icon + name) selects the node, or cycles if there are several; a count like "(2)" shows when there's more than one.</p></div>
+  <div class="control"><h4>Select</h4><div class="where">Right button on a present row</div><p>Selects that node (click again to cycle duplicates).</p></div>
+  <div class="control"><h4>+ Add</h4><div class="where">Right button on an absent row</div><p>Inserts the node with its sun / environment / camera references already wired. Undoable. Terrain-child families (Erosion, Wild Flowers, Grass Fire) need a terrain and are added under it. If the family's <a href="#features">feature switch</a> is off, it's turned on for you and a note is printed.</p></div>
+  <div class="control"><h4>Lighting Preset</h4><div class="where">Panel · buttons Dawn · Noon · Dusk · Night · Storm · Snow</div><p>Applies a bundle of values to the scene's Day / Night, Sky, Weather and the renderer's god rays. One History step ("Apply Dusk preset"), undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p></div>
+  <div class="control"><h4>Wire Sun / Env Refs</h4><div class="where">Panel · button below the presets</div><p>Fills empty sun / environment references on Sky, Day / Night, Weather and Sun Shafts — using the selected light / environment, or the ones other effects use. Undoable. Prints "Pixel World: wired N reference(s)."</p></div>
+  <div class="control"><h4>Preview hint</h4><div class="where">Panel · bottom text</div><p>Tells you whether Pixel Preview is on and what that means.</p></div>
+</div>
+
+<figure class="shot"><img src="media/07-pixelizer/32-pixelworld-wire-hint.png" alt="The Wire Sun / Env Refs button, and beneath it the hint text: '"Pixel Preview" is on: the 3D viewport shows the scene through the pixel renderer (editor grid hidden; gizmos draw on top).'"><figcaption>Wire Sun / Env Refs and the preview hint.</figcaption></figure>
+<figure class="clip"><video src="media/07-pixelizer/47-wire-refs.mp4" poster="media/07-pixelizer/47-wire-refs.png" data-autoplay></video><figcaption>Hovering <span class="ui">Wire Sun / Env Refs</span> for its tooltip, then clicking it: it fills any empty sun / environment references on the scene's pixel nodes in one undoable step. The viewport keeps its normal daytime pixel look.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p><b>"wired 0" is good news.</b> It means every sun / environment reference was already filled in — the tutorial scene comes fully wired — so there was nothing to do. You'd only see a higher number in a scene where some of those references were still empty.</p></div>
+
+<h3 id="presets">Lighting presets</h3>
+<div class="compare" data-before="Before" data-after="Dusk"><img src="media/07-pixelizer/33-preset-before.png" alt="The pixel hill under a muted lavender sky."><img src="media/07-pixelizer/33-preset-after.png" alt="After the Dusk preset: a warm orange sky with a dithered edge and a darker green hill."></div>
+<figure class="clip"><video src="media/07-pixelizer/46-lighting-preset.mp4" poster="media/07-pixelizer/46-lighting-preset.png" data-autoplay></video><figcaption>In the Pixel World panel, clicking <span class="ui">Dusk</span> under <span class="ui">Lighting Preset</span>: the daytime scene recolours to a warm dusk orange. <span class="ui">Animate</span> was on, so the sky updates straight away.</figcaption></figure>
+<div class="callout warn"><span class="label">Watch out</span><p><b>The Dusk look sticks for the rest of your editor session.</b> Presets set some global sun / shader state that stays in the preview even after undoing, and even after reloading the scene. The saved settings are correct; only the picture stays dusk-orange. Restarting the editor clears it — so if you want to compare other looks afterwards, restart first. With <span class="ui">Animate</span> off, the sky can also look stale after an undo — turn Animate on or nudge a value.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like setting Lighting's <b>ClockTime</b>, Atmosphere and Sky in one go. Studio has no "+ Add with everything wired" — here the new effect is hooked up to your sun and camera automatically.</p></div>
+
+<!-- ===================================================== FEATURES -->
+<h2 id="features">Project feature switches</h2>
+<p><span class="ui">Project → Project Settings</span>, type "features" in the filter, open <span class="ui">Marching Squares Terrain → Features</span> — or use <span class="ui">Pixel World menu → Project → Features</span>. Each checkbox compiles a whole feature in or out for the project. Turning one off makes that feature's nodes build and draw nothing; their settings are kept.</p>
+<figure class="shot"><img src="media/07-pixelizer/50-feature-switches.png" alt="Project Settings filtered to 'features': under Marching Squares Terrain → Features, checkboxes for Clouds, God Rays, Water, Weather, Birds, Fireflies, Smoke and Fire (the list continues below the picture), all ticked On."><figcaption>The feature switches. In this screenshot they're all switched on; a new project starts with most of them off (table below).</figcaption></figure>
+<table class="ref"><tr><th>Feature</th><th>Default</th><th>Feature</th><th>Default</th></tr>
+<tr><td>Clouds</td><td>Off</td><td>Fireflies</td><td>Off</td></tr>
+<tr><td>God Rays</td><td>Off</td><td>Smoke</td><td>Off</td></tr>
+<tr><td>Outlines</td><td><b>On</b></td><td>Fire</td><td>Off</td></tr>
+<tr><td>Outline Ids</td><td><b>On</b></td><td>Particle Fields</td><td>Off</td></tr>
+<tr><td>Water</td><td>Off</td><td>Light Volumes</td><td>Off</td></tr>
+<tr><td>Weather</td><td>Off</td><td>Sun Shafts</td><td>Off</td></tr>
+<tr><td>Birds</td><td>Off</td><td>Grass</td><td><b>On</b></td></tr>
+</table>
+<p>Each item's tooltip names its cost and says it's saved in Project Settings. When you <span class="ui">+ Add</span> a family whose feature is off, the plugin switches it on for you.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Like turning a heavy feature off for a whole place in Game Settings — except here it removes the feature from the build entirely, so it costs nothing.</p></div>
+
+<!-- ===================================================== PAGE 08 OVERVIEW -->
+<h2 id="atmosphere">Sky, weather, water and effects (page 8)</h2>
+<p>The other families in the toolbar and panel — <b>Sky &amp; Clouds, Day / Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke &amp; Fire, Light Volume</b> and <b>Sun Shafts</b> — have their own strips that work exactly the same way. They're covered in full in <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a>. Here's a quick look at the two that are already in the tutorial scene:</p>
+<figure class="shot"><img src="media/07-pixelizer/70-page08-sky.png" alt="The Sky &amp; Clouds strip: Clouds ticked, Coverage 0.45, Softness 0.121, Scale 0.019, Wind X 0.02, Wind Y 0.011, Height 300, Shadow 0.45, Bands 0, Deck ticked, Deck Size 500, Opacity 0.85, Color and Shade swatches."><figcaption>Sky &amp; Clouds — see <a href="08-atmosphere-effects.html">page 8</a>.</figcaption></figure>
+<figure class="shot"><img src="media/07-pixelizer/71-page08-daynight.png" alt="The Day / Night strip with tabs Time, Sun &amp; Fog, Rim Light: Time 0.42, Override -1.0, Running ticked, Day Length 600, Time Scale 1.0, Latitude 35, Azimuth 20, Shadows ticked."><figcaption>Day / Night — see <a href="08-atmosphere-effects.html">page 8</a>.</figcaption></figure>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<div class="tabs">
+  <div class="panel" data-tab="Chunky retro">
+    <ol class="steps" data-id="pix-recipe-chunky">
+      <li>Renderer tab → <span class="ui">Pixel Size</span> 4.</li>
+      <li>Outlines tab → <span class="ui">Darken</span> 1.0 for black outlines.</li>
+      <li>Color / Palette → <span class="ui">Matrix</span> Bayer 4, raise <span class="ui">Spread</span> a little for more checker dithering.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Soft painterly">
+    <ol class="steps" data-id="pix-recipe-soft">
+      <li>Pixel Size 1 or 2.</li>
+      <li>Outlines → <span class="ui">Darken</span> about 0.3.</li>
+      <li>Color / Palette → <span class="ui">Mix</span> about 0.66 to keep a hint of the original colours.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Hero prop">
+    <ol class="steps" data-id="pix-recipe-hero">
+      <li>Select the prop's PixelObject (e.g. BuilderRuin).</li>
+      <li>Set <span class="ui">Outline</span> On, tick <span class="ui">Own Color</span>, pick an <span class="ui">Outline Col.</span>.</li>
+      <li>On the renderer's Outlines tab make sure <span class="ui">Obj. Outline</span> is ticked.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Moody sunset">
+    <ol class="steps" data-id="pix-recipe-dusk">
+      <li>Pixel World panel → <span class="ui">Dusk</span>.</li>
+      <li>Rays tab → tick <span class="ui">God Rays</span>, <span class="ui">Ray Alpha</span> 2.</li>
+      <li>Turn on <span class="ui">Animate</span> to see it move.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Light editor">
+    <ol class="steps" data-id="pix-recipe-light">
+      <li>Turn <span class="ui">Animate</span> off.</li>
+      <li>Renderer → <span class="ui">Mode</span> Low Res if you only need colour while building.</li>
+      <li>Or switch <span class="ui">Pixel Preview</span> off entirely while sculpting.</li>
+    </ol>
+  </div>
+</div>
+<div class="callout tip"><span class="label">Tip</span><p>Not sure why an outline is there? Debug Views → <span class="ui">Outline Cause</span>. Red is a silhouette (try <span class="ui">Depth Thr.</span>), yellow a crease (try <span class="ui">Normal Thr.</span> or <span class="ui">Fold Limit</span>).</p></div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You open the tutorial scene and click Pixel Preview. The pixel look disappears. Why?</summary><p>The scene's renderer has <code>studio_prelook</code> on, so Pixel Preview starts <b>on</b>. Your first click turned it off.</p></details>
+<details class="check"><summary>Which knob makes the art pixels bigger, and where is it?</summary><p><span class="ui">Pixel Size</span> on the Renderer tab of the PixelRenderer strip.</p></details>
+<details class="check"><summary>You want the original colours back without losing the palette entirely. What do you change?</summary><p>Lower <span class="ui">Mix</span> on the Color / Palette tab (0 = original colours, 1 = fully palette).</p></details>
+<details class="check"><summary>You clicked BuilderRuin's child "Ruin" and got modelling tools instead of the Pixel Object strip. What should you click?</summary><p>The parent <b>BuilderRuin</b> — that's the PixelObject.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a> — every effect family listed in the Pixel World panel.</li>
+  <li><a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a> — the Roblox UI toggle in the same menu bar.</li>
+  <li><a href="10-builder-modeller.html">Modelling: faces, edges &amp; vertices</a> — what opens when you select Ruin.</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — chunk lines and project settings.</li>
+  <li><a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

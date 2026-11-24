@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shortcuts &amp; glossary – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .chips button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 99px; padding: 3px 12px; font: inherit; font-size: .88rem; cursor: pointer; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .countline { font-size: .88rem; color: var(--ink-2); margin: 4px 0 0; }
+  .area { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .76rem; background: var(--accent-soft); color: var(--accent); white-space: nowrap; margin: 1px 2px 1px 0; }
+  table.keys td:first-child { white-space: nowrap; font-weight: 600; }
+  table.keys td:last-child, table.map td:last-child { white-space: nowrap; }
+  table.map td:first-child { font-weight: 600; }
+  .terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .terms .control { margin: 0; }
+  .terms .control h4 code { font-size: .95em; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Shortcuts &amp; Roblox→Godot glossary</h1>
+<p class="lede">Every keyboard shortcut and mouse gesture from the guide in one filterable table, plus two dictionaries: one translating Roblox Studio into Godot and this add-on, and one explaining Godot's own words.</p>
+<div class="meta-row"><span class="pill">Reference</span><span class="pill">Keep it open in a tab</span><span class="pill">Godot 4.7</span></div>
+
+<h2 id="learn">What's on this page</h2>
+<ul>
+  <li><a href="#shortcuts">Master shortcut table</a>: over 100 keys and gestures, filterable by where they work.</li>
+  <li><a href="#rules">Three rules</a> that explain why a shortcut sometimes "does nothing".</li>
+  <li><a href="#roblox">Roblox Studio → Godot / MST glossary</a>: concepts, panels, tools and properties.</li>
+  <li><a href="#godot-terms">Godot &amp; add-on terms</a>: node, scene, resource, Inspector, <code>res://</code>, GDExtension and the rest.</li>
+</ul>
+
+<!-- ============================================================ RULES -->
+<h2 id="rules">Three rules before you press anything</h2>
+<div class="callout warn"><span class="label">1 · Put the mouse over the 3D view</span><p>Godot sends most keys to whatever panel is under the mouse. The terrain tools' number keys, the builder's <kbd>E</kbd> / <kbd>I</kbd> / <kbd>Alt</kbd>+<kbd>3</kbd> and friends, and <kbd>F</kbd> (focus) only work while the pointer is over the <b>3D view</b>. If the builder ignores <kbd>[</kbd> / <kbd>]</kbd>, click a part in the view first so it has focus. (<a href="10-builder-modeller.html#shortcuts">page 10</a>)</p></div>
+<div class="callout warn"><span class="label">2 · The same key means different things in different places</span><p>While a <b>terrain</b> is selected, <kbd>1</kbd>–<kbd>9</kbd> switch terrain tools and don't reach editor shortcuts like <kbd>Ctrl</kbd>+<kbd>1</kbd>; click another node first. In the builder's <b>Roblox</b> layout, <kbd>1</kbd>–<kbd>5</kbd> are Select / Move / Scale / Rotate / Transform and <kbd>F</kbd> is zoom-to. In the <b>MST / Modeler</b> layouts, <kbd>1</kbd>–<kbd>4</kbd> are selection modes and <kbd>F</kbd> fills a hole. <kbd>Ctrl</kbd>+<kbd>L</kbd> locks a node in Godot, but toggles local / world handles in the Roblox layout.</p></div>
+<div class="callout roblox"><span class="label">3 · F8 is Stop, not Run</span><p>In Roblox Studio, <kbd>F8</kbd> is <i>Run</i> and <kbd>Shift</kbd>+<kbd>F5</kbd> is Stop. In Godot, <kbd>F8</kbd> <b>stops</b> the game. <kbd>F6</kbd> plays the scene you're editing, and <kbd>F5</kbd> plays the project's Main Scene. (<a href="13-playtest-export.html#run-bar">page 13</a>)</p></div>
+
+<!-- ============================================================ SHORTCUTS -->
+<h2 id="shortcuts">Master shortcut table</h2>
+<p>Pick an area with the chips, then type to narrow it down (try <code>wheel</code>, <code>ctrl+shift</code>, <code>undo</code>, <code>chunk</code>). <b>LMB / MMB / RMB</b> = left / middle / right mouse button. <b>Kp</b> = the numeric keypad.</p>
+<input class="filter-box" id="key-filter" data-target="#key-table" placeholder="Filter shortcuts… (e.g. wheel, bevel, F6, copy)">
+<div class="chips" id="key-chips">
+  <button type="button" class="on" data-chip="">All</button>
+  <button type="button" data-chip="terrain">Terrain tools</button>
+  <button type="button" data-chip="roblox">Builder · Roblox UI</button>
+  <button type="button" data-chip="mst">Builder · MST / Modeler</button>
+  <button type="button" data-chip="pixel">Pixel &amp; effects</button>
+  <button type="button" data-chip="godot">Godot editor</button>
+  <button type="button" data-chip="game">Running game</button>
+</div>
+<table class="keys" id="key-table">
+  <thead><tr><th>Keys</th><th>Action</th><th>Where it works</th><th>Page</th></tr></thead>
+  <tbody>
+    <!-- Godot editor: camera -->
+    <tr data-area="godot"><td>MMB-drag</td><td>Orbit the 3D camera</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Shift</kbd>+MMB-drag</td><td>Pan the camera</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td>Wheel</td><td>Zoom in / out (a distance ruler flashes on the left)</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td>Hold RMB + <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Fly like a first-person camera; move the mouse to look. <kbd>Q</kbd> down, <kbd>E</kbd> up.</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>F</kbd></td><td>Focus: frame the selected node</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Kp 7</kbd> / <kbd>Kp 1</kbd> / <kbd>Kp 3</kbd></td><td>Top / Front / Right view. Add <kbd>Alt</kbd> for Bottom / Rear / Left.</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Kp 5</kbd></td><td>Switch Perspective ↔ Orthogonal (gets you back to 3D after clicking the nav cube)</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td>Click a nav-cube axis</td><td>Snap to that side view (switches to Orthogonal)</td><td><span class="area">Godot editor</span> 3D view, top right</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Ctrl</kbd>+<kbd>1</kbd> … <kbd>Ctrl</kbd>+<kbd>4</kbd></td><td>1 / 2 / 3 / 4 viewports. Select a non-terrain node first.</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>#</kbd></td><td>Toggle the editor grid (View Grid)</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#camera">1</a></td></tr>
+    <!-- Godot editor: gizmo & nodes -->
+    <tr data-area="godot"><td><kbd>Q</kbd> / <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd></td><td>Select / Move / <b>Rotate</b> / <b>Scale</b> gizmo (E is rotate, R is scale)</td><td><span class="area">Godot editor</span> 3D view</td><td><a href="01-godot-for-roblox.html#gizmo">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Add Child Node (opens Create New Node)</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="01-godot-for-roblox.html#nodes">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>F2</kbd> or double-click</td><td>Rename the selected node</td><td><span class="area">Godot editor</span> Scene dock</td><td><a href="01-godot-for-roblox.html#nodes">1</a></td></tr>
+    <tr data-area="godot"><td>Drag a node onto another</td><td>Reparent (make it a child)</td><td><span class="area">Godot editor</span> Scene dock</td><td><a href="01-godot-for-roblox.html#nodes">1</a></td></tr>
+    <tr data-area="godot"><td><kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td>Lock / unlock the node (can't be picked in the view)</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="01-godot-for-roblox.html#nodes">1</a></td></tr>
+    <tr data-area="godot roblox mst"><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate (in the builder's element modes: duplicate the selected faces)</td><td><span class="area">Godot editor</span> <span class="area">Builder</span></td><td><a href="09-builder-greybox.html#shortcuts">9</a>, <a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="godot roblox mst"><td><kbd>Delete</kbd></td><td>Delete the selected node / part (asks to confirm); in element modes, delete faces / edges / vertices</td><td><span class="area">Godot editor</span> <span class="area">Builder</span></td><td><a href="09-builder-greybox.html#shortcuts">9</a>, <a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="godot terrain roblox mst pixel"><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo. Every stroke, stamp, paste, drag, boolean, preset or slider drag is one step.</td><td><span class="area">Everywhere in the editor</span></td><td><a href="01-godot-for-roblox.html#undo">1</a>, <a href="03-terrain-sculpting.html#undo">3</a></td></tr>
+    <tr data-area="godot terrain mst pixel"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo</td><td><span class="area">Everywhere in the editor</span></td><td><a href="01-godot-for-roblox.html#undo">1</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo, as in Studio (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> works too)</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="09-builder-greybox.html#shortcuts">9</a></td></tr>
+    <tr data-area="godot"><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save the scene (first time: Save Scene As…). Also saves the terrain's data file.</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="02-first-world.html">2</a>, <a href="06-chunks-settings.html#storage">6</a></td></tr>
+    <!-- Godot editor: running -->
+    <tr data-area="godot"><td><kbd>F6</kbd></td><td>Play the scene you're editing (Run Current Scene). Runs the <i>saved</i> file, so save first.</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="13-playtest-export.html#run-bar">13</a></td></tr>
+    <tr data-area="godot"><td><kbd>F5</kbd></td><td>Run the project's Main Scene (in this project: the demo island)</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="13-playtest-export.html#run-bar">13</a></td></tr>
+    <tr data-area="godot"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F5</kbd></td><td>Run a custom scene (opens a picker)</td><td><span class="area">Godot editor</span> anywhere</td><td><a href="13-playtest-export.html#run-bar">13</a></td></tr>
+    <tr data-area="godot"><td><kbd>F7</kbd></td><td>Pause the running game</td><td><span class="area">Godot editor</span> while running</td><td><a href="13-playtest-export.html#run-bar">13</a></td></tr>
+    <tr data-area="godot game"><td><kbd>F8</kbd></td><td>Stop the running game</td><td><span class="area">Godot editor</span> while running</td><td><a href="13-playtest-export.html#run-bar">13</a></td></tr>
+
+    <!-- Terrain: general -->
+    <tr data-area="terrain"><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Switch terrain tool: 1 Brush · 2 Level · 3 Smooth · 4 Bridge · 5 Foliage · 6 Paint · 7 Inspect · 8 Chunks · 9 Settings. Stamp, Gradient, Select and Tint have no key.</td><td><span class="area">Terrain tools</span> terrain selected, mouse over 3D view</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Shift</kbd>+wheel</td><td>Brush <b>Size</b> (Bridge: width). Camera stays still.</td><td><span class="area">Terrain tools</span> every brush tool, Paint, Foliage, Tint</td><td><a href="03-terrain-sculpting.html#size">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+wheel</td><td><b>Strength</b> on Brush (Raise / Lower), Smooth and Gradient; <b>Height</b> on Stamp. Level, Paint, Foliage and Tint have no Strength, so there it zooms the camera.</td><td><span class="area">Terrain tools</span></td><td><a href="03-terrain-sculpting.html#strength">3</a>, <a href="04-terrain-painting.html#wheel">4</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Alt</kbd>+wheel</td><td>Brush <b>Rotation</b>, 15° per notch (only matters for non-round brushes). Camera stays still.</td><td><span class="area">Terrain tools</span></td><td><a href="03-terrain-sculpting.html#rotation">3</a></td></tr>
+    <!-- Brush raise/lower -->
+    <tr data-area="terrain"><td>Hold LMB</td><td>Raise (up to Ceiling)</td><td><span class="area">Terrain tools</span> Brush · Raise / Lower</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>Hold RMB</td><td>Lower (down to Floor)</td><td><span class="area">Terrain tools</span> Brush · Raise / Lower</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>Hold LMB+RMB</td><td>Flatten toward Height</td><td><span class="area">Terrain tools</span> Brush · Raise / Lower</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+LMB / MMB / <kbd>Ctrl</kbd>+RMB</td><td>Pick Ceiling / Height / Floor from the hovered cell</td><td><span class="area">Terrain tools</span> Brush · Raise / Lower</td><td><a href="03-terrain-sculpting.html#reference">3</a></td></tr>
+    <!-- Brush drag -->
+    <tr data-area="terrain"><td>LMB-drag</td><td>Paint a selection of cells (they turn white)</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB-drag from a white cell</td><td>Move every selected cell up / down together (snaps to terrace steps)</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>Hold <kbd>Ctrl</kbd> while moving</td><td>Move freely, without terrace snapping</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Shift</kbd>+LMB-drag / <kbd>Ctrl</kbd>+LMB-drag</td><td>Add cells to / remove cells from the selection</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#reference">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Alt</kbd>+LMB-drag</td><td>Move only the hovered cell</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#reference">3</a></td></tr>
+    <tr data-area="terrain"><td>RMB or <kbd>Esc</kbd></td><td>Clear the selection (RMB is the reliable one)</td><td><span class="area">Terrain tools</span> Brush · Drag</td><td><a href="03-terrain-sculpting.html#reference">3</a></td></tr>
+    <!-- Level / bridge / gradient / stamp / select / tint / inspect -->
+    <tr data-area="terrain"><td>LMB-drag</td><td>Level ground to the Height value (a flat shelf)</td><td><span class="area">Terrain tools</span> Level</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+LMB</td><td>Set Height from the hovered cell</td><td><span class="area">Terrain tools</span> Level</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB-drag start → end</td><td>Build a straight ramp / causeway between two points</td><td><span class="area">Terrain tools</span> Bridge</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+LMB / <kbd>Ctrl</kbd>+RMB</td><td>Pick the ramp's start / end point (position + height)</td><td><span class="area">Terrain tools</span> Gradient</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB-drag</td><td>Pull the ground toward the ramp with the brush</td><td><span class="area">Terrain tools</span> Gradient</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB / LMB-drag</td><td>Stamp; a drag pins the centre and drags out size and rotation</td><td><span class="area">Terrain tools</span> Stamp</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>Rotate the stamp (Stamp) or the pasted patch (Select paste mode)</td><td><span class="area">Terrain tools</span> Stamp, Select</td><td><a href="03-terrain-sculpting.html#reference">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB-drag</td><td>Select cells to copy</td><td><span class="area">Terrain tools</span> Select</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Alt</kbd> or <kbd>Esc</kbd></td><td>Clear the cell selection</td><td><span class="area">Terrain tools</span> Select</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>C</kbd></td><td>Copy the selected cells (height, textures, grass). The hovered cell is the anchor.</td><td><span class="area">Terrain tools</span> Select</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>V</kbd></td><td>Enter paste mode (a ghost follows the cursor)</td><td><span class="area">Terrain tools</span> Select</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td><kbd>M</kbd></td><td>Mirror the pasted patch</td><td><span class="area">Terrain tools</span> Select paste mode</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB / RMB or <kbd>Esc</kbd></td><td>Drop a copy (one undo step) / leave paste mode</td><td><span class="area">Terrain tools</span> Select paste mode</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <tr data-area="terrain"><td>LMB / RMB</td><td>Paint the Tint colour / erase tint</td><td><span class="area">Terrain tools</span> Tint</td><td><a href="04-terrain-painting.html#tint">4</a></td></tr>
+    <tr data-area="terrain"><td>LMB a cell</td><td>Print that cell's data (position, height, textures, grass) to the Output panel</td><td><span class="area">Terrain tools</span> Inspect</td><td><a href="03-terrain-sculpting.html#tools">3</a></td></tr>
+    <!-- Paint -->
+    <tr data-area="terrain"><td>LMB-drag</td><td>Paint the selected Material (texture slot)</td><td><span class="area">Terrain tools</span> Paint</td><td><a href="04-terrain-painting.html#brush">4</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+LMB</td><td>Eyedropper: pick the texture under the cursor</td><td><span class="area">Terrain tools</span> Paint</td><td><a href="04-terrain-painting.html#eyedropper">4</a></td></tr>
+    <!-- Foliage -->
+    <tr data-area="terrain"><td>LMB-drag</td><td>Paint the selected palette entries (a click places at least one)</td><td><span class="area">Terrain tools</span> Foliage</td><td><a href="05-foliage-grass.html#strip">5</a></td></tr>
+    <tr data-area="terrain"><td>RMB-drag or <kbd>Shift</kbd>+LMB-drag</td><td>Erase the selected kinds (every prop if Erase All is ticked)</td><td><span class="area">Terrain tools</span> Foliage</td><td><a href="05-foliage-grass.html#erase">5</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>/<kbd>Shift</kbd>+click palette</td><td>Select several entries to paint them mixed</td><td><span class="area">Terrain tools</span> Foliage palette</td><td><a href="05-foliage-grass.html#palette">5</a></td></tr>
+    <tr data-area="terrain"><td>Double-click a palette entry</td><td>Open its settings in the Inspector (same as Edit)</td><td><span class="area">Terrain tools</span> Foliage palette</td><td><a href="05-foliage-grass.html#palette">5</a></td></tr>
+    <!-- Chunks -->
+    <tr data-area="terrain"><td>LMB a green <b>+</b></td><td>Add a chunk there</td><td><span class="area">Terrain tools</span> Chunks</td><td><a href="06-chunks-settings.html#chunks-tool">6</a></td></tr>
+    <tr data-area="terrain"><td>LMB an existing chunk</td><td><b>Removes</b> it (it shows red with an X first)</td><td><span class="area">Terrain tools</span> Chunks</td><td><a href="06-chunks-settings.html#chunks-tool">6</a></td></tr>
+    <tr data-area="terrain"><td><kbd>Ctrl</kbd>+LMB a chunk</td><td>Select it without removing (blue outline)</td><td><span class="area">Terrain tools</span> Chunks</td><td><a href="06-chunks-settings.html#chunks-tool">6</a></td></tr>
+    <tr data-area="terrain"><td>Drag a vertex handle</td><td>Move one terrain point (Vertex Handles on)</td><td><span class="area">Terrain tools</span> Chunks</td><td><a href="06-chunks-settings.html#chunks-tool">6</a></td></tr>
+
+    <!-- Builder: Roblox UI -->
+    <tr data-area="roblox"><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd></td><td>Select / Move / Scale / Rotate / Transform tool</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="09-builder-greybox.html#tools">9</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Ctrl</kbd> + Scale drag</td><td>Symmetric resize; a plain drag is one-sided (like Studio)</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="09-builder-greybox.html#tools">9</a></td></tr>
+    <tr data-area="roblox"><td><kbd>V</kbd> while moving</td><td>Snap the move onto the vertex under the cursor</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="09-builder-greybox.html#shortcuts">9</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Shift</kbd>+click / marquee</td><td>Add parts to the selection</td><td><span class="area">Builder · Roblox UI</span> 3D view</td><td><a href="09-builder-greybox.html#select-many">9</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Toggle local / world handles</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="09-builder-greybox.html#shortcuts">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Halve / double the grid step (e.g. 1.0 → 0.5 m). Click the 3D view first.</td><td><span class="area">Builder</span> all layouts</td><td><a href="09-builder-greybox.html#snap">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Group as Model / Group as Folder / Ungroup</td><td><span class="area">Builder</span></td><td><a href="09-builder-greybox.html#model-group">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></td><td>Union</td><td><span class="area">Builder</span> Object mode</td><td><a href="09-builder-greybox.html#solid">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Intersect</td><td><span class="area">Builder</span> Object mode</td><td><a href="09-builder-greybox.html#solid">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd></td><td>Separate a Union / Intersection</td><td><span class="area">Builder</span> Object mode</td><td><a href="09-builder-greybox.html#solid">9</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>Negate: make the part a hole (magenta ghost)</td><td><span class="area">Builder</span> Object mode</td><td><a href="09-builder-greybox.html#solid">9</a></td></tr>
+    <tr data-area="roblox"><td><kbd>F</kbd></td><td>Zoom to the selection</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Alt</kbd>+<kbd>F</kbd></td><td>Fill hole (moved off F in this layout)</td><td><span class="area">Builder · Roblox UI</span> Edge mode</td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Alt</kbd>+<kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></td><td>Object / Face / Edge / Vertex mode</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="10-builder-modeller.html#modes">10</a></td></tr>
+    <tr data-area="roblox"><td><kbd>Alt</kbd>+<kbd>5</kbd></td><td>Vertex paint tool</td><td><span class="area">Builder · Roblox UI</span></td><td><a href="10-builder-modeller.html#paint">10</a></td></tr>
+    <!-- Builder: MST/Modeler only -->
+    <tr data-area="mst"><td><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></td><td>Object / Face / Edge / Vertex mode</td><td><span class="area">Builder · MST / Modeler</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>5</kbd></td><td>Vertex paint tool</td><td><span class="area">Builder · MST / Modeler</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>W</kbd></td><td>Select / move tool</td><td><span class="area">Builder · MST / Modeler</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>C</kbd></td><td>Draw shape: drag a footprint on the grid, move up for height</td><td><span class="area">Builder · MST</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>Shift</kbd>+<kbd>C</kbd></td><td>Bezier plane / block</td><td><span class="area">Builder · MST</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>P</kbd></td><td>Place on cell</td><td><span class="area">Builder · MST</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>F</kbd></td><td>Fill hole</td><td><span class="area">Builder · MST / Modeler</span> Edge mode</td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="mst"><td><kbd>Alt</kbd>+click a shape</td><td>Place that shape at once from + Add Mesh</td><td><span class="area">Builder · Modeler</span></td><td><a href="10-builder-modeller.html#layouts">10</a></td></tr>
+    <!-- Builder: shared mesh editing -->
+    <tr data-area="roblox mst"><td><kbd>H</kbd></td><td>Cycle modes: Object → Vertex → Edge → Face → Object</td><td><span class="area">Builder</span> all layouts</td><td><a href="10-builder-modeller.html#modes">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>E</kbd></td><td>Extrude (Adjust panel: distance, method)</td><td><span class="area">Builder</span> Face, Edge</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>I</kbd></td><td>Inset (Adjust panel: Inset, Inset by, Individual)</td><td><span class="area">Builder</span> Face</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Bevel (amount, segments, profile…)</td><td><span class="area">Builder</span> Edge, Vertex</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Loop Cut (insert an edge loop; Adjust panel: Cuts)</td><td><span class="area">Builder</span> Edge</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>M</kbd></td><td>Merge (faces → one n-gon, vertices → one)</td><td><span class="area">Builder</span> Face, Vertex</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>J</kbd></td><td>Connect two vertices</td><td><span class="area">Builder</span> Vertex</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Triangulate faces</td><td><span class="area">Builder</span> Face</td><td><a href="10-builder-modeller.html#ops">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>G</kbd> / <kbd>Shift</kbd>+<kbd>G</kbd></td><td>Grow / shrink the selection</td><td><span class="area">Builder</span> element modes</td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>L</kbd></td><td>Select Loop / Select Ring</td><td><span class="area">Builder</span> Edge</td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Esc</kbd></td><td>Cancel the current operation / Adjust panel (change discarded)</td><td><span class="area">Builder</span></td><td><a href="10-builder-modeller.html#shortcuts">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>B</kbd></td><td>Paint tool: click a face to give it the current slot and colour</td><td><span class="area">Builder</span></td><td><a href="10-builder-modeller.html#paint">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>Shift</kbd>+click / <kbd>Ctrl</kbd>+click</td><td>Fill the flat (coplanar) region / pick a face's material slot</td><td><span class="area">Builder</span> Paint tool</td><td><a href="10-builder-modeller.html#paint">10</a></td></tr>
+    <tr data-area="roblox mst"><td><kbd>U</kbd></td><td>Open the UV editor</td><td><span class="area">Builder</span></td><td><a href="10-builder-modeller.html#uv">10</a></td></tr>
+
+    <!-- Pixel & effects -->
+    <tr data-area="pixel"><td>Drag a number sideways</td><td>Change a strip value; the whole drag is one undo step. Click it to type instead.</td><td><span class="area">Pixel &amp; effects</span> bottom strip</td><td><a href="07-pixelizer.html#editing">7</a></td></tr>
+    <tr data-area="pixel"><td>Wheel over the panel</td><td>Scroll the Pixel World panel to reach the lower rows and the Lighting Preset buttons</td><td><span class="area">Pixel &amp; effects</span> Pixel World panel</td><td><a href="08-atmosphere-effects.html#tips">8</a></td></tr>
+    <tr data-area="pixel"><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> after a preset</td><td>Undo the whole Lighting Preset in one step</td><td><span class="area">Pixel &amp; effects</span></td><td><a href="08-atmosphere-effects.html#presets">8</a></td></tr>
+    <tr data-area="pixel"><td>Click grass / <kbd>Shift</kbd>+click</td><td>Start a fire / put it out (Ignite Tool on)</td><td><span class="area">Pixel &amp; effects</span> Grass Fire</td><td><a href="08-atmosphere-effects.html#all-settings">8</a></td></tr>
+
+    <!-- Running game -->
+    <tr data-area="game"><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>Move (run); the character turns to face the way it moves</td><td><span class="area">Running game</span> demo player</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td>Hold <kbd>Shift</kbd></td><td>Walk instead of run</td><td><span class="area">Running game</span> demo player</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td><kbd>Space</kbd></td><td>Jump</td><td><span class="area">Running game</span> demo player</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td>Mouse drag / <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></td><td>Orbit the camera around the character</td><td><span class="area">Running game</span> demo player</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td>Wheel</td><td>Zoom the follow camera</td><td><span class="area">Running game</span> demo player</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td><kbd>F1</kbd></td><td>Show the controls hint again</td><td><span class="area">Running game</span> demo</td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+    <tr data-area="game"><td><kbd>F3</kbd></td><td>Pixel tuner / diagnostics overlay (only where a PixelDiagnostics node exists, e.g. the demo island). Changes aren't saved.</td><td><span class="area">Running game</span></td><td><a href="13-playtest-export.html#f3">13</a></td></tr>
+    <tr data-area="game"><td><kbd>Esc</kbd></td><td>Nothing in the demo. Quit with <kbd>F8</kbd> in the editor or the window's close box.</td><td><span class="area">Running game</span></td><td><a href="13-playtest-export.html#controls">13</a></td></tr>
+  </tbody>
+</table>
+<p class="countline" id="key-count"></p>
+
+<div class="pair">
+  <figure class="clip"><video src="media/03-terrain-sculpting/101-toolbar-collapse-keys.mp4" poster="media/03-terrain-sculpting/101-toolbar-collapse-keys.png" data-autoplay></video><figcaption>Number keys switch terrain tools while the terrain is selected (page 3).</figcaption></figure>
+  <figure class="clip"><video src="media/10-builder-modeller/clip-02-mode-cycle-h.mp4" poster="media/10-builder-modeller/clip-02-mode-cycle-h.png" data-autoplay></video><figcaption><kbd>H</kbd> cycles the builder's selection modes (page 10).</figcaption></figure>
+</div>
+<figure class="shot"><img src="media/13-playtest-export/18-hint-text.png" alt="The demo game's on-screen hint: WASD move, Shift walk, Space jump, drag / arrows orbit, wheel zoom, F3 tuner, F1 help."><figcaption>The demo game prints its own controls when it starts. <kbd>F1</kbd> brings the line back.</figcaption></figure>
+
+<!-- ============================================================ ROBLOX GLOSSARY -->
+<h2 id="roblox">Roblox Studio → Godot / MST glossary</h2>
+<p>Look up the Studio word you know and find its partner here. The first block matches the dictionary on <a href="01-godot-for-roblox.html#map">page 1</a>; the rest adds terms from every other chapter.</p>
+<input class="filter-box" id="map-filter" data-target="#map-table" placeholder="Filter… (try “Union”, “Anchored”, “Play”, “ClockTime”)">
+<div class="chips" id="map-chips">
+  <button type="button" class="on" data-chip="">All</button>
+  <button type="button" data-chip="windows">Windows</button>
+  <button type="button" data-chip="objects">Objects</button>
+  <button type="button" data-chip="tools">Tools</button>
+  <button type="button" data-chip="camera">Camera</button>
+  <button type="button" data-chip="terrain">Terrain</button>
+  <button type="button" data-chip="lighting">Lighting &amp; effects</button>
+  <button type="button" data-chip="building">Building</button>
+  <button type="button" data-chip="models">Models</button>
+  <button type="button" data-chip="testing">Testing</button>
+  <button type="button" data-chip="files">Files</button>
+</div>
+<table class="map" id="map-table">
+  <thead><tr><th>Roblox Studio</th><th>Godot / this add-on</th><th>Notes</th><th>Topic</th></tr></thead>
+  <tbody>
+    <tr data-area="windows"><td>Explorer</td><td><b>Scene dock</b> (scene tree)</td><td>Left side. Add, rename, reparent, hide, lock.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Properties</td><td><b>Inspector</b></td><td>Right side. Shows the selected node's properties.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Output window</td><td><b>Output</b> bottom panel</td><td>Engine messages and errors.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Big mode tabs (Home / Model…)</td><td><b>Main-screen buttons</b> 2D · 3D · Script · Game · Asset Store</td><td>Switch the centre area. Stay in 3D.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Model tab ribbon</td><td><b>Roblox UI</b> switch → Model / Edit ribbon</td><td>Add-on feature, toolbar row 2. <a href="09-builder-greybox.html#turn-on">Page 9</a>.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Terrain tab always in the ribbon</td><td>Terrain toolbar appears <b>only while a terrain is selected</b></td><td>Click <b>MarchingSquaresTerrain</b> in the Scene dock first.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="windows"><td>Insert Object (effects)</td><td><b>Pixel World</b> menu / panel <b>+ Add</b></td><td>Each entry is a whole effect and wires the sun / camera for you.</td><td><span class="area">windows</span></td></tr>
+    <tr data-area="objects"><td>Workspace / the place</td><td>The <b>scene</b> and its <b>root node</b> (<code>.tscn</code>)</td><td>One scene = one file.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Instance (Part, Model…)</td><td><b>Node</b></td><td>Everything in a scene is a node.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Part</td><td>A <code>MeshInstance3D</code>, or the add-on's <code>PixelBuilderMesh</code></td><td>Builder parts: <a href="09-builder-greybox.html">page 9</a>.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Model / grouping</td><td>A <code>Node3D</code> holding children, or a saved <b>scene</b> you instance</td><td>Drag nodes under it to group.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Inserting a Model / Package</td><td><b>Instance Child Scene</b> (chain icon)</td><td>Next to + in the Scene dock.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Insert Object</td><td><b>Add Child Node</b> (+, <kbd>Ctrl</kbd>+<kbd>A</kbd>)</td><td>Opens Create New Node.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Visible / Transparency toggle</td><td>The <b>eye</b> icon on a node's row</td><td>Doesn't visibly hide the pixel-rendered terrain.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="objects"><td>Lock</td><td><b>Lock</b> (padlock, <kbd>Ctrl</kbd>+<kbd>L</kbd>)</td><td>Unlock: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>.</td><td><span class="area">objects</span></td></tr>
+    <tr data-area="tools"><td>Terrain Editor</td><td>Select a <b>MarchingSquaresTerrain</b> node → terrain toolbar</td><td>See <a href="03-terrain-sculpting.html">Sculpting</a>.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="tools"><td>Move / Scale / Rotate tools</td><td>Gizmo <kbd>W</kbd> / <kbd>R</kbd> / <kbd>E</kbd>, or the Roblox UI ribbon</td><td>Note E = rotate, R = scale.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="tools"><td>Select tool</td><td><kbd>Q</kbd> Select mode</td><td>Toolbar row 1.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="tools"><td>Stud / degree snapping</td><td>Gizmo <b>snap</b> toggle; ribbon <b>1.0 m</b> / <b>45°</b> boxes</td><td>Metres, not studs.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="tools"><td>Position / Orientation / Size fields</td><td>Inspector <b>Transform</b>: Position / Rotation / Scale</td><td>Scale is a multiplier, not a size in studs.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="tools"><td>Undo / Redo</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> + <b>History</b> dock</td><td>A whole slider drag or stroke is one step.</td><td><span class="area">tools</span></td></tr>
+    <tr data-area="camera"><td>Right-drag orbit</td><td><b>Middle-drag</b> orbit</td><td>The biggest habit to relearn.</td><td><span class="area">camera</span></td></tr>
+    <tr data-area="camera"><td>Middle-drag pan</td><td><kbd>Shift</kbd> + middle-drag</td><td></td><td><span class="area">camera</span></td></tr>
+    <tr data-area="camera"><td>Right-drag + WASD fly</td><td>Hold <b>RMB</b> + WASD (Q/E down/up)</td><td></td><td><span class="area">camera</span></td></tr>
+    <tr data-area="camera"><td>Scroll zoom</td><td>Mouse wheel</td><td></td><td><span class="area">camera</span></td></tr>
+    <tr data-area="camera"><td>Zoom to selection (F)</td><td><kbd>F</kbd> Focus</td><td>Same key.</td><td><span class="area">camera</span></td></tr>
+    <!-- terrain -->
+    <tr data-area="terrain"><td>Terrain Add / Subtract</td><td><b>Brush</b> (<kbd>1</kbd>) in <b>Raise / Lower</b> mode</td><td>LMB raises, RMB lowers, both flatten.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Grow / Erode</td><td>No live sphere; terrain is heights on a <b>grid of cells</b></td><td>Use Brush and Smooth; the <b>Erosion</b> node weathers a whole map.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Flatten</td><td><b>Level</b> (<kbd>2</kbd>) to a chosen Height</td><td><kbd>Ctrl</kbd>+LMB picks the height.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Smooth</td><td><b>Smooth</b> (<kbd>3</kbd>)</td><td>Terraced or Sloped.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Brush Size / Strength sliders</td><td><b>Size</b> (<kbd>Shift</kbd>+wheel) / <b>Strength</b> (<kbd>Ctrl</kbd>+wheel)</td><td>Strength exists on Raise / Lower, Smooth and Gradient.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Paint (terrain materials)</td><td><b>Paint</b> (<kbd>6</kbd>), 16 editable texture slots</td><td>Swap each slot's image, pattern, colour, grass. <a href="04-terrain-painting.html">Page 4</a>.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Material eyedropper</td><td><kbd>Ctrl</kbd>+LMB on the terrain (Paint tool)</td><td></td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Grassy / Rock / Sand materials</td><td>Default slots: 1 Grass, 4 Sand, 6 Cliff, 7 Dark Rock, 8 Snow…</td><td>Grass blades grow only on slots with <b>Has grass</b>.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>(no equivalent) colour per area</td><td><b>Tint</b> tool</td><td>A colour layer over whole cells: territory, biomes, paths.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Terrain region / one big voxel volume</td><td><b>Chunks</b>: fixed-size tiles you add with green <b>+</b> markers</td><td>A new terrain has 0 chunks. <a href="06-chunks-settings.html">Page 6</a>.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Generate tab</td><td>Settings (<kbd>9</kbd>) → <b>New Chunks</b> → Noise Amp / Freq / Seed</td><td>Every chunk you add afterwards arrives with hills.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Region Copy / Paste</td><td><b>Select</b> tool: <kbd>C</kbd> / <kbd>V</kbd>, <kbd>Z</kbd>/<kbd>X</kbd> rotate, <kbd>M</kbd> mirror</td><td>Height, textures and grass come along.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Dragging in a terrain blob</td><td><b>Stamp</b>: mountain, crater, mesa, valley, hill or an image</td><td>Negative Height carves.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Terrain Water / sea level</td><td><b>PixelWater</b> node; flat ground at height 0 sits at the water line</td><td>That's why a flat terrain reads as an island.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain"><td>Scattering decoration Models</td><td><b>Foliage</b> (<kbd>5</kbd>): paint props with a brush, or <b>Fill Terrain</b></td><td><a href="05-foliage-grass.html">Page 5</a>.</td><td><span class="area">terrain</span></td></tr>
+    <tr data-area="terrain files"><td>Terrain saved inside the place</td><td>A <b>terrain data</b> resource (<code>.res</code>) beside the scene, or per-chunk files</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd> saves both.</td><td><span class="area">terrain</span></td></tr>
+    <!-- lighting -->
+    <tr data-area="lighting"><td>Lighting.ClockTime (0–24)</td><td><b>Day / Night → Time</b> (0–1)</td><td>Multiply by 24: 0.5 = noon, 0.75 = 18:00.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>Lighting presets / Atmosphere + Sky</td><td><b>Lighting Preset</b>: Dawn · Noon · Dusk · Night · Storm · Snow</td><td>One click, one undo step. <a href="08-atmosphere-effects.html#presets">Page 8</a>.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>Sky object</td><td><b>Sky &amp; Clouds</b> (adds a Sun + WorldEnvironment)</td><td>This is what lights a new scene.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>Rain / snow built from ParticleEmitters</td><td><b>Weather</b>: one dropdown for clear, cloudy, foggy, rain, snow, storm</td><td>Includes wet ground and lightning.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>ParticleEmitter / Beam decorations</td><td><b>Fireflies</b>, <b>Birds</b>, <b>Smoke &amp; Fire</b>, <b>Particle Field</b></td><td>Pixel-styled presets; tune counts and colours.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>PointLight glow / SunRays</td><td><b>Light Volume</b> / <b>Sun Shafts</b>, god rays on the renderer</td><td></td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>ColorCorrectionEffect</td><td>Renderer → <b>Color / Palette</b>: Saturation, Contrast, Brightness</td><td>Plus a palette that limits every colour.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>Graphics quality / view style</td><td><b>Pixel Preview</b> (3D view menu bar)</td><td>Changes how the view is drawn, not the objects.</td><td><span class="area">lighting</span></td></tr>
+    <tr data-area="lighting"><td>(no equivalent) wildfire</td><td><b>Grass Fire</b> with the Ignite Tool</td><td>Click grass to start a spreading fire.</td><td><span class="area">lighting</span></td></tr>
+    <!-- building -->
+    <tr data-area="building"><td>Part ▾ Block / Sphere / Wedge / Corner Wedge / Cylinder</td><td>Same five, plus <b>More Shapes ▸</b> (14 more)</td><td>Insert group on the Model tab.</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>New Part is solid Medium Stone Grey</td><td>Same: new parts are solid Medium Stone Grey. Pick a material with <b>nothing selected</b> to make it the default for new parts</td><td>With a part selected, the picker only paints that part. <a href="09-builder-greybox.html#appearance">Page 9</a>.</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Material picker (43 materials)</td><td>Same picker layout (search, Recent / Project / Built-in shelves)</td><td>The materials are the add-on's, not Studio's 43: Grid, Checker, No Draw, Collider, Trigger + your textures.</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Color (honeycomb)</td><td><b>Color</b> palette + hex field + Apply</td><td>Per-face colour needs material slots (<a href="10-builder-modeller.html#paint">page 10</a>).</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Union / Intersect / Separate / Negate</td><td>Same, on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> / <kbd>I</kbd> / <kbd>U</kbd> / <kbd>N</kbd></td><td>Magenta ghosts, reversible.</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Group (<kbd>Ctrl</kbd>+<kbd>G</kbd>) / Ungroup (<kbd>Ctrl</kbd>+<kbd>U</kbd>)</td><td>Same, plus Group as Folder (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>)</td><td></td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Anchored (physics)</td><td><b>Anchor</b> = sit on and follow the <b>terrain</b></td><td>Different meaning! Not physics.</td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Align Tool</td><td>Align group: same panel and options</td><td></td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Pivot: Edit / Snap / Reset</td><td>Pivot group: same</td><td></td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>One-sided Scale drag ("extrude")</td><td>Same gesture; <kbd>Ctrl</kbd> = symmetric</td><td></td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>Properties: Size, Position, Color, Material…</td><td><b>Part</b> section in the Inspector</td><td></td><td><span class="area">building</span></td></tr>
+    <tr data-area="building"><td>(no mesh editing in Studio)</td><td><b>Edit</b> tab: modes, Extrude, Inset, Bevel, Loop Cut, UV…</td><td>Closer to Blender. <a href="10-builder-modeller.html">Page 10</a>.</td><td><span class="area">building</span></td></tr>
+    <!-- models -->
+    <tr data-area="models"><td>Toolbox / Import 3D</td><td>Put the file in the project folder; <b>FileSystem</b> + <b>Import dock</b></td><td>Godot re-imports when the file changes. <a href="11-importing-models.html">Page 11</a>.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Export Selection → .obj</td><td>Drop the <code>.obj</code> + <code>.mtl</code> into <code>res://models/</code></td><td>Imports as a Mesh.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>MeshPart</td><td>An imported scene you instance</td><td>Can be converted into an editable builder mesh.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>CanCollide / CollisionFidelity</td><td>Advanced Import → <b>Generate ▸ Physics</b>, Shape Type</td><td>Or a StaticBody3D + CollisionShape3D.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Properties → Color / Material</td><td><b>StandardMaterial3D</b>: Albedo, Metallic, Roughness, textures</td><td></td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Toolbox model placed in the world</td><td><b>Placed prop</b>: instance it, sit it on the terrain, wrap in a <b>PixelObject</b></td><td><a href="12-using-models.html">Page 12</a>.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Grass / decoration brushes</td><td>Your model in a foliage <b>scatter item</b>, then paint it</td><td>Hundreds at once, filtered by slope / height.</td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Tile kits (a model as a map tile)</td><td>No equivalent: the terrain is sculpted, not tiled</td><td></td><td><span class="area">models</span></td></tr>
+    <tr data-area="models"><td>Export terrain to Studio</td><td>Settings → Storage → <b>Export GLB</b>, then Studio's 3D Importer</td><td>Comes in as a MeshPart with a baked texture.</td><td><span class="area">models</span></td></tr>
+    <!-- testing -->
+    <tr data-area="testing"><td>Play</td><td><kbd>F6</kbd> Run Current Scene (<kbd>F5</kbd> runs the main scene)</td><td>Opens a separate window (or the Game tab).</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Play Here</td><td><kbd>F6</kbd>; what spawns is whatever the scene contains</td><td>No built-in avatar.</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Run (F8 in Studio)</td><td><kbd>F6</kbd> on a scene without a player</td><td>Shows the scene's camera.</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Stop</td><td><kbd>F8</kbd> / ⏹</td><td>Careful: F8 is Run in Studio.</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Pause</td><td><kbd>F7</kbd></td><td></td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>SpawnLocation / your avatar</td><td>Instance <code>res://demo/player.tscn</code> (knight) or <code>fox_player.tscn</code></td><td>Move it above the ground first!</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Edit / Play split view</td><td>The <b>Game</b> tab and the <b>Remote</b> scene tree</td><td>Inspect live nodes while the game runs.</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Publish</td><td><b>Project → Export…</b> a standalone build</td><td>Needs export templates.</td><td><span class="area">testing</span></td></tr>
+    <tr data-area="testing"><td>Screenshot button</td><td><b>Editor → Take Screenshot</b>; in-game use your OS tool</td><td></td><td><span class="area">testing</span></td></tr>
+    <tr data-area="files"><td>Toolbox / where assets live</td><td><b>FileSystem</b> dock (<code>res://</code>) + <b>Asset Store</b></td><td>Your own files.</td><td><span class="area">files</span></td></tr>
+    <tr data-area="files"><td>Saving the place (File → Save)</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd> saves the scene as a <code>.tscn</code></td><td><a href="02-first-world.html">Page 2</a>.</td><td><span class="area">files</span></td></tr>
+    <tr data-area="files"><td>Plugins / Manage Plugins</td><td><b>GDExtension</b> tab in Project Settings (Plugins tab is empty)</td><td>Always on.</td><td><span class="area">files</span></td></tr>
+    <tr data-area="files"><td>Studio settings</td><td><b>Editor Settings</b> (you) vs <b>Project Settings</b> (this game)</td><td>The builder layout lives in Editor Settings.</td><td><span class="area">files</span></td></tr>
+  </tbody>
+</table>
+<p class="countline" id="map-count"></p>
+
+<div class="pair">
+  <figure class="shot"><img src="media/01-godot-for-roblox/56-robloxui-off.png" alt="The 3D view menu bar (Pixel Preview, Animate, Pixel World) with the Roblox UI switch off, and the terrain toolbar below it. No ribbon."><figcaption>Roblox UI off: no ribbon, just the add-on's menu bar.</figcaption></figure>
+  <figure class="shot"><img src="media/01-godot-for-roblox/57-robloxui-on.png" alt="The same view with Roblox UI on: a Model / Edit ribbon with Select, Move, Scale, Rotate and snap boxes."><figcaption>Roblox UI on: a Studio-style Model / Edit ribbon.</figcaption></figure>
+</div>
+
+<!-- ============================================================ GODOT TERMS -->
+<h2 id="godot-terms">Godot &amp; add-on terms</h2>
+<p>Words you'll see on every page, explained without jargon. The chips split Godot's own words from this add-on's.</p>
+<input class="filter-box" id="term-filter" data-target="#term-list" placeholder="Filter terms… (e.g. resource, chunk, dock)">
+<div class="chips" id="term-chips">
+  <button type="button" class="on" data-chip="">All</button>
+  <button type="button" data-chip="godot">Godot</button>
+  <button type="button" data-chip="mst">This add-on</button>
+</div>
+<div class="terms" id="term-list">
+  <div class="control" data-area="godot"><h4>Node</h4><div class="where">Godot</div><p>One thing in a scene: a light, a camera, a terrain, a mesh. Like a Roblox Instance. Nodes sit in a tree, and a child moves with its parent.</p></div>
+  <div class="control" data-area="godot"><h4>Scene</h4><div class="where">Godot</div><p>A tree of nodes saved as one file. Your whole level is a scene, and a single reusable prop can be a scene too. Like a place, or a Model you can reuse.</p></div>
+  <div class="control" data-area="godot"><h4><code>.tscn</code></h4><div class="where">Godot · file</div><p>The file a scene is saved in. Double-click one in the FileSystem dock to open it in a tab.</p></div>
+  <div class="control" data-area="godot"><h4>Root node</h4><div class="where">Godot</div><p>The top node of a scene (e.g. <i>World</i>). Everything else is under it. Like the Workspace.</p></div>
+  <div class="control" data-area="godot"><h4>Instance</h4><div class="where">Godot</div><p>A copy of a saved scene dropped into another scene with <span class="ui">Instance Child Scene</span> (chain icon). Edit the original and every instance updates. Like inserting a Package.</p></div>
+  <div class="control" data-area="godot"><h4>Scene dock</h4><div class="where">Godot · left</div><p>The tree of nodes in the open scene: add, rename, reparent, hide and lock them. Your Explorer.</p></div>
+  <div class="control" data-area="godot"><h4>Inspector</h4><div class="where">Godot · right</div><p>Every property of the selected node, in collapsible groups. Your Properties window.</p></div>
+  <div class="control" data-area="godot"><h4>FileSystem dock</h4><div class="where">Godot · bottom left</div><p>The files in your project folder: scenes, models, textures. Shares the corner with the History tab.</p></div>
+  <div class="control" data-area="godot"><h4><code>res://</code></h4><div class="where">Godot · path</div><p>"The project folder". <code>res://tutorial/guide/first_world.tscn</code> means the file <code>tutorial/guide/first_world.tscn</code> inside your project.</p></div>
+  <div class="control" data-area="godot"><h4>Dock</h4><div class="where">Godot</div><p>A panel around the edges of the editor (Scene, FileSystem, Inspector, History, Import). Docks can be moved and tabbed together.</p></div>
+  <div class="control" data-area="godot"><h4>Viewport / 3D view</h4><div class="where">Godot · centre</div><p>The big 3D picture where you look at and edit your world. Most shortcuts need the mouse over it.</p></div>
+  <div class="control" data-area="godot"><h4>Main-screen buttons</h4><div class="where">Godot · top centre</div><p>2D · 3D · Script · Game · Asset Store. They swap the centre area. Stay in <b>3D</b>.</p></div>
+  <div class="control" data-area="godot"><h4>Resource</h4><div class="where">Godot</div><p>A piece of data that isn't a node: a material, a texture, a mesh, the terrain's data. It can live inside a scene or in its own file (<code>.res</code> / <code>.tres</code>) and be shared.</p></div>
+  <div class="control" data-area="godot"><h4><code>.res</code> / <code>.tres</code></h4><div class="where">Godot · file</div><p>Saved resources (binary / text). The terrain's chunk data is often a <code>.res</code> next to the scene. Keep it with the scene when you copy things.</p></div>
+  <div class="control" data-area="godot"><h4>Gizmo</h4><div class="where">Godot</div><p>The coloured arrows, rings and boxes for moving, rotating and scaling the selected node (<kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd>). Red = X, green = Y (up), blue = Z.</p></div>
+  <div class="control" data-area="godot"><h4>Transform</h4><div class="where">Godot · Inspector</div><p>A node's Position, Rotation and Scale. Type exact numbers here instead of dragging.</p></div>
+  <div class="control" data-area="godot"><h4>Node3D</h4><div class="where">Godot · node type</div><p>The basic 3D node: a position in space with children. Use one as an empty "folder" or a scene root.</p></div>
+  <div class="control" data-area="godot"><h4>MeshInstance3D</h4><div class="where">Godot · node type</div><p>A node that shows a 3D model (a mesh). Imported models are made of these.</p></div>
+  <div class="control" data-area="godot"><h4>Camera3D</h4><div class="where">Godot · node type</div><p>The camera the game looks through. Adding the pixel Renderer adds one for you.</p></div>
+  <div class="control" data-area="godot"><h4>DirectionalLight3D (Sun)</h4><div class="where">Godot · node type</div><p>Sunlight from one direction. A new scene has none, so it's dark until you add Sky &amp; Clouds or a preset.</p></div>
+  <div class="control" data-area="godot"><h4>WorldEnvironment</h4><div class="where">Godot · node type</div><p>The sky, ambient light and fog for the whole scene, like Roblox's Lighting + Atmosphere.</p></div>
+  <div class="control" data-area="godot"><h4>StaticBody3D + CollisionShape3D</h4><div class="where">Godot · node types</div><p>Make something solid: the body says "this doesn't move", the shape says how big the solid part is. Like CanCollide.</p></div>
+  <div class="control" data-area="godot"><h4>CharacterBody3D</h4><div class="where">Godot · node type</div><p>A body moved by code that collides with the world, used by the demo player. If it starts inside the ground, it falls through.</p></div>
+  <div class="control" data-area="godot"><h4>Material / StandardMaterial3D</h4><div class="where">Godot · resource</div><p>How a surface looks: colour (Albedo), Metallic, Roughness and textures.</p></div>
+  <div class="control" data-area="godot"><h4>Shader</h4><div class="where">Godot</div><p>A small program that draws a surface or effect. The pixel look is built from shaders; you only change their settings.</p></div>
+  <div class="control" data-area="godot"><h4>GDExtension</h4><div class="where">Godot</div><p>A compiled add-on that Godot loads at start-up. MST is one, so it's always on and listed under Project Settings → <span class="ui">GDExtension</span>, not Plugins.</p></div>
+  <div class="control" data-area="godot"><h4>Plugin (EditorPlugin)</h4><div class="where">Godot</div><p>The other kind of add-on, switched on in Project Settings → Plugins. That list is empty here, and that's normal.</p></div>
+  <div class="control" data-area="godot"><h4>Project Settings</h4><div class="where">Godot · Project menu</div><p>Settings saved with this game: Main Scene, window size, renderer, import options.</p></div>
+  <div class="control" data-area="godot"><h4>Editor Settings</h4><div class="where">Godot · Editor menu</div><p>Your personal editor preferences, shared by all projects. The builder layout (MST / Modeler / Roblox) is stored here.</p></div>
+  <div class="control" data-area="godot"><h4>Main Scene</h4><div class="where">Godot · Project Settings</div><p>The scene the game starts in. <kbd>F5</kbd> and exported builds run it. In this project it's the demo island.</p></div>
+  <div class="control" data-area="godot"><h4>Import dock / Reimport</h4><div class="where">Godot · top left</div><p>Settings for how a model or image file is converted (e.g. Root Scale). Change them, then press <span class="ui">Reimport</span>.</p></div>
+  <div class="control" data-area="godot"><h4>glTF / GLB</h4><div class="where">Godot · file format</div><p>The recommended 3D model format (<code>.gltf</code> text or <code>.glb</code> single file). Y is up.</p></div>
+  <div class="control" data-area="godot"><h4>Export template</h4><div class="where">Godot · export</div><p>The ready-made game runtime Godot packs your project into. Install it once (Manage Export Templates) before Export Project works.</p></div>
+  <div class="control" data-area="godot"><h4>History dock</h4><div class="where">Godot · bottom left</div><p>The list of every undoable action, newest at the top.</p></div>
+  <div class="control" data-area="godot"><h4>Output panel</h4><div class="where">Godot · bottom</div><p>Messages, warnings (yellow) and errors (red). Read the top line of a red message first.</p></div>
+  <div class="control" data-area="godot"><h4>Config warning ⚠</h4><div class="where">Godot · Scene dock</div><p>A yellow triangle on a node means "this isn't set up yet". Hover it for the reason.</p></div>
+  <div class="control" data-area="godot"><h4>Perspective / Orthogonal</h4><div class="where">Godot · 3D view</div><p>Normal 3D view vs a flat, no-depth view. Clicking the nav cube switches to Orthogonal; <kbd>Kp 5</kbd> switches back.</p></div>
+  <div class="control" data-area="godot"><h4>Remote / Local</h4><div class="where">Godot · Scene dock</div><p>While the game runs, Remote shows the live game's node tree; Local is your saved scene.</p></div>
+
+  <div class="control" data-area="mst"><h4>MarchingSquaresTerrain</h4><div class="where">Add-on · node</div><p>The terrain node. Select it and the terrain toolbar, strip and hint bar appear.</p></div>
+  <div class="control" data-area="mst"><h4>Chunk</h4><div class="where">Add-on · terrain</div><p>One square tile of ground (32 cells × 2 m = 64 m by default). A new terrain has none: add them with the Chunks tool (<kbd>8</kbd>).</p></div>
+  <div class="control" data-area="mst"><h4>Cell</h4><div class="where">Add-on · terrain</div><p>One square (or hex / triangle) of the terrain grid. Heights, textures and tints are stored per cell.</p></div>
+  <div class="control" data-area="mst"><h4>Terrain data (MarchingSquaresTerrainData)</h4><div class="where">Add-on · resource</div><p>The resource holding all chunk heights, paint and foliage. Shown in the Inspector as <span class="ui">Contents</span>.</p></div>
+  <div class="control" data-area="mst"><h4>Strip</h4><div class="where">Add-on · bottom of the 3D view</div><p>The row of settings for the current tool or selected effect (Size, Strength, Pixel Size…).</p></div>
+  <div class="control" data-area="mst"><h4>Hint bar</h4><div class="where">Add-on · bottom left of the 3D view</div><p>One line listing the current tool's mouse and key actions. Read it whenever you switch tools.</p></div>
+  <div class="control" data-area="mst"><h4>Grid type</h4><div class="where">Add-on · Settings</div><p>Square, Triangle, Hexagon or Hex Rings. Some features (Terraced smoothing, waterfalls) need a non-square grid.</p></div>
+  <div class="control" data-area="mst"><h4>Surroundings</h4><div class="where">Add-on · terrain</div><p>Endless procedural land drawn around your chunks in the editor, so it's hard to see where your map ends. The running game shows the real edge.</p></div>
+  <div class="control" data-area="mst"><h4>Scatter item (PixelScatterItem)</h4><div class="where">Add-on · resource</div><p>One entry in the Foliage palette: its Form or model, density, size and slope rules.</p></div>
+  <div class="control" data-area="mst"><h4>Erosion node</h4><div class="where">Add-on · node</div><p><code>MarchingSquaresErosion</code>, a child of the terrain. Press Erode to weather the whole map in one undo step.</p></div>
+  <div class="control" data-area="mst"><h4>PixelRenderer</h4><div class="where">Add-on · node</div><p>Turns the 3D scene into pixel art: Pixel Size, outlines, palette, god rays. Added by Pixel World → Renderer (with a Camera).</p></div>
+  <div class="control" data-area="mst"><h4>Pixel Preview</h4><div class="where">Add-on · 3D view menu bar</div><p>Shows the editor view through the pixel renderer. Some scenes open with it already on.</p></div>
+  <div class="control" data-area="mst"><h4>Animate</h4><div class="where">Add-on · 3D view menu bar</div><p>Runs clouds, water, weather, birds and fire in the editor. Off keeps the editor light; edits still show at once. The game always animates.</p></div>
+  <div class="control" data-area="mst"><h4>Pixel World</h4><div class="where">Add-on · menu + right panel</div><p>Where you add effects (Renderer, Sky &amp; Clouds, Day / Night, Weather, Water…), apply Lighting Presets and Wire Sun / Env Refs.</p></div>
+  <div class="control" data-area="mst"><h4>Wire Sun / Env Refs</h4><div class="where">Add-on · Pixel World</div><p>Reconnects effects to the scene's Sun and WorldEnvironment. Use it when an effect shows ⚠.</p></div>
+  <div class="control" data-area="mst"><h4>PixelObject</h4><div class="where">Add-on · node</div><p>A parent node that gives the models under it the pixel look and its own outline settings.</p></div>
+  <div class="control" data-area="mst"><h4>PixelBuilderMesh</h4><div class="where">Add-on · node</div><p>A builder "part": a mesh you insert, shape and edit face by face (pages 9 and 10).</p></div>
+  <div class="control" data-area="mst"><h4>Roblox UI</h4><div class="where">Add-on · 3D view toolbar</div><p>Switches the builder to a Studio-style Model / Edit ribbon with Studio handles and shortcuts.</p></div>
+  <div class="control" data-area="mst"><h4>Builder layouts</h4><div class="where">Add-on · Editor Settings</div><p><b>MST</b> (left toolbar + panels), <b>Modeler</b> (top toolbar + popups), <b>Roblox</b> (ribbon). Same tools, different keys.</p></div>
+  <div class="control" data-area="mst"><h4>Material slot</h4><div class="where">Add-on · builder</div><p>A material on a builder mesh that faces can use. A new part has none, so painting colours the whole mesh until you add slots.</p></div>
+  <div class="control" data-area="mst"><h4>Adjust panel</h4><div class="where">Add-on · builder</div><p>The small panel that appears after Extrude, Inset, Bevel or Loop Cut so you can tweak the amount. <kbd>Esc</kbd> cancels.</p></div>
+  <div class="control" data-area="mst"><h4>Lighting Preset</h4><div class="where">Add-on · Pixel World</div><p>Dawn, Noon, Dusk, Night, Storm or Snow: sets time, sky, weather and god rays in one undoable click.</p></div>
+</div>
+<p class="countline" id="term-count"></p>
+
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You pressed <kbd>Ctrl</kbd>+<kbd>1</kbd> to get back to one viewport but the terrain switched to the Brush instead. Why?</summary><p>While the terrain is selected, number keys go to the terrain tools. Click another node (e.g. the scene root) first, then press <kbd>Ctrl</kbd>+<kbd>1</kbd>.</p></details>
+<details class="check"><summary>In the Roblox layout, how do you switch to Face mode? And in the MST layout?</summary><p>Roblox layout: <kbd>Alt</kbd>+<kbd>2</kbd> (bare <kbd>2</kbd> is the Move tool). MST / Modeler: plain <kbd>2</kbd>.</p></details>
+<details class="check"><summary>What's Roblox's "Anchored" in this add-on?</summary><p>There's an <b>Anchor</b> button, but it means "sit on and follow the terrain", not "freeze physics".</p></details>
+<details class="check"><summary>What does <code>res://</code> mean?</summary><p>The project folder. Every path that starts with it is a file inside your project.</p></details>
+
+<h2 id="related">Related pages</h2>
+<div class="cards">
+  <a class="card" href="01-godot-for-roblox.html"><img src="media/01-godot-for-roblox/00-orientation.png" alt="The Godot editor with a pixel island."><div><b>1 · Godot for Roblox builders</b><span>The editor tour these terms come from.</span></div></a>
+  <a class="card" href="09-builder-greybox.html"><img src="media/09-builder-greybox/02-editor-overview.png" alt="The Roblox-style ribbon."><div><b>9 · Greyboxing</b><span>The Roblox UI in depth.</span></div></a>
+  <a class="card" href="15-troubleshooting.html"><img src="media/13-playtest-export/59c-move-or-not-compare.png" alt="A player placed above the ground versus one left inside it."><div><b>15 · Troubleshooting</b><span>When a key or tool doesn't do what you expect.</span></div></a>
+</div>
+
+</div></main>
+<script>
+(function () {
+  // Chips + text filter for any table / list on this page. Rows carry data-area="a b c".
+  function wire(chipsId, filterId, rowsSel, countId, noun) {
+    var chips = document.querySelectorAll('#' + chipsId + ' button');
+    var box = document.getElementById(filterId);
+    var rows = document.querySelectorAll(rowsSel);
+    var count = document.getElementById(countId);
+    var area = '';
+    function apply() {
+      var q = (box.value || '').toLowerCase(), n = 0;
+      rows.forEach(function (r) {
+        var areas = (r.getAttribute('data-area') || '').split(' ');
+        var ok = (!q || r.textContent.toLowerCase().indexOf(q) >= 0) && (!area || areas.indexOf(area) >= 0);
+        r.style.display = ok ? '' : 'none'; if (ok) n++;
+      });
+      count.textContent = n + ' of ' + rows.length + ' ' + noun + ' shown';
+    }
+    chips.forEach(function (c) {
+      c.addEventListener('click', function () {
+        area = c.dataset.chip; chips.forEach(function (x) { x.classList.toggle('on', x === c); }); apply();
+      });
+    });
+    // app.js also filters on input; run ours after it so the chip stays applied.
+    box.addEventListener('input', function () { setTimeout(apply, 0); });
+    apply();
+  }
+  wire('key-chips', 'key-filter', '#key-table tbody tr', 'key-count', 'shortcuts');
+  wire('map-chips', 'map-filter', '#map-table tbody tr', 'map-count', 'terms');
+  wire('term-chips', 'term-filter', '#term-list .control', 'term-count', 'terms');
+})();
+</script>
+</body>
+</html>

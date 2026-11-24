@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your first world – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+  figure.narrow { max-width: 340px; }
+  figure.tall { max-width: 220px; }
+  .side { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 700px) { .side { grid-template-columns: 1fr; } }
+  .side figure { margin-top: 0; }
+  ol.steps > li h3 { margin-top: .2em; }
+  .stepnum { display: inline-block; min-width: 1.8em; padding: 0 6px; border-radius: 99px; background: var(--accent); color: #fff; font-size: .8rem; text-align: center; margin-right: 6px; vertical-align: 2px; }
+  .progress { position: sticky; top: 56px; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 14px; margin: 1em 0; display: flex; align-items: center; gap: 12px; font-size: .92rem; }
+  .progress .track { flex: 1; height: 8px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+  .progress .fill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .gotchas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 1em 0; }
+  .gotchas div { border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: var(--radius); padding: 10px 14px; background: var(--panel); }
+  .gotchas b { display: block; margin-bottom: 4px; }
+  .keystrip { display: flex; flex-wrap: wrap; gap: 6px; margin: .6em 0; }
+  .keystrip span { border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--panel); font-size: .9rem; }
+  .keystrip span kbd { margin-right: 4px; }
+  .mat-list { columns: 4; font-size: .93rem; } @media (max-width: 700px) { .mat-list { columns: 2; } }
+  table.keys td:first-child { white-space: nowrap; font-weight: 600; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Your first world (quick start)</h1>
+<p class="lede">Start from an empty scene and build a lit, sculpted, painted, tree-covered pixel-art island, then run it as a game. Takes about half an hour.</p>
+<div class="meta-row"><span class="pill">⏱ 30 min</span><span class="pill">Beginner</span><span class="pill">Finished scene: res://tutorial/guide/first_world.tscn</span></div>
+
+<figure class="shot"><img src="media/02-first-world/11-run-game.png" alt="The finished first world running in its game window: a square green pixel-art island seen at an angle, floating in a deep blue sea under a blue sky, with a sandy patch ringed by small dark-green trees at its centre."><figcaption>Where you'll end up: your island running as a game (<kbd>F6</kbd>). A 2×2-chunk terrain, a hill, a sand patch and trees, surrounded by pixel water.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>How to start a <a href="#s0">new 3D scene</a> and <a href="#s1">add a terrain</a>.</li>
+  <li>Why a new terrain shows nothing until you <a href="#s2">add chunks</a> and <a href="#s3">add lighting</a>.</li>
+  <li>How to <a href="#s4">raise a hill</a>, <a href="#s5">flatten ground</a>, <a href="#s6">paint sand</a> and <a href="#s7">plant trees</a>.</li>
+  <li>How to <a href="#s8">preview the pixel look</a>, how the <a href="#s9">camera</a> is set up for you, and how to <a href="#s10">save</a> and <a href="#s11">run</a> your world.</li>
+</ul>
+<p>If you haven't opened Godot before, read <a href="01-godot-for-roblox.html">Godot for Roblox builders</a> first. It explains the Scene dock, the Inspector, and how to move the camera.</p>
+
+<h2 id="gotchas">Three things that trip everyone up</h2>
+<p>These are the most common reasons a first world "doesn't work". Read them once before you start.</p>
+<div class="gotchas">
+  <div><b>1 · A new terrain is empty</b>It starts with <b>0 chunks</b> (a ⚠ sits on the node). You can't sculpt anything until you add at least one chunk with the <span class="ui">Chunks</span> tool (<a href="#s2">step 2</a>).</div>
+  <div><b>2 · It's dark until it's lit</b>A new scene has no sun and no sky, so you can't see what you're sculpting. Add <span class="ui">Pixel World → Sky &amp; Clouds</span> <em>before</em> sculpting (<a href="#s3">step 3</a>).</div>
+  <div><b>3 · Number keys switch terrain tools</b>While the terrain is selected, <kbd>1</kbd>–<kbd>9</kbd> pick terrain tools and don't reach editor shortcuts like <kbd>Ctrl</kbd>+<kbd>1</kbd>. Click another node (e.g. <code>World</code>) first if you need those.</div>
+</div>
+<div class="callout tip"><span class="label">Good to know</span><p>While a terrain tool is using <kbd>Shift</kbd>+wheel or <kbd>Alt</kbd>+wheel (for example, Shift+wheel for brush size), those wheel moves <b>don't zoom the camera</b>. The camera stays still while you resize the brush.</p></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is like opening a fresh baseplate, adding Terrain, using the Terrain Editor's Grow / Flatten / Paint tools, scattering some trees and pressing Play. The steps are in that order. The extra one is <b>Pixel World</b>, a one-click way to add sun, sky, day/night and water. Roblox has nothing like it; it's what gives the addon its finished pixel-art look.</p></div>
+
+<!-- ============================================================ BUILD -->
+<h2 id="build">The build, step by step</h2>
+<p>Tick each step as you go. The ticks are saved in your browser, so you can stop and come back later.</p>
+<div class="progress" aria-live="polite"><span id="prog-text">0 / 12 steps</span><div class="track"><div class="fill" id="prog-fill"></div></div></div>
+
+<ol class="steps" data-id="first-world" id="build-steps">
+
+<li id="s0"><h3><span class="stepnum">0</span>Make a new 3D scene</h3>
+<p>Choose <span class="ui">Scene → New Scene</span>. The Scene dock now says <b>Create Root Node</b> and shows four buttons: <span class="ui">2D Scene</span>, <span class="ui">3D Scene</span>, <span class="ui">User Interface</span>, <span class="ui">Other Node</span>. Click <span class="ui">3D Scene</span>. You get a <b>Node3D</b> root. Select it, press <kbd>F2</kbd> and rename it <code>World</code>.</p>
+<figure class="clip"><video src="media/02-first-world/01-new-scene.mp4" poster="media/02-first-world/01-new-scene.png" data-autoplay></video><figcaption>Scene → New Scene → 3D Scene. The root is renamed <code>World</code>.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The root node is your <b>Workspace</b>. A Node3D is an empty object in 3D space, like an empty Model or Folder.</p></div>
+</li>
+
+<li id="s1"><h3><span class="stepnum">1</span>Add the terrain</h3>
+<p>With <code>World</code> selected, click <b>+</b> in the Scene dock (or press <kbd>Ctrl</kbd>+<kbd>A</kbd>). In <b>Create New Node</b>, search <code>MarchingSquaresTerrain</code> and click <span class="ui">Create</span>. The new node is selected automatically, so two new things appear: the <b>terrain toolbar</b> (a vertical column on the left of the 3D view) and the <b>attribute strip</b> along the bottom.</p>
+<figure class="clip"><video src="media/02-first-world/02-add-terrain.mp4" poster="media/02-first-world/02-add-terrain.png" data-autoplay></video><figcaption>+ → Create New Node → <code>MarchingSquaresTerrain</code> → Create.</figcaption></figure>
+<p>Look at the Inspector. The terrain already has <b>Contents</b> (an automatically created <code>MarchingSquaresTerrainData</code>, where its heights and paint are stored), a <b>Tex Assign</b> (the default texture set), <b>Grid Type = Square</b>, <b>Chunk Size = 32</b> and <b>Cell Size = 2.0 × 2.0</b>. What it doesn't have yet is any <b>chunks</b>, so there's nothing to see.</p>
+<div class="callout warn"><span class="label">Watch out</span><p>The node shows a ⚠ warning. That's expected: it just means "no chunks yet". The next step clears it.</p></div>
+</li>
+
+<li id="s2"><h3><span class="stepnum">2</span>Add chunks (the step everyone misses)</h3>
+<p>A <b>chunk</b> is one square tile of ground. Here each one is 32 cells × 2 m = 64 m across. Click <span class="ui">Chunks</span> in the terrain toolbar (or press <kbd>8</kbd>). The strip becomes the <b>Chunk Manager</b>. Look at the terrain from above (top view: <kbd>Kp 7</kbd>). You'll see <b>green "+" markers</b> at the empty chunk slots.</p>
+<ul>
+  <li><b>LMB a green +</b>: adds a chunk there. It fills with grass straight away.</li>
+  <li><b>LMB an existing chunk</b>: <em>removes</em> it. Careful!</li>
+  <li><b><kbd>Ctrl</kbd>+LMB</b>: selects a chunk.</li>
+</ul>
+<p>Add <b>four</b> chunks in a 2×2 square (128 m × 128 m).</p>
+<figure class="clip"><video src="media/02-first-world/03-add-chunks.mp4" poster="media/02-first-world/03-add-chunks.png" data-autoplay></video><figcaption>Top view with the Chunks tool: clicking green + markers adds chunks.</figcaption></figure>
+<figure class="shot"><img src="media/02-first-world/42-chunks-strip.png" alt="The Chunk Manager strip: a Chunk dropdown, a chunk count, a Remove Chunk button, Merge Mode set to Polyhedron, an Apply Mode to All Chunks button, a Vertex Handles checkbox and the hint LMB = add chunk, LMB chunk: remove, Ctrl+LMB select."><figcaption>The Chunk Manager strip: <b>Chunk</b> dropdown, chunk count, <b>Remove Chunk</b>, <b>Merge Mode</b> (Polyhedron), <b>Apply Mode to All Chunks</b>, <b>Vertex Handles</b>. Full details on <a href="06-chunks-settings.html">Chunks, settings &amp; saving</a>.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox the terrain region is always there to sculpt. Here you first choose <b>where ground exists</b> by placing chunks, like laying baseplate tiles. Then you sculpt them.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>In the editor, your chunks blend into endless procedural grassland (the "Surroundings" feature), so it's hard to see where they end. The edge of your island becomes obvious once you run the game.</p></div>
+</li>
+
+<li id="s3"><h3><span class="stepnum">3</span>Light it with Pixel World</h3>
+<p>Click <span class="ui">Pixel World</span> in viewport toolbar row 2. It's a drop-down <b>Add</b> menu, not a dialog. Add these four items, in this order:</p>
+<div class="side">
+  <figure class="shot tall"><img src="media/02-first-world/20-pixelworld-menu.png" alt="The Pixel World Add menu: Renderer, Sky &amp; Clouds, Day / Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke &amp; Fire, Light Volume, Sun Shafts, Pixel Object, Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire; then Lighting Preset: Dawn, Noon, Dusk, Night, Storm, Snow; then Wire Sun / Env Refs; then Project: Features."><figcaption>The full Pixel World menu.</figcaption></figure>
+  <div>
+    <table class="keys">
+      <thead><tr><th>Add</th><th>What appears</th></tr></thead>
+      <tbody>
+        <tr><td>1. Renderer</td><td>A <b>PixelRenderer</b> node <em>and</em> a <b>Camera</b>. The view becomes pixelated, a <b>Pixel World dock</b> opens on the right (rows with <span class="ui">Select</span> or <span class="ui">+ Add</span>), and a <b>Renderer settings strip</b> opens at the bottom (Pixel Size = 4, Mode = Anchor, Depth Range = 200…).</td></tr>
+        <tr><td>2. Sky &amp; Clouds</td><td>A <b>Sun</b> (directional light) and a <b>WorldEnvironment</b> (sky). <b>This is what lights the scene.</b></td></tr>
+        <tr><td>3. Day / Night</td><td>A <b>DayNight</b> node that drives the time of day.</td></tr>
+        <tr><td>4. Water</td><td>A <b>Water</b> plane. Your flat terrain sits at height 0, the water level, so the land now reads as an <b>island</b>.</td></tr>
+      </tbody>
+    </table>
+    <p>The dock's <span class="ui">+ Add</span> buttons do exactly the same thing as this menu.</p>
+  </div>
+</div>
+<figure class="clip"><video src="media/02-first-world/21-pixelworld-add.mp4" poster="media/02-first-world/21-pixelworld-add.png" data-autoplay></video><figcaption>Adding the Pixel World components. The 3D view is split into four viewports in this clip; if that happens to you, <a href="#gotchas">gotcha 3</a> explains how to get back to one.</figcaption></figure>
+<div class="callout warn"><span class="label">Watch out</span><p>After adding, <b>Water</b> (and <b>Birds</b>, if you add it) may show a ⚠. They want to be connected to the Sun and sky. Choose <span class="ui">Pixel World → Wire Sun / Env Refs</span> to clear it. The scene runs fine either way.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>Want a different mood? The <b>Lighting Preset</b> entries (Dawn, Noon, Dusk, Night, Storm, Snow) set the lighting in one click. Everything else in the menu is covered on <a href="07-pixelizer.html">The pixelizer</a> and <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a>.</p></div>
+</li>
+
+<li id="s4"><h3><span class="stepnum">4</span>Raise a hill (Brush)</h3>
+<p>Click <span class="ui">MarchingSquaresTerrain</span> in the Scene dock again, then choose <span class="ui">Brush</span> (key <kbd>1</kbd>). In the strip, set <span class="ui">Brush Mode</span> to <b>Raise / Lower</b>. Hover over the middle of your island and <b>hold the left mouse button</b>. A hill grows, with a smooth slope at its edges.</p>
+<figure class="clip"><video src="media/02-first-world/04-sculpt-hill.mp4" poster="media/02-first-world/04-sculpt-hill.png" data-autoplay></video><figcaption>Brush in Raise / Lower mode: holding LMB raised the ground from 0 to about 10.6.</figcaption></figure>
+<figure class="shot"><img src="media/02-first-world/41-brush-strip.png" alt="The Brush attribute strip: Brush Type Round, Brush Mode Drag, Size 15, Aspect 1.009, Rotation 0, Flatten checked, Falloff checked, Peak 0.010, Grid Size, Quick Paint None."><figcaption>The Brush strip (shown before switching to Raise / Lower): Brush Type, Brush Mode, <b>Size</b> (15), Aspect, Rotation, Flatten, Falloff, Peak.</figcaption></figure>
+<table class="keys">
+  <thead><tr><th>Input (Raise / Lower)</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td>Hold LMB</td><td>Raise</td></tr>
+    <tr><td>Hold RMB</td><td>Lower</td></tr>
+    <tr><td>LMB + RMB</td><td>Flatten</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+LMB / MMB / RMB</td><td>Pick the Ceiling / Height / Floor from the ground under the cursor</td></tr>
+    <tr><td><kbd>Shift</kbd>+wheel</td><td>Brush size</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Strength</td></tr>
+  </tbody>
+</table>
+<p>In Raise / Lower mode the strip also shows <b>Ceiling</b> (16, the highest it will raise), <b>Height</b> (0), <b>Floor</b> (−8, the lowest it will dig) and <b>Strength</b> (about 4). The other mode, <b>Drag</b>, paints a selection of cells and then lifts them all at once. Every sculpt tool is covered on <a href="03-terrain-sculpting.html">Sculpting terrain</a>.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This works like the Terrain Editor's <b>Grow</b> and <b>Erode</b>: hold to raise, right-click to lower, both together to flatten.</p></div>
+</li>
+
+<li id="s5"><h3><span class="stepnum">5</span>Flatten a spot (Level)</h3>
+<p>Choose <span class="ui">Level</span> (key <kbd>2</kbd>). It pulls ground toward the <b>Height</b> value in the strip (0 by default). LMB-drag across part of the hill to cut a flat plateau. <kbd>Ctrl</kbd>+LMB picks up the height under the cursor, so you can level other ground to match it.</p>
+<figure class="clip"><video src="media/02-first-world/05-level-flatten.mp4" poster="media/02-first-world/05-level-flatten.png" data-autoplay></video><figcaption>Level: LMB-drag flattens toward Height. Strip: Brush Type, Size, Aspect, Rotation, Height, Falloff, Peak.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is the Terrain Editor's <b>Flatten</b>.</p></div>
+</li>
+
+<li id="s6"><h3><span class="stepnum">6</span>Paint some sand (Paint)</h3>
+<p>Choose <span class="ui">Paint</span> (key <kbd>6</kbd>). In the <span class="ui">Material</span> dropdown pick <b>4. Sand</b>, then LMB-drag over the ground. <kbd>Ctrl</kbd>+LMB picks up the material under the cursor, and <kbd>Shift</kbd>+wheel changes the size. A <b>Textures</b> panel also opens on the right (per-slot Pattern, Scale, Color, Grass toggle and sprite).</p>
+<figure class="clip"><video src="media/02-first-world/06-paint.mp4" poster="media/02-first-world/06-paint.png" data-autoplay></video><figcaption>Painting Sand. The Textures panel is on the right.</figcaption></figure>
+<figure class="shot"><img src="media/02-first-world/43-paint-strip.png" alt="The Paint strip: Rotation, Material 1. Grass, Texture Name, Texture Preset None, Paint Walls, Slope Min 0, Slope Max 90, and the edge of the Textures panel showing Texture 2 Meadow."><figcaption>The Paint strip: <b>Material</b>, Texture Name, Texture Preset, <b>Paint Walls</b>, <b>Slope Min / Max</b>.</figcaption></figure>
+<p>The 16 ground materials:</p>
+<ol class="mat-list"><li>Grass</li><li>Meadow</li><li>Forest Floor</li><li>Sand</li><li>Dirt</li><li>Cliff</li><li>Dark Rock</li><li>Snow</li><li>Gravel</li><li>Clay</li><li>Moss</li><li>Path</li><li>Stone Tiles</li><li>Ash</li><li>Ice</li><li>Void</li></ol>
+<p>Everything about painting (textures, tint, slopes) is on <a href="04-terrain-painting.html">Painting, textures &amp; tint</a>.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same as the Terrain Editor's <b>Paint</b>: pick a material, drag over the ground.</p></div>
+</li>
+
+<li id="s7"><h3><span class="stepnum">7</span>Plant trees (Foliage)</h3>
+<p>Choose <span class="ui">Foliage</span> (key <kbd>5</kbd>). A palette opens on the right: <b>Grass</b>, <b>+ Bush</b>, <b>+ Flowers</b>, <b>+ Pine</b>, <b>+ Rock</b> and <b>+ Tree</b>. (A <b>+</b> means a built-in prop this terrain doesn't use yet; your first stroke adds it to the terrain and the + disappears.) Click <b>+ Tree</b>, then LMB-drag across the island. Each drag scatters trees (one drag placed 138 of them). RMB or <kbd>Shift</kbd>+LMB erases.</p>
+<figure class="clip"><video src="media/02-first-world/07-foliage.mp4" poster="media/02-first-world/07-foliage.png" data-autoplay></video><figcaption>Foliage: dragging to scatter trees.</figcaption></figure>
+<figure class="shot"><img src="media/02-first-world/44-foliage-strip.png" alt="The Foliage strip: Size 46, Density 0.253, Slope Min 0, Slope Max 90, an Erase All checkbox, Fill Terrain and Clear buttons, with the prop palette at the right showing + Flowers, + Pine, + Rock and + Tree (selected)."><figcaption>The Foliage strip: Size, <b>Density</b> (0.253), Slope Min / Max, the <b>Erase All</b> checkbox (erasing then removes every prop, not just the selected one), <b>Fill Terrain</b>, <b>Clear</b>, and the prop palette.</figcaption></figure>
+<p>All foliage options are on <a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a>.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>It's like dropping lots of tree Models from the Toolbox, except you paint them on in one stroke.</p></div>
+</li>
+
+<li id="s8"><h3><span class="stepnum">8</span>Check the pixel look (Pixel Preview)</h3>
+<p>Click <span class="ui">Pixel Preview</span> in toolbar row 2. It turns on the final pixel-art processing in the editor: chunkier pixels and dithered edges, as in the game. The pixel style always shows once there's a PixelRenderer. This button controls the final-resolution pass.</p>
+<div class="compare" data-before="Pixel Preview off" data-after="Pixel Preview on"><img src="media/02-first-world/30-pixelpreview-off.png" alt="Top view of the island's sand patch and round trees with Pixel Preview off: smoother edges."><img src="media/02-first-world/31-pixelpreview-on.png" alt="The same view with Pixel Preview on: chunkier pixels and dithered edges."></div>
+<figure class="clip"><video src="media/02-first-world/08-pixel-preview.mp4" poster="media/02-first-world/08-pixel-preview.png" data-autoplay></video><figcaption>Toggling Pixel Preview on and off.</figcaption></figure>
+<p>Pixel size, outlines, palettes and more are on <a href="07-pixelizer.html">The pixelizer</a>.</p>
+</li>
+
+<li id="s9"><h3><span class="stepnum">9</span>The camera (already done)</h3>
+<p>You don't need to add a camera. The <b>Renderer</b> from step 3 already added a <code>Camera</code>, and the running game uses it. Select it to get <span class="ui">Preview</span> (look through it) and <span class="ui">Pilot</span> (fly it) toggles at the top-left of the 3D view.</p>
+<p>If you ever want to place one yourself: <b>+</b> → <code>Camera3D</code>, then move it with the <kbd>W</kbd> / <kbd>E</kbd> gizmo (see <a href="01-godot-for-roblox.html#gizmo">page 1</a>).</p>
+<figure class="shot narrow"><img src="media/02-first-world/40-scene-tree.png" alt="The finished scene tree: World with children MarchingSquaresTerrain, Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water and Birds; Water and Birds show small warning triangles."><figcaption>The finished tree: <code>World</code> → terrain, Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water, Birds. (Birds is an optional extra from the same Pixel World menu.) The ⚠ on Water and Birds clears with Wire Sun / Env Refs.</figcaption></figure>
+</li>
+
+<li id="s10"><h3><span class="stepnum">10</span>Save</h3>
+<p>Press <kbd>Ctrl</kbd>+<kbd>S</kbd>. The first time, <b>Save Scene As…</b> opens. Go into <code>tutorial</code> → <code>guide</code> (Path <code>res://tutorial/guide/</code>), set <b>File</b> to <code>first_world.tscn</code>, and click <span class="ui">Save</span>. (Pick a different name if you don't want to overwrite the ready-made copy.)</p>
+<div class="pair">
+  <figure class="clip"><video src="media/02-first-world/10-save.mp4" poster="media/02-first-world/10-save.png" data-autoplay></video><figcaption>Save Scene As…: moving through the folders.</figcaption></figure>
+  <figure class="shot"><img src="media/02-first-world/20-save-dialog.png" alt="The Save Scene As dialog with the Path set to res://tutorial/guide, the guide scene files listed in the folder, a File field reading first_world.tscn, a filter All Recognized (*.tscn, *.scn, *.res), and Cancel / Save buttons."><figcaption>The dialog: Path at the top, folders in the middle, <b>File</b> name and Save at the bottom.</figcaption></figure>
+</div>
+<p>The saved scene is <b>self-contained</b>. The terrain's chunks, heights, paint and foliage are stored inside the <code>.tscn</code> itself; the only outside files it uses are the addon's own textures and shaders.</p>
+</li>
+
+<li id="s11"><h3><span class="stepnum">11</span>Run it!</h3>
+<p>Put the mouse over the 3D view and press <kbd>F6</kbd> (Run Current Scene). A 1280×720 game window opens, shows the Godot splash, then your world: a green pixel-art island in a blue sea under a dawn sky, with your sand patch and trees in the middle. Press <kbd>F8</kbd> to stop.</p>
+<figure class="clip"><video src="media/02-first-world/11-run-game.mp4" poster="media/02-first-world/11-run-game.png" data-autoplay></video><figcaption>The finished first world, running.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p><kbd>F6</kbd> = Play, <kbd>F8</kbd> = Stop. The game runs in its own window, so close or stop it before making more edits.</p></div>
+</li>
+</ol>
+
+<div class="callout try"><span class="label">Try it</span><p>Want to compare with the finished version? Open <code>res://tutorial/guide/first_world.tscn</code> from the FileSystem dock (<code>tutorial</code> → <code>guide</code>). It's exactly this build: 2×2 chunks, a hill, a levelled patch, sand, trees, Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water and Birds.</p></div>
+
+<!-- ============================================================ REFERENCE -->
+<h2 id="tools-ref">Terrain tools at a glance</h2>
+<p>While the terrain is selected, the toolbar on the left of the 3D view lists its tools. Number keys pick them:</p>
+<div class="keystrip">
+  <span><kbd>1</kbd>Brush</span><span><kbd>2</kbd>Level</span><span><kbd>3</kbd>Smooth</span><span><kbd>4</kbd>Bridge</span><span><kbd>5</kbd>Foliage</span><span><kbd>6</kbd>Paint</span><span><kbd>7</kbd>Inspect</span><span><kbd>8</kbd>Chunks</span><span><kbd>9</kbd>Settings</span>
+</div>
+<p class="note">Keys 1, 2, 5, 6 and 8 were used in this walkthrough. The others follow the toolbar order (Stamp, Gradient and Select come after Settings and have no number key). Each tool's page lists its exact key.</p>
+<input class="filter-box" data-target="#tool-ref" placeholder="Filter tools and controls…">
+<div id="tool-ref">
+  <div class="control"><h4>Chunks</h4><div class="where">Terrain toolbar · key 8</div><p>Add/remove ground tiles. LMB a green + adds, LMB a chunk removes, Ctrl+LMB selects. Strip: Chunk, count, Remove Chunk, Merge Mode, Apply Mode to All Chunks, Vertex Handles.</p><dl><dt>Deep page</dt><dd><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a></dd></dl></div>
+  <div class="control"><h4>Brush</h4><div class="where">Terrain toolbar · key 1</div><p>Sculpt. Modes: Raise / Lower (hold LMB raise, RMB lower, both flatten) and Drag. Size 15 default; Ceiling 16, Height 0, Floor −8, Strength ≈ 4.</p><dl><dt>Keys</dt><dd><kbd>Shift</kbd>+wheel size · <kbd>Ctrl</kbd>+wheel strength</dd><dt>Deep page</dt><dd><a href="03-terrain-sculpting.html">Sculpting terrain</a></dd></dl></div>
+  <div class="control"><h4>Level</h4><div class="where">Terrain toolbar · key 2</div><p>LMB-drag levels to Height; Ctrl+LMB picks the hovered height.</p><dl><dt>Deep page</dt><dd><a href="03-terrain-sculpting.html">Sculpting terrain</a></dd></dl></div>
+  <div class="control"><h4>Paint</h4><div class="where">Terrain toolbar · key 6</div><p>Paint one of 16 materials. Ctrl+LMB picks; Paint Walls; Slope Min / Max; Textures panel.</p><dl><dt>Deep page</dt><dd><a href="04-terrain-painting.html">Painting, textures &amp; tint</a></dd></dl></div>
+  <div class="control"><h4>Foliage</h4><div class="where">Terrain toolbar · key 5</div><p>Scatter Grass / Tree / Bush / Flowers / Pine / Rock. RMB or Shift+LMB erases (tick Erase All to erase every prop). Density, Slope, Fill Terrain, Clear.</p><dl><dt>Deep page</dt><dd><a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a></dd></dl></div>
+  <div class="control"><h4>Pixel World</h4><div class="where">Viewport toolbar row 2</div><p>Add menu: Renderer, Sky &amp; Clouds, Day / Night, Weather, Water, Fireflies, Particle Field, Birds, Smoke &amp; Fire, Light Volume, Sun Shafts, Pixel Object, Animation Stepper, Diagnostics, Erosion, Wild Flowers, Grass Fire; Lighting Presets; Wire Sun / Env Refs; Features.</p><dl><dt>Deep pages</dt><dd><a href="07-pixelizer.html">The pixelizer</a> · <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a></dd></dl></div>
+  <div class="control"><h4>Pixel Preview</h4><div class="where">Viewport toolbar row 2</div><p>Toggle the final pixel-art pass in the editor.</p><dl><dt>Deep page</dt><dd><a href="07-pixelizer.html">The pixelizer</a></dd></dl></div>
+  <div class="control"><h4>Roblox UI</h4><div class="where">Viewport toolbar row 2</div><p>Studio-style Model / Edit ribbon for building with parts. Newly inserted builder parts come in <b>solid grey</b>, like a fresh Roblox Part.</p><dl><dt>Deep page</dt><dd><a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a></dd></dl></div>
+</div>
+
+<h2 id="recipes">Recipes &amp; variations</h2>
+<div class="tabs">
+  <div class="panel" data-tab="Bigger island">
+    <p>Go back to <span class="ui">Chunks</span> (<kbd>8</kbd>) and click more green + markers around the edge. Each new chunk adds 64 m of grass that you can sculpt.</p>
+  </div>
+  <div class="panel" data-tab="Mountain & valley">
+    <p>Brush in Raise / Lower mode: raise to Ceiling with LMB, then hold RMB elsewhere to dig down toward Floor (−8). Remember the water sits at height 0, so anything you dig below that is under the sea line.</p>
+  </div>
+  <div class="panel" data-tab="Beach ring">
+    <p>Paint (<kbd>6</kbd>), material <b>4. Sand</b>, and drag along the island's edge where it meets the water. Use <kbd>Shift</kbd>+wheel for a narrower brush.</p>
+  </div>
+  <div class="panel" data-tab="Sunset">
+    <p>Pixel World → Lighting Preset → <b>Dusk</b> (or Dawn, Noon, Night, Storm, Snow), then run with <kbd>F6</kbd>.</p>
+  </div>
+  <div class="panel" data-tab="Forest fill">
+    <p>Foliage (<kbd>5</kbd>), pick <b>Tree</b> (or <b>+ Tree</b> / <b>+ Pine</b>), and click <span class="ui">Fill Terrain</span> to cover everything. <span class="ui">Clear</span> removes every copy of the selected prop again.</p>
+  </div>
+</div>
+
+<h2 id="trouble">If something goes wrong</h2>
+<input class="filter-box" data-target="#trouble-list" placeholder="Filter problems…">
+<div id="trouble-list">
+  <div class="control"><h4>I can't sculpt anything</h4><div class="where">Step 2</div><p>The terrain has no chunks. Use Chunks (<kbd>8</kbd>) and click a green +.</p></div>
+  <div class="control"><h4>Everything is dark / black</h4><div class="where">Step 3</div><p>No sun yet. Pixel World → <b>Sky &amp; Clouds</b>, or pick a Lighting Preset.</p></div>
+  <div class="control"><h4>A chunk disappeared when I clicked</h4><div class="where">Step 2</div><p>LMB on an existing chunk removes it. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p></div>
+  <div class="control"><h4>Ctrl+1 or other number shortcuts don't work</h4><div class="where">Any step</div><p>The terrain is selected, so number keys switch terrain tools. Click <code>World</code> first.</p></div>
+  <div class="control"><h4>The 3D view is split into four</h4><div class="where">Any step</div><p>Select a non-terrain node, then <kbd>Ctrl</kbd>+<kbd>1</kbd> (or View → 1 Viewport).</p></div>
+  <div class="control"><h4>Water / Birds show a ⚠ warning</h4><div class="where">Step 3</div><p>Pixel World → <b>Wire Sun / Env Refs</b>. It runs fine even with the warning.</p></div>
+  <div class="control"><h4>I can't tell where my island ends</h4><div class="where">Editor only</div><p>That's the endless Surroundings grassland. Run the game: the island is clearly bounded by sea.</p></div>
+  <div class="control"><h4>The camera zooms when I change brush size</h4><div class="where">Step 4–7</div><p>It shouldn't: <kbd>Shift</kbd>/<kbd>Alt</kbd>+wheel don't zoom while a terrain tool uses them. If the camera still zooms, your copy of the addon is older than this guide; update it.</p></div>
+  <div class="control"><h4>Brush keys do nothing</h4><div class="where">Steps 4–7</div><p>Make sure <b>MarchingSquaresTerrain</b> is selected (the terrain toolbar is only there when it is).</p></div>
+</div>
+<p>More fixes are on <a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</p>
+
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You've just added a MarchingSquaresTerrain and nothing shows up. Why, and what do you do?</summary><p>A new terrain has <b>0 chunks</b>. Choose <span class="ui">Chunks</span> (<kbd>8</kbd>), look from above and click a green <b>+</b> marker.</p></details>
+<details class="check"><summary>Which Pixel World entry actually lights the scene?</summary><p><b>Sky &amp; Clouds</b>. It adds the Sun and the WorldEnvironment. (Renderer adds the pixel renderer and the camera.)</p></details>
+<details class="check"><summary>Why does a flat terrain look like an island once Water is added?</summary><p>The chunks sit at height 0, the water surface. The water surrounds them, so the land reads as an island. Anything you raise becomes a hill above the sea.</p></details>
+<details class="check"><summary>Do you need to add a Camera3D before running?</summary><p>No. Adding the <b>Renderer</b> also added a Camera, and the game uses it.</p></details>
+
+<h2 id="next">Where next</h2>
+<div class="cards">
+  <a class="card" href="03-terrain-sculpting.html"><img src="media/02-first-world/05-level-flatten.png" alt="Levelling terrain."><div><b>3 · Sculpting terrain</b><span>Brush, Level, Smooth, Bridge and more.</span></div></a>
+  <a class="card" href="04-terrain-painting.html"><img src="media/02-first-world/06-paint.png" alt="Painting sand."><div><b>4 · Painting, textures &amp; tint</b><span>All 16 materials, slopes and the Textures panel.</span></div></a>
+  <a class="card" href="05-foliage-grass.html"><img src="media/02-first-world/07-foliage.png" alt="Scattering trees."><div><b>5 · Foliage, grass &amp; flowers</b><span>Density, slopes, Fill Terrain and props.</span></div></a>
+  <a class="card" href="07-pixelizer.html"><img src="media/02-first-world/31-pixelpreview-on.png" alt="Pixel preview on."><div><b>7 · The pixelizer</b><span>Pixel size, outlines, palettes.</span></div></a>
+</div>
+
+</div></main>
+<script>
+(function () {
+  // Progress bar for the build steps (reads the checkboxes app.js adds).
+  function update() {
+    var boxes = document.querySelectorAll('#build-steps > li > input.check');
+    var n = 0; boxes.forEach(function (b) { if (b.checked) n++; });
+    var t = boxes.length || 12;
+    document.getElementById('prog-text').textContent = n + ' / ' + t + ' steps' + (n === t ? ' 🎉 Done! Press F6.' : '');
+    document.getElementById('prog-fill').style.width = (100 * n / t) + '%';
+  }
+  document.addEventListener('change', function (e) { if (e.target.matches && e.target.matches('#build-steps input.check')) update(); });
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(update, 0); });
+})();
+</script>
+</body>
+</html>

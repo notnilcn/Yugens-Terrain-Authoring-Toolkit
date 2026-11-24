@@ -1,0 +1,3389 @@
+{
+  "page": "05-foliage-grass",
+  "media_dir": "docs/guide/media/05-foliage-grass",
+  "session": {
+    "scene": "res://tutorial/02_island.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [
+    {
+      "wait": 1
+    },
+    {
+      "shell": "python3 /tmp/opencode/mst_ui_ds.py waitready"
+    },
+    {
+      "shell": "cat > /tmp/opencode/mst_ui_ds.py <<'PYEOF'\nimport json, os, subprocess, sys, tempfile, time\nDRIVE = [\"python3\", \"qa/drive.py\", \"--port\", os.environ.get(\"PORT\") or os.environ.get(\"MST_QA_PORT\", \"8879\"),\n         \"--display\", os.environ.get(\"DISPLAY\", \":79\")]\n\n\ndef run(*a):\n    try:\n        return subprocess.run(DRIVE + [str(x) for x in a], cwd=os.environ.get(\"ROOT\", \".\"),\n                              capture_output=True, text=True, timeout=45)\n    except subprocess.TimeoutExpired:\n        class R: returncode = 1; stdout = \"\"; stderr = \"timeout\"\n        return R()\n\n\ndef dump():\n    p = tempfile.mktemp(suffix=\".json\")\n    r = run(\"ui\", \"--filter\", \"\", \"--save\", p)\n    if r.returncode:\n        sys.exit(\"ui failed: \" + r.stderr[-300:])\n    d = json.load(open(p)); os.unlink(p)\n    return [c for c in d[\"controls\"] if c.get(\"rect\") and c[\"rect\"][2] > 0 and c[\"rect\"][3] > 0 and c.get(\"visible\")]\n\n\ndef find(name, classes=None, field=\"name\"):\n    cs = dump()\n    if classes:\n        cs = [c for c in cs if c.get(\"class\") in classes]\n    order = {\"name\": (\"name\", \"text\", \"tooltip\"), \"text\": (\"text\", \"name\", \"tooltip\"),\n             \"tooltip\": (\"tooltip\", \"name\", \"text\")}[field]\n    for key in order:\n        hits = [c for c in cs if c.get(key) == name]\n        if hits:\n            return hits[0]\n    sys.exit(\"control not found: \" + name)\n\n\ndef center(c):\n    x, y, w, h = c[\"rect\"]\n    return int(x + w / 2), int(y + h / 2)\n\n\ndef path(p):\n    return p if os.path.isabs(p) else os.path.join(os.environ.get(\"OUT\", \".\"), p)\n\n\ndef expand(text):\n    for _ in range(3):\n        c = find(text, (\"EditorInspectorSection\",), field=\"tooltip\")\n        if c[\"rect\"][3] >= 40:\n            return c\n        run(\"click\", *center(c)); time.sleep(1.2)\n    return find(text, (\"EditorInspectorSection\",), field=\"tooltip\")\n\n\ncmd = sys.argv[1]\nif cmd == \"full\":\n    from PIL import Image, ImageDraw\n    out = path(sys.argv[2]); tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    im = Image.open(tmp)\n    if len(sys.argv) > 3 and sys.argv[3] == \"boxes\":\n        d = ImageDraw.Draw(im)\n        for r in [(280, 202, 408, 703), (1060, 157, 1298, 728), (412, 739, 930, 861)]:\n            d.rectangle(r, outline=(255, 59, 48), width=4)\n    im.save(out); os.unlink(tmp); print(out)\nelif cmd == \"cropwin\":\n    from PIL import Image\n    out = path(sys.argv[2]); x, y, w, h = [int(v) for v in sys.argv[3:7]]\n    scale = float(sys.argv[7]) if len(sys.argv) > 7 else 1\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    im = Image.open(tmp).crop((x, y, x + w, y + h))\n    if scale != 1:\n        im = im.resize((int(w * scale), int(h * scale)), Image.NEAREST)\n    im.save(out); os.unlink(tmp); print(out)\nelif cmd == \"cropgrass\":\n    from PIL import Image\n    out = path(sys.argv[2])\n    c = expand(\"Grass\"); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    im = img.crop((int(x) - 2, int(y) + 196, int(x) - 2 + 258, int(y) + 196 + 212))\n    im.resize((516, 424), Image.NEAREST).save(out); os.unlink(tmp); print(out)\nelif cmd == \"crop\":\n    from PIL import Image\n    out, name = path(sys.argv[2]), sys.argv[3]\n    pads = [int(v) for v in sys.argv[4:8]]\n    c = find(name); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pads[0]), max(0, y - pads[2]), min(img.width, x + w + pads[1]), min(img.height, y + h + pads[3]))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"click\":\n    c = find(sys.argv[2])\n    print(run(\"click\", *center(c)).stdout[-80:])\nelif cmd == \"clickt\":\n    c = find(sys.argv[2], field=\"text\")\n    print(run(\"click\", *center(c)).stdout[-80:])\nelif cmd == \"click2\":\n    name, text = sys.argv[2], sys.argv[3]\n    cs = [c for c in dump() if c.get(\"name\") == name and c.get(\"text\") == text]\n    if not cs:\n        sys.exit(\"control not found: %s/%s\" % (name, text))\n    print(run(\"click\", *center(cs[0])).stdout[-80:])\nelif cmd == \"check\":\n    want = sys.argv[3].lower() in (\"1\", \"on\", \"true\", \"yes\")\n    c = find(sys.argv[2], (\"CheckBox\",))\n    if bool(c.get(\"toggled\")) != want:\n        run(\"click\", *center(c)); time.sleep(0.4)\n    print(sys.argv[2], \"->\", want)\nelif cmd == \"checky\":\n    want = sys.argv[2].lower() in (\"1\", \"on\", \"true\", \"yes\")\n    cs = [c for c in dump() if c.get(\"class\") == \"CheckBox\" and c[\"rect\"][1] > 700\n          and 580 < c[\"rect\"][0] < 1010]\n    if not cs:\n        sys.exit(\"no strip checkbox\")\n    c = cs[0]\n    if bool(c.get(\"toggled\")) != want:\n        run(\"click\", *center(c)); time.sleep(0.5)\n    print(\"strip check ->\", want)\nelif cmd == \"spin_at\":\n    x, y, val = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.5)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", val); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(\"spin@\", x, y, \":=\", val)\nelif cmd == \"spin\":\n    c = find(sys.argv[2], (\"EditorSpinSlider\", \"SpinBox\"))\n    x, y = center(c)\n    run(\"click\", x, y); time.sleep(0.5)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[3]); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(sys.argv[2], \":=\", sys.argv[3])\nelif cmd == \"insp1\":\n    expand(\"Look\"); g = expand(\"Grass\")\n    gy, gh = g[\"rect\"][1], g[\"rect\"][3]\n    cs = [c for c in dump() if c.get(\"class\") == \"EditorSpinSlider\" and c[\"rect\"][0] > 1330\n          and gy <= c[\"rect\"][1] <= gy + gh + 80]\n    if not cs:\n        run(\"wheel\", 1400, 500, \"down\", \"--times\", \"3\"); time.sleep(1.2)\n        cs = [c for c in dump() if c.get(\"class\") == \"EditorSpinSlider\" and c[\"rect\"][0] > 1330\n              and 300 < c[\"rect\"][1] < 1200]\n    if not cs:\n        sys.exit(\"no inspector spin slider\")\n    c = cs[0]; x, y = center(c)\n    run(\"click\", x, y); time.sleep(0.5)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[2]); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(\"insp1\", c[\"rect\"], \":=\", sys.argv[2])\nelif cmd == \"slider\":\n    c = find(sys.argv[2], (\"HSlider\",))\n    frac = max(0.0, min(1.0, float(sys.argv[3]))); x, y, w, h = c[\"rect\"]\n    tx = int(x + 2 + frac * (w - 4)); yy = int(y + h / 2)\n    run(\"drag\", tx - 1, yy, tx + 1, yy, \"--duration\", \"0.2\"); time.sleep(0.5)\n    print(sys.argv[2], \"->\", frac)\nelif cmd == \"pal\":\n    col, row = int(sys.argv[2]), int(sys.argv[3])\n    x = 1123 if col == 0 else 1235\n    y = 407 + 100 * row\n    run(\"click\", x, y); time.sleep(0.4)\n    print(\"pal\", col, row, \"at\", x, y)\nelif cmd == \"dbl\":\n    x, y = int(sys.argv[2]), int(sys.argv[3])\n    run(\"click\", x, y); time.sleep(0.15); run(\"click\", x, y); time.sleep(0.6)\n    print(\"dbl\", x, y)\nelif cmd == \"waitready\":\n    last = None\n    stable = 0\n    ok = False\n    for _ in range(40):\n        try:\n            info = json.loads(run(\"info\").stdout)\n        except Exception:\n            info = {}\n        scene = info.get(\"scene\")\n        if scene and scene == last:\n            stable += 1\n            if stable >= 2:\n                ok = True\n                break\n        else:\n            stable = 0\n        last = scene\n        time.sleep(2.5)\n    if not ok:\n        sys.exit(\"editor did not settle (scene never stable)\")\n    time.sleep(3)\n    print(\"scene ready:\", last)\nelif cmd == \"foliage\":\n    ok = False\n    for _ in range(6):\n        cs = dump()\n        pal = [c for c in cs if c.get(\"name\") == \"FoliagePalette\"]\n        title = [c for c in cs if c.get(\"name\") == \"ToolTitle\" and c.get(\"text\") == \"Foliage\"]\n        if pal and title:\n            ok = True; break\n        f = [c for c in cs if c.get(\"name\") == \"Foliage\" and c.get(\"class\") == \"Button\"]\n        if not f:\n            sys.exit(\"no Foliage button\")\n        run(\"click\", *center(f[0])); time.sleep(2.0)\n    if not ok:\n        sys.exit(\"foliage tool did not open\")\n    time.sleep(0.6)\n    print(\"foliage ready\")\nelif cmd == \"collapse\":\n    def vh():\n        try:\n            return json.loads(run(\"view3d\").stdout)[\"rect\"][3]\n        except Exception:\n            return 0\n\n    def tab_xy():\n        try:\n            cs = [c for c in dump() if c.get(\"class\") == \"TabBar\" and c[\"rect\"][0] > 280\n                  and c[\"rect\"][1] > 800]\n            if cs:\n                r = cs[0][\"rect\"]\n                return int(r[0] + 44), int(r[1] + 16)\n        except Exception:\n            pass\n        return 335, 874\n\n    ok = vh() >= 500\n    for _ in range(10):\n        if ok:\n            break\n        x, y = tab_xy()\n        run(\"move\", x, y)\n        run(\"click\", x, y)\n        time.sleep(2.6)\n        ok = vh() >= 500\n    if not ok:\n        try:\n            ds = [c for c in dump() if c.get(\"class\") == \"SplitContainerDragger\"\n                  and c[\"rect\"][0] > 280 and c[\"rect\"][2] > 500]\n            if ds:\n                x, y, w, h = ds[0][\"rect\"]\n                cx, cy = int(x + w / 2), int(y + h / 2)\n                run(\"drag\", cx, cy, cx, 897, \"--duration\", \"1.6\")\n                time.sleep(2.5)\n                ok = vh() >= 500\n        except Exception:\n            pass\n    if not ok:\n        sys.exit(\"could not collapse the bottom panel\")\n    print(\"collapsed, viewport height\", vh())\nelif cmd == \"waitready\":\n    last = None; stable = 0; ok = False\n    for _ in range(40):\n        try:\n            info = json.loads(run(\"info\").stdout)\n        except Exception:\n            info = {}\n        scene = info.get(\"scene\"); fps = info.get(\"fps\") or 0\n        if scene == last and fps >= 8:\n            stable += 1\n            if stable >= 2:\n                ok = True; break\n        else:\n            stable = 0\n        last = scene\n        time.sleep(2.5)\n    if not ok:\n        sys.exit(\"editor did not settle (scene/fps)\")\n    time.sleep(3)\n    print(\"scene ready:\", last)\nelif cmd == \"foliage\":\n    ok = False\n    for _ in range(6):\n        cs = dump()\n        pal = [c for c in cs if c.get(\"name\") == \"FoliagePalette\"]\n        title = [c for c in cs if c.get(\"name\") == \"ToolTitle\" and c.get(\"text\") == \"Foliage\"]\n        if pal and title:\n            ok = True; break\n        f = [c for c in cs if c.get(\"name\") == \"Foliage\" and c.get(\"class\") == \"Button\"]\n        if not f:\n            sys.exit(\"no Foliage button\")\n        run(\"click\", *center(f[0])); time.sleep(2.0)\n    if not ok:\n        sys.exit(\"foliage tool did not open\")\n    time.sleep(0.6)\n    print(\"foliage ready\")\nelif cmd == \"collapse\":\n    def vh():\n        try:\n            return json.loads(run(\"view3d\").stdout)[\"rect\"][3]\n        except Exception:\n            return 0\n\n    ok = False\n    for _ in range(10):\n        if vh() >= 500:\n            ok = True; break\n        run(\"move\", 335, 874); run(\"click\", 335, 874); time.sleep(2.6)\n    if not ok and vh() >= 500:\n        ok = True\n    if not ok:\n        # fallback: drag the main/bottom splitter all the way down\n        try:\n            ds = [c for c in dump() if c.get(\"class\") == \"SplitContainerDragger\"\n                  and c[\"rect\"][0] > 280 and c[\"rect\"][2] > 500]\n            if ds:\n                x, y, w, h = ds[0][\"rect\"]\n                cx, cy = int(x + w / 2), int(y + h / 2)\n                run(\"drag\", cx, cy, cx, 897, \"--duration\", \"1.6\")\n                time.sleep(2.5)\n                ok = vh() >= 500\n        except Exception:\n            pass\n    if not ok:\n        sys.exit(\"could not collapse the bottom panel\")\n    print(\"collapsed, viewport height\", vh())\nelif cmd == \"waitready\":\n    last = None; stable = 0; ok = False\n    for _ in range(40):\n        try:\n            info = json.loads(run(\"info\").stdout)\n        except Exception:\n            info = {}\n        scene = info.get(\"scene\"); fps = info.get(\"fps\") or 0\n        if scene == last and fps >= 8:\n            stable += 1\n            if stable >= 2:\n                ok = True; break\n        else:\n            stable = 0\n        last = scene\n        time.sleep(2.5)\n    if not ok:\n        sys.exit(\"editor did not settle (scene/fps)\")\n    time.sleep(3)\n    print(\"scene ready:\", last)\nelif cmd == \"foliage\":\n    ok = False\n    for _ in range(6):\n        cs = dump()\n        pal = [c for c in cs if c.get(\"name\") == \"FoliagePalette\"]\n        title = [c for c in cs if c.get(\"name\") == \"ToolTitle\" and c.get(\"text\") == \"Foliage\"]\n        if pal and title:\n            ok = True; break\n        f = [c for c in cs if c.get(\"name\") == \"Foliage\" and c.get(\"class\") == \"Button\"]\n        if not f:\n            sys.exit(\"no Foliage button\")\n        run(\"click\", *center(f[0])); time.sleep(2.0)\n    if not ok:\n        sys.exit(\"foliage tool did not open\")\n    time.sleep(0.6)\n    print(\"foliage ready\")\nelif cmd == \"collapse\":\n    ok = False\n    for _ in range(10):\n        d = json.loads(run(\"view3d\").stdout)\n        h = d[\"rect\"][3]\n        if h >= 500:\n            print(\"collapsed, viewport height\", h); ok = True; break\n        run(\"move\", 335, 874)\n        run(\"click\", 335, 874); time.sleep(2.8)\n    if not ok:\n        sys.exit(\"could not collapse the bottom panel\")\nelif cmd == \"expand\":\n    c = expand(sys.argv[2]); print(\"expanded\", sys.argv[2], c[\"rect\"])\nelse:\n    sys.exit(\"unknown command \" + cmd)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPYEOF"
+    },
+    {
+      "shell": "python3 /tmp/opencode/mst_ui_ds.py collapse"
+    },
+    {
+      "shell": "python3 -c \"import json,subprocess,os;d=json.loads(subprocess.run(['python3','qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],'view3d'],capture_output=True,text=True).stdout);h=d['rect'][3];print('viewport height',h);raise SystemExit(0 if h>=540 else 1)\""
+    }
+  ],
+  "items": [
+    {
+      "id": "00-overview",
+      "kind": "still",
+      "outputs": [
+        "00-foliage-overview.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/02_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py full 00-foliage-overview.png boxes"
+        }
+      ],
+      "check": "Full editor with red boxes around the left toolbar, the Foliage palette and the bottom strip.",
+      "notes": ""
+    },
+    {
+      "id": "01-02-toolbar-palette",
+      "kind": "series",
+      "outputs": [
+        "01-toolbar-foliage.png",
+        "02-palette.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/02_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 01-toolbar-foliage.png 283 205 122 495 2"
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 02-palette.png 1063 160 232 565 2"
+        }
+      ],
+      "check": "The left toolbar with Foliage (5) highlighted, then the whole Foliage palette panel at 2x.",
+      "notes": ""
+    },
+    {
+      "id": "02b-palette-loaded",
+      "kind": "still",
+      "outputs": [
+        "02b-palette-loaded.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 02b-palette-loaded.png 1063 355 232 490 2"
+        }
+      ],
+      "check": "A terrain carrying many Scatter Items: Grass/Tree/Pine/Bush/Rock/Flowers/Pebbles/+Bush/+Flowers/+Pine at 2x.",
+      "notes": ""
+    },
+    {
+      "id": "03-strip",
+      "kind": "still",
+      "outputs": [
+        "03-strip.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/02_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 03-strip.png 420 748 512 108 2"
+        }
+      ],
+      "check": "The Foliage strip at 2x: Size, Density, Slope Min/Max, Erase All, Fill Terrain, Clear.",
+      "notes": ""
+    },
+    {
+      "id": "04-hero",
+      "kind": "still",
+      "outputs": [
+        "04-hero-scene.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shot": {
+            "out": "04-hero-scene.png",
+            "crop": [
+              425,
+              165,
+              635,
+              580
+            ]
+          }
+        }
+      ],
+      "check": "The sandbox hill with props sitting on the terraced slope, hint bar at the bottom.",
+      "notes": ""
+    },
+    {
+      "id": "05-switch-tool",
+      "kind": "clip",
+      "outputs": [
+        "05-switch-tool.mp4",
+        "05-switch-tool.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click-text",
+            "Brush"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_start": {
+            "out": "05-switch-tool.mp4",
+            "rect": [
+              287,
+              82,
+              1012,
+              600
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "345",
+            "364"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "05-switch-tool.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "05-switch-tool.mp4",
+            "out": "05-switch-tool.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Clicking Foliage (slot 5) in the left toolbar opens the right palette and the bottom strip.",
+      "notes": ""
+    },
+    {
+      "id": "10-paint-pine",
+      "kind": "clip",
+      "outputs": [
+        "10-paint-pine.mp4",
+        "10-paint-pine.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "10-paint-pine.mp4",
+            "rect": [
+              560,
+              345,
+              500,
+              400
+            ],
+            "fps": 12,
+            "max": 28
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "455",
+            "880",
+            "480",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "740",
+            "510",
+            "920",
+            "535",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "record_stop": {
+            "out": "10-paint-pine.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "10-paint-pine.mp4",
+            "out": "10-paint-pine.png",
+            "at": 4.0
+          }
+        }
+      ],
+      "check": "LMB-dragging with +Pine selected paints a band of +Pine.",
+      "notes": ""
+    },
+    {
+      "id": "11-paint-bush",
+      "kind": "clip",
+      "outputs": [
+        "11-paint-bush.mp4",
+        "11-paint-bush.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 3"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "11-paint-bush.mp4",
+            "rect": [
+              560,
+              345,
+              500,
+              400
+            ],
+            "fps": 12,
+            "max": 28
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "500",
+            "860",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "730",
+            "555",
+            "900",
+            "575",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "record_stop": {
+            "out": "11-paint-bush.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "11-paint-bush.mp4",
+            "out": "11-paint-bush.png",
+            "at": 4.0
+          }
+        }
+      ],
+      "check": "LMB-dragging with +Bush selected paints a band of +Bush.",
+      "notes": ""
+    },
+    {
+      "id": "12-paint-flowers",
+      "kind": "clip",
+      "outputs": [
+        "12-paint-flowers.mp4",
+        "12-paint-flowers.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.85"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "12-paint-flowers.mp4",
+            "rect": [
+              560,
+              345,
+              500,
+              400
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "500",
+            "870",
+            "540",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "465",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "record_stop": {
+            "out": "12-paint-flowers.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "12-paint-flowers.mp4",
+            "out": "12-paint-flowers.png",
+            "at": 4.0
+          }
+        }
+      ],
+      "check": "LMB-dragging with +Flowers selected paints a colourful band of flowers.",
+      "notes": "Density raised to ~0.85 so the blooms read at this framing."
+    },
+    {
+      "id": "13-paint-rock",
+      "kind": "clip",
+      "outputs": [
+        "13-paint-rock.mp4",
+        "13-paint-rock.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 2"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "13-paint-rock.mp4",
+            "rect": [
+              560,
+              345,
+              500,
+              400
+            ],
+            "fps": 12,
+            "max": 28
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "520",
+            "880",
+            "570",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "730",
+            "575",
+            "920",
+            "625",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "record_stop": {
+            "out": "13-paint-rock.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "13-paint-rock.mp4",
+            "out": "13-paint-rock.png",
+            "at": 4.0
+          }
+        }
+      ],
+      "check": "LMB-dragging with Rock selected paints a band of Rock.",
+      "notes": ""
+    },
+    {
+      "id": "14-grass-mask",
+      "kind": "clip",
+      "outputs": [
+        "14-grass-mask.mp4",
+        "14-grass-mask.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "14-grass-mask.mp4",
+            "rect": [
+              560,
+              345,
+              470,
+              370
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "450",
+            "860",
+            "500",
+            "--button",
+            "right",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "520",
+            "860",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "record_stop": {
+            "out": "14-grass-mask.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "14-grass-mask.mp4",
+            "out": "14-grass-mask.png",
+            "at": 4.5
+          }
+        }
+      ],
+      "check": "Grass selected: RMB erases a patch of blades, then LMB paints a patch back.",
+      "notes": ""
+    },
+    {
+      "id": "14b-grass-mask-pair",
+      "kind": "still",
+      "outputs": [
+        "14b-grass-mask-on.png",
+        "14b-grass-mask-off.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "14b-grass-mask-on.png",
+            "crop": [
+              560,
+              345,
+              470,
+              370
+            ]
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "450",
+            "900",
+            "540",
+            "--button",
+            "right",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "move",
+            "1030",
+            "700"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "14b-grass-mask-off.png",
+            "crop": [
+              560,
+              345,
+              470,
+              370
+            ]
+          }
+        }
+      ],
+      "check": "Same framing: grass tufts present, then erased (the ground stays green).",
+      "notes": ""
+    },
+    {
+      "id": "15-erase",
+      "kind": "clip",
+      "outputs": [
+        "15-erase.mp4",
+        "15-erase.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 0.1"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "430",
+            "880",
+            "440",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "465",
+            "880",
+            "470",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "880",
+            "505",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "535",
+            "880",
+            "540",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_start": {
+            "out": "15-erase.mp4",
+            "rect": [
+              560,
+              315,
+              500,
+              430
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "880",
+            "480",
+            "--button",
+            "right",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "15-erase.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "15-erase.mp4",
+            "out": "15-erase.png",
+            "at": 3.5
+          }
+        }
+      ],
+      "check": "A band of pines is painted, then RMB erasing carves a gap through the selected kind only.",
+      "notes": ""
+    },
+    {
+      "id": "16-erase-all",
+      "kind": "clip",
+      "outputs": [
+        "16-erase-all.mp4",
+        "16-erase-all.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 0.1"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "430",
+            "880",
+            "440",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "465",
+            "880",
+            "470",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "880",
+            "505",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "535",
+            "880",
+            "540",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py check EraseAll on"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "16-erase-all.mp4",
+            "rect": [
+              560,
+              315,
+              500,
+              430
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "480",
+            "880",
+            "480",
+            "--button",
+            "right",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "16-erase-all.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "16-erase-all.mp4",
+            "out": "16-erase-all.png",
+            "at": 3.5
+          }
+        }
+      ],
+      "check": "Erase All ticked: RMB removes every prop under the brush, hint bar says erase every prop.",
+      "notes": ""
+    },
+    {
+      "id": "17-fill-terrain",
+      "kind": "clip",
+      "outputs": [
+        "17-fill-terrain.mp4",
+        "17-fill-terrain.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "17-fill-terrain.mp4",
+            "rect": [
+              425,
+              165,
+              635,
+              580
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click FillTerrain"
+        },
+        {
+          "wait": 3.5
+        },
+        {
+          "record_stop": {
+            "out": "17-fill-terrain.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "17-fill-terrain.mp4",
+            "out": "17-fill-terrain.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Pine selected: Fill Terrain scatters pines over the whole terrain by their own rules.",
+      "notes": ""
+    },
+    {
+      "id": "18-clear",
+      "kind": "clip",
+      "outputs": [
+        "18-clear.mp4",
+        "18-clear.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click FillTerrain"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_start": {
+            "out": "18-clear.mp4",
+            "rect": [
+              425,
+              165,
+              635,
+              580
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Clear"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "18-clear.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "18-clear.mp4",
+            "out": "18-clear.png",
+            "at": 2.5
+          }
+        }
+      ],
+      "check": "Clear removes every instance of the selected prop from the terrain.",
+      "notes": ""
+    },
+    {
+      "id": "20-inspector-grass",
+      "kind": "still",
+      "outputs": [
+        "20-inspector-grass.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://tutorial/02_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropgrass 20-inspector-grass.png"
+        }
+      ],
+      "check": "Inspector Look > Grass at 2x: Turf Stuff, Grass Pixel Size, Grass Outline, Ledge Cutoff, Min Height.",
+      "notes": ""
+    },
+    {
+      "id": "21-settings-grass",
+      "kind": "still",
+      "outputs": [
+        "21-settings-grass.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Grass"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 21-settings-grass.png 420 718 700 148 2"
+        }
+      ],
+      "check": "Settings > Grass page strip at 2x: Grass, Animation FPS, Subdivisions, Grass Size, Ledge Cutoff, Min Height.",
+      "notes": ""
+    },
+    {
+      "id": "22-grass-enabled",
+      "kind": "clip",
+      "outputs": [
+        "22-grass-enabled.mp4",
+        "22-grass-enabled.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Grass"
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_start": {
+            "out": "22-grass-enabled.mp4",
+            "rect": [
+              420,
+              165,
+              634,
+              580
+            ],
+            "fps": 12,
+            "max": 18
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py checky off"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py checky on"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "record_stop": {
+            "out": "22-grass-enabled.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "22-grass-enabled.mp4",
+            "out": "22-grass-enabled.png",
+            "at": 2.2
+          }
+        }
+      ],
+      "check": "Toggling the Settings > Grass checkbox: all grass blade tufts vanish, then return.",
+      "notes": ""
+    },
+    {
+      "id": "22b-grass-enabled-pair",
+      "kind": "still",
+      "outputs": [
+        "22b-grass-enabled-on.png",
+        "22b-grass-enabled-off.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Grass"
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "shot": {
+            "out": "22b-grass-enabled-on.png",
+            "crop": [
+              425,
+              165,
+              635,
+              580
+            ]
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py checky off"
+        },
+        {
+          "wait": 3.5
+        },
+        {
+          "drive": [
+            "move",
+            "1000",
+            "600"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "shot": {
+            "out": "22b-grass-enabled-off.png",
+            "crop": [
+              425,
+              165,
+              635,
+              580
+            ]
+          }
+        }
+      ],
+      "check": "Grass blades on vs off, same framing; the ground colour does not change.",
+      "notes": ""
+    },
+    {
+      "id": "30-density-series",
+      "kind": "series",
+      "outputs": [
+        "30-density-1.png",
+        "30-density-2.png",
+        "30-density-3.png",
+        "30-density-4.png",
+        "30-density-5.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.05"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "30-density-1.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.2"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "30-density-2.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.5"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "30-density-3.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.81"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "30-density-4.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 1.0"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "870",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "30-density-5.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "Same pine dab at Density 0.05 / 0.20 / 0.50 / 0.81 / 1.0: sparse to almost touching.",
+      "notes": "Density is an HSlider; the harness drag overshoots, so the thumb is set by a 2-px drag at the fraction position."
+    },
+    {
+      "id": "31-size-series",
+      "kind": "series",
+      "outputs": [
+        "31-size-1.png",
+        "31-size-2.png",
+        "31-size-3.png",
+        "31-size-4.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 0.030612244897959183"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "480",
+            "840",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "31-size-1.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 0.2857142857142857"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "480",
+            "840",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "31-size-2.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 0.6020408163265306"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "480",
+            "840",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "31-size-3.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Size 1.0408163265306123"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "480",
+            "840",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.4"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "31-size-4.png",
+            "crop": [
+              560,
+              330,
+              450,
+              360
+            ]
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY undo >/dev/null"
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "One pine stroke at Size 2.5 / 15 / 30.5 / 52: the painted footprint grows.",
+      "notes": "Size is an HSlider (1-50); set through the thumb fraction (value = 1 + 49*frac)."
+    },
+    {
+      "id": "32-brush-size",
+      "kind": "clip",
+      "outputs": [
+        "32-brush-size.mp4",
+        "32-brush-size.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "32-brush-size.mp4",
+            "rect": [
+              420,
+              165,
+              640,
+              700
+            ],
+            "fps": 12,
+            "max": 22
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "700",
+            "500",
+            "up",
+            "--times",
+            "8",
+            "--mod",
+            "shift"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "move",
+            "760",
+            "520"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "860",
+            "520",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "32-brush-size.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "32-brush-size.mp4",
+            "out": "32-brush-size.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Shift+wheel grows the brush (Size value in the strip updates) then paints a wider stroke.",
+      "notes": "Records viewport + strip; the rect stops above the bottom-panel tab/status row (the verified run used 735 px; this trims the last 15 px of chrome)."
+    },
+    {
+      "id": "33-grass-pixel-series",
+      "kind": "series",
+      "outputs": [
+        "33-grass-pixel-1.png",
+        "33-grass-pixel-2.png",
+        "33-grass-pixel-3.png",
+        "33-grass-pixel-4.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "set-prop",
+            "grass_pixel_size",
+            "1",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "740",
+            "470"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "33-grass-pixel-1.png",
+            "crop": [
+              460,
+              285,
+              600,
+              450
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "grass_pixel_size",
+            "2",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "740",
+            "470"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "33-grass-pixel-2.png",
+            "crop": [
+              460,
+              285,
+              600,
+              450
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "grass_pixel_size",
+            "4",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "740",
+            "470"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "33-grass-pixel-3.png",
+            "crop": [
+              460,
+              285,
+              600,
+              450
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "grass_pixel_size",
+            "8",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "740",
+            "470"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "33-grass-pixel-4.png",
+            "crop": [
+              460,
+              285,
+              600,
+              450
+            ]
+          }
+        }
+      ],
+      "check": "Grass blades at Grass Pixel Size 1 / 2 / 4 / 8: progressively chunkier blocks.",
+      "notes": "Grass Pixel Size is set with set-prop grass_pixel_size --class MarchingSquaresTerrain (the Inspector spin rows have no stable names)."
+    },
+    {
+      "id": "40-scatter-item",
+      "kind": "still",
+      "outputs": [
+        "40-scatter-item.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py dbl 1123 607"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 40-scatter-item.png 1332 192 222 355 2"
+        }
+      ],
+      "check": "PixelScatterItem Inspector at 2x: Display Name, Form, Shape Seed, Cage, Scene, Tint, group list.",
+      "notes": ""
+    },
+    {
+      "id": "41-scatter-placement",
+      "kind": "still",
+      "outputs": [
+        "41-scatter-placement.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py dbl 1123 607"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py expand Placement"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 41-scatter-placement.png 1332 425 196 345 2"
+        }
+      ],
+      "check": "Expanded Placement group at 2x: Density, Scale Min/Max, Random Yaw, Align to Normal, Texture1-16 flags.",
+      "notes": ""
+    },
+    {
+      "id": "50-lod-nature",
+      "kind": "still",
+      "outputs": [
+        "50-lod-nature.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 50-lod-nature.png 415 733 648 135 2"
+        }
+      ],
+      "check": "Settings > LOD & Nature strip at 2x: LOD Distance, Erosion Add, LOD In Editor, Wild Flowers Add.",
+      "notes": ""
+    },
+    {
+      "id": "51-wildflowers-inspector",
+      "kind": "still",
+      "outputs": [
+        "51-wildflowers-inspector.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click2 WildFlowers Add"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 51-wildflowers-inspector.png 1326 180 222 250 2"
+        }
+      ],
+      "check": "MarchingSquaresWildFlowers Inspector at 2x: Terrain, Scatter/Clear buttons, Species, Seed, Placement, Ground water.",
+      "notes": ""
+    },
+    {
+      "id": "52-wildflowers-strip",
+      "kind": "still",
+      "outputs": [
+        "52-wildflowers-strip.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click2 WildFlowers Add"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 52-wildflowers-strip.png 332 736 624 128 2"
+        }
+      ],
+      "check": "Wild Flowers strip Placement tab at 2x: Scatter, Clear, Seed, Density, Patch Scale, Threshold, Max Slope, Points/Cell, Jitter.",
+      "notes": ""
+    },
+    {
+      "id": "52b-wildflowers-groundwater",
+      "kind": "still",
+      "outputs": [
+        "52b-wildflowers-groundwater.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click2 WildFlowers Add"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click GroundWater"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py cropwin 52b-wildflowers-groundwater.png 332 736 624 128 2"
+        }
+      ],
+      "check": "Wild Flowers strip Ground Water tab at 2x: Ground Water, Variation, Shore Wet, Water Level, Shore Dist., Trees Shade.",
+      "notes": ""
+    },
+    {
+      "id": "53-wildflowers-scatter",
+      "kind": "clip",
+      "outputs": [
+        "53-wildflowers-scatter.mp4",
+        "53-wildflowers-scatter.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click2 WildFlowers Add"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_start": {
+            "out": "53-wildflowers-scatter.mp4",
+            "rect": [
+              420,
+              165,
+              640,
+              545
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Scatter"
+        },
+        {
+          "wait": 4.0
+        },
+        {
+          "record_stop": {
+            "out": "53-wildflowers-scatter.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "53-wildflowers-scatter.mp4",
+            "out": "53-wildflowers-scatter.png",
+            "at": 3.5
+          }
+        }
+      ],
+      "check": "Pressing Scatter blooms a wild-flower meadow, clustered toward the pond shore.",
+      "notes": ""
+    },
+    {
+      "id": "54-wildflowers-clear",
+      "kind": "clip",
+      "outputs": [
+        "54-wildflowers-clear.mp4",
+        "54-wildflowers-clear.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click TerrainSettings"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click LODNature"
+        },
+        {
+          "wait": 1.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click2 WildFlowers Add"
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Scatter"
+        },
+        {
+          "wait": 4.0
+        },
+        {
+          "record_start": {
+            "out": "54-wildflowers-clear.mp4",
+            "rect": [
+              420,
+              165,
+              640,
+              545
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py click Clear"
+        },
+        {
+          "wait": 3.5
+        },
+        {
+          "record_stop": {
+            "out": "54-wildflowers-clear.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "54-wildflowers-clear.mp4",
+            "out": "54-wildflowers-clear.png",
+            "at": 2.5
+          }
+        }
+      ],
+      "check": "Pressing Clear removes the wild flowers again.",
+      "notes": ""
+    },
+    {
+      "id": "61-add-entry",
+      "kind": "clip",
+      "outputs": [
+        "61-add-entry.mp4",
+        "61-add-entry.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 3"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "61-add-entry.mp4",
+            "rect": [
+              700,
+              240,
+              650,
+              560
+            ],
+            "fps": 12,
+            "max": 26
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "470",
+            "860",
+            "510",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "61-add-entry.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "61-add-entry.mp4",
+            "out": "61-add-entry.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Painting a + entry: the first stroke adds the real item, palette label '+ Bush' becomes 'Bush'.",
+      "notes": ""
+    },
+    {
+      "id": "62-undo",
+      "kind": "clip",
+      "outputs": [
+        "62-undo.mp4",
+        "62-undo.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 2"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_start": {
+            "out": "62-undo.mp4",
+            "rect": [
+              560,
+              365,
+              460,
+              380
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "690",
+            "500",
+            "850",
+            "540",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "62-undo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "62-undo.mp4",
+            "out": "62-undo.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "Paint a rock cluster, then Ctrl+Z removes it in one undo step.",
+      "notes": ""
+    },
+    {
+      "id": "70-recipe-rocks-shore",
+      "kind": "still",
+      "outputs": [
+        "70-recipe-rocks-shore.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 2"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py spin SlopeMax 20"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "520",
+            "980",
+            "610",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "drag",
+            "720",
+            "600",
+            "1000",
+            "660",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "570",
+            "990",
+            "640",
+            "--button",
+            "left",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "600"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "70-recipe-rocks-shore.png",
+            "crop": [
+              440,
+              300,
+              620,
+              440
+            ]
+          }
+        }
+      ],
+      "check": "Rocks painted along the pond shoreline, like a pebble beach at the waterline.",
+      "notes": "Rocks are kept at the waterline with Slope Max 20; three passes along the shore. The crop ends at the viewport bottom (the verified run used 540 px from the same top, which included the strip)."
+    },
+    {
+      "id": "71-recipe-flower-meadow",
+      "kind": "still",
+      "outputs": [
+        "71-recipe-flower-meadow.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 0 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 1.0"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "drag",
+            "680",
+            "470",
+            "900",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "680",
+            "510",
+            "900",
+            "530",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "680",
+            "545",
+            "900",
+            "560",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "move",
+            "930",
+            "620"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "71-recipe-flower-meadow.png",
+            "crop": [
+              460,
+              285,
+              580,
+              480
+            ]
+          }
+        }
+      ],
+      "check": "A dense flower meadow painted back and forth over flat grass.",
+      "notes": ""
+    },
+    {
+      "id": "72-recipe-forest-edge",
+      "kind": "still",
+      "outputs": [
+        "72-recipe-forest-edge.png"
+      ],
+      "fresh_session": true,
+      "scene": "res://demo/hex_island.tscn",
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py foliage"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py pal 1 4"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/mst_ui_ds.py slider Density 0.8"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "740",
+            "470",
+            "up",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "drag",
+            "660",
+            "460",
+            "900",
+            "470",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "660",
+            "490",
+            "900",
+            "500",
+            "--button",
+            "left",
+            "--duration",
+            "1.8"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "540",
+            "820",
+            "555",
+            "--button",
+            "left",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "move",
+            "930",
+            "620"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "72-recipe-forest-edge.png",
+            "crop": [
+              420,
+              165,
+              600,
+              500
+            ]
+          }
+        }
+      ],
+      "check": "A dense pine band whose margin thins into open grass: a natural tree line.",
+      "notes": ""
+    }
+  ]
+}

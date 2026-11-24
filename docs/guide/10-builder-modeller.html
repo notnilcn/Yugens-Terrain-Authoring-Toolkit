@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelling: faces, edges &amp; vertices – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  /* Hotspot frame: keeps the % positions relative to the image only (the tour text is added below it). */
+  .hs-frame { position: relative; }
+  .hs-frame > img { display: block; width: 100%; border-radius: var(--radius); border: 1px solid var(--line); }
+  .hs-frame.narrow { max-width: 320px; }
+  .hs-frame.mid { max-width: 520px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+  .side-by-side { display: grid; grid-template-columns: 110px 1fr; gap: 18px; align-items: start; }
+  .side-by-side img.tall { width: 96px; border: 1px solid var(--line); border-radius: var(--radius); }
+  table.ref td:first-child, table.keys td:first-child, table.keys td:nth-child(2) { white-space: nowrap; }
+  table.ref td:first-child { font-weight: 600; }
+  .op-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -.4em 0 .6em; }
+  .op-head .pill { font-size: .82rem; }
+  .mode-chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .8rem; background: var(--accent-soft); color: var(--accent); margin-right: 4px; }
+  .layout-badge { font-size: .8rem; color: var(--ink-2); }
+  .swatch-key { display: inline-block; width: .9em; height: .9em; border-radius: 2px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
+  .shape-list { columns: 3; font-size: .93rem; } @media (max-width: 700px) { .shape-list { columns: 2; } }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Modelling: faces, edges &amp; vertices</h1>
+<p class="lede">Go beyond stacking parts: reach inside a builder mesh and push, cut, round and paint its faces, edges and corners — the kind of modelling Roblox Studio can't do — then fix its UVs and export it.</p>
+<div class="meta-row"><span class="pill">⏱ 45 min</span><span class="pill">Beginner → Intermediate</span><span class="pill">Example scene: res://tutorial/guide/modelled_prop.tscn</span></div>
+
+<figure class="shot"><img src="media/10-builder-modeller/15-prop-beveled.png" alt="A terracotta box hollowed out into an open crate, with a softly rounded lip around its top opening."><figcaption>Where this page takes you: a plain box turned into an open crate with a rounded lip, using only Extrude, Inset and Bevel. You'll build exactly this in the <a href="#tutorial">guided tutorial</a>.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>How to switch to the <a href="#edit-tab">Edit tab</a> of the Roblox-style ribbon, and what every button on it does.</li>
+  <li>The four <a href="#modes">selection modes</a> — <b>Object</b>, <b>Face</b>, <b>Edge</b>, <b>Vertex</b> — and how to pick, add to and grow a selection.</li>
+  <li>Every <a href="#ops">mesh operation</a>: Move, Extrude, Inset, Bevel, Loop Cut, Bridge, Merge, Connect, Fill, Triangulate, Duplicate, Delete — each with a clip — and the <b>Adjust panel</b> that appears after one.</li>
+  <li>A complete <a href="#tutorial">crate walkthrough</a> you can tick off step by step.</li>
+  <li><a href="#paint">Colour, painting and materials</a>: the Color palette, the Paint tool, material slots and presets, vertex paint, smooth vs faceted shading.</li>
+  <li>The <a href="#uv">UV editor</a>, the <a href="#export">export</a> formats, and every <a href="#prefs">preference</a> in the Options dialog.</li>
+  <li>How the three builder <a href="#layouts">layouts</a> — <b>Roblox UI</b>, <b>MST</b> and <b>Modeler</b> — differ, and a <a href="#shortcuts">filterable shortcut reference</a> covering all of them.</li>
+</ul>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p><b>Roblox Studio has no mesh editing.</b> You place Parts and resize or rotate them; the closest thing to "extrude" is dragging one side of a Part with the Scale tool, and anything fancier is modelled in Blender and imported as a MeshPart. The builder's <b>Edit</b> tab gives you real mesh editing right inside the editor — faces, edges, vertices, extrude, inset, bevel, loop cuts. If you've ever watched a Blender tutorial, this is that world's "edit mode". If you haven't, don't worry: this page starts from zero.</p></div>
+
+<h2 id="words">A few words first</h2>
+<p>You met nodes, the Inspector and the 3D view on the previous page (<a href="09-builder-greybox.html">Greyboxing with the Roblox UI</a>); if any Godot word on this page is new, <a href="01-godot-for-roblox.html">Godot for Roblox builders</a> and the <a href="14-shortcuts-glossary.html">glossary</a> explain it. These are the new ones:</p>
+<dl>
+  <dt><b>Mesh</b></dt><dd>The 3D shape of an object, made of flat pieces. Every part you insert with the builder is a mesh you can edit.</dd>
+  <dt><b>Face</b></dt><dd>One flat side of a mesh. A box has 6 faces.</dd>
+  <dt><b>Edge</b></dt><dd>The line where two faces meet (or the border of an open hole). A box has 12.</dd>
+  <dt><b>Vertex</b> (plural <i>vertices</i>)</dt><dd>A corner point where edges meet. A box has 8.</dd>
+  <dt><b>Normal</b></dt><dd>The direction a face points "out" of the mesh. Extrude pushes faces along their normals.</dd>
+  <dt><b>N-gon</b></dt><dd>A face with more than four corners. Merging two side-by-side faces makes one.</dd>
+  <dt><b>Edge loop / ring</b></dt><dd>An edge <i>loop</i> is a chain of edges that runs all the way around a shape (like the rim of a cup). An edge <i>ring</i> is the set of parallel edges that cross it (like the rungs of a ladder bent into a circle).</dd>
+  <dt><b>UVs</b></dt><dd>How a flat picture (a texture) is wrapped onto the faces. U and V are just the names of the picture's horizontal and vertical axes.</dd>
+  <dt><b>Material slot</b></dt><dd>A numbered material (colour/texture) stored on the mesh. A mesh with several slots can have a different material on each face.</dd>
+  <dt><b><code>PixelBuilderMesh</code></b></dt><dd>The node type the builder edits — the "root" that holds your parts. Think of it as a Roblox <b>Model</b> whose children are editable meshes.</dd>
+  <dt><b>Undo step</b></dt><dd>One entry in Godot's <b>History</b> dock (next to FileSystem, bottom-left). Every operation on this page is exactly one step, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes one operation at a time.</dd>
+</dl>
+
+<div class="callout warn"><span class="label">Watch out — mouse over the 3D view</span><p>Every builder shortcut on this page (<kbd>E</kbd>, <kbd>Alt</kbd>+<kbd>3</kbd>, <kbd>Ctrl</kbd>+<kbd>B</kbd>…) only works while the <b>mouse pointer is over the 3D view</b>. That's normal Godot behaviour: keys go to whatever panel is under the mouse. If a key "does nothing", move the mouse into the viewport and press it again.</p></div>
+
+<!-- ===================================================== LAYOUTS (overview) -->
+<h2 id="layouts">The three layouts at a glance</h2>
+<p>The builder can wear three different "outfits". All three run the <b>same commands</b> on the same mesh — only the buttons and a few shortcuts differ — so you can switch whenever you like. Switching keeps your current mode, your selection and your full undo history, and the choice is saved in Editor Settings so it survives a restart.</p>
+<ul>
+  <li><b>Roblox UI</b> — a Roblox Studio-style ribbon with <span class="ui">Model</span> and <span class="ui">Edit</span> tabs. Turn it on with the <span class="ui">Roblox UI</span> toggle in the 3D-view menu bar (to the right of <span class="ui">Pixel Preview · Animate · Pixel World</span>). Its tooltip: <i>"Roblox UI: show the modelling tools as a Roblox Studio-style ribbon with Roblox handles and shortcuts. Off: the regular Builder layout."</i> This page teaches you on this one.</li>
+  <li><b>MST</b> — the classic builder: a left vertical toolbar, a right panel (Materials, Smoothing, Face UV) and a bottom strip. Materials and smoothing live here.</li>
+  <li><b>Modeler</b> — a horizontal top toolbar with a big <span class="ui">+ Add Mesh</span> shape palette and an <span class="ui">Actions</span> menu; operations open small floating pop-ups in the viewport.</li>
+</ul>
+<p>With <span class="ui">Roblox UI</span> <b>off</b>, you get MST or Modeler — pick which in the <span class="ui">Builder</span> menu (or Options). Click through the tabs to see each one:</p>
+
+<div class="tabs">
+  <div class="panel" data-tab="Roblox UI">
+    <p>Two ribbon tabs sit under the 3D menu bar. <span class="ui">Model</span> is the parts toolbox you used on <a href="09-builder-greybox.html">page 9</a>; <span class="ui">Edit</span> is the mesh-editing toolbox this page is about.</p>
+    <figure class="shot"><img src="media/10-builder-modeller/04-roblox-model-tab.png" alt="The Model tab ribbon in its compact icon-only form: select, move, scale, rotate and transform tool icons; a 'Geometric' label with ticked grid-step 1.0 m and rotate 45° spin boxes; then icon dropdowns for pivot, part insert, material/colour, group, lock, anchor, align, and the four boolean buttons."><figcaption>The <span class="ui">Model</span> tab (shown in compact, icons-only form): tools <kbd>1</kbd>–<kbd>5</kbd>, the Geometric/Surface drag mode, grid step (1.0 m) and rotation snap (45°), Pivot, Part ▾, Material, Color, Group ▾, Lock ▾, Anchor ▾, Align and the booleans Union / Intersect / Separate / Negate. Covered fully on page 9.</figcaption></figure>
+    <figure class="shot"><img src="media/10-builder-modeller/01-edit-ribbon.png" alt="The Edit tab ribbon: Object (lit blue), Face, Edge, Vertex mode buttons; greyed Extrude, Inset, Bevel, Loop Cut, Bridge, Merge, Delete; a Select menu; greyed Pivot to Sel.; and a UV button."><figcaption>The <span class="ui">Edit</span> tab — <a href="#edit-tab">toured below</a>.</figcaption></figure>
+    <p><b>Shortcut differences:</b> in this layout the bare number keys <kbd>1</kbd>–<kbd>5</kbd> are the <b>tools</b> (Select / Move / Scale / Rotate / Transform, just like Studio), so the selection modes move to <kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>Alt</kbd>+<kbd>4</kbd>. <kbd>F</kbd> is <b>Zoom to</b> (like Studio's focus key), so Fill hole moves to <kbd>Alt</kbd>+<kbd>F</kbd>, and vertex paint to <kbd>Alt</kbd>+<kbd>5</kbd>.</p>
+  </div>
+  <div class="panel" data-tab="MST">
+    <p>Roblox UI <b>off</b>, layout set to <b>MST</b>. A left toolbar, a right panel and a bottom strip wrap around the 3D view. Click the markers:</p>
+    <div class="hotspots"><div class="hs-frame"><img src="media/10-builder-modeller/60-mst-layout.png" alt="The MST layout: Scene tree with PixelBuilderMesh and its Box child on the far left, a vertical toolbar with Mode, Tool and Edit sections, the 3D view showing a green crate and the status line 'Pixel Builder – Object mode, Paint material, 36 verts 68 edges 34 faces', the right panel with Materials, Smoothing and Face UV sections, and a bottom strip with Slot, Color swatches, Grid, Subdiv, Weld dist and Mirror options.">
+      <button class="spot" style="left:21.5%;top:15%" data-title="Mode" data-text="Object 1 · Face 2 · Edge 3 · Vertex 4. In this layout the bare digits are the modes.">1</button>
+      <button class="spot" style="left:21.5%;top:50%" data-title="Tool" data-text="Select/move W · Draw shape C · Paint B · Vertex paint 5 · Place on cell P · Bezier plane/block Shift+C.">2</button>
+      <button class="spot" style="left:21.5%;top:85%" data-title="Edit" data-text="Subdivide · Triangulate (Ctrl+T) · Flip normals · Weld.">3</button>
+      <button class="spot" style="left:42%;top:10%" data-title="Status line" data-text="Current mode and tool, the mesh's vertex / edge / face counts, and how many of each are selected. Watch it to confirm an operation worked.">4</button>
+      <button class="spot" style="left:91%;top:9%" data-title="Materials" data-text="+ Slot, + Preset, Palette and Sample — see the Materials panel tour further down.">5</button>
+      <button class="spot" style="left:91%;top:26%" data-title="Smoothing" data-text="Smooth, Faceted, New group, Tint groups, Normals.">6</button>
+      <button class="spot" style="left:91%;top:59%" data-title="Face UV" data-text="Offset U/V, Scale U/V, Rotation, World aligned, Apply / Reset / ↻90° for the selected faces.">7</button>
+      <button class="spot" style="left:40%;top:92%" data-title="Slot &amp; Color" data-text="The current material slot number and the colour swatch row used by the Paint tool.">8</button>
+      <button class="spot" style="left:67%;top:92%" data-title="Grid &amp; Subdiv" data-text="Grid snap step (metres) and the Subdivide count.">9</button>
+      <button class="spot" style="left:29%;top:97%" data-title="Weld dist" data-text="How close vertices must be for Weld to join them.">10</button>
+      <button class="spot" style="left:49%;top:97%" data-title="Mirror X/Y/Z + Mirror copy" data-text="Mirror edits across an axis; Mirror copy makes the mirrored half a copy.">11</button>
+    </div></div>
+    <div class="side-by-side">
+      <img class="tall" src="media/10-builder-modeller/62-mst-left-toolbar.png" alt="The MST left toolbar close up: Mode heading with four mode icons (Object lit blue), Tool heading with move arrows, draw-shape box, a blue paint brush, a vertex-paint pen, a place-on-cell icon and a bezier curve, then Edit heading with subdivide grid, triangulate, flip-normals and weld icons.">
+      <div>
+        <p><b>Left toolbar, top to bottom</b></p>
+        <ul>
+          <li><b>Mode:</b> Object <kbd>1</kbd> · Face <kbd>2</kbd> · Edge <kbd>3</kbd> · Vertex <kbd>4</kbd></li>
+          <li><b>Tool:</b> Select/move <kbd>W</kbd> · Draw shape <kbd>C</kbd> (drag a footprint on the grid, then move up for height) · Paint <kbd>B</kbd> · Vertex paint <kbd>5</kbd> · Place on cell <kbd>P</kbd> · Bezier plane/block <kbd>Shift</kbd>+<kbd>C</kbd></li>
+          <li><b>Edit:</b> Subdivide · Triangulate <kbd>Ctrl</kbd>+<kbd>T</kbd> · Flip normals · Weld</li>
+        </ul>
+        <p>In MST the bare digits <kbd>1</kbd>–<kbd>4</kbd> are the modes, <kbd>5</kbd> is vertex paint and <kbd>F</kbd> is Fill hole.</p>
+      </div>
+    </div>
+  </div>
+  <div class="panel" data-tab="Modeler">
+    <p>Roblox UI <b>off</b>, layout set to <b>Modeler</b> — the "larger palette" layout. There's no left toolbar or right panel; instead a horizontal toolbar runs along the top of the 3D view:</p>
+    <figure class="shot"><img src="media/10-builder-modeller/70-modeler-toolbar.png" alt="The Modeler top toolbar: Builder, Pixel Preview, Animate, Pixel World and the Roblox UI toggle (off), then four small icon buttons, '+ Add Mesh', 'Actions', and four more icons ending in a gear."><figcaption>The Modeler toolbar: icon buttons (hover any for its tooltip), <span class="ui">+ Add Mesh</span> and <span class="ui">Actions</span>.</figcaption></figure>
+    <div class="pair">
+      <figure class="shot"><img src="media/10-builder-modeller/71-modeler-add-mesh.png" alt="The Add Mesh palette: a grid of shape buttons — Box (highlighted), Prism, Sprite, Plane, Cylinder, Cone, Sphere, Pipe, Torus, Arch, Door, Stairs, Poly Shape, Bezier Plane, Bezier Block, Icosphere, Ramp, Arch (wall), Hex prism, Hex cluster, Curved stairs, Trim and Wall."><figcaption>+ Add Mesh: a palette of 23 shapes. <b>Alt-click</b> a shape to place it immediately.</figcaption></figure>
+      <div>
+        <p><b>+ Add Mesh shapes</b></p>
+        <ul class="shape-list">
+          <li>Box</li><li>Prism</li><li>Sprite</li><li>Plane</li><li>Cylinder</li><li>Cone</li><li>Sphere</li><li>Pipe</li><li>Torus</li><li>Arch</li><li>Door</li><li>Stairs</li><li>Poly Shape</li><li>Bezier Plane</li><li>Bezier Block</li><li>Icosphere</li><li>Ramp</li><li>Arch (wall)</li><li>Hex prism</li><li>Hex cluster</li><li>Curved stairs</li><li>Trim</li><li>Wall</li>
+        </ul>
+        <p><b>Actions</b> menu bundles: Subdivide / Triangulate Faces, Merge Objects, Flip Faces, Conform Normals, Center Pivot, Freeze Transform, Mirror, Set Collider / Trigger, Generate Lightmap UVs, Create Reusable Part, UV Editor…, Export Mesh, Boolean, Place on cell, Weld, Assign material, New blend material, Invert alpha, Bake to MeshInstance3D, Shape parameters, Paint colour.</p>
+        <p>Operations such as Paint open a <b>floating pop-up</b> in the viewport (for example <i>"Paint — Click or drag over faces… Options / Cancel / Done"</i>) instead of a docked strip. Modes and keys are the same as MST.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout tip"><span class="label">Tip</span><p>Model in whichever layout feels best, but you'll visit <b>MST</b> (or Modeler) for two things the Roblox ribbon doesn't have: the <b>Materials</b> panel (per-face materials) and the <b>Smoothing</b> panel. Flip <span class="ui">Roblox UI</span> off, do the job, flip it back — nothing is lost.</p></div>
+
+<!-- ===================================================== EDIT TAB -->
+<h2 id="edit-tab">The Edit tab, button by button</h2>
+<p>Turn on <span class="ui">Roblox UI</span>, select your builder mesh, and click the <span class="ui">Edit</span> tab next to <span class="ui">Model</span>. The ribbon reads left to right as: <b>who you're picking</b> (modes) → <b>what to do to it</b> (operations) → <b>selection helpers</b> → <b>pivot</b> → <b>UVs</b>. Click the markers:</p>
+
+<div class="hotspots"><div class="hs-frame"><img src="media/10-builder-modeller/01-edit-ribbon.png" alt="The Edit tab ribbon with Object mode lit: Object, Face, Edge, Vertex; then greyed Extrude, Inset, Bevel, Loop Cut, Bridge, Merge, Delete; Select; greyed Pivot to Sel.; UV.">
+  <button class="spot" style="left:3%;top:45%" data-title="Object" data-text="Alt+1 (Roblox) / 1 (MST, Modeler). Whole meshes — 'use Godot's gizmo to move them'. The default mode. Only object actions (Insert part, Lock, Anchor, Pivot, Union…) work here, so every mesh operation is greyed.">1</button>
+  <button class="spot" style="left:9%;top:45%" data-title="Face" data-text="Alt+2 / 2. 'Click faces (Shift adds), drag on empty space for a box.' Enables Extrude, Inset, Merge, Delete and Pivot to Sel.">2</button>
+  <button class="spot" style="left:15%;top:45%" data-title="Edge" data-text="Alt+3 / 3. 'Pick edges.' Enables Extrude, Bevel, Loop Cut, Bridge and Delete.">3</button>
+  <button class="spot" style="left:22%;top:45%" data-title="Vertex" data-text="Alt+4 / 4. 'Pick vertices.' Enables Bevel, Merge and Delete.">4</button>
+  <button class="spot" style="left:30%;top:45%" data-title="Extrude (E)" data-text="Face / Edge mode. Pushes faces along their normals (or open edges outwards) by Dist, building side walls.">5</button>
+  <button class="spot" style="left:37%;top:45%" data-title="Inset (I)" data-text="Face mode. Shrinks each selected face into a smaller face with a rim around it.">6</button>
+  <button class="spot" style="left:43%;top:45%" data-title="Bevel (Ctrl+B)" data-text="Edge mode (edges) or Vertex mode (corners). Chamfers with 1 segment, rounds with more.">7</button>
+  <button class="spot" style="left:50%;top:45%" data-title="Loop Cut (Ctrl+R)" data-text="Edge mode. 'Insert edge loop — cuts loops across the quad ring through the selected edge.'">8</button>
+  <button class="spot" style="left:57%;top:45%" data-title="Bridge" data-text="Edge mode, no default key. 'Join two open (boundary) edges, or two equal open edge runs, with faces.'">9</button>
+  <button class="spot" style="left:63%;top:45%" data-title="Merge (M)" data-text="Face mode: faces into one n-gon. Vertex mode: vertices into one.">10</button>
+  <button class="spot" style="left:69%;top:45%" data-title="Delete (Delete)" data-text="Face / Edge / Vertex mode. Removes the selected faces, edges or vertices.">11</button>
+  <button class="spot" style="left:78%;top:45%" data-title="Select ▾" data-text="Selection helpers: Select Loop (L), Select Ring (Alt+L), Grow (G), Shrink (Shift+G), Similar.">12</button>
+  <button class="spot" style="left:89%;top:45%" data-title="Pivot to Sel." data-text="Element modes. 'Move the node origin to the centre of the selected elements' — handy before rotating or scaling around a specific spot.">13</button>
+  <button class="spot" style="left:97%;top:45%" data-title="UV (U)" data-text="Opens the UV window for this mesh: move / scale / rotate, planar / box projection, flip, fit, sew, copy / paste, texel density.">14</button>
+</div></div>
+
+<p><b>Why is everything grey?</b> Operations light up only when you're in a mode that supports them <i>and</i> you have something selected. Hover a greyed button and its tooltip tells you why — e.g. <i>"Use face selection mode."</i> Drag the slider to step through the modes (nothing selected yet), then drag the divider in the second picture to see what selecting a face does:</p>
+
+<div class="scrubber" data-label="Mode" data-frames='[{"v":"Object","src":"media/10-builder-modeller/01-edit-ribbon.png","note":"Object mode: whole meshes. All mesh operations are greyed."},{"v":"Face","src":"media/10-builder-modeller/02-mode-face.png","note":"Face mode lit blue. Operations stay grey until you click a face."},{"v":"Edge","src":"media/10-builder-modeller/02-mode-edge.png","note":"Edge mode. Select an edge to enable Extrude, Bevel, Loop Cut, Bridge, Delete."},{"v":"Vertex","src":"media/10-builder-modeller/02-mode-vertex.png","note":"Vertex mode. Select vertices to enable Bevel, Merge, Delete."}]'></div>
+
+<div class="compare" data-before="Face, nothing picked" data-after="Face, top face picked"><img src="media/10-builder-modeller/02-mode-face.png" alt="Edit ribbon in Face mode with no selection: every operation greyed."><img src="media/10-builder-modeller/03-edit-ribbon-face.png" alt="Edit ribbon in Face mode with a face selected: Extrude, Inset, Delete and Pivot to Sel. are now bright; Bevel, Loop Cut, Bridge and Merge stay grey."></div>
+
+<figure class="clip"><video src="media/10-builder-modeller/clip-26-edit-tab.mp4" poster="media/10-builder-modeller/clip-26-edit-tab.png" data-autoplay></video><figcaption>The Edit tab in use: with one face selected the pointer sweeps the ribbon — Extrude, Inset and Delete are live, Bevel / Loop Cut / Bridge / Merge are greyed for Face mode — then clicks the mode buttons.</figcaption></figure>
+
+<!-- ===================================================== MODES -->
+<h2 id="modes">Selection modes and picking things</h2>
+<p>Before you can change part of a mesh you have to tell the builder <i>which kind of piece</i> you want to grab — that's the <b>mode</b> — and then click the pieces themselves.</p>
+
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-01-modes.mp4" poster="media/10-builder-modeller/clip-01-modes.png" data-autoplay></video><figcaption>Clicking <b>Object → Face → Edge → Vertex</b>. The lit button, the status line ("Pixel Builder – Face mode, Select / Move") and the handles on the cube all change.</figcaption></figure>
+  <figure class="clip"><video src="media/10-builder-modeller/clip-02-mode-cycle-h.mp4" poster="media/10-builder-modeller/clip-02-mode-cycle-h.png" data-autoplay></video><figcaption>Pressing <kbd>H</kbd> (mouse over the 3D view) cycles the modes in the order <b>Object → Vertex → Edge → Face → Object</b>; the ribbon follows along.</figcaption></figure>
+</div>
+
+<table class="ref">
+  <thead><tr><th>Mode</th><th>Roblox UI</th><th>MST / Modeler</th><th>You pick…</th><th>Operations it enables</th></tr></thead>
+  <tbody>
+    <tr><td>Object</td><td><kbd>Alt</kbd>+<kbd>1</kbd></td><td><kbd>1</kbd></td><td>whole meshes (move them with Godot's gizmo)</td><td>object actions only: Insert part, Lock, Anchor, Pivot, Union…</td></tr>
+    <tr><td>Face</td><td><kbd>Alt</kbd>+<kbd>2</kbd></td><td><kbd>2</kbd></td><td>flat sides</td><td>Extrude, Inset, Merge, Delete, Pivot to Sel.</td></tr>
+    <tr><td>Edge</td><td><kbd>Alt</kbd>+<kbd>3</kbd></td><td><kbd>3</kbd></td><td>lines between faces</td><td>Extrude, Bevel, Loop Cut, Bridge, Delete</td></tr>
+    <tr><td>Vertex</td><td><kbd>Alt</kbd>+<kbd>4</kbd></td><td><kbd>4</kbd></td><td>corner points</td><td>Bevel, Merge, Delete</td></tr>
+  </tbody>
+</table>
+
+<h3 id="picking">Clicking, adding and box-selecting</h3>
+<ul>
+  <li><b>Click</b> a face / edge / vertex to select just that one. It turns orange.</li>
+  <li><b><kbd>Shift</kbd>+click</b> to add more. (Whether Shift <i>adds</i>, <i>subtracts</i> or <i>toggles</i> depends on the <span class="ui">Shift selects</span> preference — MST toggles, Modeler adds; see <a href="#prefs">Options</a>.)</li>
+  <li><b>Drag on empty space</b> to draw a selection box. Whether the box must fully enclose an element or just touch it is the <span class="ui">Box selects</span> preference.</li>
+  <li>The <b>hover highlight</b> shows what a click would grab before you click — useful for thin edges.</li>
+  <li>Watch the <b>status line</b> at the top-left of the 3D view: <i>"8 verts 12 edges 6 faces | selected: 1 faces 0 edges 0 verts"</i>.</li>
+</ul>
+
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-03-select-face.mp4" poster="media/10-builder-modeller/clip-03-select-face.png" data-autoplay></video><figcaption><b>Face mode:</b> click the top face, then <kbd>Shift</kbd>+click two side faces — all three light up.</figcaption></figure>
+  <figure class="clip"><video src="media/10-builder-modeller/clip-04-select-edge.mp4" poster="media/10-builder-modeller/clip-04-select-edge.png" data-autoplay></video><figcaption><b>Edge mode:</b> click one edge, <kbd>Shift</kbd>+click to add — three top edges selected.</figcaption></figure>
+  <figure class="clip"><video src="media/10-builder-modeller/clip-05-select-vertex.mp4" poster="media/10-builder-modeller/clip-05-select-vertex.png" data-autoplay></video><figcaption><b>Vertex mode:</b> click corner points (white handles); <kbd>Shift</kbd> adds.</figcaption></figure>
+</div>
+
+<div class="callout tip"><span class="label">Tip — hitting thin edges</span><p>Edges and vertices are only a few pixels wide when you're zoomed out. Zoom in (mouse wheel) and wait for the hover highlight before clicking. If you keep missing, select a <i>face</i> next to the edge first to see where things are.</p></div>
+
+<h3 id="select-menu">Growing a selection: the Select ▾ menu</h3>
+<p>Clicking every edge of a rim one by one is tedious. The <span class="ui">Select ▾</span> menu (and its keys) grows a selection for you:</p>
+<input class="filter-box" data-target="#select-ref" placeholder="Filter selection helpers…">
+<div id="select-ref">
+  <div class="control"><h4>Select Loop</h4><div class="where">Select ▾ · Edge mode</div><p>Selects the whole edge loop through the picked edge. Picking <b>one</b> rim edge of a box then pressing <kbd>L</kbd> selected the whole <b>4-edge</b> top loop.</p><dl><dt>Shortcut</dt><dd><kbd>L</kbd></dd></dl></div>
+  <div class="control"><h4>Select Ring</h4><div class="where">Select ▾ · Edge mode</div><p>Selects the ring of parallel edges crossing the loop (1 → 4 edges on a box).</p><dl><dt>Shortcut</dt><dd><kbd>Alt</kbd>+<kbd>L</kbd></dd></dl></div>
+  <div class="control"><h4>Grow</h4><div class="where">Select ▾</div><p>Adds every neighbour of the current selection. One top face grows to five (the top plus four sides).</p><dl><dt>Shortcut</dt><dd><kbd>G</kbd></dd></dl></div>
+  <div class="control"><h4>Shrink</h4><div class="where">Select ▾</div><p>The reverse of Grow: drops the outer ring of the selection (five faces back to one).</p><dl><dt>Shortcut</dt><dd><kbd>Shift</kbd>+<kbd>G</kbd></dd></dl></div>
+  <div class="control"><h4>Similar</h4><div class="where">Select ▾ (menu only)</div><p>Selects elements similar to the current selection. No keyboard shortcut.</p></div>
+</div>
+<figure class="clip"><video src="media/10-builder-modeller/clip-16-grow-select.mp4" poster="media/10-builder-modeller/clip-16-grow-select.png" data-autoplay></video><figcaption><kbd>G</kbd> grows one selected face to five; the status line reads <i>selected: 1 → 5 faces</i>. Press <kbd>G</kbd> again and all six faces are picked.</figcaption></figure>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Studio only selects whole Parts. The four modes are like Blender's vertex / edge / face select buttons — Roblox has nothing equivalent. <b>Object</b> mode is the one that behaves like Studio.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Guided tutorial: model an open crate</h2>
+<p>About 15 minutes. You'll turn a single box into a hollow crate with a rounded lip using four operations, then colour it. Tick each step as you go — your progress is remembered. The finished result is saved in the project as <code>res://tutorial/guide/modelled_prop.tscn</code> (<code>res://</code> means "the project folder"; in the FileSystem dock, open <code>tutorial</code> → <code>guide</code>) if you want to compare.</p>
+
+<div class="callout tip"><span class="label">Tip — what you'll see</span><p>A newly inserted part is solid Roblox <b>Medium Stone Grey</b> (RGB 163, 162, 165 — the same grey as a fresh Part in Studio) until you give it a colour or material. It does <b>not</b> copy the materials of whatever mesh you had selected. The one exception: if you picked a material from the Model tab's <span class="ui">Material</span> menu while nothing was selected, new parts use that material instead. The pictures on this page show the part coloured terracotta on a dark, empty background so the edits read clearly — your editor's shading may look a little different.</p></div>
+
+<ol class="steps" data-id="crate">
+  <li><b>Start an empty scene.</b> <span class="ui">Scene → New Scene</span>, then in the Scene tree click <span class="ui">Other Node</span>, search for <code>PixelBuilderMesh</code> in the <b>Create New Node</b> dialog and click <span class="ui">Create</span>. An empty scene keeps the background plain so your edits are easy to see.</li>
+  <li><b>Insert a box.</b> Turn on <span class="ui">Roblox UI</span>, open the <span class="ui">Model</span> tab and click <span class="ui">Part</span>. A Box appears at the centre of the view.
+    <figure class="shot"><img src="media/10-builder-modeller/10-walk-start.png" alt="A flat terracotta-coloured box part with blue outline and red, green and blue move arrows, on a dark brown ground; status line reads 'selected: 0 faces 0 edges 0 verts'."><figcaption>The starting box, already coloured terracotta.</figcaption></figure>
+    <div class="callout warn"><span class="label">Watch out — set the size first</span><p>If you want a different box size, change <span class="ui">Size</span> in the Inspector <b>now</b>. Changing Size later rebuilds the box and replaces all your face / edge edits (the Inspector warns: <i>"Rebuilding replaces the element edits. Undo can restore them."</i>).</p></div></li>
+  <li><b>Colour it.</b> Click <span class="ui">Color</span> on the Model tab, type <code>c8743c</code> in the hex field (a terracotta orange) and click <span class="ui">Apply</span>.</li>
+  <li><b>Pick the top face.</b> Move the mouse over the 3D view, press <kbd>Alt</kbd>+<kbd>2</kbd> (Face mode) and click the box's top face. It turns orange and the status line reads <i>selected: 1 faces</i>.</li>
+  <li><b>Extrude it up.</b> Press <kbd>E</kbd>. The top rises and new side walls appear. In the <span class="ui">Adjust Extrude</span> panel set <span class="ui">Dist</span> to about <code>1</code> and click <span class="ui">Done</span>. Now you have a tall box.
+    <figure class="clip"><video src="media/10-builder-modeller/clip-22-crate-extrude.mp4" poster="media/10-builder-modeller/clip-22-crate-extrude.png"></video><figcaption>Crate 1/4 — Face mode, select the top, Extrude up.</figcaption></figure>
+    <div class="compare" data-before="Before Extrude" data-after="After Extrude"><img src="media/10-builder-modeller/12-extrude-before.png" alt="The flat terracotta box in Face mode with its top face selected (orange, outlined); the full status line reads '8 verts 12 edges 6 faces | selected: 1 faces'."><img src="media/10-builder-modeller/12-extrude-after.png" alt="The same box after extruding the top face upward: noticeably taller, the top face still selected in orange, status '12 verts 20 edges 10 faces | selected: 1 faces'."></div></li>
+  <li><b>Inset the top.</b> With the top face still selected, press <kbd>I</kbd>. A smaller face appears inside the top with a rim around it. Leave <span class="ui">Inset</span> at about <code>0.2</code> (<span class="ui">Inset by</span>: Fraction) and click <span class="ui">Done</span>.
+    <figure class="clip"><video src="media/10-builder-modeller/clip-23-crate-inset.mp4" poster="media/10-builder-modeller/clip-23-crate-inset.png"></video><figcaption>Crate 2/4 — Inset the top face to make a lid rim.</figcaption></figure>
+    <figure class="shot"><img src="media/10-builder-modeller/13-inset-after.png" alt="The tall box with an inner face inset on top, leaving a rim; below it the Adjust Inset panel reads Inset 0.2, Inset by Fraction, Individual ticked, with Cancel and Done. The status line reads '16 verts 28 edges 14 faces'."><figcaption>After Inset: 14 faces, the new inner face is selected; the Adjust Inset panel stays live until you press Done.</figcaption></figure></li>
+  <li><b>Push the inside down.</b> Press <kbd>E</kbd> again and type a <b>negative</b> <span class="ui">Dist</span> (e.g. <code>-0.7</code>) so the inner face sinks into the box. Click <span class="ui">Done</span>. The crate is now hollow.
+    <figure class="clip"><video src="media/10-builder-modeller/clip-24-crate-recess.mp4" poster="media/10-builder-modeller/clip-24-crate-recess.png"></video><figcaption>Crate 3/4 — hollowing the crate: with the inset face selected, <b>Extrude</b> opens the Adjust Extrude panel and <span class="ui">Dist</span> is typed as a <b>negative</b> number (<b>-0.72</b>) so the face sinks <i>into</i> the box instead of rising. The status line counts the new walls (10 → 18 faces). The adjust panel previews the move live; press <span class="ui">Done</span> to commit it.</figcaption></figure>
+    <figure class="shot"><img src="media/10-builder-modeller/14-crate-hollow.png" alt="The box now has a sunken opening in its top surrounded by a rim; move gizmo sits inside the recess. Status: 20 verts 36 edges 18 faces."><figcaption>Hollow: 18 faces.</figcaption></figure></li>
+  <li><b>Select the outer rim.</b> Press <kbd>Alt</kbd>+<kbd>3</kbd> (Edge mode), click one of the four <b>outer</b> top edges, then press <kbd>L</kbd> (Select Loop). All four rim edges are selected — <i>selected: 4 edges</i>.
+    <figure class="shot"><img src="media/10-builder-modeller/20-select-loop.png" alt="The hollow crate in Edge mode with the four outer top-rim edges highlighted orange; status '0 faces 4 edges 0 verts'."><figcaption>One click + <kbd>L</kbd> selects the whole rim loop.</figcaption></figure></li>
+  <li><b>Round the lip.</b> Press <kbd>Ctrl</kbd>+<kbd>B</kbd> (Bevel). In <span class="ui">Adjust Bevel</span> set <span class="ui">Segs</span> to <code>3</code> and <span class="ui">Bevel</span> to about <code>0.22</code> (Amount: Offset). Click <span class="ui">Done</span>.
+    <figure class="clip"><video src="media/10-builder-modeller/clip-25-crate-bevel.mp4" poster="media/10-builder-modeller/clip-25-crate-bevel.png"></video><figcaption>Crate 4/4 — the Bevel step in motion: Edge mode, <kbd>L</kbd> to select the rim loop, then <kbd>Ctrl</kbd>+<kbd>B</kbd> and <span class="ui">Segs</span> set to <b>3</b> with Bevel <b>0.22</b>. The status line echoes it — <i>Bevel · 3 segments · Profile 0.50 · Offset 0.220</i> — and the flat rim becomes a rounded lip.</figcaption></figure>
+    <figure class="shot"><img src="media/10-builder-modeller/15-prop-beveled.png" alt="The finished crate in Edge mode: a hollow box with a softly rounded top lip; the status line reads '32 verts 60 edges 30 faces' and 'Profile 0.50 · Offset 0.220'."><figcaption>The rounded lip. The status line echoes the bevel settings: <i>Profile 0.50 · Offset 0.220</i>.</figcaption></figure></li>
+  <li><b>Check your undo history.</b> Open the <b>History</b> dock (bottom-left, next to FileSystem). Each operation is one entry — <i>Pixel Builder: Extrude</i>, <i>Inset</i>, <i>Bevel</i>… Try <kbd>Ctrl</kbd>+<kbd>Z</kbd> once and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo.</li>
+  <li><b>Give it a new colour.</b> Press <kbd>Alt</kbd>+<kbd>1</kbd> for Object mode, pick a swatch in <span class="ui">Color</span> and click <span class="ui">Apply</span> — the whole crate changes colour. (For a different colour on each face, see <a href="#paint">painting with material slots</a>.)
+    <figure class="shot"><img src="media/10-builder-modeller/16-crate-painted.png" alt="The finished crate recoloured bright green, with its rounded lip and hollow top."><figcaption>The finished crate, recoloured.</figcaption></figure></li>
+  <li><b>Save.</b> <kbd>Ctrl</kbd>+<kbd>S</kbd> and name it, e.g. <code>my_crate.tscn</code>. A <code>.tscn</code> is a saved scene — like a Roblox model file you can drop into other scenes.</li>
+</ol>
+
+<div class="callout try"><span class="label">Try it</span><p>Open the finished example, <code>res://tutorial/guide/modelled_prop.tscn</code>, and look at the Inspector's <span class="ui">Editable Mesh</span> section: <i>36 vertices, 68 edges, 34 faces</i>. Select its <code>Box</code> child, switch to Face mode and click around to see how the crate is built. When you're happy, try <a href="#export">exporting</a> it as a GLB file.</p></div>
+
+<!-- ===================================================== OPERATIONS -->
+<h2 id="ops">Every mesh operation</h2>
+<p>Each operation below is a single undo step and shows the action name you'll see in the History dock. Operations marked with an Adjust panel open a small live panel in the viewport right after you run them: change the numbers and watch the mesh update, then click <span class="ui">Done</span> to keep it or <span class="ui">Cancel</span> / <kbd>Esc</kbd> to throw it away. (You can turn the Adjust panel off in <a href="#prefs">Options</a> — then operations apply at once with their last settings.)</p>
+
+<h3 id="op-move">Move (select / move tool)</h3>
+<div class="op-head"><span class="pill"><kbd>W</kbd> (MST / Modeler) · tool <kbd>2</kbd> (Roblox)</span><span class="mode-chip">any mode</span></div>
+<p>Select faces, edges or vertices and drag the coloured arrows to move just those pieces; the rest of the mesh stretches to follow. A live readout shows the offset, e.g. <code>(0, 1, 0)</code>.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-06-move-w.mp4" poster="media/10-builder-modeller/clip-06-move-w.png" data-autoplay></video><figcaption>Dragging the green (Y) arrow lifts the selected top face; the box stretches taller.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same arrows as Studio's Move tool — red X, green Y, blue Z — but they move only the selected <i>piece</i> of the mesh, not the whole Part. Use <kbd>[</kbd> / <kbd>]</kbd> to halve or double the grid step while you drag.</p></div>
+
+<h3 id="op-extrude">Extrude</h3>
+<div class="op-head"><span class="pill"><kbd>E</kbd></span><span class="mode-chip">Face</span><span class="mode-chip">Edge</span><span class="layout-badge">History: "Pixel Builder: Extrude"</span></div>
+<p>Pushes the selection along its normal and builds the connecting side walls. Faces go along their normals; open (border) edges go outwards. Use it to pull out legs, handles, chimneys — or, with a negative distance, to dig holes.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-07-extrude-e.mp4" poster="media/10-builder-modeller/clip-07-extrude-e.png" data-autoplay></video><figcaption><kbd>E</kbd> on the top face pushes it up and opens the Adjust Extrude panel.</figcaption></figure>
+  <figure class="shot"><img src="media/10-builder-modeller/11-adjust-extrude.png" alt="The Adjust Extrude panel: Dist spin box set to 0.99 and an Extrude dropdown set to Face normal."><figcaption>Adjust Extrude.</figcaption></figure>
+</div>
+<div id="extrude-ref">
+  <div class="control"><h4>Dist</h4><div class="where">Adjust Extrude</div><p>How far to push, in metres. <b>Negative</b> pushes inward (a recess).</p></div>
+  <div class="control"><h4>Extrude (method)</h4><div class="where">Adjust Extrude · dropdown</div><p><b>Face normal</b> — the selection moves as one along the faces' normals. <b>Vertex normal</b> — as one, along averaged vertex normals (good for curved selections). <b>Individual</b> — every face along its own normal (each face becomes its own little block). Edges extrude as a group.</p></div>
+  <div class="control"><h4>Cancel / Done</h4><div class="where">Adjust Extrude</div><p>Throw the operation away, or keep it.</p></div>
+</div>
+
+<h3 id="op-inset">Inset</h3>
+<div class="op-head"><span class="pill"><kbd>I</kbd></span><span class="mode-chip">Face</span><span class="layout-badge">History: "Pixel Builder: Inset"</span></div>
+<p>Makes a smaller face inside each selected face, with a rim around it. Inset then Extrude is the classic way to make panels, windows, lids and frames.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-08-inset-i.mp4" poster="media/10-builder-modeller/clip-08-inset-i.png" data-autoplay></video><figcaption><kbd>I</kbd> on the top face makes an inner face and rim.</figcaption></figure>
+  <figure class="shot"><img src="media/10-builder-modeller/13-adjust-inset.png" alt="The Adjust Inset panel: Inset 0.2, Inset by Fraction, Individual ticked, Cancel and Done buttons."><figcaption>Adjust Inset.</figcaption></figure>
+</div>
+<div id="inset-ref">
+  <div class="control"><h4>Inset</h4><div class="where">Adjust Inset · spin box</div><p>The amount — a fraction toward the centre, or a rim width in metres, depending on <i>Inset by</i>.</p></div>
+  <div class="control"><h4>Inset by</h4><div class="where">Adjust Inset · dropdown</div><p><b>Fraction</b> — corners move toward the centre. <b>Width</b> — a rim this many metres wide. <b>Equal</b> — a rim of the same width everywhere with mitred (angled) corners.</p></div>
+  <div class="control"><h4>Individual</h4><div class="where">Adjust Inset · checkbox</div><p>On: inset every selected face on its own. Off: connected faces inset together as one group (one rim around the whole patch).</p></div>
+</div>
+
+<h3 id="op-bevel">Bevel</h3>
+<div class="op-head"><span class="pill"><kbd>Ctrl</kbd>+<kbd>B</kbd></span><span class="mode-chip">Edge</span><span class="mode-chip">Vertex</span><span class="layout-badge">History: "Pixel Builder: Bevel"</span></div>
+<p>Cuts off a sharp edge (Edge mode) or corner (Vertex mode). One segment makes a flat <b>chamfer</b>; more segments make a round edge. Where several selected edges meet in a rim, their corners are inset neatly.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-09-bevel.mp4" poster="media/10-builder-modeller/clip-09-bevel.png" data-autoplay></video><figcaption>Bevel on the top edge loop (selected with <kbd>L</kbd>) chamfers the rim.</figcaption></figure>
+  <figure class="shot"><img src="media/10-builder-modeller/21-adjust-bevel.png" alt="The Adjust Bevel panel: Bevel 0.22, Amount Offset, Segs 3, B profile 0.51, Clamp ticked, Harden unticked, and a summary 'Bevel · 3 segments · Profile 0.50 · Offset 0.220'."><figcaption>Adjust Bevel.</figcaption></figure>
+</div>
+<input class="filter-box" data-target="#bevel-ref" placeholder="Filter Bevel settings…">
+<div id="bevel-ref">
+  <div class="control"><h4>Bevel</h4><div class="where">Adjust Bevel · spin box</div><p>The size of the bevel, measured as set by <i>Amount</i>.</p></div>
+  <div class="control"><h4>Amount</h4><div class="where">Adjust Bevel · dropdown</div><p><b>Offset</b> — distance from the original edge. <b>Width</b> — width of the new face. <b>Depth</b> — depth of the cut. <b>Percent</b> — 0–100 % of the neighbouring edge's length.</p></div>
+  <div class="control"><h4>Segs</h4><div class="where">Adjust Bevel · spin box</div><p>Number of segments. 1 = chamfer, more = rounder.</p><dl><dt>Range</dt><dd>1 – 32</dd></dl></div>
+  <div class="control"><h4>B profile</h4><div class="where">Adjust Bevel · spin box</div><p>Shape of the rounding. <b>0.5</b> is circular; lower is concave (scooped), higher is convex / boxy.</p></div>
+  <div class="control"><h4>Clamp</h4><div class="where">Adjust Bevel · checkbox</div><p>Clamp overlap: stops a big bevel from pushing past neighbouring geometry.</p></div>
+  <div class="control"><h4>Harden</h4><div class="where">Adjust Bevel · checkbox</div><p>Harden normals so the flat faces next to the bevel keep crisp shading.</p></div>
+</div>
+
+<h3 id="op-loopcut">Loop Cut</h3>
+<div class="op-head"><span class="pill"><kbd>Ctrl</kbd>+<kbd>R</kbd></span><span class="mode-chip">Edge</span><span class="layout-badge">History: "Pixel Builder: Insert edge loop"</span></div>
+<p>Slices a new edge loop all the way around the shape, across the ring of four-sided faces through the selected edge. Use it to add detail exactly where you need it — a band around a barrel, a split for a door, extra edges before bending.</p>
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-10-loopcut.mp4" poster="media/10-builder-modeller/clip-10-loopcut.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+<kbd>R</kbd> inserts a loop around the box.</figcaption></figure>
+  <figure class="shot"><img src="media/10-builder-modeller/22-loop-cut.png" alt="The hollow crate with a new horizontal edge loop running around its sides (dashed orange line) and the 'Adjust Insert edge loop' panel showing Cuts 1 with Cancel and Done."><figcaption>Adjust Insert edge loop: <span class="ui">Cuts</span> sets how many parallel loops to insert.</figcaption></figure>
+</div>
+
+<h3 id="op-bridge">Bridge</h3>
+<div class="op-head"><span class="pill">no default key — ribbon button</span><span class="mode-chip">Edge</span></div>
+<p>Joins two open (border) edges, or two equal-length runs of open edges, with new faces. Use it to close the gap between two openings — e.g. connect two holes to make a tunnel. (No clip: there's no default shortcut; click <span class="ui">Bridge</span> on the Edit tab.)</p>
+
+<h3 id="op-merge">Merge</h3>
+<div class="op-head"><span class="pill"><kbd>M</kbd></span><span class="mode-chip">Face</span><span class="mode-chip">Vertex</span><span class="layout-badge">History: "Pixel Builder: Merge faces"</span></div>
+<p>Face mode: fuses the selected faces into one n-gon. Vertex mode: collapses the selected vertices into one point.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-12-merge.mp4" poster="media/10-builder-modeller/clip-12-merge.png" data-autoplay></video><figcaption>Two adjacent faces become one — the face count drops 6 → 5.</figcaption></figure>
+
+<h3 id="op-connect">Connect</h3>
+<div class="op-head"><span class="pill"><kbd>J</kbd></span><span class="mode-chip">Vertex</span><span class="layout-badge">History: "Pixel Builder: Connect"</span></div>
+<p>Draws a new edge between two selected vertices across a face, splitting it in two. Great for adding a diagonal or a custom cut where a full loop would be too much.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-13-connect.mp4" poster="media/10-builder-modeller/clip-13-connect.png" data-autoplay></video><figcaption>Two opposite top corners connected — edges go 12 → 13.</figcaption></figure>
+
+<h3 id="op-fill">Fill hole</h3>
+<div class="op-head"><span class="pill"><kbd>Alt</kbd>+<kbd>F</kbd> (Roblox) · <kbd>F</kbd> (MST / Modeler)</span><span class="mode-chip">Edge</span><span class="layout-badge">History: "Pixel Builder: Fill hole"</span></div>
+<p>Select the border loop of an open hole and Fill caps it with a new face. An Adjust Fill-hole panel follows.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-14-fill.mp4" poster="media/10-builder-modeller/clip-14-fill.png" data-autoplay></video><figcaption>A box with one side face deleted: the hole's border loop is selected, <kbd>Alt</kbd>+<kbd>F</kbd> caps it — faces go 5 → 6 — and the Adjust Fill-hole panel appears.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In the Roblox layout, plain <kbd>F</kbd> is <b>Zoom to</b>, just like focusing a Part in Studio. That's why Fill moves to <kbd>Alt</kbd>+<kbd>F</kbd> there.</p></div>
+
+<h3 id="op-triangulate">Triangulate</h3>
+<div class="op-head"><span class="pill"><kbd>Ctrl</kbd>+<kbd>T</kbd></span><span class="mode-chip">Face</span><span class="layout-badge">History: "Pixel Builder: Triangulate faces"</span></div>
+<p>Splits the selected faces into triangles. Useful before exporting to tools that want triangles, or to control exactly how a bent quad folds. Also in MST's left toolbar (Edit section) and the right-click menu's <i>Build</i> section.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-11-triangulate.mp4" poster="media/10-builder-modeller/clip-11-triangulate.png" data-autoplay></video><figcaption>The selected quad splits into two triangles along a new diagonal edge — faces go 6 → 7.</figcaption></figure>
+
+<h3 id="op-dupdel">Duplicate and Delete</h3>
+<div class="op-head"><span class="pill"><kbd>Ctrl</kbd>+<kbd>D</kbd> / <kbd>Delete</kbd></span><span class="mode-chip">Face</span><span class="mode-chip">Edge</span><span class="mode-chip">Vertex</span><span class="layout-badge">History: "Pixel Builder: Duplicate" / "Pixel Builder: Delete"</span></div>
+<p><b>Duplicate</b> copies the selected elements in place (move the copy with the arrows). <b>Delete</b> removes the selected faces, edges or vertices — deleting a face leaves a hole you can later <a href="#op-fill">Fill</a> or <a href="#op-bridge">Bridge</a>.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-15-duplicate-delete.mp4" poster="media/10-builder-modeller/clip-15-duplicate-delete.png" data-autoplay></video><figcaption>Watch the status line: Duplicate takes the face count 6 → 7, Delete brings it back to 6.</figcaption></figure>
+
+<h3 id="op-other">Pivot to Sel., grid step and cancelling</h3>
+<ul>
+  <li><b>Pivot to Sel.</b> (Edit tab, element modes) moves the node's origin to the centre of the selected elements — so rotating or scaling the object later pivots around that spot.</li>
+  <li><kbd>[</kbd> / <kbd>]</kbd> halve / double the grid step (e.g. 1.0 m → 2.0 m) while you edit.</li>
+  <li><kbd>Esc</kbd> (or <span class="ui">Cancel</span>) cancels the current operation: the Adjust panel closes and the change is discarded.</li>
+  <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last committed operation — always exactly one operation.</li>
+</ul>
+
+<!-- ===================================================== SHORTCUTS -->
+<h2 id="shortcuts">Shortcut &amp; operation reference</h2>
+<p>Every key on this page, in one table. Type to filter (try <code>face</code>, <code>alt</code> or <code>paint</code>). Every one of them needs the mouse over the 3D view.</p>
+<input class="filter-box" data-target="#keys-table" placeholder="Filter shortcuts — e.g. bevel, Ctrl, edge…">
+<div id="keys-table">
+<table class="keys">
+  <thead><tr><th>Roblox UI</th><th>MST / Modeler</th><th>Action</th><th>Modes / notes</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>1</kbd>–<kbd>5</kbd></td><td>—</td><td>Tools: Select / Move / Scale / Rotate / Transform</td><td>Roblox layout only (Model tab)</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>1</kbd></td><td><kbd>1</kbd></td><td>Object mode</td><td>whole meshes</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>2</kbd></td><td><kbd>2</kbd></td><td>Face mode</td><td>pick faces</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>3</kbd></td><td><kbd>3</kbd></td><td>Edge mode</td><td>pick edges</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>4</kbd></td><td><kbd>4</kbd></td><td>Vertex mode</td><td>pick vertices</td></tr>
+    <tr><td><kbd>H</kbd></td><td><kbd>H</kbd></td><td>Cycle modes</td><td>Object → Vertex → Edge → Face → Object</td></tr>
+    <tr><td>—</td><td><kbd>W</kbd></td><td>Select / move tool</td><td>any mode</td></tr>
+    <tr><td><kbd>E</kbd></td><td><kbd>E</kbd></td><td>Extrude</td><td>Face, Edge · Adjust panel (Dist, method)</td></tr>
+    <tr><td><kbd>I</kbd></td><td><kbd>I</kbd></td><td>Inset</td><td>Face · Adjust panel (Inset, Inset by, Individual)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Bevel</td><td>Edge, Vertex · Adjust panel (amount, Segs, profile…)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Loop Cut (insert edge loop)</td><td>Edge · Adjust panel (Cuts)</td></tr>
+    <tr><td>button</td><td>—</td><td>Bridge</td><td>Edge · no default key</td></tr>
+    <tr><td><kbd>M</kbd></td><td><kbd>M</kbd></td><td>Merge (faces → n-gon / vertices → one)</td><td>Face, Vertex</td></tr>
+    <tr><td><kbd>J</kbd></td><td><kbd>J</kbd></td><td>Connect two vertices</td><td>Vertex</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>F</kbd></td><td><kbd>F</kbd></td><td>Fill hole</td><td>Edge (boundary loop) · Adjust panel</td></tr>
+    <tr><td><kbd>F</kbd></td><td>—</td><td>Zoom to selection</td><td>Roblox layout</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Triangulate faces</td><td>Face</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate</td><td>element modes</td></tr>
+    <tr><td><kbd>Delete</kbd></td><td><kbd>Delete</kbd></td><td>Delete faces / edges / vertices</td><td>Face, Edge, Vertex</td></tr>
+    <tr><td><kbd>G</kbd></td><td><kbd>G</kbd></td><td>Grow selection</td><td>1 → 5 faces on a box</td></tr>
+    <tr><td><kbd>Shift</kbd>+<kbd>G</kbd></td><td><kbd>Shift</kbd>+<kbd>G</kbd></td><td>Shrink selection</td><td>5 → 1 faces</td></tr>
+    <tr><td><kbd>L</kbd></td><td><kbd>L</kbd></td><td>Select Loop</td><td>Edge · 1 → 4 edges (rim)</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td><kbd>Alt</kbd>+<kbd>L</kbd></td><td>Select Ring</td><td>Edge · 1 → 4 edges</td></tr>
+    <tr><td>menu</td><td>menu</td><td>Select Similar</td><td>Select ▾ menu only</td></tr>
+    <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Halve / double grid step</td><td>e.g. 1.0 → 2.0 m</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td><kbd>Esc</kbd></td><td>Cancel the current operation / Adjust panel</td><td>change discarded</td></tr>
+    <tr><td><kbd>B</kbd></td><td><kbd>B</kbd></td><td>Paint tool (paint material)</td><td><kbd>Shift</kbd>+click fills coplanar region, <kbd>Ctrl</kbd>+click picks a face's slot</td></tr>
+    <tr><td><kbd>Alt</kbd>+<kbd>5</kbd></td><td><kbd>5</kbd></td><td>Vertex paint tool</td><td>soft brush</td></tr>
+    <tr><td>—</td><td><kbd>C</kbd></td><td>Draw shape</td><td>MST tool: drag a footprint, move up for height</td></tr>
+    <tr><td>—</td><td><kbd>Shift</kbd>+<kbd>C</kbd></td><td>Bezier plane / block</td><td>MST tool</td></tr>
+    <tr><td>—</td><td><kbd>P</kbd></td><td>Place on cell</td><td>MST tool</td></tr>
+    <tr><td><kbd>U</kbd></td><td><kbd>U</kbd></td><td>Open the UV editor</td><td>also the UV button / Inspector</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></td><td>Union</td><td>Object mode · booleans</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd></td><td>Intersect</td><td>Object mode · booleans</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd></td><td>Separate</td><td>Object mode · booleans</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>Negate</td><td>Object mode · booleans</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Group as Model</td><td>right-click menu</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd></td><td>Group as Folder</td><td>right-click menu</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td><td>Ungroup</td><td>right-click menu</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo one operation</td><td>History dock</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ===================================================== PAINT -->
+<h2 id="paint">Colour, painting &amp; materials</h2>
+
+<h3 id="color">The Color palette (whole mesh)</h3>
+<p>The quickest way to colour a part is the <span class="ui">Color</span> button on the Model tab. It opens a hexagon colour wheel:</p>
+<div class="pair">
+  <figure class="shot"><img src="media/10-builder-modeller/30-color-palette.png" alt="The Color palette pop-up: a hexagon of coloured hexagon swatches from blue at the top through pink, red, orange, yellow and green, a row of greys from black to white, a 'Click object to apply color' toggle, a hex text field and an Apply button."><figcaption>The Color palette.</figcaption></figure>
+  <div>
+    <ul>
+      <li><b>Hexagon swatches</b> — click one to set the builder's <i>active colour</i>.</li>
+      <li><b>Grey row</b> — black through white.</li>
+      <li><b>Hex field</b> — type an exact colour, e.g. <code>c8743c</code>.</li>
+      <li><b>Apply</b> — paints the <b>whole selected mesh</b> in the active colour.</li>
+      <li><b>Click object to apply color</b> — toggle on, then click objects in the view to colour them.</li>
+    </ul>
+  </div>
+</div>
+
+<h3 id="paint-tool">The Paint tool and why a fresh part paints all over</h3>
+<p>Press <kbd>B</kbd> for the <b>Paint</b> tool (the status line says <i>Paint material</i>). Clicking a face paints it with the active colour and material slot. <b>But</b> a freshly inserted part has <b>0 material slots</b>, and on such a mesh colour is per-<i>mesh</i>: clicking any face recolours the <b>entire</b> part. Drag the slider:</p>
+<div class="scrubber" data-label="Paint click" data-frames='[{"v":"blue","src":"media/10-builder-modeller/31-paint-blue.png","note":"One click with blue: the whole 0-slot crate turns blue."},{"v":"green","src":"media/10-builder-modeller/31-paint-green.png","note":"One click with green: again the whole mesh."},{"v":"red","src":"media/10-builder-modeller/31-paint-red.png","note":"One click with red: still one colour for everything."}]'></div>
+<div class="callout warn"><span class="label">Watch out — per-face colour needs material slots</span><p>Painting individual faces is a <b>Materials-panel feature</b>, not a one-click thing on a fresh part. First give the mesh at least one material slot (MST / Modeler → Materials → <span class="ui">+ Slot</span> or <span class="ui">+ Preset</span>), <i>then</i> each face paints on its own.</p></div>
+
+<h3 id="materials">The Materials panel (MST / Modeler)</h3>
+<p>Switch <span class="ui">Roblox UI</span> off to reach the right-hand panel. Tour it:</p>
+<div class="hotspots"><div class="hs-frame narrow"><img src="media/10-builder-modeller/61-mst-materials-panel.png" alt="The MST right panel: Materials heading with + Slot, + Preset, Palette and Sample buttons; Smoothing heading with Smooth, Faceted, New group buttons, 'No smoothing groups in this mesh', Tint groups and Normals checkboxes; Face UV heading with Offset U 0.02, Offset V 0.02, Scale U 1.02, Scale V 1.02, Rotation 0, World aligned ticked, and Apply, Reset, ↻90° buttons.">
+  <button class="spot" style="left:10%;top:9%" data-title="+ Slot" data-text="Adds a material slot: a vertex-colour StandardMaterial3D you can later replace with your own material.">1</button>
+  <button class="spot" style="left:43%;top:9%" data-title="+ Preset" data-text="Adds a ready-made slot: Grid, Checker, No Draw, Collider or Trigger.">2</button>
+  <button class="spot" style="left:76%;top:9%" data-title="Palette" data-text="Save or load the slots' materials plus the colour swatches as a JSON file — reuse a palette across props.">3</button>
+  <button class="spot" style="left:14%;top:16%" data-title="Sample" data-text="Makes the most-used slot / colour / smoothing group of the selected faces the current one (an eyedropper for the whole selection).">4</button>
+  <button class="spot" style="left:14%;top:32%" data-title="Smooth" data-text="Soft, smooth shading on the selected faces. History: 'Pixel Builder: Smooth'.">5</button>
+  <button class="spot" style="left:48%;top:32%" data-title="Faceted" data-text="Flat shading for the selected faces (smoothing group 0). History: 'Pixel Builder: Faceted'.">6</button>
+  <button class="spot" style="left:85%;top:32%" data-title="New group" data-text="The selected faces get the next free smoothing group (1–23).">7</button>
+  <button class="spot" style="left:25%;top:45%" data-title="Tint groups" data-text="Tint faces by smoothing group, each in its chip colour — to see which faces share a group.">8</button>
+  <button class="spot" style="left:74%;top:45%" data-title="Normals" data-text="Show a normal line at every face corner.">9</button>
+  <button class="spot" style="left:34%;top:63%" data-title="Offset U / V" data-text="Face UV: slide the texture across the selected faces.">10</button>
+  <button class="spot" style="left:34%;top:75%" data-title="Scale U / V" data-text="Face UV: stretch or shrink the texture on the selected faces.">11</button>
+  <button class="spot" style="left:34%;top:84%" data-title="Rotation" data-text="Face UV: rotate the texture on the selected faces.">12</button>
+  <button class="spot" style="left:6%;top:90%" data-title="World aligned" data-text="Face UV: project the texture in world space so neighbouring faces line up.">13</button>
+  <button class="spot" style="left:11%;top:97%" data-title="Apply / Reset / ↻90°" data-text="Apply the Face UV values, reset them, or turn the texture 90°.">14</button>
+</div></div>
+
+<div class="pair">
+  <figure class="shot"><img src="media/10-builder-modeller/63-mst-preset-menu.png" alt="The + Preset menu open below the button, listing Grid, Checker, No Draw, Collider and Trigger."><figcaption>The <span class="ui">+ Preset</span> menu.</figcaption></figure>
+  <div>
+    <p><b>Presets</b></p>
+    <ul>
+      <li><b>Grid</b> — a grid texture: great for judging scale while you model.</li>
+      <li><b>Checker</b> — a checker texture: shows UV stretching at a glance.</li>
+      <li><b>No Draw</b> — faces with this slot aren't drawn.</li>
+      <li><b>Collider</b> — marks faces as collision.</li>
+      <li><b>Trigger</b> — marks faces as a trigger area.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="pair">
+  <figure class="clip"><video src="media/10-builder-modeller/clip-18-material-preset.mp4" poster="media/10-builder-modeller/clip-18-material-preset.png" data-autoplay></video><figcaption><span class="ui">+ Preset → Grid</span> adds a material slot (a preview sphere appears) and textures the mesh.</figcaption></figure>
+  <figure class="clip"><video src="media/10-builder-modeller/clip-19-paint-face.mp4" poster="media/10-builder-modeller/clip-19-paint-face.png" data-autoplay></video><figcaption>With a slot in place, <kbd>B</kbd> paints one face <b>blue</b> and another <b>green</b> independently; <kbd>Ctrl</kbd>+click picks a face's colour (the Color chip updates).</figcaption></figure>
+</div>
+
+<h4>Paint tool modifiers (MST / Modeler)</h4>
+<p>The full tooltip: <i>"Click or drag over faces to give them the current material slot and color. Shift+click fills the coplanar region, Ctrl+click picks the slot of a face."</i></p>
+<ul>
+  <li><b>Click / drag</b> — paint faces with the current slot + colour.</li>
+  <li><b><kbd>Shift</kbd>+click</b> — flood-fill every connected face in the same flat plane.</li>
+  <li><b><kbd>Ctrl</kbd>+click</b> — pick (eyedrop) the slot of the clicked face. <span class="ui">Sample</span> does the same for the whole selection.</li>
+  <li>The bottom strip's <span class="ui">Slot</span> number and <span class="ui">Color</span> swatches set what you paint with.</li>
+</ul>
+<p>You can also reach <b>Paint colour</b> and <b>Assign material</b> from the right-click menu's <i>Paint</i> section (and the Modeler <span class="ui">Actions</span> menu).</p>
+
+<h3 id="vertex-paint">Vertex paint</h3>
+<p>Press <kbd>5</kbd> (MST / Modeler) or <kbd>Alt</kbd>+<kbd>5</kbd> (Roblox) for the <b>Vertex paint</b> tool: a soft round brush that blends colour across the surface instead of filling whole faces. Its bottom-strip controls are <span class="ui">Apply</span> (Brush), <span class="ui">Channel</span> (RGBA), <span class="ui">Radius</span> and <span class="ui">Strength</span>.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-20-vertex-paint.mp4" poster="media/10-builder-modeller/clip-20-vertex-paint.png" data-autoplay></video><figcaption>The radial vertex-paint brush moving over the cube, with its controls in the strip below.</figcaption></figure>
+
+<h3 id="smoothing">Smooth vs faceted</h3>
+<p>Select faces, then click <span class="ui">Smooth</span> for soft, rounded-looking shading or <span class="ui">Faceted</span> for crisp, flat shading. Faceted suits blocky pixel-art props; Smooth suits barrels and rounded bevels. <span class="ui">New group</span> puts the selected faces in their own smoothing group so they shade separately from the rest.</p>
+<figure class="clip"><video src="media/10-builder-modeller/clip-21-smooth-faceted.mp4" poster="media/10-builder-modeller/clip-21-smooth-faceted.png" data-autoplay></video><figcaption>Toggling Smooth (gradient shading) and Faceted (flat) on the selected faces.</figcaption></figure>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Studio you set a Part's <b>Material</b> and <b>Color</b> in Properties and the whole Part changes. A fresh builder part works the same way. The difference: once you add <b>material slots</b>, one mesh can carry many materials — one per face — which a single Roblox Part can't.</p></div>
+
+<!-- ===================================================== UV -->
+<h2 id="uv">The UV editor</h2>
+<p>UVs decide how a texture lies on each face. Open the <b>Pixel Builder – UV Editor</b> window with <kbd>U</kbd>, the <span class="ui">UV</span> button on the Edit tab, or <span class="ui">Open UV Editor</span> in the Inspector. The window is resizable. Tour it:</p>
+
+<div class="hotspots"><div class="hs-frame"><img src="media/10-builder-modeller/40-uv-editor.png" alt="The Pixel Builder – UV Editor window: rows of buttons (Faces, Verts, Manual, Auto, Planar, Box, Spherical, Flip U, Flip V; Rot 90, Fit, Fit U, Fit V, Sew, Copy, Paste, Texel, Island, Frame; Frame Sel, Lock 0-1, Split, Snap, Tile, Step 0.063 and two 1.0 fields; Scale), an Auto UVs row (Tile, No anchor, Flip U, Flip V, Swap UV, Group, Apply Auto), Template 1024 with Grid ticked, Transparent and Export UV Template…, a dark grid canvas with green outlines of the unwrapped faces, a status line '34 faces (0 manual), 0 corners selected', and gesture help text.">
+  <button class="spot" style="left:6%;top:6.5%" data-title="Faces / Verts" data-text="UV selection mode: click or box-select faces or corners. Double-click a face to select its whole UV island.">1</button>
+  <button class="spot" style="left:30%;top:6.5%" data-title="Manual / Auto" data-text="Manual bakes the automatic projection into per-corner UVs you can edit. Auto goes back to the automatic world / box projection.">2</button>
+  <button class="spot" style="left:55%;top:6.5%" data-title="Planar / Box / Spherical" data-text="Planar: one island along the average normal, fit to 0-1. Box: each face along its dominant axis, fit to 0-1. Spherical: longitude / latitude around the centre.">3</button>
+  <button class="spot" style="left:83%;top:6.5%" data-title="Flip U / Flip V" data-text="Mirror the projection horizontally / vertically.">4</button>
+  <button class="spot" style="left:5.5%;top:12.3%" data-title="Rot 90" data-text="Rotate the selected UVs 90° about the selection centre.">5</button>
+  <button class="spot" style="left:22%;top:12.3%" data-title="Fit / Fit U / Fit V" data-text="Fit the selection to the 0-1 square — uniformly, or along one axis only.">6</button>
+  <button class="spot" style="left:41%;top:12.3%" data-title="Sew" data-text="Corners that share a vertex move to their average UV — closes seams.">7</button>
+  <button class="spot" style="left:54%;top:12.3%" data-title="Copy / Paste" data-text="Copy the first selected face's layout; paste it onto faces with the same number of corners.">8</button>
+  <button class="spot" style="left:68%;top:12.3%" data-title="Texel" data-text="Match texel density (texture pixels per metre) to the first selected face, so pixels look the same size everywhere.">9</button>
+  <button class="spot" style="left:78%;top:12.3%" data-title="Island" data-text="Select the connected UV island.">10</button>
+  <button class="spot" style="left:90%;top:12.3%" data-title="Frame / Frame Sel" data-text="Frame the 0-1 square, or the current selection, in the canvas.">11</button>
+  <button class="spot" style="left:21.5%;top:18%" data-title="Lock 0-1" data-text="Keep moved / scaled islands inside the 0-1 square.">12</button>
+  <button class="spot" style="left:32%;top:18%" data-title="Split" data-text="Grab one corner on its own, tearing the seam.">13</button>
+  <button class="spot" style="left:41%;top:18%" data-title="Snap + Step" data-text="Snap UV moves to a step (0.063 shown). The two fields after it hold the U / V factors used by Scale.">14</button>
+  <button class="spot" style="left:49%;top:18%" data-title="Tile" data-text="Tile the texture preview in the canvas.">15</button>
+  <button class="spot" style="left:4.5%;top:24%" data-title="Scale" data-text="Scale the selection by the U / V factors.">16</button>
+  <button class="spot" style="left:18.5%;top:29.7%" data-title="Auto UVs: Fill" data-text="Tile = repeat at world density · Fit = the longer side spans 0-1 · Stretch = both sides to 0-1.">17</button>
+  <button class="spot" style="left:36%;top:29.7%" data-title="Auto UVs: anchor" data-text="Where the automatic projection is anchored (No anchor by default).">18</button>
+  <button class="spot" style="left:68%;top:29.7%" data-title="Flip U / Flip V / Swap UV / Group" data-text="Options for Apply Auto. Group = one projection across all the selected faces.">19</button>
+  <button class="spot" style="left:7.5%;top:35.5%" data-title="Apply Auto" data-text="Apply the Auto UVs settings above.">20</button>
+  <button class="spot" style="left:30%;top:35.5%" data-title="Template" data-text="Size (1024), Grid and Transparent options for the UV template image.">21</button>
+  <button class="spot" style="left:73%;top:35.5%" data-title="Export UV Template…" data-text="Save a picture of the UV layout to paint your texture over in an art program.">22</button>
+  <button class="spot" style="left:49%;top:61%" data-title="Canvas" data-text="The 0-1 UV square with every face's layout. Drag = move · Ctrl+drag = scale (Shift = per axis) · Alt+drag = rotate · Middle = pan · Wheel = zoom.">23</button>
+  <button class="spot" style="left:17%;top:84.5%" data-title="Status line" data-text="'N faces (M manual), K corners selected'.">24</button>
+  <button class="spot" style="left:49%;top:93%" data-title="Gesture help" data-text="The in-window cheat sheet, including Ctrl+click a face = stitch it to the first selected face, and Ctrl+Shift+click = copy that face's layout onto it.">25</button>
+</div></div>
+
+<figure class="clip"><video src="media/10-builder-modeller/clip-17-uv-editor.mp4" poster="media/10-builder-modeller/clip-17-uv-editor.png" data-autoplay></video><figcaption>The UV editor in use: Faces / Verts, the projection buttons, <span class="ui">Rot 90</span>, and zooming, panning and <span class="ui">Frame</span> in the canvas.</figcaption></figure>
+
+<figure class="shot"><img src="media/10-builder-modeller/41-uv-before.png" alt="Close-up of the UV canvas: thin green outlines of the crate's unwrapped faces on a dark grid — a square in the top-left and long rectangles with angled rim strips across the middle."><figcaption>The crate's faces laid out in the UV canvas before any manual edits.</figcaption></figure>
+
+<h3 id="uv-gestures">Canvas gestures</h3>
+<table class="ref">
+  <thead><tr><th>Gesture</th><th>Does</th></tr></thead>
+  <tbody>
+    <tr><td>Drag</td><td>Move the selected UVs</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+drag</td><td>Scale (add <kbd>Shift</kbd> to scale one axis)</td></tr>
+    <tr><td><kbd>Alt</kbd>+drag</td><td>Rotate</td></tr>
+    <tr><td>Middle-drag</td><td>Pan the canvas</td></tr>
+    <tr><td>Wheel</td><td>Zoom</td></tr>
+    <tr><td>Double-click</td><td>Select a face's whole island</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+click a face</td><td>Stitch it to the first selected face</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+click</td><td>Copy that face's layout onto it</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Cancel</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">Tip — dragging UVs</span><p>Moving, scaling and rotating by dragging works on <b>Manual</b> UVs. If dragging seems to do nothing, click <span class="ui">Manual</span> first to bake the automatic projection into editable corners, select faces (or corners), and add a <span class="ui">Checker</span> preset so you can actually see the texture move.</p></div>
+
+<!-- ===================================================== INSPECTOR -->
+<h2 id="inspector">The Inspector for a builder mesh</h2>
+<p>Select a builder part and the Inspector (right dock — Godot's <b>Properties</b> window) shows builder sections:</p>
+<input class="filter-box" data-target="#insp-ref" placeholder="Filter Inspector sections…">
+<div id="insp-ref">
+  <div class="control"><h4>Part — Appearance</h4><div class="where">Inspector</div><p>Color, Material, Transparency — like a Roblox Part's appearance properties.</p></div>
+  <div class="control"><h4>Part — Transform</h4><div class="where">Inspector</div><p>Size x / y / z (edits the part's recipe — see the warning below), Position, Orientation, Pivot Offset.</p></div>
+  <div class="control"><h4>Part</h4><div class="where">Inspector</div><p>Shape, Locked, Anchored ▸ terrain.</p></div>
+  <div class="control"><h4>Behavior</h4><div class="where">Inspector</div><p>Collision (None / …).</p></div>
+  <div class="control"><h4>Editable Mesh</h4><div class="where">Inspector</div><p>A live count — <i>"N vertices, M edges, K faces"</i> — and the number of material slots.</p></div>
+  <div class="control"><h4>Shape</h4><div class="where">Inspector</div><p>Carries the rebuild warning <i>"Rebuilding replaces the element edits. Undo can restore them."</i> and an <span class="ui">Edit Shape</span> button.</p></div>
+  <div class="control"><h4>UV &amp; Lightmap</h4><div class="where">Inspector</div><p><span class="ui">Open UV Editor</span>, <span class="ui">Generate Lightmap UVs</span>.</p></div>
+  <div class="control"><h4>Collision</h4><div class="where">Inspector</div><p><i>Current: Detail</i>, <span class="ui">Set Collider</span>, <span class="ui">Set Trigger</span>, and a <span class="ui">Collision: On</span> checkbox lower down. The <span class="ui">Collider</span> / <span class="ui">Trigger</span> material presets and right-click menu do the same per object.</p></div>
+</div>
+<div class="callout warn"><span class="label">Watch out — Size rebuilds the mesh</span><p>Changing <span class="ui">Size</span> (width / height / depth) on a part you've already edited <b>rebuilds the box from scratch and replaces your face / edge / vertex edits</b>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> brings them back. Rule of thumb: <b>size the box first, then model it.</b></p></div>
+
+<!-- ===================================================== CONTEXT MENU -->
+<h2 id="context">The right-click menu</h2>
+<p>Right-click a builder mesh in the 3D view for a menu of object-level actions. Filter it:</p>
+<div class="callout warn"><span class="label">Note</span><p>There's no picture of this menu yet, and not every entry below has been checked click-by-click. Every entry is also reachable from the ribbon, the <span class="ui">Builder</span> menu or the Modeler <span class="ui">Actions</span> menu.</p></div>
+<input class="filter-box" data-target="#ctx-ref" placeholder="Filter menu entries — e.g. normals, export…">
+<div id="ctx-ref">
+  <div class="control"><h4>Duplicate · Delete</h4><div class="where">Top of menu</div><p>Copy or remove the object.</p></div>
+  <div class="control"><h4>Group as Model · Group as Folder · Ungroup</h4><div class="where">Top of menu</div><p><kbd>Ctrl</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>U</kbd> — like Roblox's Group as Model / Folder.</p></div>
+  <div class="control"><h4>Select children</h4><div class="where">Top of menu</div><p>Select every child of the object.</p></div>
+  <div class="control"><h4>Union · Intersect · Negate · Separate</h4><div class="where">Top of menu</div><p>Booleans: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> / <kbd>I</kbd> / <kbd>N</kbd> / <kbd>U</kbd>. Results stay editable meshes (see <a href="09-builder-greybox.html">page 9</a>).</p></div>
+  <div class="control"><h4>Zoom to · Lock · Make Editable · UV Editor…</h4><div class="where">Top of menu</div><p>Frame the object, lock it, make it editable, open the UV editor (<kbd>U</kbd>).</p></div>
+  <div class="control"><h4>Build: Subdivide · Triangulate</h4><div class="where">Build section</div><p>Split faces into smaller faces; split into triangles (<kbd>Ctrl</kbd>+<kbd>T</kbd>).</p></div>
+  <div class="control"><h4>Join: Weld</h4><div class="where">Join section</div><p>Join vertices that sit closer than <span class="ui">Weld dist</span>.</p></div>
+  <div class="control"><h4>Paint: Assign material · Paint colour</h4><div class="where">Paint section</div><p>Give selected faces the current material slot or colour.</p></div>
+  <div class="control"><h4>Normals: Flip normals · Conform normals</h4><div class="where">Normals section</div><p>Turn faces inside-out (fix a face that's facing the wrong way), or make all normals point consistently.</p></div>
+  <div class="control"><h4>Object: Center pivot · Freeze transform · Mirror · Merge objects</h4><div class="where">Object section</div><p>Move the origin to the middle; bake position / rotation / scale into the mesh; mirror; combine objects into one.</p></div>
+  <div class="control"><h4>Object: Collider · Trigger</h4><div class="where">Object section</div><p>Make the object a collider or a trigger.</p></div>
+  <div class="control"><h4>Object: Generate lightmap UVs · Create reusable part · Bake to MeshInstance3D</h4><div class="where">Object section</div><p>Make a second UV set for baked lighting; save the part for reuse; turn it into a plain Godot mesh node.</p></div>
+  <div class="control"><h4>Export: OBJ… · glTF… · STL… · PLY… · Godot Mesh… · Options…</h4><div class="where">Export section</div><p>See <a href="#export">Export</a>.</p></div>
+</div>
+
+<!-- ===================================================== EXPORT -->
+<h2 id="export">Exporting a mesh</h2>
+<p>Right-click → <span class="ui">Export ▸</span> (or Modeler <span class="ui">Actions → Export Mesh</span>) offers five formats (the example crate exports cleanly to GLB and STL):</p>
+<ul>
+  <li><b>OBJ…</b> — a simple, universal mesh format.</li>
+  <li><b>glTF…</b> — the modern standard (<code>.glb</code> / <code>.gltf</code>). Best for Blender, other engines, and re-importing into Godot (see <a href="11-importing-models.html">Importing models</a>).</li>
+  <li><b>STL…</b> — for 3D printing.</li>
+  <li><b>PLY…</b> — a mesh format common in scanning tools.</li>
+  <li><b>Godot Mesh…</b> — a Godot mesh resource file.</li>
+</ul>
+<div class="pair">
+  <figure class="shot"><img src="media/10-builder-modeller/42-export-options.png" alt="The Builder export options dialog: header text 'Every option applies to Export OBJ / STL / PLY; glTF and Godot Mesh use selected faces, world transforms and combine', then checkboxes Selected faces only, Apply world transforms, Vertex colours, Right-handed (Godot axes) ticked, Combine selected builder meshes, STL binary ticked, and an OK button."><figcaption>Export ▸ Options…</figcaption></figure>
+  <div id="export-ref">
+    <p>Every option applies to OBJ / STL / PLY; glTF and Godot Mesh use only <i>Selected faces</i>, <i>world transforms</i> and <i>Combine</i>.</p>
+    <div class="control"><h4>Selected faces only</h4><p>Export just the faces you've selected.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+    <div class="control"><h4>Apply world transforms</h4><p>Bake the object's position / rotation / scale into the file.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+    <div class="control"><h4>Vertex colours</h4><p>Include painted vertex colours.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+    <div class="control"><h4>Right-handed (Godot axes)</h4><p>Use Godot's axis convention.</p><dl><dt>Default</dt><dd>on</dd></dl></div>
+    <div class="control"><h4>Combine selected builder meshes</h4><p>Write several selected meshes as one.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+    <div class="control"><h4>STL binary</h4><p>Write compact binary STL instead of text.</p><dl><dt>Default</dt><dd>on</dd></dl></div>
+  </div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox, custom shapes are modelled in Blender and imported as <b>MeshParts</b>. Here you can keep editing the mesh live forever — or export it to glTF / OBJ / STL and bring it back as a normal Godot mesh node (or use <i>Bake to MeshInstance3D</i>). How to use the result as a tile or prop is on <a href="12-using-models.html">page 12</a>.</p></div>
+
+<!-- ===================================================== PREFERENCES -->
+<h2 id="prefs">Options: Pixel Builder Preferences</h2>
+<p>The Options dialog (from the <span class="ui">Builder</span> menu) holds every builder preference. <span class="ui">Reset to Defaults</span> at the bottom puts everything back.</p>
+<div class="pair">
+  <figure class="shot"><img src="media/10-builder-modeller/50-preferences.png" alt="The Pixel Builder Preferences dialog: Vertex size 6, Handle size 1.06, Grid step 0.25, Rotate snap 16, Grid snap on ticked, Lightmap texel 0.25, Shift selects and Box selects set to Layout default, Hover highlight, Show scene info and Adjust panel ticked, Show dimensions unticked, Roblox rotate step 45, Roblox rotate snap on ticked, Collisions and Roblox compact ribbon unticked, colour pickers for Edges and Selected edges, and a Reset to Defaults button."><figcaption>Pixel Builder Preferences (scroll for the colour fields).</figcaption></figure>
+  <div>
+    <input class="filter-box" data-target="#prefs-table" placeholder="Filter preferences…">
+    <div id="prefs-table">
+    <table class="ref">
+      <thead><tr><th>Field</th><th>Default</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Vertex size (px)</td><td>6</td><td>Size of the vertex handles in Vertex mode.</td></tr>
+        <tr><td>Handle size</td><td>1.06</td><td>Scale of the move / rotate / scale handles (1 = 64 px arms).</td></tr>
+        <tr><td>Grid step</td><td>0.25</td><td>Grid snap step the builder starts with (<kbd>[</kbd> / <kbd>]</kbd> halve / double it while editing).</td></tr>
+        <tr><td>Rotate snap (°)</td><td>16</td><td>Rotate-handle snap step while grid snapping is on (0 = free).</td></tr>
+        <tr><td>Grid snap on</td><td>✓</td><td>Start with grid snapping enabled.</td></tr>
+        <tr><td>Lightmap texel</td><td>0.25</td><td>Texel size for the lightmap UV2 unwrap on Bake / glTF export (0 = skip).</td></tr>
+        <tr><td>Shift selects</td><td>Layout default</td><td>Shift+click / box = Add, Subtract or Toggle. MST toggles, Modeler adds.</td></tr>
+        <tr><td>Box selects</td><td>Layout default</td><td>Intersect (box touches) or Complete (fully inside). MST = Complete, Modeler = Intersect.</td></tr>
+        <tr><td>Hover highlight</td><td>✓</td><td>Highlight the face / edge / vertex under the cursor.</td></tr>
+        <tr><td>Show scene info</td><td>✓</td><td>Vertex / edge / face counts and selected counts in the viewport.</td></tr>
+        <tr><td>Show dimensions</td><td>✗</td><td>Show the size of the selection's bounding box.</td></tr>
+        <tr><td>Adjust panel</td><td>✓</td><td>Show the live Adjust panel after Extrude / Inset / Bevel / … (off = apply at once).</td></tr>
+        <tr><td>Roblox rotate step (°)</td><td>45</td><td>Rotate-snap step of the Roblox ribbon's Snap group.</td></tr>
+        <tr><td>Roblox rotate snap on</td><td>✓</td><td>The Roblox ribbon's rotate-snap checkbox.</td></tr>
+        <tr><td>Collisions</td><td>✗</td><td>Roblox drag: a dragged part stops at the first part it would overlap.</td></tr>
+        <tr><td>Roblox compact ribbon</td><td>✗</td><td>Ribbon shows icons only (labels move to tooltips); the Model tab fits one row.</td></tr>
+        <tr><td>Edges / Selected edges / Hovered edge</td><td>colour</td><td>Wireframe, selected and hovered edge colours.</td></tr>
+        <tr><td>Vertices / Selected vertices / Hovered vertex</td><td>colour</td><td>Vertex-handle colours.</td></tr>
+        <tr><td>Selected faces</td><td>colour</td><td>Tint of selected faces.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<input class="filter-box" data-target="#recipes-ref" placeholder="Filter recipes…">
+<div id="recipes-ref">
+  <div class="control"><h4>Hollow anything (box, bin, planter)</h4><div class="where">Face mode</div><p>Select the top face → <kbd>I</kbd> Inset → <kbd>E</kbd> Extrude with a <b>negative</b> Dist. That's the crate's core move.</p></div>
+  <div class="control"><h4>Rounded edges</h4><div class="where">Edge mode</div><p>Click one edge → <kbd>L</kbd> to take the loop → <kbd>Ctrl</kbd>+<kbd>B</kbd>, <span class="ui">Segs</span> 3+, <span class="ui">B profile</span> 0.5. For a chunky pixel-art look, use Segs 1 (a chamfer) and Faceted shading.</p></div>
+  <div class="control"><h4>Panel lines and trim bands</h4><div class="where">Edge then Face mode</div><p><kbd>Ctrl</kbd>+<kbd>R</kbd> a loop around the side, select the band of faces it creates (<kbd>Alt</kbd>+<kbd>L</kbd> ring / <kbd>G</kbd> grow help), then <kbd>I</kbd> Inset with <span class="ui">Individual</span> off and <kbd>E</kbd> a small negative Dist.</p></div>
+  <div class="control"><h4>Legs and handles</h4><div class="where">Face mode</div><p>Loop-cut to make a small face where the leg goes, select it, <kbd>E</kbd> Extrude. <span class="ui">Individual</span> extrude pulls several faces out separately.</p></div>
+  <div class="control"><h4>A different colour on each face</h4><div class="where">MST / Modeler</div><p>Turn Roblox UI off → Materials → <span class="ui">+ Slot</span> (or <span class="ui">+ Preset</span>) → <kbd>B</kbd> Paint, pick colours in the bottom strip, click faces. <kbd>Shift</kbd>+click floods a flat area.</p></div>
+  <div class="control"><h4>Check the scale with a grid</h4><div class="where">MST Materials</div><p><span class="ui">+ Preset → Grid</span> textures the mesh so you can judge size and see stretched UVs. Swap it for the real material later.</p></div>
+  <div class="control"><h4>Make a part hard to see visible again</h4><div class="where">Any</div><p>Against a bright sky a Medium Stone Grey part can blend in. Give it a colour, or model in an empty scene and bring it into your level afterwards.</p></div>
+  <div class="control"><h4>Something went wrong</h4><div class="where">Any</div><p><kbd>Esc</kbd> during an Adjust panel throws the operation away; afterwards, <kbd>Ctrl</kbd>+<kbd>Z</kbd> — every operation is one step in the History dock.</p></div>
+</div>
+
+<h2 id="roblox">Roblox habits, translated</h2>
+<table class="ref">
+  <thead><tr><th>In Roblox Studio you…</th><th>Here you…</th></tr></thead>
+  <tbody>
+    <tr><td>Resize a Part with one Scale handle to stretch it</td><td>Face mode, select that face, <kbd>E</kbd> Extrude (adds new geometry) or drag it with Move (stretches what's there).</td></tr>
+    <tr><td>Can't edit faces, edges or vertices at all</td><td>Use the four modes on the Edit tab — like Blender's edit mode.</td></tr>
+    <tr><td>Use Union / Negate to cut shapes</td><td>Same booleans on the Model tab and right-click menu, but the result is an editable mesh, not a CSG part.</td></tr>
+    <tr><td>Import a MeshPart from Blender</td><td>Model it here, or Export to glTF / OBJ / STL and bring it back as a mesh node.</td></tr>
+    <tr><td>Set Material + Color in Properties</td><td>Color palette for the whole part; material slots + Paint for per-face colour.</td></tr>
+    <tr><td>Press <kbd>F</kbd> to focus a Part</td><td>Still <kbd>F</kbd> in the Roblox layout (Fill hole is <kbd>Alt</kbd>+<kbd>F</kbd> there).</td></tr>
+    <tr><td>Press <kbd>1</kbd>–<kbd>5</kbd> for tools</td><td>Same in the Roblox layout; the modes are <kbd>Alt</kbd>+<kbd>1</kbd>–<kbd>4</kbd>.</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You select a face, press <kbd>E</kbd> and nothing happens. What two things should you check?</summary><p>That the <b>mouse is over the 3D view</b> (shortcuts only go to the panel under the pointer), and that you're in a mode that supports Extrude (<b>Face</b> or <b>Edge</b>) with something actually selected — the status line should say <i>selected: 1 faces</i>. A greyed ribbon button's tooltip names the missing mode.</p></details>
+<details class="check"><summary>How do you dig a hole into the top of a box?</summary><p>Face mode, select the top, <kbd>I</kbd> Inset to make an inner face, then <kbd>E</kbd> Extrude it with a <b>negative</b> Dist.</p></details>
+<details class="check"><summary>You click one face with the Paint tool and the whole part changes colour. Why, and how do you paint just one face?</summary><p>The part has <b>0 material slots</b>, so colour is per-mesh. Switch to MST or Modeler, add a slot with <span class="ui">+ Slot</span> or <span class="ui">+ Preset</span>, then paint — each face now paints on its own.</p></details>
+<details class="check"><summary>Why should you set a part's Size before extruding and bevelling it?</summary><p>Changing Size later <b>rebuilds</b> the box and replaces your element edits (Undo can bring them back).</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="09-builder-greybox.html">9 · Greyboxing with the Roblox UI</a> — the Model tab: parts, moving, booleans.</li>
+  <li><a href="11-importing-models.html">11 · Importing models</a> — bringing exported glTF / OBJ files back in.</li>
+  <li><a href="12-using-models.html">12 · Using models: tiles, foliage &amp; props</a> — placing your crate in the world.</li>
+  <li><a href="14-shortcuts-glossary.html">14 · Shortcuts &amp; Roblox→Godot glossary</a></li>
+  <li><a href="15-troubleshooting.html">15 · Troubleshooting &amp; FAQ</a></li>
+</ul>
+
+</div></main>
+</body>
+</html>

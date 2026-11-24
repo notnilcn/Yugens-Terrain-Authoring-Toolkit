@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .hero { margin: 18px 0 8px; }
+  .hero figure { margin: 0; }
+  .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 14px 0; }
+  .pillar { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .pillar img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--panel-2); }
+  .pillar div { padding: 10px 14px 14px; }
+  .pillar b { display: block; margin-bottom: 4px; }
+  .pillar p { margin: 0; font-size: .92rem; color: var(--ink-2); }
+  .path-group { margin: 22px 0 4px; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); font-weight: 700; }
+  .cards .card .tag { display: inline-block; margin-top: 6px; font-size: .75rem; color: var(--accent); }
+  table.scenes td:first-child { white-space: nowrap; }
+  .howto { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 12px 0; }
+  .howto > div { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+  .howto h4 { margin: 0 0 6px; }
+  .howto p { margin: 0; font-size: .93rem; }
+  .gallery figcaption { font-size: .85rem; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Welcome to the MarchingSquaresTerrain guide</h1>
+<p class="lede">You've built places in Roblox Studio and want to make your own pixel-art worlds in Godot. This guide takes you from "I've never opened Godot" to a sculpted, painted, lit island with props you modelled yourself, running as a real game.</p>
+<div class="meta-row"><span class="pill">15 chapters</span><span class="pill">Beginner friendly</span><span class="pill">Godot 4.7</span><span class="pill">No programming</span></div>
+
+<div class="hero">
+  <figure class="clip"><video src="media/13-playtest-export/23-pixel-world-alive.mp4" poster="media/13-playtest-export/23-pixel-world-alive.png" data-autoplay></video><figcaption>A world made with this addon, running as a game: sculpted terrain, painted paths and sand, grass, rocks, pixel water and a knight you can walk around with WASD.</figcaption></figure>
+</div>
+
+<h2 id="who">Who this guide is for</h2>
+<p>This guide is for <b>artists and builders coming from Roblox Studio</b>. You know Parts, the Move / Scale / Rotate tools, Union and Negate, the Terrain Editor, the Explorer and Properties windows, and the Toolbox. You have <b>never opened Godot</b>, and you don't want to write code.</p>
+<p>Every page explains Godot's own words the first time they come up (node, scene, Inspector, <code>res://</code> and so on). Red <b>Coming from Roblox</b> boxes link what you already know to the new way of doing it:</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The <b>Scene dock</b> is your Explorer, the <b>Inspector</b> is your Properties window, <b>F6</b> is Play and <b>F8</b> is Stop. If you'd like the addon's modelling tools laid out like Studio, there's a <b>Roblox UI</b> switch that gives you a Model / Edit ribbon with Move, Scale, Rotate, snapping and Union / Negate on the keys you already know.</p></div>
+<p>You don't need a powerful computer to follow along. Every screenshot and clip in this guide comes from the real Godot editor.</p>
+
+<h2 id="what">What MarchingSquaresTerrain is</h2>
+<p><b>MarchingSquaresTerrain</b> (MST for short) is a Godot add-on with three parts that work together:</p>
+<div class="three">
+  <div class="pillar"><img src="media/03-terrain-sculpting/112-erosion-after.png" alt="Pixel-art green cliffs and terraces above blue water, shaped with the sculpt tools and the erosion node."><div><b>1 · Terrain</b><p>Sculpt hills, cliffs and ramps with brushes, paint 16 ground textures, scatter grass, trees and rocks, and grow your map one chunk at a time. Like Roblox's Terrain Editor, but on a grid of cells.</p></div></div>
+  <div class="pillar"><img src="media/08-atmosphere-effects/21-weather-snow.png" alt="A small pixel island in a teal sea with large snowflakes falling over it."><div><b>2 · The pixel look</b><p>A renderer that turns the 3D scene into crisp pixel art with outlines and palettes, plus sky, day / night, weather, water, birds, fireflies, smoke and fire, each added with one click.</p></div></div>
+  <div class="pillar"><img src="media/09-builder-greybox/30-build-03-final.png" alt="A chunky orange greybox building with a doorway and a sloped roof, standing on grassy pixel terrain under a cloudy sky."><div><b>3 · The builder</b><p>Model your own props: block them out with Parts the Studio way (Roblox UI), then edit faces, edges and vertices with Extrude, Inset, Bevel and Loop Cut, and paint them.</p></div></div>
+</div>
+<p>Under the hood the add-on is a <b>GDExtension</b>: a compiled extension that Godot loads automatically, so there is nothing to switch on. (That's why the <span class="ui">Plugins</span> tab in Project Settings looks empty; see <a href="01-godot-for-roblox.html#addon">page 1</a>.)</p>
+
+<h2 id="gallery">What you can make</h2>
+<p>All of these come from the pages of this guide. Click any picture to enlarge it.</p>
+<div class="gallery">
+  <figure><img src="media/02-first-world/11-run-game.png" alt="A flat green pixel-art island with a sand patch in the middle, sitting in a dark blue sea under a blue sky."><figcaption>Your first world, running (page 2).</figcaption></figure>
+  <figure><img src="media/13-playtest-export/58-world-overview.png" alt="Low-poly pixel-art trees with dark outlines on a grassy hill, a sandy clearing and the sea behind."><figcaption>Walking through it as a character (page 13).</figcaption></figure>
+  <figure><img src="media/05-foliage-grass/04-hero-scene.png" alt="Hexagonal grassy terraces with rocks, a stone fort and a blue pond, all in pixel art."><figcaption>Foliage and grass painted with a brush (page 5).</figcaption></figure>
+  <figure><img src="media/12-using-models/50-scene-overview-orbit.png" alt="A courtyard of trees, pillars and stones in a sunken grassy clearing ringed with eroded terraces."><figcaption>Your own models as props and foliage (page 12).</figcaption></figure>
+  <figure><img src="media/11-importing-models/01-imported-models-hero.png" alt="An imported low-poly tree and a fox character standing on the Godot editor grid."><figcaption>Imported models from Blender or Studio (page 11).</figcaption></figure>
+  <figure><img src="media/10-builder-modeller/16-crate-painted.png" alt="A green hollow crate with a bright rim, modelled with Extrude, Inset and Bevel."><figcaption>A crate modelled face by face (page 10).</figcaption></figure>
+</div>
+<figure class="clip"><video src="media/08-atmosphere-effects/50-lighting-presets.mp4" poster="media/08-atmosphere-effects/50-lighting-presets.png" data-autoplay></video><figcaption>One click per mood: the Lighting Preset buttons switch the island between dawn, noon, dusk, night, storm and snow (page 8).</figcaption></figure>
+
+<h2 id="path">Suggested learning path</h2>
+<p>Read the chapters in order if you're new. Pages 1 and 2 get you to a running world in about an hour. After that, each group goes deeper into one area, so you can jump to whatever you need. The pages in <b>Reference</b> are for looking things up.</p>
+
+<p class="path-group">Start here</p>
+<div class="cards">
+  <a class="card" href="01-godot-for-roblox.html"><img src="media/01-godot-for-roblox/00-orientation.png" alt="The Godot editor with a pixel island in the 3D view, the Scene dock on the left and the Inspector on the right."><div><b>1 · Godot for Roblox builders</b><span>Where everything is on screen, moving the camera, nodes and scenes, running your world.</span><span class="tag">⏱ 25 min · start here</span></div></a>
+  <a class="card" href="02-first-world.html"><img src="media/02-first-world/11-run-game.png" alt="The finished first world: a green island in a blue sea."><div><b>2 · Your first world</b><span>Build an island from an empty scene: chunks, sky, a hill, sand, trees, then play it.</span><span class="tag">⏱ 30 min · quick start</span></div></a>
+</div>
+
+<p class="path-group">Terrain</p>
+<div class="cards">
+  <a class="card" href="03-terrain-sculpting.html"><img src="media/03-terrain-sculpting/00-orientation.png" alt="The terrain toolbar and the sculpt strip over a pixel landscape."><div><b>3 · Sculpting terrain</b><span>Brush, Level, Smooth, Bridge, Stamp, Gradient, Select, Tint and Erosion.</span></div></a>
+  <a class="card" href="04-terrain-painting.html"><img src="media/04-terrain-painting/06-paint-stroke-after.png" alt="A painted stroke of a new ground texture across the terrain."><div><b>4 · Painting, textures &amp; tint</b><span>16 texture slots, cliffs, slope painting, your own images, colour tint.</span></div></a>
+  <a class="card" href="05-foliage-grass.html"><img src="media/05-foliage-grass/04-hero-scene.png" alt="Grass, rocks and trees on hex terraces."><div><b>5 · Foliage, grass &amp; flowers</b><span>Paint trees and rocks, Fill Terrain, grass look, wild flowers.</span></div></a>
+  <a class="card" href="06-chunks-settings.html"><img src="media/06-chunks-settings/03-chunks-overview.png" alt="A grid of terrain chunks seen from above, each marked with a white plus in a teal circle, inside a yellow outline."><div><b>6 · Chunks, settings &amp; saving</b><span>Grow the map, every terrain setting, where the data is saved.</span></div></a>
+</div>
+
+<p class="path-group">The pixel look</p>
+<div class="cards">
+  <a class="card" href="07-pixelizer.html"><img src="media/07-pixelizer/02-preview-on.png" alt="The pixel renderer strip below a pixelated green hill, with the Pixel World panel on the right."><div><b>7 · The pixelizer</b><span>Pixel size, outlines, palettes, god rays and the Pixel World panel.</span></div></a>
+  <a class="card" href="08-atmosphere-effects.html"><img src="media/08-atmosphere-effects/21-weather-snow.png" alt="Snow falling over a pixel island."><div><b>8 · Sky, weather, water &amp; effects</b><span>Time of day, weather, water, birds, fireflies, smoke, grass fire, presets.</span></div></a>
+</div>
+
+<p class="path-group">Builder (modelling)</p>
+<div class="cards">
+  <a class="card" href="09-builder-greybox.html"><img src="media/09-builder-greybox/02-editor-overview.png" alt="The Roblox-style Model ribbon above the 3D view with a part selected."><div><b>9 · Greyboxing with the Roblox UI</b><span>Parts, Move / Scale / Rotate, snapping, Union and Negate, the Studio way.</span></div></a>
+  <a class="card" href="10-builder-modeller.html"><img src="media/10-builder-modeller/04-roblox-model-tab.png" alt="The builder's Model tab ribbon."><div><b>10 · Modelling: faces, edges &amp; vertices</b><span>Extrude, Inset, Bevel, Loop Cut, painting, UVs, export.</span></div></a>
+</div>
+
+<p class="path-group">Models</p>
+<div class="cards">
+  <a class="card" href="11-importing-models.html"><img src="media/11-importing-models/01-imported-models-hero.png" alt="An imported tree and fox in the editor."><div><b>11 · Importing models</b><span>Bring in .glb and .obj files (including ones exported from Studio).</span></div></a>
+  <a class="card" href="12-using-models.html"><img src="media/12-using-models/12-custom-foliage-after.png" alt="A custom tree model painted across the terrain as foliage."><div><b>12 · Using models</b><span>Your models as foliage, placed props and reusable parts.</span></div></a>
+  <a class="card" href="13-playtest-export.html"><img src="media/13-playtest-export/54-player-landing.png" alt="The knight character standing on the first world's terrain in the running game."><div><b>13 · Playtesting &amp; exporting</b><span>Run your world, walk around in it, export a GLB or a playable build.</span></div></a>
+</div>
+
+<p class="path-group">Reference</p>
+<div class="cards">
+  <a class="card" href="14-shortcuts-glossary.html"><img src="media/01-godot-for-roblox/47-toolbar-transform.png" alt="The 3D view toolbar with the Select, Move, Rotate and Scale buttons."><div><b>14 · Shortcuts &amp; glossary</b><span>Every key in one filterable table, plus Roblox→Godot and Godot words.</span></div></a>
+  <a class="card" href="15-troubleshooting.html"><img src="media/13-playtest-export/59c-move-or-not-compare.png" alt="Side by side: a player placed above the ground lands on it; one left at the origin falls through to sky and sea."><div><b>15 · Troubleshooting &amp; FAQ</b><span>Symptom → cause → fix for the things that trip people up.</span></div></a>
+</div>
+
+<div class="callout tip"><span class="label">Short on time?</span><p>Do <a href="01-godot-for-roblox.html">page 1</a> and <a href="02-first-world.html">page 2</a>, then jump straight to <a href="09-builder-greybox.html">page 9</a> if you mostly want to build, or <a href="03-terrain-sculpting.html">page 3</a> if you mostly want landscapes. Keep <a href="14-shortcuts-glossary.html">page 14</a> open in another tab.</p></div>
+
+<h2 id="how">How to use this guide</h2>
+<div class="howto">
+  <div><h4>🔎 Search</h4><p>Type in the box at the top of every page. It searches every heading and paragraph in the guide, so try a Roblox word ("Explorer", "Union", "Anchor") or a control name ("Pixel Size").</p></div>
+  <div><h4>◐ Light / dark</h4><p>The half-moon button at the top right switches between light and dark. Your choice is remembered.</p></div>
+  <div><h4>☰ Chapters &amp; contents</h4><p>The left sidebar lists every chapter. Long pages also show an <b>On this page</b> list that follows you as you scroll. On a phone, open the chapters with ☰.</p></div>
+  <div><h4>← → Previous / next</h4><p>The bottom of each page links to the chapter before and after it, in the order of the learning path.</p></div>
+</div>
+
+<h3 id="widgets">The interactive bits</h3>
+<p>The pages are made to be played with, not just read:</p>
+<ul>
+  <li><b>Clips</b> loop silently while on screen. Use the speed buttons under each clip to slow it down (0.5×) or speed it up.</li>
+  <li><b>Screenshots</b> enlarge when you click them. Press <kbd>Esc</kbd> or click again to close.</li>
+  <li><b>Before / after sliders</b>: drag the round handle across the picture to compare two states.</li>
+  <li><b>Scrubbers</b>: drag a slider to step through pictures of one setting at different values (for example Pixel Size 1, 2, 4, 8).</li>
+  <li><b>Hotspot tours</b>: click the numbered dots on a picture of a panel to learn what each part does.</li>
+  <li><b>Tabs</b> switch between alternatives, such as the different sculpt tools.</li>
+  <li><b>Filter boxes</b> above long reference lists hide everything that doesn't match what you type.</li>
+  <li><b>Check yourself</b> questions open when you click them, so you can test yourself first.</li>
+</ul>
+<p>Tutorial steps have a tick box. Ticks are <b>remembered in this browser</b>, so you can close the guide and pick up where you left off. Try it here:</p>
+<ol class="steps" data-id="welcome-start">
+  <li>Open the project in <b>Godot 4.7</b> (the Project Manager lists it as <i>Marching Squares Terrain</i>; double-click it).</li>
+  <li>Read <a href="01-godot-for-roblox.html">Godot for Roblox builders</a> and learn to orbit the camera with the middle mouse button.</li>
+  <li>Build and run <a href="02-first-world.html">your first world</a>.</li>
+  <li>Pick the next group of chapters from the learning path above.</li>
+</ol>
+<div class="callout tip"><span class="label">Tip</span><p>Ticks and the light / dark choice are saved in your browser only. A private window, a different browser or clearing site data starts you fresh.</p></div>
+
+<h2 id="scenes">Follow-along scenes</h2>
+<p>Ready-made scenes for the guide live in the project folder <code>res://tutorial/guide/</code>. (<code>res://</code> is Godot's name for your project folder; you'll find it in the <b>FileSystem</b> dock at the bottom left.) Double-click a <code>.tscn</code> file there to open it. Use them to compare with your own work, or to skip ahead.</p>
+<table class="scenes">
+  <thead><tr><th>Scene</th><th>What's inside</th><th>Used on</th></tr></thead>
+  <tbody>
+    <tr><td><code>first_world.tscn</code></td><td>The finished quick-start world: a 2×2-chunk terrain with a sculpted hill, a levelled patch, a sand-painted area and scattered trees, plus Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water and Birds. Self-contained.</td><td><a href="02-first-world.html">2</a></td></tr>
+    <tr><td><code>first_world_player.tscn</code></td><td>The same world plus the demo player (<b>PlayerRig</b>, a knight) already moved to Position (5, 8, 4), above the hill. Press <kbd>F6</kbd> and walk around with WASD.</td><td><a href="13-playtest-export.html">13</a></td></tr>
+    <tr><td><code>sculpt_playground.tscn</code><br><small>+ <code>sculpt_playground_data.res</code></small></td><td>A flat 3×3-chunk square-grid terrain at height 0 with the pixel look, water, sky, day / night and an orbit camera: a blank canvas for trying every sculpt tool. Its terrain data lives in the <code>.res</code> file next to it (keep the two together).</td><td><a href="03-terrain-sculpting.html">3</a></td></tr>
+    <tr><td><code>greybox_tower.tscn</code></td><td>A small greybox watchtower built with the Roblox UI: a floor, three walls, a front wall with a doorway cut by Negate + Union, a wedge roof and stairs, all in the built-in Grid material.</td><td><a href="09-builder-greybox.html">9</a></td></tr>
+    <tr><td><code>modelled_prop.tscn</code></td><td>The "terracotta crate": a builder mesh shaped by extrude → inset → recess → bevelled rim, then painted. Self-contained.</td><td><a href="10-builder-modeller.html">10</a></td></tr>
+    <tr><td><code>imported_models.tscn</code></td><td>Two imported models placed in a scene: the courtyard's <b>round tree</b> and the textured, rigged <b>fox</b> character, both from the add-on's own assets.</td><td><a href="11-importing-models.html">11</a></td></tr>
+    <tr><td><code>model_uses.tscn</code></td><td>The courtyard demo plus a custom foliage entry, "Round Tree (custom model)", that paints the round-tree model. Shows a model used as foliage and as placed props (fountain, pillars, trees and stones under one PixelObject, each with collision).</td><td><a href="12-using-models.html">12</a></td></tr>
+  </tbody>
+</table>
+<div class="callout warn"><span class="label">Watch out</span><p>Opening a follow-along scene and saving over it changes the reference copy. To experiment safely, use <span class="ui">Scene → Save Scene As…</span> first and give your copy a new name.</p></div>
+<p>The other chapters use the project's own example scenes, such as <code>res://tutorial/01_flat_playground.tscn</code>, <code>res://tutorial/03_pixel_look.tscn</code>, <code>res://tutorial/04_world_mood.tscn</code> and the demo island <code>res://demo/hex_island.tscn</code>. Each page says which one at the top.</p>
+
+<h2 id="versions">Versions</h2>
+<table>
+  <thead><tr><th>What</th><th>Version used in this guide</th></tr></thead>
+  <tbody>
+    <tr><td>Godot editor</td><td><b>Godot 4.7</b> (screenshots taken on 4.7.2.stable). The add-on needs at least 4.7.</td></tr>
+    <tr><td>MarchingSquaresTerrain add-on</td><td>The GDExtension shipped in this project at <code>res://addons/MarchingSquaresTerrain/</code> (version 0.1.0), November 2026 build</td></tr>
+    <tr><td>Renderer</td><td>The project's default renderer (Compatibility)</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="label">On an older build?</span><p>Several add-on fixes landed while this guide was being made. For example, <kbd>Shift</kbd>/<kbd>Alt</kbd>+wheel no longer zoom the camera, and new parts no longer look dark. If something behaves differently from the clips, check <a href="15-troubleshooting.html">Troubleshooting</a>, which has a section on older builds.</p></div>
+
+<h2 id="next">Start here</h2>
+<div class="cards">
+  <a class="card" href="01-godot-for-roblox.html"><img src="media/01-godot-for-roblox/01-editor-clean.png" alt="The Godot editor's main regions."><div><b>1 · Godot for Roblox builders</b><span>Your first 25 minutes in Godot.</span></div></a>
+  <a class="card" href="02-first-world.html"><img src="media/02-first-world/04-sculpt-hill.png" alt="Raising a hill with the Brush tool."><div><b>2 · Your first world</b><span>An island from scratch, start to finish.</span></div></a>
+</div>
+
+</div></main>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sculpting Terrain – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+  .tall-tour { max-width: 340px; }
+  .tall-shot img { max-height: 560px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: .95em; }
+  table.ref th, table.ref td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .hint { font-family: ui-monospace, monospace; font-size: .88em; background: var(--line); padding: 2px 6px; border-radius: 4px; }
+  .toolhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 10px; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Sculpting terrain</h1>
+<p class="lede">Raise hills, cut cliffs, carve valleys, stamp mountains and weather the result — every sculpting tool, button, slider and shortcut in the terrain editor, mapped to the Roblox Terrain Editor you already know.</p>
+<div class="meta-row"><span class="pill">⏱ 45 min</span><span class="pill">Beginner</span><span class="pill">Scene: tutorial/guide/sculpt_playground.tscn</span></div>
+
+<figure class="shot"><img src="media/03-terrain-sculpting/00-orientation.png" alt="The full Godot editor with MarchingSquaresTerrain selected in the Scene dock. A red box marks the vertical terrain toolbar on the left of the 3D view (Collapse, Brush 1, Level 2, Smooth 3, Bridge 4, Foliage 5, Paint 6, Inspect 7, Chunks 8, Settings 9, Stamp, Gradient, Select, Tint, Grid). Below the 3D view sits the Brush attribute strip, and a hint line runs along the bottom of the viewport."><figcaption>Where sculpting happens: the terrain toolbar (red box) appears at the left of the 3D view as soon as you select the <code>MarchingSquaresTerrain</code> node. Its settings strip sits under the view.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>The <a href="#surfaces">three sculpting surfaces</a>: left toolbar, bottom attribute strip and hint bar.</li>
+  <li>How each <a href="#roblox-map">Roblox Terrain Editor tool</a> (Add, Subtract, Grow, Erode, Smooth, Flatten, Paint) maps to MST.</li>
+  <li><a href="#shape">Brush shape, size, aspect and rotation</a>, and the mouse-wheel shortcuts.</li>
+  <li>Every tool in detail: <a href="#tools">Brush (Raise / Lower and Drag), Level, Smooth, Bridge, Stamp, Gradient, Select, Inspect and Tint</a>.</li>
+  <li><a href="#grids">Square vs hex grids</a> and the Grid overlay.</li>
+  <li>Six <a href="#recipes">recipes</a>: hill, cliff / plateau, river valley, terraces, ramp, crater.</li>
+  <li><a href="#erosion">Erosion</a>: weathering a whole landscape in one click.</li>
+  <li><a href="#undo">Undo and redo</a>, plus a <a href="#reference">filterable reference</a> of every control.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in your scene, like an Instance in Roblox. The terrain is a node called <code>MarchingSquaresTerrain</code>.</dd>
+  <dt><b>Scene dock</b></dt><dd>The panel at the top left listing every node, like Roblox's <b>Explorer</b>. A <b>dock</b> is any panel you can move around the editor.</dd>
+  <dt><b>Inspector</b></dt><dd>The panel on the right showing the selected node's properties, like Roblox's <b>Properties</b> window.</dd>
+  <dt><b>3D view (viewport)</b></dt><dd>The big picture of your world in the middle. You sculpt directly in it.</dd>
+  <dt><b>Output panel</b></dt><dd>The text log under the 3D view, like Roblox's <b>Output</b> window. The Inspect tool prints here.</dd>
+  <dt><b><code>.tscn</code> / <code>res://</code></b></dt><dd>A <code>.tscn</code> file is a saved scene, like a Roblox place file. <code>res://</code> means "the project folder".</dd>
+  <dt><b>Cell</b></dt><dd>MST terrain is a grid of cells, each with its own height. You sculpt by changing those heights, not by adding blobs of voxels.</dd>
+  <dt><b>LMB / RMB / MMB</b></dt><dd>Left, right and middle mouse button. "Wheel" means the scroll wheel.</dd>
+</dl>
+
+<h2 id="playground">Your follow-along scene</h2>
+<p>Everything on this page can be tried on a flat practice terrain made for this guide: <code>res://tutorial/guide/sculpt_playground.tscn</code>. In the <b>FileSystem</b> dock (bottom left) open <code>tutorial</code> → <code>guide</code> and double-click <code>sculpt_playground.tscn</code>. It's a flat 3×3-chunk terrain on a <b>Square</b> grid, with water, sky, day/night, the pixel look and an orbit camera already set up. The green chunk in the middle is your main play surface; the chunks around it sit at or under the water line.</p>
+<figure class="shot"><img src="media/03-terrain-sculpting/72-sculpt-playground.png" alt="The sculpt playground seen from above at an angle: a flat light-green square of ground in the middle of teal water, with a pale lavender sky behind."><figcaption>The sculpt playground: a flat green square in a sea of water. Nothing on it yet — that's your job.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>Relief reads best from a <b>low, three-quarter angle zoomed in on the patch you're working on</b>. Straight from above, even big hills look flat. Hold <b>RMB</b> in the view and use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to fly, just like Roblox Studio's camera.</p></div>
+
+<!-- ===================================================== SURFACES -->
+<h2 id="surfaces">The three sculpting surfaces</h2>
+<p>Click <code>MarchingSquaresTerrain</code> in the Scene dock. Three things appear:</p>
+<ol>
+  <li><b>The left toolbar</b> — a vertical bar of tool buttons inside the 3D view. It is only there while a terrain node is selected. The pressed (blue) button is the current tool.</li>
+  <li><b>The bottom attribute strip</b> — a wrapping row of controls under the 3D view. Its contents change with the tool. Its title (far left) names the tool.</li>
+  <li><b>The hint bar</b> — one translucent line at the bottom left of the 3D view summing up the current tool's mouse and key actions.</li>
+</ol>
+
+<h3 id="toolbar-tour">Toolbar tour</h3>
+<p>Click the numbered dots to learn each button. Tools 1–9 have a number-key shortcut; the four tools under the third divider (Stamp, Gradient, Select, Tint) don't.</p>
+<div class="hotspots tall-tour"><img src="media/03-terrain-sculpting/01-toolbar.png" alt="The expanded terrain toolbar: Collapse at the top, then Brush 1 (highlighted blue), Level 2, Smooth 3, Bridge 4, a divider, Foliage 5, Paint 6, a divider, Inspect 7, Chunks 8, Settings 9, a divider, Stamp, Gradient, Select, Tint, a divider, and Grid at the bottom.">
+  <button class="spot" style="left:45%;top:4%" data-title="Collapse" data-text="Show / hide the tool names (icons only). The arrow flips between ‹ and ›. Your choice is remembered for the project.">1</button>
+  <button class="spot" style="left:45%;top:11%" data-title="Brush · key 1" data-text="Raise or lower terrain. Two modes: Drag (paint a selection, then drag it up/down) and Raise / Lower (hold LMB to raise, RMB to lower).">2</button>
+  <button class="spot" style="left:45%;top:17%" data-title="Level · key 2" data-text="Flatten terrain toward the Height value — Roblox's Flatten.">3</button>
+  <button class="spot" style="left:45%;top:23%" data-title="Smooth · key 3" data-text="Relax cells toward their neighbours' average height. Terraced or Sloped.">4</button>
+  <button class="spot" style="left:45%;top:29%" data-title="Bridge · key 4" data-text="Drag from one point to another to build a straight ramp between them.">5</button>
+  <button class="spot" style="left:45%;top:37%" data-title="Foliage · key 5" data-text="Paint grass, trees, rocks and props. Covered on the Foliage page.">6</button>
+  <button class="spot" style="left:45%;top:43%" data-title="Paint · key 6" data-text="Paint ground textures. Covered on the Painting page.">7</button>
+  <button class="spot" style="left:45%;top:50%" data-title="Inspect · key 7" data-text="Click a cell to print its data (position, height, textures, grass) to the Output panel.">8</button>
+  <button class="spot" style="left:45%;top:57%" data-title="Chunks · key 8" data-text="Add, remove and merge chunks. Covered on the Chunks &amp; settings page.">9</button>
+  <button class="spot" style="left:45%;top:63%" data-title="Settings · key 9" data-text="Global terrain settings. Covered on the Chunks &amp; settings page.">10</button>
+  <button class="spot" style="left:45%;top:70%" data-title="Stamp" data-text="Drop a prebuilt heightmap shape: Mountain, Crater, Mesa, Valley, Hill, or your own image.">11</button>
+  <button class="spot" style="left:45%;top:76%" data-title="Gradient" data-text="Pull terrain toward a straight ramp between two points you pick.">12</button>
+  <button class="spot" style="left:45%;top:82%" data-title="Select" data-text="Select cells and copy / paste them — height, textures and grass together.">13</button>
+  <button class="spot" style="left:45%;top:88%" data-title="Tint" data-text="Paint a saved colour over whole cells. Covered in full on the Painting page.">14</button>
+  <button class="spot" style="left:45%;top:96%" data-title="Grid" data-text="Toggle the white cell-line overlay on the terrain (show_grid_in_editor).">15</button>
+</div>
+<p>Hover any button in the editor to read its full tooltip. Picking a tool highlights its button, changes the strip title and the hint, and clears any active selection or paste.</p>
+
+<div class="pair">
+  <figure class="shot tall-shot"><img src="media/03-terrain-sculpting/02-toolbar-compact.png" alt="The collapsed toolbar: a › arrow at the top, then only the tool icons stacked vertically with no names, the Brush icon highlighted blue."><figcaption>Collapsed: icons only. Click the arrow again to bring the names back.</figcaption></figure>
+  <figure class="clip"><video src="media/03-terrain-sculpting/101-toolbar-collapse-keys.mp4" poster="media/03-terrain-sculpting/101-toolbar-collapse-keys.png" data-autoplay></video><figcaption>Pressing <kbd>1</kbd>–<kbd>4</kbd> switches tools (the button lights up), and <span class="ui">Collapse</span> toggles the icon-only bar. Number keys work in both layouts.</figcaption></figure>
+</div>
+
+<div class="callout warn"><span class="label">Watch out</span><p>On a short editor window the toolbar is taller than the 3D view, so the last buttons (<span class="ui">Tint</span>, <span class="ui">Grid</span>) hide behind a scrollbar. Scroll the bar, make the window taller, close the Output panel, or click <span class="ui">Collapse</span> to make it fit.</p></div>
+
+<h3 id="strip">The attribute strip and hint bar</h3>
+<figure class="shot"><img src="media/03-terrain-sculpting/03-brush-strip.png" alt="The Brush attribute strip in three rows: Brush title, Brush Type Round, Brush Mode Drag, Size 15.0; Aspect 1.009, Rotation 0, Flatten ticked, Falloff ticked, Peak 0.010; Grid Aligned (greyed), Grid Size 1, Quick Paint None."><figcaption>The Brush strip (Drag mode). Sliders show their value on the right; spin boxes (like Rotation) can be dragged or typed into.</figcaption></figure>
+<figure class="shot"><img src="media/03-terrain-sculpting/04-hint-bar.png" alt="The hint bar text: LMB: paint a selection · LMB-drag selected cells: raise / lower · Shift: add · Ctrl: remove · Alt: one cell · RMB / Esc: clear."><figcaption>The hint bar for Brush (Drag). When you forget a shortcut, read this line.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>The strip <b>reflows</b> when a value's text gets wider (Peak <code>0.010</code> vs <code>-1.000</code>, for example), so controls to its right can shift sideways. Not a bug — just re-find the control after changing its neighbour.</p></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Studio, the Terrain Editor is a separate window with tool tabs and a settings panel. Here the toolbar <i>is</i> those tabs, the strip <i>is</i> that settings panel, and both live inside the 3D view. They disappear when you click a different node — click the terrain again to bring them back.</p></div>
+
+<!-- ===================================================== ROBLOX MAP -->
+<h2 id="roblox-map">From the Roblox Terrain Editor to MST</h2>
+<p>Roblox terrain is made of voxels you add and remove like clay. MST terrain is a <b>grid of cells with heights</b> — you push cells up and down. So the jobs are the same but split across differently named tools:</p>
+<table class="ref">
+  <thead><tr><th>Roblox tool</th><th>MST equivalent</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Add</td><td><a href="#t-raise">Brush → Raise / Lower</a>, hold <b>LMB</b></td><td>Raises toward a <b>Ceiling</b> height. For big shapes in one click use <a href="#t-stamp">Stamp</a>.</td></tr>
+    <tr><td>Subtract</td><td>Brush → Raise / Lower, hold <b>RMB</b></td><td>Lowers toward a <b>Floor</b> height. Or Stamp with a negative Height.</td></tr>
+    <tr><td>Grow</td><td>Raise / Lower LMB, or Stamp <b>Add</b> / <b>Max</b></td><td>No voxel "grow sphere" — there's no blob to grow, only cell heights.</td></tr>
+    <tr><td>Erode</td><td>Raise / Lower RMB, Smooth, or the <a href="#erosion">Erosion node</a></td><td>MST's Erosion is a whole-terrain rain simulation, not a brush.</td></tr>
+    <tr><td>Smooth</td><td><a href="#t-smooth">Smooth</a> (key 3)</td><td>Extra choice: Terraced or Sloped.</td></tr>
+    <tr><td>Flatten</td><td><a href="#t-level">Level</a> (key 2), or LMB+RMB in Raise / Lower</td><td>Flattens to a typed or picked <b>Height</b>.</td></tr>
+    <tr><td>Paint</td><td>Paint (key 6)</td><td>See <a href="04-terrain-painting.html">Painting, textures &amp; tint</a>.</td></tr>
+    <tr><td>Region Select / Copy / Paste</td><td><a href="#t-select">Select</a></td><td><kbd>C</kbd> copy, <kbd>V</kbd> paste, <kbd>Z</kbd>/<kbd>X</kbd> rotate, <kbd>M</kbd> mirror.</td></tr>
+    <tr><td>Import heightmap</td><td><a href="#t-stamp">Stamp</a> with an image</td><td>Drop PNG/JPG/WEBP/EXR files in <code>addons/MarchingSquaresTerrain/stamps/</code>.</td></tr>
+    <tr><td>Brush Size / Strength</td><td><b>Size</b> (<kbd>Shift</kbd>+wheel) / <b>Strength</b> (<kbd>Ctrl</kbd>+wheel)</td><td>Strength exists on Raise / Lower, Smooth and Gradient.</td></tr>
+  </tbody>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Two MST tools have no Terrain Editor parallel. <b>Brush → Drag</b> works like selecting Parts and moving them with the Move tool: you first paint a selection of cells, then drag them all up or down as one. <b>Bridge / Gradient</b> build perfectly straight ramps — something you'd fake in Roblox with a rotated wedge Part.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Guided tutorial: your first sculpt</h2>
+<p>About 15 minutes on the sculpt playground. You'll raise a hill, carve a pit, flatten a shelf, lift a plateau and undo it all.</p>
+<ol class="steps" data-id="sculpt-first">
+  <li><b>Open the playground.</b> FileSystem → <code>tutorial/guide/sculpt_playground.tscn</code>, double-click. Make sure the <b>3D</b> tab at the top centre is active.</li>
+  <li><b>Select the terrain.</b> Click <code>MarchingSquaresTerrain</code> in the Scene dock. The toolbar, strip and hint bar appear. Brush is already pressed.</li>
+  <li><b>Frame the camera.</b> Fly in so the green chunk fills the view at a low angle.</li>
+  <li><b>Switch to Raise / Lower.</b> In the strip, open <span class="ui">Brush Mode</span> and pick <span class="ui">Raise / Lower</span>. Ceiling, Height, Floor and Strength appear.
+    <figure class="shot"><img src="media/03-terrain-sculpting/05-brush-raiselower-strip.png" alt="The Brush (Raise / Lower) strip: Brush Type Round, Brush Mode Raise / Lower, Size 23.0, Aspect 1.110, Rotation 0, Ceiling 16.0, Height 0.0, Floor -8.0, Strength 4.008, Falloff ticked, Peak 0.010, Grid Aligned greyed, Grid Size 1, Quick Paint None."><figcaption>The Raise / Lower strip.</figcaption></figure></li>
+  <li><b>Raise a hill.</b> Hover the ground — a round outline follows the cursor. <b>Hold LMB</b> and move a little. The ground rises. Let go when you like it.
+    <figure class="clip"><video src="media/03-terrain-sculpting/84-raise-lmb.mp4" poster="media/03-terrain-sculpting/84-raise-lmb.png" data-autoplay></video><figcaption>Holding LMB raises a hill toward Ceiling.</figcaption></figure></li>
+  <li><b>Dig a pit.</b> Move aside and <b>hold RMB</b>. The ground sinks toward Floor.</li>
+  <li><b>Resize the brush.</b> Hold <kbd>Shift</kbd> and roll the wheel; watch <span class="ui">Size</span> change.</li>
+  <li><b>Flatten a shelf.</b> Press <kbd>2</kbd> for Level. Type <code>6</code> in <span class="ui">Height</span>, untick <span class="ui">Falloff</span>, and LMB-drag a patch. A flat shelf appears.</li>
+  <li><b>Lift a plateau.</b> Press <kbd>1</kbd>, set Brush Mode back to <span class="ui">Drag</span>. LMB-drag over some ground — the cells turn white. Then LMB-drag <i>starting on a white cell</i> and move the mouse up: the whole selection rises as one flat block. Right-click to clear the selection.</li>
+  <li><b>Undo everything.</b> Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> once per stroke. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> brings a stroke back.</li>
+  <li><b>Save</b> with <kbd>Ctrl</kbd>+<kbd>S</kbd> if you want to keep your work.</li>
+</ol>
+
+<!-- ===================================================== SHAPE -->
+<h2 id="shape">Brush shape, size, aspect and rotation</h2>
+<p>Most tools share the same brush controls at the start of the strip. Learn them once.</p>
+
+<h3 id="brush-type">Brush Type</h3>
+<p>A dropdown: <b>Round</b> (default), <b>Square</b>, <b>Hexagon</b>, <b>Hexagon30</b> (hexagon turned 30°), <b>Triangle</b> and <b>Triangle180</b> (triangle flipped). The outline under the cursor changes to match. Slide to compare:</p>
+<div class="scrubber" data-label="Brush Type" data-start="0"
+  data-frames='[{"v":"Round","src":"media/03-terrain-sculpting/10-brushtype-round.png","note":"Round: a circle. The default and the most natural for hills."},{"v":"Square","src":"media/03-terrain-sculpting/11-brushtype-square.png","note":"Square: straight edges for blocky, built-looking ground."},{"v":"Hexagon","src":"media/03-terrain-sculpting/12-brushtype-hexagon.png","note":"Hexagon: six sides."},{"v":"Hexagon30","src":"media/03-terrain-sculpting/13-brushtype-hexagon30.png","note":"Hexagon30: the hexagon turned 30 degrees."},{"v":"Triangle","src":"media/03-terrain-sculpting/14-brushtype-triangle.png","note":"Triangle: pointing one way…"},{"v":"Triangle180","src":"media/03-terrain-sculpting/15-brushtype-triangle180.png","note":"Triangle180: …and flipped to point the other way."}]'></div>
+<figure class="clip"><video src="media/03-terrain-sculpting/91-brush-type-footprints.mp4" poster="media/03-terrain-sculpting/91-brush-type-footprints.png" data-autoplay></video><figcaption>Cycling Brush Type: Round → Square → Hexagon → Triangle. The outline and the strip label change together.</figcaption></figure>
+
+<h3 id="size">Size</h3>
+<p>The brush <b>diameter</b> in world units. Range 1–50 (the maximum grows with your terrain's cell size), step 0.5, default 15. Drag the slider or hold <kbd>Shift</kbd> and roll the wheel.</p>
+<div class="scrubber" data-label="Size" data-start="1"
+  data-frames='[{"v":"5","src":"media/03-terrain-sculpting/16-size-5.png","note":"Tiny: a couple of cells. For details, river beds, paths."},{"v":"15","src":"media/03-terrain-sculpting/17-size-15.png","note":"Default size."},{"v":"30","src":"media/03-terrain-sculpting/18-size-30.png","note":"Medium: whole hills in a stroke."},{"v":"50","src":"media/03-terrain-sculpting/19-size-50.png","note":"Large: broad landforms."}]'></div>
+<figure class="clip"><video src="media/03-terrain-sculpting/88-shift-wheel-size.mp4" poster="media/03-terrain-sculpting/88-shift-wheel-size.png" data-autoplay></video><figcaption><kbd>Shift</kbd>+wheel changes Size. The camera holds still — only the brush changes.</figcaption></figure>
+
+<h3 id="aspect">Aspect</h3>
+<p>Stretches the brush into an ellipse or rectangle: Z radius ÷ X radius. Range 0.2–5.0, step 0.05, default 1.0 (round).</p>
+<div class="scrubber" data-label="Aspect" data-start="1"
+  data-frames='[{"v":"0.3","src":"media/03-terrain-sculpting/20-aspect-03.png","note":"Aspect 0.3: a wide, shallow rectangle — much wider than it is deep."},{"v":"1.0","src":"media/03-terrain-sculpting/21-aspect-10.png","note":"Aspect 1.0: the default, a square (these stills use the Square brush)."},{"v":"2.5","src":"media/03-terrain-sculpting/22-aspect-25.png","note":"Aspect 2.5: a tall rectangle, deeper than it is wide."},{"v":"5.0","src":"media/03-terrain-sculpting/23-aspect-50.png","note":"Aspect 5.0: a long, narrow strip."}]'></div>
+<p>These stills use the <b>Square</b> brush, so its footprint stretches into a rectangle; with <b>Round</b> it becomes an ellipse. Handy for ridges, river banks and long walls.</p>
+
+<h3 id="rotation">Rotation</h3>
+<p>Turns the brush, in degrees: −180 to 180, step 1, default 0. Type it, drag the spin box, or hold <kbd>Alt</kbd> and roll the wheel (15° per notch). It matters for non-round shapes.</p>
+<figure class="clip"><video src="media/03-terrain-sculpting/89-alt-wheel-rotation.mp4" poster="media/03-terrain-sculpting/89-alt-wheel-rotation.png" data-autoplay></video><figcaption><kbd>Alt</kbd>+wheel spins a Square brush in place. The camera doesn't move.</figcaption></figure>
+
+<h3 id="strength">Strength (<kbd>Ctrl</kbd>+wheel)</h3>
+<p>How hard the tool pushes. Only <b>Brush (Raise / Lower)</b>, <b>Smooth</b> and <b>Gradient</b> have a Strength slider; on <b>Stamp</b>, <kbd>Ctrl</kbd>+wheel changes the stamp's <b>Height</b> instead. <b>Level has no Strength</b>, and its hint stops at "Shift+wheel: size".</p>
+<figure class="clip"><video src="media/03-terrain-sculpting/90-ctrl-wheel-strength.mp4" poster="media/03-terrain-sculpting/90-ctrl-wheel-strength.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+wheel takes Strength from 4.0 to 10.5. The hint reads "Ctrl+wheel: strength"; the camera stays put.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox has Size and Strength sliders in the Terrain Editor panel. Here they're the same idea, plus wheel shortcuts so you never leave the 3D view: <kbd>Shift</kbd> = size, <kbd>Ctrl</kbd> = strength, <kbd>Alt</kbd> = rotation.</p></div>
+
+<h3 id="falloff">Falloff and Peak</h3>
+<p><span class="ui">Falloff</span> (checkbox, on by default) weakens the brush toward its edge, giving soft rounded shapes. Off, the brush acts evenly right to the edge — flat-topped and abrupt.</p>
+<div class="compare" data-before="Falloff on" data-after="Falloff off"><img src="media/03-terrain-sculpting/36-falloff-on.png" alt="A soft, rounded hill with gently sloping sides on the green chunk, made with Falloff on."><img src="media/03-terrain-sculpting/37-falloff-off.png" alt="The same spot with Falloff off: a flat-topped mound with abrupt edges."></div>
+<p><span class="ui">Peak</span> (slider −1 to 1, step 0.05, default 0.010) is the falloff's contrast: above 0 makes pointy peaks, below 0 flat-topped mesas. It only does something while Falloff is on.</p>
+<div class="scrubber" data-label="Peak" data-start="1"
+  data-frames='[{"v":"−1","src":"media/03-terrain-sculpting/33-peak-neg1.png","note":"Peak −1: a broad, flat-topped mound."},{"v":"0","src":"media/03-terrain-sculpting/34-peak-0.png","note":"Peak 0: a rounded dome."},{"v":"+1","src":"media/03-terrain-sculpting/35-peak-pos1.png","note":"Peak +1: a narrow, pointy peak."}]'></div>
+<div class="callout tip"><span class="label">Tip</span><p>The three stills above are one stroke each at the same Strength: −1 spreads the top into a mesa, +1 pinches it into a spike. Stack strokes to exaggerate it further.</p></div>
+
+<h3 id="grid-aligned">Grid Aligned, Grid Size and Quick Paint</h3>
+<ul>
+  <li><span class="ui">Grid Aligned</span> (checkbox, off) snaps the brush to whole cells. It only works on a <b>Triangle, Hexagon or Hex Rings</b> grid <b>and</b> with Falloff off; otherwise it's greyed out with the tooltip "Grid Aligned needs a Triangle/Hexagon/Hex Rings grid and Falloff off." On the Square-grid playground it's always grey.</li>
+  <li><span class="ui">Grid Size</span> (slider 0–20, default 1) — the size of the grid-aligned stamp, in cells.</li>
+  <li><span class="ui">Quick Paint</span> (dropdown) paints a texture while you sculpt: <b>None</b> (default), <b>Full Void</b> (slot 15 on ground and wall, no grass), <b>Base Grass Masked</b> (slot 0), or <b>Selected Material</b> (whatever slot is chosen in the Paint tool). Handy for roughing in cliffs that should be rock as you raise them. Texture slots are explained on <a href="04-terrain-painting.html">the Painting page</a>.</li>
+</ul>
+
+<!-- ===================================================== TOOLS -->
+<h2 id="tools">The tools, one by one</h2>
+<p>Pick a tab. Each one covers the tool's controls, mouse actions and a clip.</p>
+
+<div class="tabs">
+
+<!-- RAISE / LOWER -->
+<div class="panel" data-tab="Raise / Lower" id="t-raise">
+  <div class="toolhead"><span class="pill">Brush · key 1</span><span class="pill">Brush Mode: Raise / Lower</span><span class="pill">Roblox: Add / Subtract</span></div>
+  <p>The everyday sculpting brush. Choose it with Brush Mode → <span class="ui">Raise / Lower</span>. The dropdown has just two entries: <i>Drag</i> and <i>Raise / Lower</i>.</p>
+  <p>Hint: <span class="hint">Hold LMB: raise · RMB: lower · LMB+RMB: flatten · Ctrl+LMB / MMB / RMB: pick Ceiling / Height / Floor · Shift+wheel: size · Ctrl+wheel: strength</span></p>
+  <table class="ref">
+    <tr><th>Action</th><th>Result</th></tr>
+    <tr><td>Hold LMB</td><td>Raise, never above <b>Ceiling</b>.</td></tr>
+    <tr><td>Hold RMB</td><td>Lower, never below <b>Floor</b>.</td></tr>
+    <tr><td>Hold LMB + RMB</td><td>Flatten toward <b>Height</b>.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+LMB</td><td>Pick Ceiling from the hovered cell.</td></tr>
+    <tr><td>MMB</td><td>Pick Height from the hovered cell.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+RMB</td><td>Pick Floor from the hovered cell.</td></tr>
+  </table>
+  <div class="compare" data-before="Before" data-after="After"><img src="media/03-terrain-sculpting/30-raise-before.png" alt="Flat grassy ground with the round brush outline hovering over it."><img src="media/03-terrain-sculpting/32-raise-after.png" alt="The same ground with a low rounded hill where the brush was held."></div>
+  <div class="pair">
+    <figure class="clip"><video src="media/03-terrain-sculpting/31-raise-hill.mp4" poster="media/03-terrain-sculpting/31-raise-hill.png" data-autoplay></video><figcaption>Holding LMB to grow a hill.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/85-raise-rmb-lower.mp4" poster="media/03-terrain-sculpting/85-raise-rmb-lower.png" data-autoplay></video><figcaption>Holding RMB digs a pit toward Floor.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/86-raise-both-flatten.mp4" poster="media/03-terrain-sculpting/86-raise-both-flatten.png" data-autoplay></video><figcaption>LMB+RMB together flattens a bump toward Height.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/87-ctrl-pick.mp4" poster="media/03-terrain-sculpting/87-ctrl-pick.png" data-autoplay></video><figcaption>Picking heights from the terrain: the Ceiling, Floor and Height spins change to 4.6, −5.3 and −0.2.</figcaption></figure>
+  </div>
+  <p>Strip controls: Brush Type, Brush Mode, Size, Aspect, Rotation, <b>Ceiling</b> (−50…50, default 16), <b>Height</b> (−50…50, default 0), <b>Floor</b> (−50…50, default −8), <b>Strength</b> (0.25–30, step 0.25, default 4), Falloff, Peak, Grid Aligned, Grid Size, Quick Paint.</p>
+  <div class="callout tip"><span class="label">Tip</span><p>Strength is a <b>rate</b>, not a target, so this brush is gentle. Want a dramatic mountain in one go? Use <a href="#t-stamp">Stamp</a>.</p></div>
+</div>
+
+<!-- DRAG -->
+<div class="panel" data-tab="Drag" id="t-drag">
+  <div class="toolhead"><span class="pill">Brush · key 1</span><span class="pill">Brush Mode: Drag (default)</span><span class="pill">Roblox: select Parts + Move</span></div>
+  <p>Two steps: paint a <b>selection</b> of cells (they turn white), then drag the whole selection up or down together.</p>
+  <p>Hint: <span class="hint">LMB: paint a selection · LMB-drag selected cells: raise / lower · Shift: add · Ctrl: remove · Alt: one cell · RMB / Esc: clear</span></p>
+  <table class="ref">
+    <tr><th>Action</th><th>Result</th></tr>
+    <tr><td>LMB-drag off the selection</td><td>Start a new selection.</td></tr>
+    <tr><td><kbd>Shift</kbd>+LMB-drag</td><td>Add cells to the selection.</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+LMB-drag</td><td>Remove cells from the selection.</td></tr>
+    <tr><td>LMB-drag starting on a white cell</td><td>Move every selected cell up / down together (mouse up/down). One undo step. Snaps to terrace steps on Terraces / HexPrism looks; hold <kbd>Ctrl</kbd> to move freely.</td></tr>
+    <tr><td><kbd>Alt</kbd>+LMB-drag</td><td>Move only the hovered cell (strip shows "1 selected").</td></tr>
+    <tr><td>RMB (or <kbd>Esc</kbd>)</td><td>Clear the selection.</td></tr>
+  </table>
+  <p><span class="ui">Flatten</span> (checkbox, on) flattens the dragged selection to the clicked height, so it rises as a flat-topped plateau.</p>
+  <div class="pair">
+    <figure class="clip"><video src="media/03-terrain-sculpting/40-drag-select-raise.mp4" poster="media/03-terrain-sculpting/40-drag-select-raise.png" data-autoplay></video><figcaption>Paint a white selection, then drag it up.</figcaption></figure>
+    <figure class="shot"><img src="media/03-terrain-sculpting/41-drag-mode-after.png" alt="A long oval selection outlined in white and lavender after being dragged up; a thin dark outline above it marks the raised edge."><figcaption>The selection after dragging it up. With Flatten on, its top stays flat.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/80-drag-shift-add.mp4" poster="media/03-terrain-sculpting/80-drag-shift-add.png" data-autoplay></video><figcaption><kbd>Shift</kbd>+drag adds cells.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/81-drag-ctrl-remove.mp4" poster="media/03-terrain-sculpting/81-drag-ctrl-remove.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+drag removes cells.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/82-drag-alt-onecell.mp4" poster="media/03-terrain-sculpting/82-drag-alt-onecell.png" data-autoplay></video><figcaption><kbd>Alt</kbd>+drag lifts just one cell.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/83-drag-rmb-clear.mp4" poster="media/03-terrain-sculpting/83-drag-rmb-clear.png" data-autoplay></video><figcaption>RMB clears the selection.</figcaption></figure>
+  </div>
+  <div class="callout tip"><span class="label">Tip</span><p>RMB is the reliable way to clear. <kbd>Esc</kbd> does the same from the keyboard (the hint bar lists it as "RMB / Esc: clear").</p></div>
+</div>
+
+<!-- LEVEL -->
+<div class="panel" data-tab="Level" id="t-level">
+  <div class="toolhead"><span class="pill">Key 2</span><span class="pill">Roblox: Flatten</span></div>
+  <p>Flattens what you drag over toward the <b>Height</b> value: lower ground rises, higher ground is cut down. The result is a flat shelf. <kbd>Ctrl</kbd>+LMB sets Height from the hovered cell. Falloff softens the edges; turn it off for sharp sides.</p>
+  <p>Hint ends at <span class="hint">… Shift+wheel: size</span> — Level has no Strength, so <kbd>Ctrl</kbd>+wheel just zooms the camera here, like an ordinary wheel.</p>
+  <div class="compare" data-before="Before" data-after="Level, Height 5"><img src="media/03-terrain-sculpting/42-level-before.png" alt="Flat grassy ground with the oval Level brush outline over it."><img src="media/03-terrain-sculpting/43-level-after.png" alt="The same ground after Level at Height 5: a low flat shelf whose curved edge shows faintly where the brush was."></div>
+  <figure class="clip"><video src="media/03-terrain-sculpting/92-level.mp4" poster="media/03-terrain-sculpting/92-level.png" data-autoplay></video><figcaption>Level dragging a flat shelf at Height 6, then <kbd>Ctrl</kbd>+LMB picking a height.</figcaption></figure>
+  <p>Strip: Brush Type, Size, Aspect, Rotation, <b>Height</b>, Falloff, Peak, Grid Aligned, Grid Size, Quick Paint.</p>
+</div>
+
+<!-- SMOOTH -->
+<div class="panel" data-tab="Smooth" id="t-smooth">
+  <div class="toolhead"><span class="pill">Key 3</span><span class="pill">Roblox: Smooth</span></div>
+  <p>Relaxes cells toward the average height of their neighbours, rounding off bumps and pits. Hint ends <span class="hint">… Ctrl+wheel: strength</span>.</p>
+  <ul>
+    <li><span class="ui">Smooth Mode</span> — <b>Terraced</b> (default): smoothed cells stay flat steps. <b>Sloped</b>: smoothed cells become slanted ramps between neighbours, like Bridge. On a <b>Square</b> grid both look the same (square grids always ramp); the difference shows on hex / triangle grids.</li>
+    <li><span class="ui">Strength</span> — slider 0.0255–0.3005, step 0.0055, default ≈ 0.15.</li>
+  </ul>
+  <div class="compare" data-before="Before" data-after="Smoothed"><img src="media/03-terrain-sculpting/44-smooth-before.png" alt="A sharp, flat-topped mound raised on the green chunk, its sides stepped and its peak clearly defined."><img src="media/03-terrain-sculpting/45-smooth-after.png" alt="The same mound after Smooth: its peak is much lower and its sides are one smooth rounded slope."></div>
+  <p>Two passes of Smooth at full Strength took the sharp mound on the left to the rounded swell on the right. The effect is gentler on small bumps:</p>
+  <div class="pair">
+    <figure class="clip"><video src="media/03-terrain-sculpting/93-smooth.mp4" poster="media/03-terrain-sculpting/93-smooth.png" data-autoplay></video><figcaption>Smooth relaxing a bump and a pit.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/94-hex-smooth-terraced-sloped.mp4" poster="media/03-terrain-sculpting/94-hex-smooth-terraced-sloped.png" data-autoplay></video><figcaption>On a hex grid: Smooth <b>Terraced</b>, then <b>Sloped</b>, on a mesa's stepped wall.</figcaption></figure>
+  </div>
+  <p>Strip: Smooth Mode, Brush Type, Size, Aspect, Rotation, Strength, Grid Aligned, Grid Size, Quick Paint.</p>
+</div>
+
+<!-- BRIDGE -->
+<div class="panel" data-tab="Bridge" id="t-bridge">
+  <div class="toolhead"><span class="pill">Key 4</span><span class="pill">Roblox: a rotated wedge</span></div>
+  <p>LMB-drag from a start point to an end point. The ground between is pulled onto a straight line joining their heights — a ramp or causeway. <kbd>Shift</kbd>+wheel sets its width (hint: <span class="hint">Shift+wheel: width</span>).</p>
+  <p><span class="ui">Ease Value</span> (−5…5, step 0.1, default −1) bends the ramp's height curve using Godot's <code>ease()</code>: <b>1</b> = linear, <b>2</b> = ease-in, <b>0.5</b> = ease-out, <b>&lt; 0</b> = in-out, <b>−1</b> = no easing.</p>
+  <figure class="clip"><video src="media/03-terrain-sculpting/95-bridge.mp4" poster="media/03-terrain-sculpting/95-bridge.png" data-autoplay></video><figcaption>Dragging a Bridge ramp between two points.</figcaption></figure>
+  <figure class="clip"><video src="media/03-terrain-sculpting/49-bridge-ramp.mp4" poster="media/03-terrain-sculpting/49-bridge-ramp.png" data-autoplay></video><figcaption>A second ramp, dragged from the low foreground up to the ridge behind. The two ends of the drag — not the brush — set its two heights.</figcaption></figure>
+  <div class="compare" data-before="Before" data-after="After"><img src="media/03-terrain-sculpting/48-bridge-before.png" alt="The green chunk from a low angle, its foreground low and a higher ridge behind, before any bridge."><img src="media/03-terrain-sculpting/50-bridge-after.png" alt="The same view after the Bridge drag: a broad ramp climbs in a straight line from the low foreground up to the ridge."></div>
+  <p>The compare shows the job plainly: the flat foreground and the ridge are now joined by one straight ramp, with the dropped sides falling away from it. Strip: Brush Type, Size, Ease Value, Grid Aligned, Grid Size, Quick Paint.</p>
+</div>
+
+<!-- STAMP -->
+<div class="panel" data-tab="Stamp" id="t-stamp">
+  <div class="toolhead"><span class="pill">No key</span><span class="pill">Roblox: Import heightmap / Toolbox terrain</span></div>
+  <p>Drops a whole prebuilt shape in one click. A live wireframe preview follows the cursor.</p>
+  <figure class="shot"><img src="media/03-terrain-sculpting/06-stamp-strip.png" alt="The Stamp strip: Stamp Mountain with a thumbnail, Mode Add, Size 48.5, Aspect 1.009, Height 14.0, Rotation 0, Snap Rotation ticked, Contrast 1.009, Limits unticked, and greyed Ceiling 16.0, Level 5.0, Floor -8.0."><figcaption>The Stamp strip. Ceiling / Level / Floor are greyed until you tick Limits.</figcaption></figure>
+  <table class="ref">
+    <tr><th>Action</th><th>Result</th></tr>
+    <tr><td>LMB</td><td>Stamp at the cursor.</td></tr>
+    <tr><td>LMB-drag</td><td>Pin the centre, drag out size and rotation.</td></tr>
+    <tr><td><kbd>Shift</kbd> / <kbd>Ctrl</kbd> / <kbd>Alt</kbd> + wheel</td><td>Size / Height / rotation.</td></tr>
+    <tr><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>Rotate.</td></tr>
+  </table>
+  <p>The five built-in shapes:</p>
+  <div class="scrubber" data-label="Stamp" data-start="0"
+    data-frames='[{"v":"Mountain","src":"media/03-terrain-sculpting/51-stamp-mountain.png","note":"Mountain: a tall stepped peak."},{"v":"Crater","src":"media/03-terrain-sculpting/52-stamp-crater.png","note":"Crater: a raised rim around a pit."},{"v":"Mesa","src":"media/03-terrain-sculpting/53-stamp-mesa.png","note":"Mesa: a flat-topped block with steep sides."},{"v":"Valley","src":"media/03-terrain-sculpting/54-stamp-valley.png","note":"Valley: a long trough with raised walls."},{"v":"Hill","src":"media/03-terrain-sculpting/55-stamp-hill.png","note":"Hill: a soft rounded mound."}]'></div>
+  <div class="pair">
+    <figure class="clip"><video src="media/03-terrain-sculpting/96-stamp-builtins.mp4" poster="media/03-terrain-sculpting/96-stamp-builtins.png" data-autoplay></video><figcaption>Mountain → Crater → Mesa → Valley → Hill placed across the chunk.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/56-stamp-dragsize.mp4" poster="media/03-terrain-sculpting/56-stamp-dragsize.png" data-autoplay></video><figcaption>LMB-drag pins the centre and drags out size and rotation.</figcaption></figure>
+  </div>
+  <p><b>Mode</b> decides how the stamp combines with the ground:</p>
+  <table class="ref">
+    <tr><td>Add</td><td>Raise by the stamp (default).</td></tr>
+    <tr><td>Max</td><td>Only raise toward the stamp.</td></tr>
+    <tr><td>Min</td><td>Only lower toward the stamp.</td></tr>
+    <tr><td>Replace</td><td>Set the area to the stamp.</td></tr>
+    <tr><td>Lift / Carve</td><td>Add / remove height × stamp value (sculpting modes).</td></tr>
+    <tr><td>Level</td><td>Pull toward the Level height.</td></tr>
+    <tr><td>Broad</td><td>Build landmass from Level up by Height — only ever raises.</td></tr>
+  </table>
+  <p><b>Negative Height carves</b> — the quickest way to make pits and valleys. <span class="ui">Limits</span> (off by default) clamps every mode between Ceiling and Floor and makes Level / Broad use the <b>Level</b> value; with Limits off, Level / Broad level at the clicked height.</p>
+  <div class="callout tip"><span class="label">Tip</span><p>Your own stamps: drop a greyscale PNG, JPG, WEBP or EXR into <code>addons/MarchingSquaresTerrain/stamps/</code> and it appears in the Stamp dropdown. The white parts reach the stamp's Height.</p></div>
+</div>
+
+<!-- GRADIENT -->
+<div class="panel" data-tab="Gradient" id="t-gradient">
+  <div class="toolhead"><span class="pill">No key</span></div>
+  <p>Like Bridge, but you <b>paint</b> the ramp with the brush, so you control exactly where it applies. Pick the two ends first:</p>
+  <ol>
+    <li><kbd>Ctrl</kbd>+LMB on the start point (takes its position and height).</li>
+    <li><kbd>Ctrl</kbd>+RMB on the end point.</li>
+    <li>LMB-drag over the ground: it's pulled toward the straight ramp between them.</li>
+  </ol>
+  <p>Hint: <span class="hint">Ctrl+LMB: start point · Ctrl+RMB: end point · LMB-drag: paint the ramp … Ctrl+wheel: strength</span></p>
+  <figure class="shot"><img src="media/03-terrain-sculpting/07-gradient-strip.png" alt="The Gradient strip's first row: Gradient title, Brush Type Round, Size 25.5, Aspect 1.110, with the hint above it."><figcaption>The Gradient strip (first row).</figcaption></figure>
+  <div class="compare" data-before="Before" data-after="Gradient ramp"><img src="media/03-terrain-sculpting/46-gradient-before.png" alt="A raised mound on the green chunk with a hard, flat top and steep sides."><img src="media/03-terrain-sculpting/47-gradient-after.png" alt="The same mound after the Gradient stroke, with the guide line gone: its top and the ground at its foot are now joined by one continuous ramp."></div>
+  <p>Picked from a cell on the mound's top to one at its foot, the stroke replaced the hard break with a single even ramp. Switch to another tool (or click away) to hide the dotted start–end guide line before inspecting the result.</p>
+  <figure class="clip"><video src="media/03-terrain-sculpting/97-gradient.mp4" poster="media/03-terrain-sculpting/97-gradient.png" data-autoplay></video><figcaption>Pick start and end, then paint the ramp.</figcaption></figure>
+  <p>Strip: Brush Type, Size, Aspect, Rotation, <b>Strength</b> (0.0055–1.0, default 0.30), Falloff, Peak.</p>
+</div>
+
+<!-- SELECT -->
+<div class="panel" data-tab="Select" id="t-select">
+  <div class="toolhead"><span class="pill">No key</span><span class="pill">Roblox: Region Copy / Paste</span></div>
+  <p>Copies a patch of ground — <b>height, textures and grass</b> — and pastes it elsewhere.</p>
+  <ol>
+    <li>LMB-drag to select cells. <kbd>Alt</kbd> or <kbd>Esc</kbd> clears.</li>
+    <li><kbd>C</kbd> copies. The hovered cell is the anchor.</li>
+    <li><kbd>V</kbd> (or the <span class="ui">Paste</span> button) enters paste mode — a ghost follows the cursor.</li>
+    <li><kbd>Z</kbd> / <kbd>X</kbd> rotate, <kbd>M</kbd> mirrors.</li>
+    <li>LMB drops a copy (one undo step). RMB or <kbd>Esc</kbd> leaves paste mode.</li>
+  </ol>
+  <figure class="shot"><img src="media/03-terrain-sculpting/08-select-strip.png" alt="The Select strip: Select title, Brush Type Round, Size 23.0, Grid Aligned greyed, Grid Size 1, Copy and Paste buttons."><figcaption>The Select strip. After Copy / Paste it continues with Paste Rotation, Mirror and Relative Height.</figcaption></figure>
+  <ul>
+    <li><span class="ui">Copy</span> / <span class="ui">Paste</span> — buttons, same as <kbd>C</kbd> / <kbd>V</kbd>.</li>
+    <li><span class="ui">Paste Rotation</span> — −360…360, default 0 (60° steps on hex, 90° on square).</li>
+    <li><span class="ui">Mirror</span> — checkbox, same as <kbd>M</kbd>.</li>
+    <li><span class="ui">Relative Height</span> — on by default: heights are pasted relative to the target cell. Off: the copied absolute heights.</li>
+  </ul>
+  <div class="pair">
+    <figure class="clip"><video src="media/03-terrain-sculpting/98-select-copy-paste.mp4" poster="media/03-terrain-sculpting/98-select-copy-paste.png" data-autoplay></video><figcaption>Select → <kbd>C</kbd> → <kbd>V</kbd> → <kbd>Z</kbd> rotate / <kbd>M</kbd> mirror → LMB drop → RMB leave.</figcaption></figure>
+    <figure class="clip"><video src="media/03-terrain-sculpting/57-select-copy-paste.mp4" poster="media/03-terrain-sculpting/57-select-copy-paste.png" data-autoplay></video><figcaption>Copying a hill and dropping a second one.</figcaption></figure>
+  </div>
+  <figure class="shot"><img src="media/03-terrain-sculpting/58-select-two-hills.png" alt="The copied hill outlined by the white selection on the left, and the paste ghost following the cursor on the right, ready to drop."><figcaption>The copied hill (white selection) and the paste ghost at the cursor. LMB drops it.</figcaption></figure>
+</div>
+
+<!-- INSPECT -->
+<div class="panel" data-tab="Inspect" id="t-inspect">
+  <div class="toolhead"><span class="pill">Key 7</span><span class="pill">Debug brush</span></div>
+  <p>LMB a cell to print its data to the <b>Output</b> panel: global position, sample / chunk / local coordinates, height, floor and wall texture (slot + name), grass, and smooth flag. Useful to read an exact height before typing it into Level or Ceiling. Strip: Brush Type and Size only.</p>
+  <figure class="clip"><video src="media/03-terrain-sculpting/99-inspect.mp4" poster="media/03-terrain-sculpting/99-inspect.png" data-autoplay></video><figcaption>Clicking three cells; each prints a line in Output.</figcaption></figure>
+  <figure class="shot"><img src="media/03-terrain-sculpting/60-inspect-output.png" alt="Output panel lines reading roughly: Marching Squares Terrain: global Vector3 (...), sample (50, 32), chunk (1, 1), local (18, 0), height 0.023, floor 1 'Grass', wall 1 'Grass', grass 255, smooth false."><figcaption>What Inspect prints.</figcaption></figure>
+</div>
+
+<!-- TINT -->
+<div class="panel" data-tab="Tint" id="t-tint">
+  <div class="toolhead"><span class="pill">No key</span></div>
+  <p>Paints a colour over whole cells — territory, biome hints, paths. It's saved with the terrain and shows in game. LMB paints the <span class="ui">Tint</span> colour (Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink, White, Black) at <span class="ui">Opacity</span> (0.05–1, default 0.5); RMB erases; <kbd>Shift</kbd>+wheel = size.</p>
+  <figure class="shot"><img src="media/03-terrain-sculpting/09-tint-strip.png" alt="The Tint strip: Tint title, Brush Type Round, Size 23.0, Aspect 1.110, Rotation 0, Tint Red."><figcaption>The Tint strip.</figcaption></figure>
+  <div class="compare" data-before="Before" data-after="Red tint"><img src="media/03-terrain-sculpting/61-tint-before.png" alt="Plain green grass on the chunk."><img src="media/03-terrain-sculpting/62-tint-after.png" alt="The same grass with a patch painted red."></div>
+  <p>Full details live on <a href="04-terrain-painting.html">Painting, textures &amp; tint</a>.</p>
+</div>
+
+</div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Stamp is like dragging a prebuilt terrain blob in from the Toolbox; Select is like <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> on a group of Parts — but for a patch of ground, grass and textures included.</p></div>
+
+<!-- ===================================================== GRIDS -->
+<h2 id="grids">Square vs hex grids, and the Grid overlay</h2>
+<p>The <span class="ui">Grid</span> button at the bottom of the toolbar toggles white cell lines on the terrain (the terrain's <code>show_grid_in_editor</code> setting). It's the quickest way to see what a "cell" is.</p>
+<div class="compare" data-before="Grid off" data-after="Grid on"><img src="media/03-terrain-sculpting/63-grid-off.png" alt="Close, low view across grassy terrain with no lines."><img src="media/03-terrain-sculpting/64-grid-on.png" alt="The same view with a square white grid of cell lines over the grass."></div>
+<p>The grid type (set in the terrain's Inspector) changes how some tools behave:</p>
+<table class="ref">
+  <thead><tr><th></th><th>Square (sculpt playground)</th><th>Hex Rings (demo/hex_island)</th></tr></thead>
+  <tbody>
+    <tr><td>Overlay</td><td>Squares</td><td>Hexagons</td></tr>
+    <tr><td>Grid Aligned</td><td>Greyed out</td><td>Available (with Falloff off)</td></tr>
+    <tr><td>Rotation snap</td><td>15° / 90°</td><td>60°</td></tr>
+    <tr><td>Smooth Terraced vs Sloped</td><td>Look the same</td><td>Visibly different</td></tr>
+  </tbody>
+</table>
+<figure class="shot"><img src="media/03-terrain-sculpting/70-hex-grid.png" alt="The hex island with the grid on: a honeycomb of hexagonal cell lines over grass, rocks and a rocky outcrop, a ruin on the hill behind."><figcaption>A Hex Rings grid on <code>demo/hex_island.tscn</code>. Select the terrain, press <span class="ui">Grid</span> and zoom in on a flat patch to see the hexes.</figcaption></figure>
+<p>Grid types themselves are covered on <a href="06-chunks-settings.html">Chunks, settings &amp; saving</a>.</p>
+
+<!-- ===================================================== REFERENCE -->
+<h2 id="reference">Control reference</h2>
+<p>Every sculpting control. Type to filter (try "wheel", "Stamp" or "Ceiling").</p>
+<input class="filter-box" data-target="#sculpt-ref" placeholder="Filter controls…">
+<div id="sculpt-ref">
+  <div class="control"><h4>Collapse</h4><div class="where">Toolbar · top</div><p>Show / hide the tool names (icons only). Remembered per project.</p></div>
+  <div class="control"><h4>Grid</h4><div class="where">Toolbar · bottom</div><p>Toggle the cell-line overlay (<code>show_grid_in_editor</code>).</p></div>
+  <div class="control"><h4>Tool number keys</h4><div class="where">Keyboard, 3D view</div><p>Switch to Brush, Level, Smooth, Bridge, Foliage, Paint, Inspect, Chunks, Settings. Stamp / Gradient / Select / Tint have no key.</p><dl><dt>Shortcut</dt><dd><kbd>1</kbd>–<kbd>9</kbd></dd></dl></div>
+  <div class="control"><h4>Brush Type</h4><div class="where">Strip · Brush, Level, Smooth, Bridge, Gradient, Select, Inspect, Tint</div><p>Brush shape.</p><dl><dt>Values</dt><dd>Round, Square, Hexagon, Hexagon30, Triangle, Triangle180</dd><dt>Default</dt><dd>Round</dd></dl></div>
+  <div class="control"><h4>Brush Mode</h4><div class="where">Strip · Brush</div><p>Drag: paint a selection, then drag it. Raise / Lower: hold LMB / RMB to sculpt.</p><dl><dt>Values</dt><dd>Drag, Raise / Lower</dd><dt>Default</dt><dd>Drag</dd></dl></div>
+  <div class="control"><h4>Size</h4><div class="where">Strip · all brush tools</div><p>Brush diameter in world units.</p><dl><dt>Range</dt><dd>1 – 50 (scales with cell size), step 0.5</dd><dt>Default</dt><dd>15</dd><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Aspect</h4><div class="where">Strip · Brush, Level, Smooth, Gradient, Tint</div><p>Brush Z radius ÷ X radius (ellipse / rectangle).</p><dl><dt>Range</dt><dd>0.2 – 5.0, step 0.05</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Rotation</h4><div class="where">Strip · Brush, Level, Smooth, Gradient, Tint</div><p>Brush rotation in degrees.</p><dl><dt>Range</dt><dd>−180 – 180, step 1</dd><dt>Default</dt><dd>0</dd><dt>Shortcut</dt><dd><kbd>Alt</kbd>+wheel (15°)</dd></dl></div>
+  <div class="control"><h4>Flatten</h4><div class="where">Strip · Brush (Drag)</div><p>Flatten the dragged selection to the clicked height.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Falloff</h4><div class="where">Strip · Brush, Level, Gradient</div><p>Weaken the brush towards its edge.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Peak</h4><div class="where">Strip · Brush, Level, Gradient</div><p>Falloff contrast: &gt; 0 pointy peaks, &lt; 0 flat-topped mesas.</p><dl><dt>Range</dt><dd>−1 – 1, step 0.05</dd><dt>Default</dt><dd>0.010</dd></dl></div>
+  <div class="control"><h4>Grid Aligned</h4><div class="where">Strip · Brush, Level, Smooth, Bridge, Select, Tint</div><p>Snap the brush to whole cells. Needs a Triangle / Hexagon / Hex Rings grid and Falloff off; greyed otherwise.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Grid Size</h4><div class="where">Strip · same as Grid Aligned</div><p>Size of the grid-aligned stamp in cells.</p><dl><dt>Range</dt><dd>0 – 20, step 1</dd><dt>Default</dt><dd>1</dd></dl></div>
+  <div class="control"><h4>Quick Paint</h4><div class="where">Strip · Brush, Level, Smooth, Bridge</div><p>Paint a texture while sculpting.</p><dl><dt>Values</dt><dd>None, Full Void, Base Grass Masked, Selected Material</dd><dt>Default</dt><dd>None</dd></dl></div>
+  <div class="control"><h4>Ceiling</h4><div class="where">Strip · Brush (Raise / Lower), Stamp</div><p>Raise never goes above this height.</p><dl><dt>Range</dt><dd>−50 – 50, step 0.1</dd><dt>Default</dt><dd>16.0</dd><dt>Pick</dt><dd><kbd>Ctrl</kbd>+LMB</dd></dl></div>
+  <div class="control"><h4>Height (Raise / Lower) · Level (Stamp)</h4><div class="where">Strip · Brush (Raise / Lower), Level, Stamp</div><p>Target height for flattening. Labelled <b>Level</b> on the Stamp strip.</p><dl><dt>Range</dt><dd>−50 – 50, step 0.1</dd><dt>Default</dt><dd>0.0</dd><dt>Pick</dt><dd>MMB (Raise / Lower), <kbd>Ctrl</kbd>+LMB (Level)</dd></dl></div>
+  <div class="control"><h4>Floor</h4><div class="where">Strip · Brush (Raise / Lower), Stamp</div><p>Lower never goes below this height.</p><dl><dt>Range</dt><dd>−50 – 50, step 0.1</dd><dt>Default</dt><dd>−8.0</dd><dt>Pick</dt><dd><kbd>Ctrl</kbd>+RMB</dd></dl></div>
+  <div class="control"><h4>Strength (Raise / Lower)</h4><div class="where">Strip · Brush (Raise / Lower)</div><p>How fast the brush raises / lowers.</p><dl><dt>Range</dt><dd>0.25 – 30, step 0.25</dd><dt>Default</dt><dd>4.0</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Smooth Mode</h4><div class="where">Strip · Smooth</div><p>Terraced: smoothed cells stay flat steps. Sloped: they become ramps. Same result on square grids.</p><dl><dt>Default</dt><dd>Terraced</dd></dl></div>
+  <div class="control"><h4>Strength (Smooth)</h4><div class="where">Strip · Smooth</div><p>How strongly cells relax.</p><dl><dt>Range</dt><dd>0.0255 – 0.3005, step 0.0055</dd><dt>Default</dt><dd>≈ 0.15</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Ease Value</h4><div class="where">Strip · Bridge</div><p>Ramp height curve (Godot <code>ease()</code>): 1 linear, 2 ease-in, 0.5 ease-out, &lt; 0 in-out, −1 none.</p><dl><dt>Range</dt><dd>−5 – 5, step 0.1</dd><dt>Default</dt><dd>−1.0</dd><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel = width</dd></dl></div>
+  <div class="control"><h4>Stamp</h4><div class="where">Strip · Stamp</div><p>Shape to stamp: built-ins plus images in <code>addons/MarchingSquaresTerrain/stamps/</code>.</p><dl><dt>Values</dt><dd>Mountain, Crater, Mesa, Valley, Hill, + images</dd><dt>Default</dt><dd>Mountain</dd></dl></div>
+  <div class="control"><h4>Mode (Stamp)</h4><div class="where">Strip · Stamp</div><p>How the stamp combines with the ground.</p><dl><dt>Values</dt><dd>Add, Max, Min, Replace, Lift, Carve, Level, Broad</dd><dt>Default</dt><dd>Add</dd></dl></div>
+  <div class="control"><h4>Size (Stamp)</h4><div class="where">Strip · Stamp</div><p>Stamp width in world units.</p><dl><dt>Range</dt><dd>2 – 200, step 0.5</dd><dt>Default</dt><dd>24.0</dd><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel, or LMB-drag</dd></dl></div>
+  <div class="control"><h4>Aspect (Stamp)</h4><div class="where">Strip · Stamp</div><p>Stamp depth ÷ width.</p><dl><dt>Range</dt><dd>0.2 – 5.0</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Height (Stamp)</h4><div class="where">Strip · Stamp</div><p>Height of white in the stamp. Negative carves.</p><dl><dt>Range</dt><dd>−100 – 100, step 0.1</dd><dt>Default</dt><dd>8.0</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Rotation (Stamp)</h4><div class="where">Strip · Stamp</div><p>Stamp rotation in degrees.</p><dl><dt>Range</dt><dd>−360 – 360, step 1</dd><dt>Default</dt><dd>0</dd><dt>Shortcut</dt><dd><kbd>Alt</kbd>+wheel, <kbd>Z</kbd> / <kbd>X</kbd></dd></dl></div>
+  <div class="control"><h4>Snap Rotation</h4><div class="where">Strip · Stamp</div><p>Rotate in 60° steps on hex / triangle grids, 15° on square.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Contrast</h4><div class="where">Strip · Stamp</div><p>Gamma of the stamp values: &gt; 1 sharper, &lt; 1 fuller.</p><dl><dt>Range</dt><dd>0.2 – 4.0, step 0.05</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Limits</h4><div class="where">Strip · Stamp</div><p>Clamp to Ceiling / Floor in every mode; Level / Broad use the Level value. Off: no limits, Level / Broad level at the clicked height.</p><dl><dt>Default</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Strength (Gradient)</h4><div class="where">Strip · Gradient</div><p>How strongly ground is pulled to the ramp.</p><dl><dt>Range</dt><dd>0.0055 – 1.0</dd><dt>Default</dt><dd>0.30</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Gradient start / end</h4><div class="where">Mouse · Gradient</div><p>Pick the ramp's two ends (position + height).</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+LMB start, <kbd>Ctrl</kbd>+RMB end</dd></dl></div>
+  <div class="control"><h4>Copy / Paste</h4><div class="where">Strip · Select</div><p>Copy the selected cells (anchor = hovered cell); enter paste mode.</p><dl><dt>Shortcut</dt><dd><kbd>C</kbd> / <kbd>V</kbd></dd></dl></div>
+  <div class="control"><h4>Paste Rotation</h4><div class="where">Strip · Select</div><p>Rotation of the pasted patch (60° steps on hex, 90° on square).</p><dl><dt>Range</dt><dd>−360 – 360, step 1</dd><dt>Default</dt><dd>0</dd><dt>Shortcut</dt><dd><kbd>Z</kbd> / <kbd>X</kbd></dd></dl></div>
+  <div class="control"><h4>Mirror</h4><div class="where">Strip · Select</div><p>Mirror the pasted patch.</p><dl><dt>Shortcut</dt><dd><kbd>M</kbd></dd></dl></div>
+  <div class="control"><h4>Relative Height</h4><div class="where">Strip · Select</div><p>Paste heights relative to the target cell; off = copied absolute heights.</p><dl><dt>Default</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Tint / Opacity</h4><div class="where">Strip · Tint</div><p>Colour (10 choices) and strength of the painted tint. LMB paints, RMB erases.</p><dl><dt>Opacity</dt><dd>0.05 – 1.0, default 0.5</dd></dl></div>
+  <div class="control"><h4>Add / remove from selection</h4><div class="where">Mouse · Brush (Drag)</div><p>Grow or shrink the white selection.</p><dl><dt>Shortcut</dt><dd><kbd>Shift</kbd>+LMB-drag / <kbd>Ctrl</kbd>+LMB-drag</dd></dl></div>
+  <div class="control"><h4>One cell</h4><div class="where">Mouse · Brush (Drag)</div><p>Drag only the hovered cell.</p><dl><dt>Shortcut</dt><dd><kbd>Alt</kbd>+LMB-drag</dd></dl></div>
+  <div class="control"><h4>Clear selection</h4><div class="where">Mouse / keyboard · Brush (Drag), Select</div><p>Drop the current selection.</p><dl><dt>Shortcut</dt><dd>RMB, <kbd>Esc</kbd> (Select: <kbd>Alt</kbd>)</dd></dl></div>
+  <div class="control"><h4>Undo / Redo</h4><div class="where">Keyboard</div><p>One step per stroke, stamp, paste or erosion.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dd></dl></div>
+</div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<p>All on the sculpt playground. Tick steps as you go; <kbd>Ctrl</kbd>+<kbd>Z</kbd> fixes any mistake.</p>
+<div class="tabs">
+  <div class="panel" data-tab="Rounded hill">
+    <ol class="steps" data-id="sculpt-recipe-hill">
+      <li>Press <kbd>1</kbd> for Brush, set Brush Mode → <span class="ui">Raise / Lower</span>.</li>
+      <li>Keep <span class="ui">Falloff</span> on. Set Size with <kbd>Shift</kbd>+wheel to about the hill's width.</li>
+      <li>Hold <b>LMB</b> on the spot. Let go when it's tall enough.</li>
+      <li>Optional: raise <span class="ui">Peak</span> for a pointier top and stroke again.</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/84-raise-lmb.mp4" poster="media/03-terrain-sculpting/84-raise-lmb.png"></video><figcaption>Holding LMB raises the hill.</figcaption></figure>
+    <p>Faster alternative: Stamp → <span class="ui">Hill</span>.</p>
+  </div>
+  <div class="panel" data-tab="Cliff / plateau">
+    <ol class="steps" data-id="sculpt-recipe-cliff">
+      <li>Press <kbd>2</kbd> for Level.</li>
+      <li>Type a <span class="ui">Height</span>, e.g. <code>6</code>.</li>
+      <li>Untick <span class="ui">Falloff</span> for sharp sides.</li>
+      <li>LMB-drag the shape of the plateau. A flat shelf with cliff edges appears.</li>
+      <li>Alternative: Stamp → <span class="ui">Mesa</span> and click once.</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/92-level.mp4" poster="media/03-terrain-sculpting/92-level.png"></video><figcaption>A Level shelf at Height 6.</figcaption></figure>
+    <figure class="shot"><img src="media/03-terrain-sculpting/53-stamp-mesa.png" alt="A flat-topped mesa with steep stepped sides stamped on the grass."><figcaption>Or one click with the Mesa stamp.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="River valley">
+    <ol class="steps" data-id="sculpt-recipe-valley">
+      <li>Open the Stamp tool. Pick <span class="ui">Valley</span>.</li>
+      <li>Rotate it with <kbd>Z</kbd> / <kbd>X</kbd> to run the way you want, and stamp. Stamp again end-to-end to lengthen it.</li>
+      <li>Press <kbd>1</kbd>, Brush Mode → Raise / Lower, small Size (about 5).</li>
+      <li>Hold <b>RMB</b> and trace along the bottom of the trough to carve the river channel.</li>
+      <li>Paint it later on the <a href="04-terrain-painting.html">Painting page</a>.</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/104-recipe-river-valley.mp4" poster="media/03-terrain-sculpting/104-recipe-river-valley.png"></video><figcaption>Two Valley stamps make a long trough with raised walls.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Terraces">
+    <ol class="steps" data-id="sculpt-recipe-terraces">
+      <li><b>On a hex terrain</b> (e.g. <code>demo/hex_island.tscn</code>): press <kbd>3</kbd> for Smooth, set Smooth Mode → <span class="ui">Terraced</span>, and brush over a slope — it keeps flat cell steps.</li>
+      <li><b>On any terrain</b>: press <kbd>2</kbd> for Level, Falloff off. Drag a big patch at Height 2.</li>
+      <li>Drag a smaller patch inside it at Height 4, then smaller again at Height 6 — stacked shelves.</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/94-hex-smooth-terraced-sloped.mp4" poster="media/03-terrain-sculpting/94-hex-smooth-terraced-sloped.png"></video><figcaption>Smooth Terraced vs Sloped on a hex grid.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Ramp up a cliff">
+    <ol class="steps" data-id="sculpt-recipe-ramp">
+      <li>Build a cliff first (see Cliff / plateau).</li>
+      <li>Press <kbd>4</kbd> for Bridge. Set the ramp's width with <kbd>Shift</kbd>+wheel.</li>
+      <li>LMB-drag from the low ground up to the top of the cliff and let go.</li>
+      <li>Undo and try a different <span class="ui">Ease Value</span> (1 for a straight ramp, 2 to ease in).</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/95-bridge.mp4" poster="media/03-terrain-sculpting/95-bridge.png"></video><figcaption>A Bridge ramp between two heights.</figcaption></figure>
+  </div>
+  <div class="panel" data-tab="Crater">
+    <ol class="steps" data-id="sculpt-recipe-crater">
+      <li>Open the Stamp tool and pick <span class="ui">Crater</span>.</li>
+      <li>Size it with <kbd>Shift</kbd>+wheel (or LMB-drag from the centre).</li>
+      <li>LMB to stamp a rim and pit.</li>
+      <li>For a deeper pit, stamp again with a <b>negative Height</b> (<kbd>Ctrl</kbd>+wheel down). Tick <span class="ui">Limits</span> and set <span class="ui">Floor</span> to cap the depth.</li>
+    </ol>
+    <figure class="clip"><video src="media/03-terrain-sculpting/107-recipe-crater.mp4" poster="media/03-terrain-sculpting/107-recipe-crater.png"></video><figcaption>Stamping a crater.</figcaption></figure>
+  </div>
+</div>
+
+<!-- ===================================================== EROSION -->
+<h2 id="erosion">Erosion: weathering the whole landscape</h2>
+<p>Hand-sculpting every gully is slow. <b>Erosion</b> simulates rain running down your terrain: it rounds ridges, cuts gullies and piles sediment at the bottom of slopes. It isn't a toolbar tool — it's a separate <b>child node</b> called <code>MarchingSquaresErosion</code> that you add under the terrain.</p>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox's <b>Erode</b> is a brush that wears terrain where you paint. MST's Erosion works on the <b>whole</b> assigned terrain at once — more like running a "weather it" generator. For local erosion, use Raise / Lower RMB or Smooth.</p></div>
+
+<h3 id="erosion-add">Add and set it up</h3>
+<ol class="steps" data-id="sculpt-erosion">
+  <li>Block out sharp features first — stamped mesas and mountains read best.</li>
+  <li>In the Scene dock, select <code>MarchingSquaresTerrain</code>.</li>
+  <li>Click the <b>+</b> (Add Child Node) at the dock's top left, type <code>Erosion</code>, pick <b>MarchingSquaresErosion</b>, click <span class="ui">Create</span>.
+    <figure class="shot"><img src="media/03-terrain-sculpting/108-erosion-add-node.png" alt="The Create New Node dialog with Erosion typed in the search box; MarchingSquaresErosion is highlighted in the matches list under Node."><figcaption>Finding the node in the Create New Node dialog.</figcaption></figure></li>
+  <li>It appears indented under the terrain with a yellow ⚠ warning: "Assign the Terrain to erode: without one, Erode does nothing."
+    <figure class="shot"><img src="media/03-terrain-sculpting/109-erosion-scene-dock.png" alt="The Scene dock: SculptPlayground, WorldEnvironment, Sun, MarchingSquaresTerrain with MarchingSquaresErosion indented under it and a yellow warning triangle, then PixelWater, Camera, PixelRenderer, PixelSky, PixelDayNight."><figcaption>The Erosion node as a child of the terrain, warning until a terrain is assigned.</figcaption></figure></li>
+  <li>In the Inspector, next to <span class="ui">Terrain</span> click <span class="ui">Assign…</span> and pick the parent <code>MarchingSquaresTerrain</code>. The warning clears.</li>
+  <li>Leave the defaults, or raise <span class="ui">Droplets</span> for a heavier pass.</li>
+  <li>Press <span class="ui">Erode</span> (in the Inspector, or the Erode button on the bottom strip while the node is selected). It runs in the background — the editor stays usable — and lands in a couple of seconds for 30 000 droplets.</li>
+  <li>Not happy? <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the whole erosion in one step ("terrain erosion"). Press Erode again for a different pass.</li>
+</ol>
+
+<div class="compare" data-before="Before erosion" data-after="After erosion"><img src="media/03-terrain-sculpting/110-erosion-before.png" alt="Stamped mesas and ridges with sharp, stepped, terraced sides rising from the grass."><img src="media/03-terrain-sculpting/112-erosion-after.png" alt="The same landforms after erosion: several ridge tops and stepped sides are worn down and softened; the overall shapes stay the same."></div>
+<figure class="clip"><video src="media/03-terrain-sculpting/111-erosion-run.mp4" poster="media/03-terrain-sculpting/111-erosion-run.png" data-autoplay></video><figcaption>Pressing Erode: the whole terrain snaps from sharp to weathered when the job finishes.</figcaption></figure>
+
+<h3 id="erosion-settings">Erosion settings</h3>
+<div class="pair">
+  <figure class="shot tall-shot"><img src="media/03-terrain-sculpting/113-erosion-inspector-droplet.png" alt="Inspector for MarchingSquaresErosion: Terrain Assign…, Droplets 30000, Seed 0, an Erode button, then the Droplet group: Radius 4, Momentum 0.051, Load 4.0, Min Load 0.011, Carve 0.3, Drop 0.3, Dry 0.011, Gravity 4.0, Steps 32, Volume 1.0, Speed 1.0, and a collapsed Terrain group."><figcaption>Basics and the Droplet group.</figcaption></figure>
+  <figure class="shot tall-shot"><img src="media/03-terrain-sculpting/114-erosion-inspector-terrain.png" alt="Inspector continued: Dry, Gravity, Steps, Volume, Speed, then the Terrain group open: Px / Cell 2, Height Scale 0.0, Mode Auto, Level Step 0.0."><figcaption>The Terrain group (Min Plateau sits just below Level Step).</figcaption></figure>
+</div>
+<input class="filter-box" data-target="#erosion-ref" placeholder="Filter erosion settings…">
+<div id="erosion-ref">
+  <div class="control"><h4>Terrain</h4><div class="where">Inspector · Basics</div><p>The terrain to weather. Required — without it Erode only prints a warning.</p></div>
+  <div class="control"><h4>Droplets</h4><div class="where">Inspector · Basics</div><p>How many rain droplets to simulate. More = heavier weathering, slower.</p><dl><dt>Range</dt><dd>100 – 500 000+, step 100</dd><dt>Default</dt><dd>30 000</dd></dl></div>
+  <div class="control"><h4>Seed</h4><div class="where">Inspector · Basics</div><p>Random seed. Goes up by 1 after every Erode, so each press is a different pass. Reset it if you need an exact repeat.</p><dl><dt>Default</dt><dd>0</dd></dl></div>
+  <div class="control"><h4>Erode</h4><div class="where">Inspector · Basics / bottom strip</div><p>Runs the simulation on a background thread; you can't start a second run until it finishes. One undo step.</p></div>
+  <div class="control"><h4>Radius</h4><div class="where">Inspector · Droplet</div><p>Splash / deposit disk radius (pixels).</p><dl><dt>Range</dt><dd>2 – 8</dd><dt>Default</dt><dd>4</dd></dl></div>
+  <div class="control"><h4>Momentum</h4><div class="where">Inspector · Droplet</div><p>How strongly a droplet keeps its direction.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.051</dd></dl></div>
+  <div class="control"><h4>Load</h4><div class="where">Inspector · Droplet</div><p>Max sediment a droplet can carry.</p><dl><dt>Range</dt><dd>0 – 32+</dd><dt>Default</dt><dd>4.0</dd></dl></div>
+  <div class="control"><h4>Min Load</h4><div class="where">Inspector · Droplet</div><p>Minimum carry before it drops sediment.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.011</dd></dl></div>
+  <div class="control"><h4>Carve</h4><div class="where">Inspector · Droplet</div><p>How fast droplets erode / pick up material.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.3</dd></dl></div>
+  <div class="control"><h4>Drop</h4><div class="where">Inspector · Droplet</div><p>How fast droplets deposit material.</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.3</dd></dl></div>
+  <div class="control"><h4>Dry</h4><div class="where">Inspector · Droplet</div><p>Evaporation per step (shorter droplet life).</p><dl><dt>Range</dt><dd>0 – 1</dd><dt>Default</dt><dd>0.011</dd></dl></div>
+  <div class="control"><h4>Gravity</h4><div class="where">Inspector · Droplet</div><p>Downhill acceleration.</p><dl><dt>Range</dt><dd>0 – 32+</dd><dt>Default</dt><dd>4.0</dd></dl></div>
+  <div class="control"><h4>Steps</h4><div class="where">Inspector · Droplet</div><p>Max steps a droplet travels before it dies.</p><dl><dt>Range</dt><dd>1 – 256</dd><dt>Default</dt><dd>32</dd></dl></div>
+  <div class="control"><h4>Volume</h4><div class="where">Inspector · Droplet</div><p>Starting water volume.</p><dl><dt>Range</dt><dd>0 – 8</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Speed</h4><div class="where">Inspector · Droplet</div><p>Starting speed.</p><dl><dt>Range</dt><dd>0 – 8</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Px / Cell</h4><div class="where">Inspector · Terrain</div><p>Simulation resolution per terrain cell. Higher = finer detail, slower.</p><dl><dt>Range</dt><dd>1 – 8</dd><dt>Default</dt><dd>2</dd></dl></div>
+  <div class="control"><h4>Height Scale</h4><div class="where">Inspector · Terrain</div><p>0 = pick automatically from the terrain.</p><dl><dt>Range</dt><dd>0 – 256+</dd><dt>Default</dt><dd>0.0</dd></dl></div>
+  <div class="control"><h4>Mode</h4><div class="where">Inspector · Terrain</div><p>Auto follows the grid (terraced on cell grids, smooth otherwise); Raw = smooth heights; Terraced = snap to terrace steps.</p><dl><dt>Values</dt><dd>Auto, Raw, Terraced</dd><dt>Default</dt><dd>Auto</dd></dl></div>
+  <div class="control"><h4>Level Step</h4><div class="where">Inspector · Terrain</div><p>Terrace step size; 0 = use the terrain's own.</p><dl><dt>Range</dt><dd>0 – 16+</dd><dt>Default</dt><dd>0.0</dd></dl></div>
+  <div class="control"><h4>Min Plateau</h4><div class="where">Inspector · Terrain</div><p>Smallest flat run kept as a plateau (stops tiny steps).</p><dl><dt>Range</dt><dd>0 – 64+</dd><dt>Default</dt><dd>4</dd></dl></div>
+</div>
+<div class="callout warn"><span class="label">Watch out</span><p>Erosion weathers the <b>entire</b> assigned terrain — there's no region box. High Droplets plus high Px / Cell takes longer.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>For a progress bar in your own tools, the node sends <code>erosion_progress(progress)</code> while running and <code>erosion_finished(applied)</code> when done.</p></div>
+
+<!-- ===================================================== UNDO -->
+<h2 id="undo">Undo and redo</h2>
+<p>Every stroke is <b>one</b> undo step: <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. Two strokes take two undos (newest first). A stamp, paste or erosion is also a single step, and undo still works after switching tools. Each step has a readable name in the <b>History</b> dock (next to FileSystem):</p>
+<table class="ref">
+  <tr><td>terrain raise/lower</td><td>Brush, Raise / Lower</td></tr>
+  <tr><td>terrain height draw</td><td>Brush, Drag</td></tr>
+  <tr><td>terrain level</td><td>Level</td></tr>
+  <tr><td>terrain smooth</td><td>Smooth</td></tr>
+  <tr><td>terrain bridge</td><td>Bridge</td></tr>
+  <tr><td>terrain stamp</td><td>Stamp</td></tr>
+  <tr><td>terrain gradient</td><td>Gradient</td></tr>
+  <tr><td>terrain paste</td><td>Select paste</td></tr>
+  <tr><td>terrain tint paint</td><td>Tint</td></tr>
+  <tr><td>terrain erosion</td><td>Erosion</td></tr>
+</table>
+<figure class="clip"><video src="media/03-terrain-sculpting/100-undo-redo.mp4" poster="media/03-terrain-sculpting/100-undo-redo.png" data-autoplay></video><figcaption>Undo makes a stamped mountain vanish; redo brings it back.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Same keys as Studio's Undo / Redo, and the History dock is like Studio's undo history — click a line to jump back to it.</p></div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>The toolbar has disappeared. How do you get it back?</summary><p>Click <code>MarchingSquaresTerrain</code> in the Scene dock. The toolbar only shows while a terrain node is selected.</p></details>
+<details class="check"><summary>You want a flat-topped plateau at exactly height 6 with sharp edges. Which tool and settings?</summary><p><b>Level</b> (key 2), Height <code>6</code>, Falloff off, then drag. Or Brush → Drag with Flatten on.</p></details>
+<details class="check"><summary>Ctrl+wheel does nothing on Level. Is it broken?</summary><p>No — Level has no Strength. Ctrl+wheel works on Raise / Lower, Smooth and Gradient (and changes Height on Stamp).</p></details>
+<details class="check"><summary>You pressed Erode and nothing happened, and the node shows a ⚠. Why?</summary><p>No terrain is assigned. In the Inspector click <span class="ui">Assign…</span> next to Terrain and pick the terrain.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="02-first-world.html">Your first world (quick start)</a> — the short version of this page.</li>
+  <li><a href="04-terrain-painting.html">Painting, textures &amp; tint</a> — Paint, Tint and texture slots (Quick Paint).</li>
+  <li><a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a> — the Foliage tool (key 5).</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — Chunks, Settings and grid types.</li>
+  <li><a href="14-shortcuts-glossary.html">Shortcuts &amp; Roblox→Godot glossary</a>.</li>
+  <li><a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</li>
+</ul>
+
+</div></main>
+</body>
+</html>

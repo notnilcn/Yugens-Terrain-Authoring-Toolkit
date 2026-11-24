@@ -1,0 +1,2580 @@
+{
+  "page": "07-pixelizer",
+  "media_dir": "docs/guide/media/07-pixelizer",
+  "session": {
+    "scene": "res://tutorial/03_pixel_look.tscn",
+    "width": 1600,
+    "height": 1040
+  },
+  "setup": [],
+  "items": [
+    {
+      "id": "42-pixel-preview-toggle",
+      "kind": "clip",
+      "outputs": [
+        "42-pixel-preview-toggle.mp4",
+        "42-pixel-preview-toggle.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 -I -c \"import json,subprocess,os; subprocess.run(['python3','qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],'ui','--root','all','--filter','Pixel Preview','--save','/tmp/pp42.json'],capture_output=True,text=True); d=json.load(open('/tmp/pp42.json')); on=[c for c in d['controls'] if c.get('name')=='PixelPreviewButton' and c.get('visible')]; on=bool(on and on[0].get('toggled')); (not on) and subprocess.run(['python3','qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],'click-text','Pixel Preview'],capture_output=True,text=True); print('preview on after ensure:', on)\""
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "42-pixel-preview-toggle.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "353",
+            "137"
+          ]
+        },
+        {
+          "wait": 3.5
+        },
+        {
+          "drive": [
+            "click",
+            "353",
+            "137"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "record_stop": {
+            "out": "42-pixel-preview-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "42-pixel-preview-toggle.mp4",
+            "out": "42-pixel-preview-toggle.png",
+            "at": 6.5
+          }
+        }
+      ],
+      "check": "Editor viewport with the pixel menu bar on top: Pixel Preview clicked OFF reveals the raw smooth scene with the editor grid and coloured origin axes, then clicked ON again restores the pixel look and hides the grid. Poster shows the pixel look ON with the cursor on Pixel Preview (no stray tooltip).",
+      "notes": "The scene's renderer has studio_prelook on, but the 3D-view Pixel Preview button state at session start is not guaranteed; a shell step reads the button's toggled state and clicks it once if needed so the clip always starts ON. Then the two recorded clicks go OFF then ON."
+    },
+    {
+      "id": "47-wire-refs",
+      "kind": "clip",
+      "outputs": [
+        "47-wire-refs.mp4",
+        "47-wire-refs.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "450",
+            "down",
+            "--times",
+            "10"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "Refs"
+            ],
+            "contains": "Wire Sun"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "47-wire-refs.mp4",
+            "rect": [
+              760,
+              398,
+              540,
+              378
+            ],
+            "fps": 12,
+            "max": 20
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "1178",
+            "617"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "click",
+            "1178",
+            "617"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "1178",
+            "617"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "47-wire-refs.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "47-wire-refs.mp4",
+            "out": "47-wire-refs.png",
+            "at": 2.3
+          }
+        }
+      ],
+      "check": "The Pixel World panel's lower section (Lighting Preset buttons + Wire Sun / Env Refs button + the hint line) with a sliver of the NORMAL DAYTIME pixel viewport on the left (no dusk/orange), the cursor hovering Wire Sun / Env Refs showing its tooltip, then clicking it.",
+      "notes": "Window is 1040 tall so the Pixel World panel fits; the panel is scrolled down 10 wheel steps to bring the Wire Sun / Env Refs button to ~y617. Crop is the panel + left viewport sliver, which keeps the daytime look (the old shot had a leftover Dusk-preset orange sky). The click at 1178,617 is verified present by the preceding ui expect."
+    },
+    {
+      "id": "01-03-menu-preview-workspace",
+      "kind": "series",
+      "outputs": [
+        "01-menu-bar.png",
+        "02-preview-off.png",
+        "02-preview-on.png",
+        "03-workspace-overview.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "01-menu-bar.png",
+            "crop": [
+              250,
+              112,
+              430,
+              56
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/01-menu-bar.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "click",
+            "353",
+            "137"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "02-preview-off.png",
+            "crop": [
+              287,
+              165,
+              1026,
+              458
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "353",
+            "137"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "02-preview-on.png",
+            "crop": [
+              287,
+              165,
+              1026,
+              458
+            ]
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "03-workspace-overview.png"
+          }
+        }
+      ],
+      "check": "Menu bar crop; viewport with Pixel Preview off (grid + axes) and on (pixel look); full editor workspace with PixelRenderer selected.",
+      "notes": "Preview toggled at the button centre 353,137 so state is deterministic; workspace is the full 1600x900 window."
+    },
+    {
+      "id": "10-17-strips",
+      "kind": "series",
+      "outputs": [
+        "10-strip-renderer.png",
+        "11-strip-outlines.png",
+        "12-strip-color-palette.png",
+        "13-strip-godrays.png",
+        "14-strip-debug.png",
+        "15-strip-pixelobject.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "10-strip-renderer.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/10-strip-renderer.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "Outlines"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "11-strip-outlines.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/11-strip-outlines.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "Color / Palette"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "12-strip-color-palette.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/12-strip-color-palette.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rays"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "13-strip-godrays.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/13-strip-godrays.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "click-text",
+            "Debug Views"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "14-strip-debug.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/14-strip-debug.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "BuilderRuin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "15-strip-pixelobject.png",
+            "crop": [
+              332,
+              545,
+              714,
+              240
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/15-strip-pixelobject.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        }
+      ],
+      "check": "The Renderer, Outlines, Color/Palette, Rays, Debug Views and Pixel Object strips (the terrain Grid/Fog strip is its own item).",
+      "notes": "Pixel Object strip needs BuilderRuin (the PixelObject), not its child Ruin."
+    },
+    {
+      "id": "17-strip-gridfog",
+      "kind": "still",
+      "outputs": [
+        "17-strip-gridfog.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "17-strip-gridfog.png",
+            "crop": [
+              332,
+              666,
+              714,
+              125
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/17-strip-gridfog.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Grid / Fog strip with Grid and Fog of War tabs.",
+      "notes": "Terrain selection opens the Grid / Fog section."
+    },
+    {
+      "id": "16-object-outline-pair",
+      "kind": "series",
+      "outputs": [
+        "16-object-outline-off.png",
+        "16-object-outline-on.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--path",
+            "BuilderRuin/Ruin"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "drag",
+            "600",
+            "400",
+            "601",
+            "400",
+            "--button",
+            "middle",
+            "--duration",
+            "0.3"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "BuilderRuin"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "move",
+            "600",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "Escape"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target 32.5 5.1 32.4 --dist 20 --azimuth 28.6 --elev 10"
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline",
+            "0",
+            "--path",
+            "BuilderRuin"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "16-object-outline-off.png",
+            "crop": [
+              600,
+              330,
+              300,
+              150
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline",
+            "1",
+            "--path",
+            "BuilderRuin"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "16-object-outline-on.png",
+            "crop": [
+              600,
+              330,
+              300,
+              150
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; f='$OUT/16-object-outline-off.png'; im=Image.open(f); im.resize((im.width*2,im.height*2), Image.NEAREST).save(f)\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; f='$OUT/16-object-outline-on.png'; im=Image.open(f); im.resize((im.width*2,im.height*2), Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Same close crop of the ruin's tower/roof edge against the sky: with Outline Off there is no dark edge; with Outline On a clear dark outline traces the silhouette (2x nearest upscale).",
+      "notes": "Pixel Preview is ON by default. Focus the ruin mesh first (select the Ruin child, middle-click the view, F) because the default editor camera is 45 m away; then select BuilderRuin, move the mouse over the view and press Esc (clears the yellow builder selection box), and frame the wall from ~20 m. Outline 0/1 is set by path; crop 600,330,300,150 around the tower/roof edge against the sky, upscaled 2x with NEAREST. Camera unchanged between the two shots."
+    },
+    {
+      "id": "20-21-pixelsize-outlines",
+      "kind": "series",
+      "outputs": [
+        "20-pixelsize-1.png",
+        "20-pixelsize-2.png",
+        "20-pixelsize-4.png",
+        "20-pixelsize-8.png",
+        "20-pixelsize-12.png",
+        "21-outlines-off.png",
+        "21-outlines-on.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "1",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "20-pixelsize-1.png",
+            "crop": [
+              430,
+              300,
+              525,
+              175
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "2",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "20-pixelsize-2.png",
+            "crop": [
+              430,
+              300,
+              525,
+              175
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "4",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "20-pixelsize-4.png",
+            "crop": [
+              430,
+              300,
+              525,
+              175
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "8",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "20-pixelsize-8.png",
+            "crop": [
+              430,
+              300,
+              525,
+              175
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "12",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "20-pixelsize-12.png",
+            "crop": [
+              430,
+              300,
+              525,
+              175
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "pixel_size",
+            "2",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outlines",
+            "false",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "21-outlines-off.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outlines",
+            "true",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "21-outlines-on.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        }
+      ],
+      "check": "Pixel Size 1/2/4/8/12 series at one crop, then the outline off/on pair.",
+      "notes": "Values set with set-prop (drags overshoot)."
+    },
+    {
+      "id": "22-24-darken-palette",
+      "kind": "series",
+      "outputs": [
+        "22-darken-0.0.png",
+        "22-darken-0.3.png",
+        "22-darken-0.6.png",
+        "22-darken-1.0.png",
+        "23-palette-off.png",
+        "23-palette-on.png",
+        "24-mix-0.0.png",
+        "24-mix-0.33.png",
+        "24-mix-0.66.png",
+        "24-mix-1.0.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Outlines"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline_darken",
+            "0.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "22-darken-0.0.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline_darken",
+            "0.3",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "22-darken-0.3.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline_darken",
+            "0.6",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "22-darken-0.6.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline_darken",
+            "1.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "22-darken-1.0.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outline_darken",
+            "0.55",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Color / Palette"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_enabled",
+            "false",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "23-palette-off.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_enabled",
+            "true",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "23-palette-on.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_mix",
+            "0.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-mix-0.0.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_mix",
+            "0.33",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-mix-0.33.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_mix",
+            "0.66",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-mix-0.66.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "palette_mix",
+            "1.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-mix-1.0.png",
+            "crop": [
+              430,
+              250,
+              500,
+              220
+            ]
+          }
+        }
+      ],
+      "check": "Darken 0/0.3/0.6/1.0, palette off/on and Mix 0/0.33/0.66/1.0 at the same crop.",
+      "notes": "Set-prop values; restore 0.55 / mix 1.0 for later items."
+    },
+    {
+      "id": "25-debug-series",
+      "kind": "series",
+      "outputs": [
+        "25-debug-normals.png",
+        "25-debug-depth.png",
+        "25-debug-pixelsize.png",
+        "25-debug-outlineids.png",
+        "25-debug-outlinecause.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "1",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-debug-normals.png",
+            "crop": [
+              330,
+              220,
+              705,
+              388
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "2",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-debug-depth.png",
+            "crop": [
+              330,
+              220,
+              705,
+              388
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "3",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-debug-pixelsize.png",
+            "crop": [
+              330,
+              220,
+              705,
+              388
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "4",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-debug-outlineids.png",
+            "crop": [
+              330,
+              220,
+              705,
+              388
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "6",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "25-debug-outlinecause.png",
+            "crop": [
+              330,
+              220,
+              705,
+              388
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "debug_view",
+            "0",
+            "--path",
+            "PixelRenderer"
+          ]
+        }
+      ],
+      "check": "Debug Views: Normals, Depth, Pixel Size, Outline Ids, Outline Cause at one crop.",
+      "notes": "debug_view enum 0 Final,1 Normals,2 Depth,3 Pixel Size,4 Outline Ids,5 Raw Color,6 Outline Cause,7 Shafts; reset to 0."
+    },
+    {
+      "id": "26-27-rays",
+      "kind": "series",
+      "outputs": [
+        "26-godrays-off.png",
+        "26-godrays-on.png",
+        "27-rayalpha-0.5.png",
+        "27-rayalpha-1.0.png",
+        "27-rayalpha-2.0.png",
+        "27-rayalpha-4.0.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rays"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "god_rays",
+            "false",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "26-godrays-off.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "god_rays",
+            "true",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "26-godrays-on.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "ray_alpha",
+            "0.5",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "27-rayalpha-0.5.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "ray_alpha",
+            "1.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "27-rayalpha-1.0.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "ray_alpha",
+            "2.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "27-rayalpha-2.0.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "ray_alpha",
+            "4.0",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "27-rayalpha-4.0.png",
+            "crop": [
+              350,
+              240,
+              753,
+              290
+            ]
+          }
+        }
+      ],
+      "check": "God rays off/on and Ray Alpha 0.5/1/2/4, shafts growing in from the sun.",
+      "notes": "Camera is the editor view, not the hand-placed sun-facing camera of the old shots; the shafts still read."
+    },
+    {
+      "id": "30-33-panel-presets",
+      "kind": "series",
+      "outputs": [
+        "30-pixelworld-panel-top.png",
+        "31-pixelworld-panel-presets.png",
+        "32-pixelworld-wire-hint.png",
+        "33-preset-before.png",
+        "33-preset-after.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "30-pixelworld-panel-top.png",
+            "crop": [
+              1055,
+              165,
+              285,
+              644
+            ]
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "10"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "31-pixelworld-panel-presets.png",
+            "crop": [
+              1055,
+              165,
+              285,
+              644
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "32-pixelworld-wire-hint.png",
+            "crop": [
+              1055,
+              600,
+              285,
+              200
+            ]
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "33-preset-before.png",
+            "crop": [
+              380,
+              260,
+              640,
+              265
+            ]
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "10"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dusk"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "33-preset-after.png",
+            "crop": [
+              380,
+              260,
+              640,
+              265
+            ]
+          }
+        }
+      ],
+      "check": "Pixel World panel top and scrolled preset section, the wire-refs hint, and the same view before/after Dusk.",
+      "notes": "Dusk sticks for the rest of the session, so this item is standalone (fresh_session) and last among preset users."
+    },
+    {
+      "id": "50-53-features-lut",
+      "kind": "series",
+      "outputs": [
+        "52-pixelpalette-bake-button.png",
+        "53-baked-lut.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "52-pixelpalette-bake-button.png",
+            "crop": [
+              1180,
+              200,
+              420,
+              300
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "53-baked-lut.png",
+            "crop": [
+              300,
+              300,
+              1024,
+              32
+            ]
+          }
+        }
+      ],
+      "check": "PixelPalette Inspector with the Bake LUT button, plus the LUT crop.",
+      "notes": "50-feature-switches.png is NOT reproduced by this item: the Project Settings dialog is outside the harness' stable controls (menu item coordinates and the filtered list do not settle reliably). Note in the page notes."
+    },
+    {
+      "id": "70-71-page08-strips",
+      "kind": "series",
+      "outputs": [
+        "70-page08-sky.png",
+        "71-page08-daynight.png"
+      ],
+      "fresh_session": false,
+      "steps": [
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelSky"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "70-page08-sky.png",
+            "crop": [
+              332,
+              590,
+              714,
+              180
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/70-page08-sky.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelDayNight"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "71-page08-daynight.png",
+            "crop": [
+              332,
+              625,
+              714,
+              120
+            ]
+          }
+        },
+        {
+          "shell": "python3 -I -c \"from PIL import Image; f='$OUT/71-page08-daynight.png'; im=Image.open(f); im.resize((im.width*2,im.height*2),Image.NEAREST).save(f)\""
+        }
+      ],
+      "check": "Sky & Clouds strip and Day / Night Time strip from the tutorial scene.",
+      "notes": "Same strips as page 08, captured here for the cross-link."
+    },
+    {
+      "id": "80-palette-perceptual",
+      "kind": "still",
+      "outputs": [
+        "80-palette-perceptual.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 0 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "80-palette-perceptual.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Perceptual (default) (palette 0) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "81-palette-channel",
+      "kind": "still",
+      "outputs": [
+        "81-palette-channel.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 1 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "81-palette-channel.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Channel (palette 1) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "82-palette-hue",
+      "kind": "still",
+      "outputs": [
+        "82-palette-hue.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 2 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "82-palette-hue.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Hue (palette 2) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "83-palette-hueweighted",
+      "kind": "still",
+      "outputs": [
+        "83-palette-hueweighted.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 3 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "83-palette-hueweighted.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Hue Weighted (palette 3) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "84-palette-lab",
+      "kind": "still",
+      "outputs": [
+        "84-palette-lab.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 4 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "84-palette-lab.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Lab (palette 4) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "85-palette-value",
+      "kind": "still",
+      "outputs": [
+        "85-palette-value.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette:quantize_mode 5 --class PixelRenderer"
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "85-palette-value.png",
+            "crop": [
+              339,
+              220,
+              705,
+              363
+            ]
+          }
+        }
+      ],
+      "check": "The viewport under Quantize Mode Value (palette 5) on the PixelPalette subresource.",
+      "notes": "Quantize Mode lives on the PixelPalette subresource; its enum popup does not take synthetic keys, so the mode is set with set-prop palette:quantize_mode <n> --class PixelRenderer (verified to work). Same framing/crop as the other palette-mode stills, shifted 20px up so the Renderer strip stays out of frame."
+    },
+    {
+      "id": "40-animate",
+      "kind": "clip",
+      "outputs": [
+        "40-animate.mp4",
+        "40-animate.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "40-animate.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "wait": 8
+        },
+        {
+          "record_stop": {
+            "out": "40-animate.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "40-animate.mp4",
+            "out": "40-animate.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "40-animate: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "41-pixelsize-drag",
+      "kind": "clip",
+      "outputs": [
+        "41-pixelsize-drag.mp4",
+        "41-pixelsize-drag.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "41-pixelsize-drag.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "for v in 1 2 4 6 8 10 12 10 8 6 4 3 2; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop pixel_size $v --path PixelRenderer >/dev/null; sleep 0.4; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "41-pixelsize-drag.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "41-pixelsize-drag.mp4",
+            "out": "41-pixelsize-drag.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "41-pixelsize-drag: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "43-outlines-darken",
+      "kind": "clip",
+      "outputs": [
+        "43-outlines-darken.mp4",
+        "43-outlines-darken.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Outlines"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "43-outlines-darken.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "for v in 0.0 0.2 0.4 0.6 0.8 1.0 0.8 0.6 0.4 0.2 0.0; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop outline_darken $v --path PixelRenderer >/dev/null; sleep 0.4; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "43-outlines-darken.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "43-outlines-darken.mp4",
+            "out": "43-outlines-darken.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "43-outlines-darken: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "44-palette-mix",
+      "kind": "clip",
+      "outputs": [
+        "44-palette-mix.mp4",
+        "44-palette-mix.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Color / Palette"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "44-palette-mix.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "for v in 0.0 0.2 0.4 0.6 0.8 1.0 0.8 0.6 0.4 0.2 0.0; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop palette_mix $v --path PixelRenderer >/dev/null; sleep 0.4; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "44-palette-mix.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "44-palette-mix.mp4",
+            "out": "44-palette-mix.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "44-palette-mix: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "45-godray-alpha",
+      "kind": "clip",
+      "outputs": [
+        "45-godray-alpha.mp4",
+        "45-godray-alpha.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rays"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "set-prop",
+            "god_rays",
+            "true",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "45-godray-alpha.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "for v in 0.0 0.5 1.0 1.5 2.0 3.0 4.0 3.0 2.0 1.0; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop ray_alpha $v --path PixelRenderer >/dev/null; sleep 0.4; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "45-godray-alpha.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "45-godray-alpha.mp4",
+            "out": "45-godray-alpha.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "45-godray-alpha: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "46-lighting-preset",
+      "kind": "clip",
+      "outputs": [
+        "46-lighting-preset.mp4",
+        "46-lighting-preset.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Animate"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "1150",
+            "500",
+            "down",
+            "--times",
+            "10"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "46-lighting-preset.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Dusk"
+          ]
+        },
+        {
+          "wait": 5
+        },
+        {
+          "record_stop": {
+            "out": "46-lighting-preset.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "46-lighting-preset.mp4",
+            "out": "46-lighting-preset.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "The daytime view recolours to warm dusk orange when Dusk is clicked.",
+      "notes": "Preset button in the scrolled Pixel World panel; Animate on so the sky refreshes."
+    },
+    {
+      "id": "48-debug-cycle",
+      "kind": "clip",
+      "outputs": [
+        "48-debug-cycle.mp4",
+        "48-debug-cycle.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Debug Views"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "48-debug-cycle.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 18
+          }
+        },
+        {
+          "shell": "for v in 0 1 2 3 4 5 6 7 0; do python3 qa/drive.py --port $PORT --display $DISPLAY set-prop debug_view $v --path PixelRenderer >/dev/null; sleep 0.9; done"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "48-debug-cycle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "48-debug-cycle.mp4",
+            "out": "48-debug-cycle.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "48-debug-cycle: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    },
+    {
+      "id": "60-undo-edit",
+      "kind": "clip",
+      "outputs": [
+        "60-undo-edit.mp4",
+        "60-undo-edit.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "420"
+          ]
+        },
+        {
+          "drive": [
+            "click-text",
+            "Outlines"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "60-undo-edit.mp4",
+            "rect": [
+              290,
+              125,
+              768,
+              490
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "drive": [
+            "set-prop",
+            "outlines",
+            "false",
+            "--path",
+            "PixelRenderer"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "60-undo-edit.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "60-undo-edit.mp4",
+            "out": "60-undo-edit.png",
+            "at": 4
+          }
+        }
+      ],
+      "check": "60-undo-edit: the renderer control changes visibly over the clip; poster shows the changed state.",
+      "notes": "Renderer selected so the strip is visible in the crop; values set with set-prop during the recording."
+    }
+  ]
+}

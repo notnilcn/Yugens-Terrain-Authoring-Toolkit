@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sky, weather, water &amp; effects – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: .6em 0 1.4em; }
+  .cards .control { margin: 0; }
+  .node-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -.4em 0 .8em; }
+  .node-head .pill code { font-size: .85em; }
+  .preset-table td:first-child { font-weight: 600; }
+  .two-up { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+  .two-up figure { margin: 0; }
+  .mood-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 1em 0; }
+  .mood-strip button { border: 2px solid var(--line); border-radius: 8px; padding: 0; overflow: hidden; background: var(--panel); cursor: pointer; color: var(--ink); font: inherit; font-size: .8rem; }
+  .mood-strip button img { display: block; width: 100%; aspect-ratio: 719 / 350; object-fit: cover; }
+  .mood-strip button span { display: block; padding: 3px 0; }
+  .mood-strip button.on { border-color: var(--accent); }
+  .mood-view { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  .mood-view img { display: block; width: 100%; border-radius: 6px; }
+  .mood-view dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 10px 0 0; font-size: .9rem; }
+  .mood-view dt { font-weight: 600; color: var(--ink-2); }
+  .mood-view dd { margin: 0; }
+  @media (max-width: 640px) { .mood-strip { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body>
+<main><div class="content">
+  <h1>Sky, weather, water &amp; effects</h1>
+  <p class="lede">Turn a plain island into a mood: set the time of day, call in rain or snow, tune the lagoon, and sprinkle on fireflies, birds, smoke, lanterns, sun shafts — even a grass fire.</p>
+  <div class="meta-row"><span class="pill">⏱ 40 min</span><span class="pill">Beginner</span><span class="pill">Scene: <code>tutorial/04_world_mood.tscn</code></span></div>
+
+  <figure class="shot"><img src="media/08-atmosphere-effects/141-preset-dusk.png" alt="The tutorial island in its lagoon under the Dusk lighting preset: sky, water and island all glow warm orange."><figcaption>One click of the <span class="ui">Dusk</span> lighting preset. Everything on this page is about getting looks like this — and then making them your own.</figcaption></figure>
+
+  <h2 id="learn">What you'll learn</h2>
+  <ul>
+    <li>How the eleven <b>atmosphere nodes</b> work together, and the two ways to add one.</li>
+    <li>Why the <span class="ui">Animate</span> switch matters (it's for <i>watching motion</i>, not for seeing your edits).</li>
+    <li>Scrub the <a href="#time-of-day">time of day</a>, flip through all six <a href="#weather">weather types</a>, and compare the six <a href="#presets">Lighting Presets</a>.</li>
+    <li>Every setting of every effect: <a href="#sky">Sky &amp; Clouds</a>, <a href="#daynight">Day / Night</a>, <a href="#weather-ref">Weather</a>, <a href="#water">Water</a>, <a href="#fireflies">Fireflies</a>, <a href="#particles">Particle Field</a>, <a href="#birds">Birds</a>, <a href="#smoke">Smoke &amp; Fire</a>, <a href="#lightvolume">Light Volumes</a>, <a href="#sunshafts">Sun Shafts</a>, <a href="#grassfire">Grass Fire</a>.</li>
+    <li>Three <a href="#recipes">recipes</a> — stormy night, misty dawn, sunny lagoon — and how all of this maps to <a href="#roblox">Roblox's Lighting, Atmosphere, Clouds, Terrain water and ParticleEmitter</a>.</li>
+  </ul>
+
+  <div class="callout tip"><span class="label">Where's the pixel look?</span><p>The renderer-level look — pixel size, outlines, palette, <b>God Rays</b>, debug views, the <span class="ui">Animate</span> and <span class="ui">Pixel Preview</span> switches and the Pixel World panel itself — lives on <a href="07-pixelizer.html">page 7, The pixelizer</a>. This page covers the effect <i>nodes</i> that sit on top of it.</p></div>
+
+  <h2 id="words">Words you'll meet</h2>
+  <dl>
+    <dt>Node</dt><dd>One building block in a Godot scene — like an Instance (a Part, a Script, a Light) in Roblox's Explorer. Every effect on this page is one node.</dd>
+    <dt>Scene / <code>.tscn</code></dt><dd>A saved file of nodes, like a Roblox place or model. This page uses <code>res://tutorial/04_world_mood.tscn</code> (<code>res://</code> just means "the project folder").</dd>
+    <dt>Scene dock</dt><dd>The tree of nodes at top-left — Godot's Explorer.</dd>
+    <dt>Inspector</dt><dd>The panel on the right listing the selected node's properties — Godot's Properties window.</dd>
+    <dt>Viewport</dt><dd>The big 3D view in the middle, where you see the world.</dd>
+    <dt>Strip</dt><dd>The addon's bottom <b>attribute strip</b>: a friendlier, tabbed copy of the selected effect's settings, under the viewport.</dd>
+    <dt>Pixel World panel</dt><dd>The addon's panel on the right of the viewport, listing every effect with a <span class="ui">Select</span> or <span class="ui">+ Add</span> button, plus the Lighting Presets.</dd>
+  </dl>
+  <p>New to Godot? <a href="01-godot-for-roblox.html">Page 1</a> tours the editor, and the <a href="14-shortcuts-glossary.html">glossary on page 14</a> translates every Godot word into its Roblox Studio equivalent.</p>
+
+  <h2 id="big-picture">The big picture: the atmosphere family</h2>
+  <p>Open <code>tutorial/04_world_mood.tscn</code> (double-click it in the FileSystem dock, bottom-left). It's a little green island with a hut in a wide turquoise lagoon, and it already has most of the atmosphere family wired up. Here's what each node in the Scene dock does:</p>
+  <figure class="shot"><img src="media/08-atmosphere-effects/01-hero.png" alt="Wide view of the tutorial scene at dusk: a small green island with a hut, far out in a large turquoise lagoon under a mauve sky."><figcaption>The tutorial scene from afar: the island sits in the middle of a big lagoon plane (the PixelWater node).</figcaption></figure>
+  <input class="filter-box" data-target="#scene-nodes" placeholder="Filter scene nodes…">
+  <table id="scene-nodes">
+    <thead><tr><th>Node (Scene dock)</th><th>Type</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>WorldEnvironment</td><td>WorldEnvironment</td><td>Holds the Godot <i>Environment</i> (sky colour, ambient light, fog) that Day / Night grades.</td></tr>
+      <tr><td>Sun</td><td>DirectionalLight3D</td><td>The sun light that the sky, day/night and god rays follow.</td></tr>
+      <tr><td>MarchingSquaresTerrain</td><td>MarchingSquaresTerrain</td><td>The island and lagoon floor (with grass).</td></tr>
+      <tr><td>PixelWater</td><td>PixelWater</td><td>The lagoon water: depth bands, foam, waves.</td></tr>
+      <tr><td>Camera</td><td>MstOrbitCamera</td><td>The game camera (orbits when you press Play).</td></tr>
+      <tr><td>PixelRenderer</td><td>PixelRenderer</td><td>The pixel look — <a href="07-pixelizer.html">page 7</a>.</td></tr>
+      <tr><td>PixelSky</td><td>PixelSky</td><td>Cloud shadows and the overhead cloud deck; shares sun/cloud info with everything else.</td></tr>
+      <tr><td>PixelDayNight</td><td>PixelDayNight</td><td>Time of day, sun arc, sky/ambient colour, fog, rim light.</td></tr>
+      <tr><td>PixelWeather</td><td>PixelWeather</td><td>Clear / Cloudy / Foggy / Rain / Snow / Storm, plus optional extra snow.</td></tr>
+      <tr><td>Fireflies</td><td>PixelFireflies</td><td>A glowing night swarm.</td></tr>
+      <tr><td>Birds</td><td>PixelBirds</td><td>A flock of flapping pixel birds.</td></tr>
+      <tr><td>Dust</td><td>PixelParticleField</td><td>Dust motes drifting in the light.</td></tr>
+      <tr><td><i>(you add)</i> Smoke</td><td>PixelSmoke</td><td>Smoke plume, optionally with flames.</td></tr>
+      <tr><td><i>(you add)</i> LightVolume</td><td>PixelLightVolume</td><td>A lantern-style light with a dithered pool.</td></tr>
+      <tr><td><i>(you add)</i> SunShafts</td><td>PixelSunShafts</td><td>Visible shafts of sunlight.</td></tr>
+      <tr><td><i>(you add)</i> FireSystem</td><td>PixelFireSystem</td><td>Spreading grass fire (goes <i>under the terrain</i>).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="workspace">Tour the workspace</h3>
+  <p>Click <b>PixelDayNight</b> in the Scene dock. Three things appear around the viewport: the addon's left pixel toolbar, the Day / Night strip at the bottom, and the Pixel World panel on the right. Click the numbered markers:</p>
+  <div class="hotspots"><img src="media/08-atmosphere-effects/01-atmosphere-workspace.png" alt="The full Godot editor with the world-mood scene open and PixelDayNight selected: scene tree on the left, viewport in the middle, Day/Night strip below it, Pixel World panel and Inspector on the right.">
+    <button class="spot" style="left:9%;top:30%" data-title="Scene dock" data-text="Every node in the scene. Click an effect here (e.g. PixelDayNight) to select it — like clicking an object in Roblox's Explorer.">1</button>
+    <button class="spot" style="left:29%;top:15%" data-title="Pixel Preview · Animate · Pixel World" data-text="The addon's menu bar over the viewport. Pixel Preview shows the pixel look; Animate makes the clock run so you can watch clouds drift, rain fall and birds fly; Pixel World toggles the right-hand panel. See page 7.">2</button>
+    <button class="spot" style="left:19%;top:44%" data-title="Pixel toolbar" data-text="One icon per section (Renderer, Sky, Day / Night, Weather, Water…). Hover an icon for its description; the selected effect's icon is highlighted.">3</button>
+    <button class="spot" style="left:43%;top:36%" data-title="Viewport" data-text="The 3D view. Edits to any effect field show up here immediately, even with Animate off.">4</button>
+    <button class="spot" style="left:40%;top:64%" data-title="Attribute strip" data-text="The selected effect's settings, split into page tabs (here Time · Sun &amp; Fog · Rim Light). Drag a number sideways, or click it to type.">5</button>
+    <button class="spot" style="left:74%;top:30%" data-title="Pixel World panel" data-text="Lists every effect. Select jumps to an effect already in the scene; + Add inserts a new one with its sun / environment / camera wired for you.">6</button>
+    <button class="spot" style="left:78%;top:63%" data-title="+ Add rows" data-text="Effects not yet in the scene (greyed: Smoke &amp; Fire, Light Volume, Sun Shafts). The panel scrolls — Grass Fire and the Lighting Preset buttons are further down.">7</button>
+    <button class="spot" style="left:90%;top:32%" data-title="Inspector" data-text="Godot's own property list for the selected node — the same settings as the strip, plus a few extras (e.g. Twilight Stretch).">8</button>
+  </div>
+
+  <h3 id="animate">Animate: for watching, not for seeing</h3>
+  <p>The <span class="ui">Animate</span> toggle in the menu bar over the viewport (<a href="07-pixelizer.html">page 7</a>) runs the shared effects clock in the editor. A fresh editor session starts with it <b>off</b>, so the clock is frozen.</p>
+  <ul>
+    <li><b>Animate off:</b> nothing moves by itself — clouds don't drift, the Day/Night sun stays put even with <span class="ui">Running</span> ticked, rain doesn't fall, birds hang in the air. But <b>any edit you make shows up at once</b>: drag <span class="ui">Time</span> and the whole scene recolours; pick a weather and it snaps fully into place.</li>
+    <li><b>Animate on:</b> the clock runs — clouds drift, the day cycles, rain and snow fall, lightning flashes, birds fly, fire flickers and spreads.</li>
+    <li><b>Press Play</b> (runtime) and everything always animates.</li>
+  </ul>
+  <div class="callout tip"><span class="label">Rule of thumb</span><p>Leave Animate off while you're tuning (the editor is calmer), and switch it on when you want to <i>watch</i> the motion. If the sun "won't move", that's just Running + Animate off — nudge <span class="ui">Time</span> or turn Animate on.</p></div>
+
+  <h3 id="add-effect">Two ways to add an effect</h3>
+  <div class="two-up">
+    <div>
+      <p><b>1. Pixel World panel → <span class="ui">+ Add</span></b> (easiest). Click <span class="ui">+ Add</span> on a row. The node is inserted with its sun, environment and camera references filled in for you, as <b>one undo step</b>, and the row's button flips to <span class="ui">Select</span>. Drag the slider to compare:</p>
+      <div class="compare" data-before="Before + Add" data-after="After"><img src="media/08-atmosphere-effects/90-add-before.png" alt="Pixel World panel with Smoke &amp; Fire greyed out and a + Add button."><img src="media/08-atmosphere-effects/90-add-after.png" alt="Pixel World panel after adding: the Smoke &amp; Fire row is lit and its button now reads Select."></div>
+      <p>Effects that belong to the terrain — <b>Grass Fire</b> (and Erosion and Wild Flowers, covered elsewhere) — are added <b>under the terrain</b>. With one terrain it just works; with several, select the terrain first.</p>
+    </div>
+    <div>
+      <p><b>2. Scene dock → Add Child Node</b> (the manual Godot way). Click the <span class="ui">+</span> at the top of the Scene dock, search the type name (e.g. <code>PixelSmoke</code>) and press <span class="ui">Create</span>. You then wire the references yourself — or click <span class="ui">Wire Sun / Env Refs</span> in the Pixel World panel, which fills any empty sun/environment slots on Sky, Day/Night, Weather and Sun Shafts.</p>
+      <div class="callout warn"><span class="label">Watch out</span><p>New effect nodes appear at the editor camera's focus point — often in mid-air. Move them onto whatever should smoke or glow: Inspector → <span class="ui">Transform</span> → <span class="ui">Position</span>.</p></div>
+      <div class="callout warn"><span class="label">The panel scrolls</span><p>The lower rows (Pixel Object, Diagnostics, Erosion, Wild Flowers, <b>Grass Fire</b>) and the <b>Lighting Preset</b> buttons are below the fold. Mouse-wheel over the panel to reach them — a button that's scrolled out of view won't respond to clicks.</p></div>
+    </div>
+  </div>
+
+  <h3 id="editing">Editing fields</h3>
+  <p>Selecting an effect (in the Scene dock, the pixel toolbar, or with <span class="ui">Select</span> in the panel) swaps the bottom strip to that effect's section. Fields work exactly as on page 7: <b>drag</b> a number sideways (one drag = one undo step) or <b>click</b> it to type, tick checkboxes, open dropdowns, click colour buttons. Hover a field for its tooltip — label, property name and range. Every change appears in the <span class="ui">History</span> tab (next to FileSystem, bottom-left) as <code>Set &lt;Section&gt; &lt;Field&gt;</code>, and <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes it.</p>
+  <div class="callout tip"><span class="label">Tip</span><p>The editor can be slow on modest machines. Wait a second after clicks that rebuild the strip, and drag spin-sliders slowly — or click and type the exact value.</p></div>
+
+  <h2 id="tutorial">Guided tutorial: give the island a mood</h2>
+  <ol class="steps" data-id="atmos-tutorial">
+    <li>Open <code>tutorial/04_world_mood.tscn</code>. Make sure <span class="ui">Pixel Preview</span> is on (menu bar over the viewport).</li>
+    <li>Click <b>PixelDayNight</b> in the Scene dock. On the strip's <span class="ui">Time</span> tab, click the <span class="ui">Time</span> number and type <code>0.25</code> — dawn. Try <code>0.5</code> (noon) and <code>0.75</code> (dusk).</li>
+    <li>Click <b>PixelWeather</b>. On the <span class="ui">Weather</span> tab, open the <span class="ui">Weather</span> dropdown and choose <b>Rain</b>. The lagoon darkens instantly.</li>
+    <li>Turn <span class="ui">Animate</span> on. Watch the rain fall and splash. Then set Weather back to <b>Clear</b>.</li>
+    <li>Click <b>PixelWater</b> and look through its seven tabs. With Animate on, watch the foam surge around the shore.</li>
+    <li>Set Day / Night <span class="ui">Time</span> to <code>0.9</code> and click <b>Fireflies</b> — the glowing swarm fades in.</li>
+    <li>In the Pixel World panel, click <span class="ui">+ Add</span> on <b>Smoke &amp; Fire</b>. Move the new Smoke node onto the island (Inspector → Position), then tick <span class="ui">Fire</span> on its <span class="ui">Colors</span> tab.</li>
+    <li>Scroll the Pixel World panel down to <b>Lighting Preset</b> and click <b>Dusk</b>. The whole scene turns gold-orange. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> — it all comes back in one step.</li>
+    <li>Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> if you want to keep your changes (or don't — it's a tutorial scene).</li>
+  </ol>
+
+  <h2 id="time-of-day">Time of day</h2>
+  <p>The single most powerful knob on this page is <b>Day / Night → Time</b>. It runs from 0 to 1: 0 is midnight, 0.25 roughly dawn, 0.5 noon, 0.75 roughly dusk. One change recolours the sky, the ambient light, the shadows and the sun's angle. Scrub it:</p>
+  <div class="scrubber" data-label="Time" data-start="2" data-frames='[{&quot;v&quot;: &quot;0.00&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/13-tod-000.png&quot;, &quot;note&quot;: &quot;Midnight \u2014 dark navy sky, the island a dark silhouette, the water a deep teal.&quot;}, {&quot;v&quot;: &quot;0.25&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/13-tod-025.png&quot;, &quot;note&quot;: &quot;Dawn \u2014 a low sun throws a golden streak across the water from the left; purple-pink sky.&quot;}, {&quot;v&quot;: &quot;0.50&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/13-tod-050.png&quot;, &quot;note&quot;: &quot;Noon \u2014 bright turquoise lagoon, lit green grass, short shadows.&quot;}, {&quot;v&quot;: &quot;0.75&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/13-tod-075.png&quot;, &quot;note&quot;: &quot;Dusk \u2014 warm rose-mauve light, long shadows, the water dims.&quot;}]'></div>
+  <p>With <span class="ui">Running</span> on and <span class="ui">Animate</span> on, the clock advances by itself (one full day every <span class="ui">Day Length</span> seconds, times <span class="ui">Time Scale</span>), and cloud shadows drift across the ground:</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/40-daynight-cycle.mp4" poster="media/08-atmosphere-effects/40-daynight-cycle.png" data-autoplay></video><figcaption>The Day / Night clock stepped through dawn, noon, dusk and night with Animate on: the sky, water and island recolour as the sun moves, and cloud shadows drift across the lagoon.</figcaption></figure>
+
+  <h2 id="weather">Weather gallery</h2>
+  <p>Select <b>PixelWeather</b> and pick one of six types from the <span class="ui">Weather</span> dropdown. Each one changes clouds, light, fog, ground wetness and adds falling rain/snow or lightning as needed — and it applies <b>instantly</b>, even with Animate off. Click a tab:</p>
+  <div class="tabs">
+    <div class="panel" data-tab="☀ Clear">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-clear.png" alt="Clear weather: bright turquoise lagoon and green island under a soft purple sky."><figcaption><b>Clear</b> — the default. Full sun, crisp shadows, a bright lagoon.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="☁ Cloudy">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-cloudy.png" alt="Cloudy weather: the same island, slightly flatter and greyer light."><figcaption><b>Cloudy</b> — more cloud cover, softer and flatter light.</figcaption></figure>
+      <figure class="clip"><video src="media/08-atmosphere-effects/49-clouds-drift.mp4" poster="media/08-atmosphere-effects/49-clouds-drift.png" data-autoplay></video><figcaption>Cloud shadows and the cloud deck drifting over the lagoon (Animate on). The drift comes from Sky &amp; Clouds → Wind X / Y.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="🌫 Foggy">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-foggy.png" alt="Foggy weather: a pale mint haze swallows the far edges of the lagoon."><figcaption><b>Foggy</b> — a pale haze that swallows the distance.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="🌧 Rain">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-rain.png" alt="Rain weather: darker lagoon, the island grass dark and wet."><figcaption><b>Rain</b> — darker, wet ground, pixel rain streaks and splashes.</figcaption></figure>
+      <figure class="clip"><video src="media/08-atmosphere-effects/42-rain.mp4" poster="media/08-atmosphere-effects/42-rain.png" data-autoplay></video><figcaption>Rain falling with Animate on: streaks and splashes on the water and island.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="❄ Snow">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-snow.png" alt="Snow weather: chunky white flakes in the air, the island turning pale lavender-white."><figcaption><b>Snow</b> — chunky pixel flakes; the ground whitens over time (<span class="ui">Ground</span> seconds).</figcaption></figure>
+      <figure class="clip"><video src="media/08-atmosphere-effects/43-snow.mp4" poster="media/08-atmosphere-effects/43-snow.png" data-autoplay></video><figcaption>Snowfall whiting out the lagoon (Animate on).</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="⛈ Storm">
+      <figure class="shot"><img src="media/08-atmosphere-effects/21-weather-storm.png" alt="Storm weather: a dimmer mauve sky and darker water; the island is almost a silhouette."><figcaption><b>Storm</b> — dark, foggy downpour with lightning.</figcaption></figure>
+      <figure class="clip"><video src="media/08-atmosphere-effects/44-storm.mp4" poster="media/08-atmosphere-effects/44-storm.png" data-autoplay></video><figcaption>A storm with lightning flashes at about 3 s, 6 s and 10 s (Animate on).</figcaption></figure>
+    </div>
+  </div>
+  <p>Drag to compare the two extremes:</p>
+  <div class="compare" data-before="Clear" data-after="Storm"><img src="media/08-atmosphere-effects/21-weather-clear.png" alt="Clear weather over the island."><img src="media/08-atmosphere-effects/21-weather-storm.png" alt="Storm weather over the island."></div>
+  <div class="callout try"><span class="label">Try it</span><p>In the editor with Animate off, a new weather snaps in at once. With Animate on (and in the running game) it blends over <span class="ui">Transition</span> seconds: <code>0</code> switches instantly, a few seconds gives a smooth in-game change.</p></div>
+
+  <h2 id="presets">Lighting Presets: six moods in one click</h2>
+  <p>Scroll the Pixel World panel down past the effect rows to the <b>Lighting Preset</b> header. Its six buttons — <b>Dawn · Noon · Dusk · Night · Storm · Snow</b> — each set a whole bundle of values on Day / Night, Sky, Weather and the renderer's God Rays at once, as <b>one undo step</b>.</p>
+  <figure class="shot" style="max-width:420px"><img src="media/08-atmosphere-effects/140-lighting-presets-panel.png" alt="The Lighting Preset section of the Pixel World panel: six buttons Dawn, Noon, Dusk, Night, Storm, Snow, and a Wire Sun / Env Refs button below."><figcaption>The Lighting Preset buttons, with <span class="ui">Wire Sun / Env Refs</span> under them.</figcaption></figure>
+  <p>Click a mood to see it and the exact values it sets:</p>
+  <div id="mood-picker">
+    <div class="mood-strip"></div>
+    <div class="mood-view"><img alt=""><dl></dl></div>
+  </div>
+  <p>All six side by side (click one to enlarge):</p>
+  <div class="gallery">
+    <figure><img src="media/08-atmosphere-effects/141-preset-dawn.png" alt="The island under the Dawn lighting preset: pink-gold morning, golden streak on the water."><figcaption>Dawn</figcaption></figure>
+    <figure><img src="media/08-atmosphere-effects/141-preset-noon.png" alt="The island under the Noon lighting preset: bright turquoise midday."><figcaption>Noon</figcaption></figure>
+    <figure><img src="media/08-atmosphere-effects/141-preset-dusk.png" alt="The island under the Dusk lighting preset: warm orange evening."><figcaption>Dusk</figcaption></figure>
+    <figure><img src="media/08-atmosphere-effects/141-preset-night.png" alt="The island under the Night lighting preset: dark blue night, island in silhouette."><figcaption>Night</figcaption></figure>
+    <figure><img src="media/08-atmosphere-effects/141-preset-storm.png" alt="The island under the Storm lighting preset: dark, foggy overcast."><figcaption>Storm</figcaption></figure>
+    <figure><img src="media/08-atmosphere-effects/141-preset-snow.png" alt="The island under the Snow lighting preset: pale whiteout, flakes in the air."><figcaption>Snow</figcaption></figure>
+  </div>
+  <table class="preset-table">
+    <thead><tr><th>Preset</th><th>Time</th><th>Weather</th><th>Clouds</th><th>God rays</th><th>Mood</th></tr></thead>
+    <tbody>
+      <tr><td>Dawn</td><td>0.27</td><td>Clear</td><td>0.35, peach deck</td><td>on, warm, alpha 0.5</td><td>soft pink-gold morning, light fog</td></tr>
+      <tr><td>Noon</td><td>0.50</td><td>Clear</td><td>0.42, no deck</td><td>on, bright, alpha 1.0</td><td>bright midday</td></tr>
+      <tr><td>Dusk</td><td>0.73</td><td>Clear</td><td>0.45, orange deck</td><td>on, orange, alpha 0.5</td><td>warm golden-orange evening</td></tr>
+      <tr><td>Night</td><td>0.95</td><td>Clear</td><td>0.30, blue deck</td><td>off</td><td>cool blue night</td></tr>
+      <tr><td>Storm</td><td>0.45</td><td><b>Storm</b></td><td>0.85, grey deck, fog</td><td>off</td><td>dark overcast downpour</td></tr>
+      <tr><td>Snow</td><td>0.42</td><td><b>Snow</b></td><td>0.62, white deck, fog</td><td>off</td><td>pale cold whiteout</td></tr>
+    </tbody>
+  </table>
+  <p>Fog: every preset except <b>Noon</b> also switches Day / Night <span class="ui">Fog</span> on (Storm thickest, then Snow); Noon switches it off.</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/50-lighting-presets.mp4" poster="media/08-atmosphere-effects/50-lighting-presets.png" data-autoplay></video><figcaption>Clicking Dawn → Noon → Dusk → Night: the world recolours on each click.</figcaption></figure>
+  <h3 id="preset-undo">Presets undo in one step</h3>
+  <p>A preset changes many fields, but it's a single history step. Step through it:</p>
+  <div class="scrubber" data-label="Step" data-frames='[{&quot;v&quot;: &quot;1 \u00b7 before&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/150-undo-before.png&quot;, &quot;note&quot;: &quot;Before: the scene at time 0.42, daylight.&quot;}, {&quot;v&quot;: &quot;2 \u00b7 Dusk&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/150-undo-dusk.png&quot;, &quot;note&quot;: &quot;Click Dusk: the whole scene turns warm orange in one step.&quot;}, {&quot;v&quot;: &quot;3 \u00b7 Ctrl+Z&quot;, &quot;src&quot;: &quot;media/08-atmosphere-effects/150-undo-after.png&quot;, &quot;note&quot;: &quot;Ctrl+Z: one step back \u2014 time 0.42 restored, back to the same daylight look as &#x27;before&#x27;.&quot;}]'></div>
+  <div class="callout tip"><span class="label">Cycle freely</span><p>You can click through all six presets in any order: each one sets fog on or off itself, so every mood looks the same however you got there, and <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverts cleanly. (If an older copy of the addon leaves a washed-out mint-green haze after Storm or Snow, update the addon.)</p></div>
+  <p>Presets are <b>starting points</b>. Apply one, then fine-tune the individual nodes below — that's how the <a href="#recipes">recipes</a> work.</p>
+
+  <h2 id="all-settings">Every effect, every setting</h2>
+  <p>Each effect below has: what it is, how to add it, its strip (tabs of screenshots), every setting as a card, and a clip. Use a node's own filter box, or search <i>all</i> settings at once here:</p>
+  <input class="filter-box" data-target="#all-settings" placeholder="Search every effect setting (e.g. wind, colour, night)…">
+  <div id="all-settings">
+
+  <h3 id="sky">Sky &amp; Clouds — <code>PixelSky</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">One strip, no tabs</span></div>
+  <p>Cloud shadows sliding over the ground, and an optional cloud <b>deck</b> — a visible sheet of cloud overhead. Its clouds also feed a shared cloud field that the terrain, grass, water and god rays all read, so turning <span class="ui">Coverage</span> up darkens the whole world consistently. <b>Add it:</b> Pixel World → <span class="ui">Sky &amp; Clouds</span> → <span class="ui">+ Add</span> (already present in the tutorial). <b>Headline knob:</b> <span class="ui">Coverage</span>.</p>
+  <figure class="shot"><img src="media/08-atmosphere-effects/30-sky-strip.png" alt="The Sky &amp; Clouds strip with all fourteen fields: Clouds, Coverage, Softness, Scale, Wind X/Y, Height, Shadow, Bands, Deck, Deck Size, Opacity, Color, Shade."><figcaption>The Sky &amp; Clouds strip with all fourteen fields: Clouds, Coverage, Softness, Scale, Wind X/Y, Height, Shadow, Bands, Deck, Deck Size, Opacity, Color, Shade.</figcaption></figure>
+  <input class="filter-box" data-target="#sky-ref" placeholder="Filter Sky &amp; Clouds settings…">
+<div id="sky-ref" class="cards">
+<div class="control"><h4>Clouds</h4><div class="where">Sky &amp; Clouds strip</div><p>Master switch for cloud shadows and the shared cloud field that terrain, grass, water and god rays read.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>clouds_enabled</code></dd></dl></div>
+<div class="control"><h4>Coverage</h4><div class="where">Sky &amp; Clouds strip</div><p>How much of the sky is cloudy. More coverage = more and bigger shadow blobs on the ground. <b>The headline knob.</b></p><dl><dt>Range / default</dt><dd>0 – 1 · default 0.45</dd><dt>Property</dt><dd><code>coverage</code></dd></dl></div>
+<div class="control"><h4>Softness</h4><div class="where">Sky &amp; Clouds strip</div><p>Soft versus hard edges on the cloud shadows.</p><dl><dt>Range / default</dt><dd>0 – 0.5 · default 0.12</dd><dt>Property</dt><dd><code>softness</code></dd></dl></div>
+<div class="control"><h4>Scale</h4><div class="where">Sky &amp; Clouds strip</div><p>Size of the cloud pattern: small values give tiny puffs, large values give big banks.</p><dl><dt>Range / default</dt><dd>0.0015 – 0.2 · default 0.02</dd><dt>Property</dt><dd><code>cloud_scale</code></dd></dl></div>
+<div class="control"><h4>Wind X</h4><div class="where">Sky &amp; Clouds strip</div><p>Cloud drift speed and direction, east–west. Only visible as motion with Animate on.</p><dl><dt>Range / default</dt><dd>−1 – 1 · default 0.02</dd><dt>Property</dt><dd><code>wind (x)</code></dd></dl></div>
+<div class="control"><h4>Wind Y</h4><div class="where">Sky &amp; Clouds strip</div><p>Cloud drift, north–south.</p><dl><dt>Range / default</dt><dd>−1 – 1 · default 0.011</dd><dt>Property</dt><dd><code>wind (y)</code></dd></dl></div>
+<div class="control"><h4>Height</h4><div class="where">Sky &amp; Clouds strip</div><p>Height of the cloud deck plane.</p><dl><dt>Range / default</dt><dd>1 – 500 · default 300</dd><dt>Property</dt><dd><code>cloud_height</code></dd></dl></div>
+<div class="control"><h4>Shadow</h4><div class="where">Sky &amp; Clouds strip</div><p>How dark the cloud shadows fall on the ground.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 0.45</dd><dt>Property</dt><dd><code>shadow_strength</code></dd></dl></div>
+<div class="control"><h4>Bands</h4><div class="where">Sky &amp; Clouds strip</div><p>Posterises the cloud shading into N flat bands. 0 = smooth.</p><dl><dt>Range / default</dt><dd>0 – 8 · default 0</dd><dt>Property</dt><dd><code>bands</code></dd></dl></div>
+<div class="control"><h4>Deck</h4><div class="where">Sky &amp; Clouds strip</div><p>Draws the overhead cloud <b>deck</b> — the visible sheet of cloud in the sky.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>deck_enabled</code></dd></dl></div>
+<div class="control"><h4>Deck Size</h4><div class="where">Sky &amp; Clouds strip</div><p>Size of the deck plane, which follows the camera.</p><dl><dt>Range / default</dt><dd>10 – 4000 · default 500</dd><dt>Property</dt><dd><code>deck_size</code></dd></dl></div>
+<div class="control"><h4>Opacity</h4><div class="where">Sky &amp; Clouds strip</div><p>How opaque the deck clouds are.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 0.85</dd><dt>Property</dt><dd><code>deck_opacity</code></dd></dl></div>
+<div class="control"><h4>Color</h4><div class="where">Sky &amp; Clouds strip</div><p>The lit cloud colour.</p><dl><dt>Range / default</dt><dd>colour · white-ish</dd><dt>Property</dt><dd><code>deck_color</code></dd></dl></div>
+<div class="control"><h4>Shade</h4><div class="where">Sky &amp; Clouds strip</div><p>The shaded cloud colour.</p><dl><dt>Range / default</dt><dd>colour · lavender-grey</dd><dt>Property</dt><dd><code>deck_shade_color</code></dd></dl></div>
+</div>
+  <p>With several skies in one scene, the Inspector property <code>cloud_camera_scope</code> picks which sky each camera uses.</p>
+
+  <h3 id="daynight">Day / Night — <code>PixelDayNight</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">Tabs: Time · Sun &amp; Fog · Rim Light</span></div>
+  <p>The sun's arc across the sky, the sky and ambient colour grading over the day, fog, the cel-shading light ramp and a rim light. <b>Add it:</b> Pixel World → <span class="ui">Day / Night</span>. <b>Headline knob:</b> <span class="ui">Time</span> (see the <a href="#time-of-day">scrubber</a>).</p>
+  <div class="tabs">
+<div class="panel" data-tab="Time"><figure class="shot"><img src="media/08-atmosphere-effects/10-daynight-time.png" alt="Day / Night strip, Time tab: Time, Override, Running, Day Length, Time Scale, Latitude, Azimuth, Shadows."><figcaption>Day / Night strip, Time tab: Time, Override, Running, Day Length, Time Scale, Latitude, Azimuth, Shadows.</figcaption></figure></div>
+<div class="panel" data-tab="Sun & Fog"><figure class="shot"><img src="media/08-atmosphere-effects/11-daynight-sunfog.png" alt="Day / Night strip, Sun &amp; Fog tab: Sun Energy, Ambient, Fog, Fog Day, Fog Night, Light Ramp."><figcaption>Day / Night strip, Sun &amp; Fog tab: Sun Energy, Ambient, Fog, Fog Day, Fog Night, Light Ramp.</figcaption></figure></div>
+<div class="panel" data-tab="Rim Light"><figure class="shot"><img src="media/08-atmosphere-effects/12-daynight-rimlight.png" alt="Day / Night strip, Rim Light tab: Light Wrap, Rim, Rim Width, Rim Back."><figcaption>Day / Night strip, Rim Light tab: Light Wrap, Rim, Rim Width, Rim Back.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#dn-ref" placeholder="Filter Day / Night settings…">
+<div id="dn-ref" class="cards">
+<div class="control"><h4>Time</h4><div class="where">Day / Night · Time tab</div><p>The clock. 0 = midnight, 0.25 ≈ dawn, 0.5 = noon, 0.75 ≈ dusk. The whole scene recolours. <b>The headline knob.</b></p><dl><dt>Range / default</dt><dd>0 – 1 · default 0.72</dd><dt>Property</dt><dd><code>time_of_day</code></dd></dl></div>
+<div class="control"><h4>Override</h4><div class="where">Day / Night · Time tab</div><p>Pins the time to a value. −1 means off — let the clock run.</p><dl><dt>Range / default</dt><dd>−1 – 1 · default −1</dd><dt>Property</dt><dd><code>time_override</code></dd></dl></div>
+<div class="control"><h4>Running</h4><div class="where">Day / Night · Time tab</div><p>Advances the clock by itself when Animate is on (editor) or at runtime. With Animate off, the sun holds still.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>running</code></dd></dl></div>
+<div class="control"><h4>Day Length</h4><div class="where">Day / Night · Time tab</div><p>How many real seconds one full day takes.</p><dl><dt>Range / default</dt><dd>1 – 3600 · default 600</dd><dt>Property</dt><dd><code>day_length_seconds</code></dd></dl></div>
+<div class="control"><h4>Time Scale</h4><div class="where">Day / Night · Time tab</div><p>Multiplies the clock speed.</p><dl><dt>Range / default</dt><dd>0 – 100 · default 1</dd><dt>Property</dt><dd><code>time_scale</code></dd></dl></div>
+<div class="control"><h4>Latitude</h4><div class="where">Day / Night · Time tab</div><p>How high the sun climbs in the sky.</p><dl><dt>Range / default</dt><dd>0 – 80 · default 35</dd><dt>Property</dt><dd><code>latitude_tilt_deg</code></dd></dl></div>
+<div class="control"><h4>Azimuth</h4><div class="where">Day / Night · Time tab</div><p>The compass direction of the sun's arc.</p><dl><dt>Range / default</dt><dd>−180 – 180 · default 20</dd><dt>Property</dt><dd><code>azimuth_deg</code></dd></dl></div>
+<div class="control"><h4>Shadows</h4><div class="where">Day / Night · Time tab</div><p>Whether the sun casts shadows.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>sun_shadows</code></dd></dl></div>
+<div class="control"><h4>Twilight Stretch</h4><div class="where">Inspector only (PixelDayNight) — not on the strip</div><p>Stretches the dawn and dusk part of the sun's arc, so the low golden light lasts longer.</p><dl><dt>Range / default</dt><dd>default 0.7</dd><dt>Property</dt><dd><code>twilight_stretch</code></dd></dl></div>
+<div class="control"><h4>Sun Energy</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>Scales the sun's brightness.</p><dl><dt>Range / default</dt><dd>0 – 4 · default 1</dd><dt>Property</dt><dd><code>sun_energy_scale</code></dd></dl></div>
+<div class="control"><h4>Ambient</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>Scales the ambient (fill) light.</p><dl><dt>Range / default</dt><dd>0 – 4 · default 1</dd><dt>Property</dt><dd><code>ambient_energy_scale</code></dd></dl></div>
+<div class="control"><h4>Fog</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>Lets Day/Night drive the environment fog.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>apply_fog</code></dd></dl></div>
+<div class="control"><h4>Fog Day</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>Fog thickness by day.</p><dl><dt>Range / default</dt><dd>0 – 0.1 · default 0.0025</dd><dt>Property</dt><dd><code>fog_density</code></dd></dl></div>
+<div class="control"><h4>Fog Night</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>Fog thickness at night.</p><dl><dt>Range / default</dt><dd>0 – 0.1 · default 0.0065</dd><dt>Property</dt><dd><code>fog_night_density</code></dd></dl></div>
+<div class="control"><h4>Light Ramp</h4><div class="where">Day / Night · Sun &amp; Fog tab</div><p>The cel-shading light ramp: how light steps from lit to shadow.</p><dl><dt>Range / default</dt><dd>Off / Classic / Soft / Hard / Warm Shadows / Custom</dd><dt>Property</dt><dd><code>light_ramp_preset</code></dd></dl></div>
+<div class="control"><h4>Light Wrap</h4><div class="where">Day / Night · Rim Light tab</div><p>Cel light-wrap: how far light wraps around a shape into its shadow side.</p><dl><dt>Range / default</dt><dd>−0.9 – 1</dd><dt>Property</dt><dd><code>light_wrap</code></dd></dl></div>
+<div class="control"><h4>Rim</h4><div class="where">Day / Night · Rim Light tab</div><p>Strength of the rim glow on edges.</p><dl><dt>Range / default</dt><dd>0 – 2</dd><dt>Property</dt><dd><code>rim_strength</code></dd></dl></div>
+<div class="control"><h4>Rim Width</h4><div class="where">Day / Night · Rim Light tab</div><p>How wide the rim band is.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>rim_width</code></dd></dl></div>
+<div class="control"><h4>Rim Back</h4><div class="where">Day / Night · Rim Light tab</div><p>Backlight glow on edges facing away from the sun.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>rim_backlight</code></dd></dl></div>
+</div>
+
+  <h3 id="weather-ref">Weather — <code>PixelWeather</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">Tabs: Weather · Snow · Particles · Rain · Lightning · Colors</span></div>
+  <p>Blends Clear / Cloudy / Foggy / Rain / Snow / Storm — clouds, light, fog, wet ground, pixel rain and lightning — from one dropdown. The <span class="ui">Snow</span> tab can add extra falling snow on top of any weather. <b>Add it:</b> Pixel World → <span class="ui">Weather</span>. <b>Headline knob:</b> <span class="ui">Weather</span> (see the <a href="#weather">gallery</a>). For a programmer: it can be switched from code with <code>set_weather("rain")</code>, and <code>strike_lightning()</code> fires a bolt on demand.</p>
+  <div class="tabs">
+<div class="panel" data-tab="Weather"><figure class="shot"><img src="media/08-atmosphere-effects/20-weather-strip.png" alt="Weather strip, Weather tab: the Weather dropdown, Transition, Ground and Strength."><figcaption>Weather strip, Weather tab: the Weather dropdown, Transition, Ground and Strength.</figcaption></figure></div>
+<div class="panel" data-tab="Snow"><figure class="shot"><img src="media/08-atmosphere-effects/22-weather-snowtab.png" alt="Weather strip, Snow tab: the tab row (Weather, Snow, Particles, Rain, Lightning, Colors) with Snow selected, the Snow checkbox, then Intensity, Accum./min, Melt/min, Max Cover, Flakes, Flake Size, Big Flakes, Fall Speed, Sway and Flake Color."><figcaption>Weather strip, Snow tab: the tab row and <span class="ui">Snow</span> toggle at the top, then the flake settings.</figcaption></figure></div>
+<div class="panel" data-tab="Particles"><figure class="shot"><img src="media/08-atmosphere-effects/23-weather-particles.png" alt="Weather strip, Particles tab: Max Drops, Area, Rain Speed, Streak."><figcaption>Weather strip, Particles tab: Max Drops, Area, Rain Speed, Streak.</figcaption></figure></div>
+<div class="panel" data-tab="Rain"><figure class="shot"><img src="media/08-atmosphere-effects/24-weather-raintab.png" alt="Weather strip, Rain tab: Rain Style, Layers, splash settings."><figcaption>Weather strip, Rain tab: Rain Style, Layers, splash settings.</figcaption></figure></div>
+<div class="panel" data-tab="Lightning"><figure class="shot"><img src="media/08-atmosphere-effects/25-weather-lightning.png" alt="Weather strip, Lightning tab: Lightning on/off and Flash energy."><figcaption>Weather strip, Lightning tab: Lightning on/off and Flash energy.</figcaption></figure></div>
+<div class="panel" data-tab="Colors"><figure class="shot"><img src="media/08-atmosphere-effects/26-weather-colors.png" alt="Weather strip, Colors tab: Rain and Bolt colour buttons."><figcaption>Weather strip, Colors tab: Rain and Bolt colour buttons.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#wx-ref" placeholder="Filter Weather settings…">
+<div id="wx-ref" class="cards">
+<div class="control"><h4>Weather</h4><div class="where">Weather · Weather tab</div><p>Which weather to show. <b>The headline knob.</b> Applies instantly even with Animate off.</p><dl><dt>Range / default</dt><dd>Clear · Cloudy · Foggy · Rain · Snow · Storm</dd><dt>Property</dt><dd><code>weather</code></dd></dl></div>
+<div class="control"><h4>Transition</h4><div class="where">Weather · Weather tab</div><p>How long a weather change takes to blend while things are animating (Animate on, or in the game). 0 = instant switch. With Animate off the new weather always appears at once.</p><dl><dt>Range / default</dt><dd>0 – 120</dd><dt>Property</dt><dd><code>transition_seconds</code></dd></dl></div>
+<div class="control"><h4>Ground</h4><div class="where">Weather · Weather tab</div><p>How long wet or snowy ground takes to build up.</p><dl><dt>Range / default</dt><dd>0 – 600</dd><dt>Property</dt><dd><code>ground_seconds</code></dd></dl></div>
+<div class="control"><h4>Strength</h4><div class="where">Weather · Weather tab</div><p>Overall strength of the weather effect.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 1</dd><dt>Property</dt><dd><code>strength</code></dd></dl></div>
+<div class="control"><h4>Snow</h4><div class="where">Weather · Snow tab</div><p>Adds <i>extra</i> falling snow on top of whatever weather is chosen.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>snow_enabled</code></dd></dl></div>
+<div class="control"><h4>Intensity</h4><div class="where">Weather · Snow tab</div><p>How heavy the extra snowfall is.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>snow_intensity</code></dd></dl></div>
+<div class="control"><h4>Accum./min</h4><div class="where">Weather · Snow tab</div><p>How fast snow builds up on the ground.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>snow_accumulation</code></dd></dl></div>
+<div class="control"><h4>Melt/min</h4><div class="where">Weather · Snow tab</div><p>How fast settled snow melts.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>snow_melt</code></dd></dl></div>
+<div class="control"><h4>Max Cover</h4><div class="where">Weather · Snow tab</div><p>The most ground snow can cover.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>snow_max_cover</code></dd></dl></div>
+<div class="control"><h4>Flakes</h4><div class="where">Weather · Snow tab</div><p>Number of falling flakes.</p><dl><dt>Range / default</dt><dd>0 – 4000</dd><dt>Property</dt><dd><code>snow_flakes</code></dd></dl></div>
+<div class="control"><h4>Flake Size</h4><div class="where">Weather · Snow tab</div><p>Flake size in art pixels.</p><dl><dt>Range / default</dt><dd>1 – 3</dd><dt>Property</dt><dd><code>flake_texels</code></dd></dl></div>
+<div class="control"><h4>Big Flakes</h4><div class="where">Weather · Snow tab</div><p>Share of larger flakes.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>snow_big_flakes</code></dd></dl></div>
+<div class="control"><h4>Fall Speed</h4><div class="where">Weather · Snow tab</div><p>How fast flakes fall.</p><dl><dt>Range / default</dt><dd>0.1 – 10</dd><dt>Property</dt><dd><code>snow_speed</code></dd></dl></div>
+<div class="control"><h4>Sway</h4><div class="where">Weather · Snow tab</div><p>Side-to-side drift of the flakes.</p><dl><dt>Range / default</dt><dd>0 – 3</dd><dt>Property</dt><dd><code>snow_sway</code></dd></dl></div>
+<div class="control"><h4>Flake Color</h4><div class="where">Weather · Snow tab</div><p>Colour of the flakes.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>snow_color</code></dd></dl></div>
+<div class="control"><h4>Max Drops</h4><div class="where">Weather · Particles tab</div><p>Most rain drops alive at once.</p><dl><dt>Range / default</dt><dd>0 – 20000</dd><dt>Property</dt><dd><code>max_drops</code></dd></dl></div>
+<div class="control"><h4>Area X / Y / Z</h4><div class="where">Weather · Particles tab</div><p>The box around the camera that rain fills.</p><dl><dt>Range / default</dt><dd>X and Z 1 – 500, Y 1 – 200</dd><dt>Property</dt><dd><code>area</code></dd></dl></div>
+<div class="control"><h4>Rain Speed</h4><div class="where">Weather · Particles tab</div><p>How fast the rain falls.</p><dl><dt>Range / default</dt><dd>1 – 60</dd><dt>Property</dt><dd><code>rain_speed</code></dd></dl></div>
+<div class="control"><h4>Streak</h4><div class="where">Weather · Particles tab</div><p>Length of each rain streak in art pixels.</p><dl><dt>Range / default</dt><dd>1 – 12</dd><dt>Property</dt><dd><code>streak_texels</code></dd></dl></div>
+<div class="control"><h4>Rain Style</h4><div class="where">Weather · Rain tab</div><p>How rain is drawn: a prebaked flipbook or individual particles.</p><dl><dt>Range / default</dt><dd>Flipbook / Particles</dd><dt>Property</dt><dd><code>rain_style</code></dd></dl></div>
+<div class="control"><h4>Rain Layers</h4><div class="where">Weather · Rain tab</div><p>Number of rain layers.</p><dl><dt>Range / default</dt><dd>1 – 32</dd><dt>Property</dt><dd><code>rain_layers</code></dd></dl></div>
+<div class="control"><h4>Layer Gap</h4><div class="where">Weather · Rain tab</div><p>Spacing between rain layers.</p><dl><dt>Range / default</dt><dd>0.2 – 20</dd><dt>Property</dt><dd><code>rain_layer_spacing</code></dd></dl></div>
+<div class="control"><h4>Rain Texel</h4><div class="where">Weather · Rain tab</div><p>Art-pixel size of the rain.</p><dl><dt>Range / default</dt><dd>0.01 – 0.5</dd><dt>Property</dt><dd><code>rain_texel</code></dd></dl></div>
+<div class="control"><h4>Splashes</h4><div class="where">Weather · Rain tab</div><p>Most splashes alive at once.</p><dl><dt>Range / default</dt><dd>0 – 8000</dd><dt>Property</dt><dd><code>max_splashes</code></dd></dl></div>
+<div class="control"><h4>Splash/s</h4><div class="where">Weather · Rain tab</div><p>Splashes spawned per second.</p><dl><dt>Range / default</dt><dd>0.1 – 10</dd><dt>Property</dt><dd><code>splash_rate</code></dd></dl></div>
+<div class="control"><h4>Splash R.</h4><div class="where">Weather · Rain tab</div><p>Splash size.</p><dl><dt>Range / default</dt><dd>1 – 8</dd><dt>Property</dt><dd><code>splash_radius</code></dd></dl></div>
+<div class="control"><h4>Lightning</h4><div class="where">Weather · Lightning tab</div><p>Allows lightning bolts and flashes (Storm uses them).</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>lightning_enabled</code></dd></dl></div>
+<div class="control"><h4>Flash</h4><div class="where">Weather · Lightning tab</div><p>How bright a lightning flash lights the scene.</p><dl><dt>Range / default</dt><dd>0 – 8</dd><dt>Property</dt><dd><code>flash_energy</code></dd></dl></div>
+<div class="control"><h4>Rain</h4><div class="where">Weather · Colors tab</div><p>Rain colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>rain_color</code></dd></dl></div>
+<div class="control"><h4>Bolt</h4><div class="where">Weather · Colors tab</div><p>Lightning bolt colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>bolt_color</code></dd></dl></div>
+</div>
+
+  <h3 id="water">Water — <code>PixelWater</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">Tabs: Surface · Waves · Light · Caustics · Foam · Colors · Waterfalls</span></div>
+  <p>A stylised pixel water surface: colour bands from shallow to deep, rolling swell and chop, a dancing caustic pattern on the floor, foam surging around the shore — and, on hex or triangle terrains, raised pools and waterfalls. <b>Add it:</b> Pixel World → <span class="ui">Water</span>.</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/41-water-waves.mp4" poster="media/08-atmosphere-effects/41-water-waves.png" data-autoplay></video><figcaption>The lagoon with Animate on: swell rolling, foam surging around the island shore, sun sparkle.</figcaption></figure>
+  <div class="tabs">
+<div class="panel" data-tab="Surface"><figure class="shot"><img src="media/08-atmosphere-effects/50-water-surface.png" alt="Water strip, Surface tab: Size, Subdivisions, Depth, Depth Bands, Rim Dither."><figcaption>Water strip, Surface tab: Size, Subdivisions, Depth, Depth Bands, Rim Dither.</figcaption></figure></div>
+<div class="panel" data-tab="Waves"><figure class="shot"><img src="media/08-atmosphere-effects/51-water-waves.png" alt="Water strip, Waves tab: swell and chop settings."><figcaption>Water strip, Waves tab: swell and chop settings.</figcaption></figure></div>
+<div class="panel" data-tab="Light"><figure class="shot"><img src="media/08-atmosphere-effects/52-water-light.png" alt="Water strip, Light tab: grazing, reflection, turquoise depth, sparkle."><figcaption>Water strip, Light tab: grazing, reflection, turquoise depth, sparkle.</figcaption></figure></div>
+<div class="panel" data-tab="Caustics"><figure class="shot"><img src="media/08-atmosphere-effects/53-water-caustics.png" alt="Water strip, Caustics tab: strength, scale, bands, reach."><figcaption>Water strip, Caustics tab: strength, scale, bands, reach.</figcaption></figure></div>
+<div class="panel" data-tab="Foam"><figure class="shot"><img src="media/08-atmosphere-effects/54-water-foam.png" alt="Water strip, Foam tab: width, speed and surge timing."><figcaption>Water strip, Foam tab: width, speed and surge timing.</figcaption></figure></div>
+<div class="panel" data-tab="Colors"><figure class="shot"><img src="media/08-atmosphere-effects/55-water-colors.png" alt="Water strip, Colors tab: the seven water colour buttons."><figcaption>Water strip, Colors tab: the seven water colour buttons.</figcaption></figure></div>
+<div class="panel" data-tab="Waterfalls"><figure class="shot"><img src="media/08-atmosphere-effects/56-water-waterfalls.png" alt="Water strip, Waterfalls tab: the tab row with Waterfalls selected, then Fall Levels 5, Level H. 0.5, Fall Speed 3.18, Streaks/m 4.0, Streak Len. 0.9, Base Foam 0.3, Spray Rate 0.7, Spray Rise 0.7 and the Fall Water, Fall Streak and Fall Foam colours."><figcaption>Water strip, Waterfalls tab on the hex island, where waterfalls actually form — so the values are real (Fall Levels 5, Fall Speed 3.18, and so on), not the zeros the square-grid tutorial shows.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#water-ref" placeholder="Filter Water settings…">
+<div id="water-ref" class="cards">
+<div class="control"><h4>Size X / Z</h4><div class="where">Water · Surface tab</div><p>How big the water plane is.</p><dl><dt>Range / default</dt><dd>1 – 4000 · default 300</dd><dt>Property</dt><dd><code>size</code></dd></dl></div>
+<div class="control"><h4>Subdiv.</h4><div class="where">Water · Surface tab</div><p>How finely the surface is divided (needed for waves to bend it).</p><dl><dt>Range / default</dt><dd>0 – 256 · default 128</dd><dt>Property</dt><dd><code>subdivisions</code></dd></dl></div>
+<div class="control"><h4>Depth</h4><div class="where">Water · Surface tab</div><p>Depth scale used to colour shallow vs deep water.</p><dl><dt>Range / default</dt><dd>0.1 – 32 · default 4</dd><dt>Property</dt><dd><code>depth_scale</code></dd></dl></div>
+<div class="control"><h4>Depth Bands</h4><div class="where">Water · Surface tab</div><p>Number of flat colour bands from shallow to deep.</p><dl><dt>Range / default</dt><dd>1 – 8 · default 4</dd><dt>Property</dt><dd><code>depth_bands</code></dd></dl></div>
+<div class="control"><h4>Rim Dither</h4><div class="where">Water · Surface tab</div><p>Dithered (checkerboard-pixel) blend at the band edges.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>rim_dither</code></dd></dl></div>
+<div class="control"><h4>Swell H.</h4><div class="where">Water · Waves tab</div><p>Height of the big rolling swell.</p><dl><dt>Range / default</dt><dd>0 – 2</dd><dt>Property</dt><dd><code>swell_height</code></dd></dl></div>
+<div class="control"><h4>Swell Len.</h4><div class="where">Water · Waves tab</div><p>Distance between swell crests.</p><dl><dt>Range / default</dt><dd>1 – 80</dd><dt>Property</dt><dd><code>swell_length</code></dd></dl></div>
+<div class="control"><h4>Steepness</h4><div class="where">Water · Waves tab</div><p>How sharp the swell crests are (Gerstner waves).</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>swell_steepness</code></dd></dl></div>
+<div class="control"><h4>Swell Speed</h4><div class="where">Water · Waves tab</div><p>How fast the swell travels.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>swell_speed</code></dd></dl></div>
+<div class="control"><h4>Chop H.</h4><div class="where">Water · Waves tab</div><p>Height of the small surface chop.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>wave_height</code></dd></dl></div>
+<div class="control"><h4>Grazing</h4><div class="where">Water · Light tab</div><p>Strength of the grazing-angle sheen.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>grazing_strength</code></dd></dl></div>
+<div class="control"><h4>Reflection</h4><div class="where">Water · Light tab</div><p>Strength of the sky reflection.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>reflection_strength</code></dd></dl></div>
+<div class="control"><h4>Refl. Bands</h4><div class="where">Water · Light tab</div><p>Posterises the reflection into bands.</p><dl><dt>Range / default</dt><dd>1 – 6</dd><dt>Property</dt><dd><code>reflection_bands</code></dd></dl></div>
+<div class="control"><h4>Turq. Depth</h4><div class="where">Water · Light tab</div><p>Depth at which the turquoise tint shows.</p><dl><dt>Range / default</dt><dd>0 – 8</dd><dt>Property</dt><dd><code>turquoise_depth</code></dd></dl></div>
+<div class="control"><h4>Sparkle</h4><div class="where">Water · Light tab</div><p>Sun sparkle glints on the surface.</p><dl><dt>Range / default</dt><dd>0 – 2</dd><dt>Property</dt><dd><code>sparkle</code></dd></dl></div>
+<div class="control"><h4>Caustics</h4><div class="where">Water · Caustics tab</div><p>Strength of the dancing light pattern on the lagoon floor.</p><dl><dt>Range / default</dt><dd>0 – 2</dd><dt>Property</dt><dd><code>caustics_strength</code></dd></dl></div>
+<div class="control"><h4>Caust. Scale</h4><div class="where">Water · Caustics tab</div><p>Size of the caustic pattern.</p><dl><dt>Range / default</dt><dd>0.05 – 4</dd><dt>Property</dt><dd><code>caustics_scale</code></dd></dl></div>
+<div class="control"><h4>Caust. Bands</h4><div class="where">Water · Caustics tab</div><p>Posterise bands for the caustics.</p><dl><dt>Range / default</dt><dd>1 – 6</dd><dt>Property</dt><dd><code>caustics_bands</code></dd></dl></div>
+<div class="control"><h4>Caust. Reach</h4><div class="where">Water · Caustics tab</div><p>How deep the caustics reach.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>caustics_reach</code></dd></dl></div>
+<div class="control"><h4>Foam Width</h4><div class="where">Water · Foam tab</div><p>Width of the foam ring along the shore.</p><dl><dt>Range / default</dt><dd>0 – 2</dd><dt>Property</dt><dd><code>foam_width</code></dd></dl></div>
+<div class="control"><h4>Foam Speed</h4><div class="where">Water · Foam tab</div><p>How fast the foam moves.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>foam_speed</code></dd></dl></div>
+<div class="control"><h4>Surge/s</h4><div class="where">Water · Foam tab</div><p>How often the foam surges up the shore.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>foam_pulse_speed</code></dd></dl></div>
+<div class="control"><h4>Surge Pause</h4><div class="where">Water · Foam tab</div><p>Pause between surges.</p><dl><dt>Range / default</dt><dd>0 – 0.95</dd><dt>Property</dt><dd><code>foam_dead_time</code></dd></dl></div>
+<div class="control"><h4>Surge</h4><div class="where">Water · Foam tab</div><p>How far a surge pushes.</p><dl><dt>Range / default</dt><dd>0 – 6</dd><dt>Property</dt><dd><code>foam_surge</code></dd></dl></div>
+<div class="control"><h4>Bands</h4><div class="where">Water · Foam tab</div><p>Foam colour bands.</p><dl><dt>Range / default</dt><dd>1 – 8</dd><dt>Property</dt><dd><code>bands</code></dd></dl></div>
+<div class="control"><h4>Shallow</h4><div class="where">Water · Colors tab</div><p>Shallow-water colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>shallow_color</code></dd></dl></div>
+<div class="control"><h4>Deep</h4><div class="where">Water · Colors tab</div><p>Deep-water colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>deep_color</code></dd></dl></div>
+<div class="control"><h4>Turquoise</h4><div class="where">Water · Colors tab</div><p>The turquoise tint colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>turquoise_color</code></dd></dl></div>
+<div class="control"><h4>Grazing</h4><div class="where">Water · Colors tab</div><p>Grazing-angle sheen colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>grazing_color</code></dd></dl></div>
+<div class="control"><h4>Sun Side</h4><div class="where">Water · Colors tab</div><p>Reflected sky colour looking toward the sun.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>sky_toward_sun</code></dd></dl></div>
+<div class="control"><h4>Away Side</h4><div class="where">Water · Colors tab</div><p>Reflected sky colour looking away from the sun.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>sky_away_from_sun</code></dd></dl></div>
+<div class="control"><h4>Foam</h4><div class="where">Water · Colors tab</div><p>Foam colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>foam_color</code></dd></dl></div>
+<div class="control"><h4>Fall Levels</h4><div class="where">Water · Waterfalls tab</div><p>Height difference (in terrain levels) needed before a waterfall forms.</p><dl><dt>Range / default</dt><dd>1 – 64</dd><dt>Property</dt><dd><code>waterfall_min_levels</code></dd></dl></div>
+<div class="control"><h4>Level H.</h4><div class="where">Water · Waterfalls tab</div><p>Height of one terrain level for waterfalls.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>waterfall_level_height</code></dd></dl></div>
+<div class="control"><h4>Fall Speed</h4><div class="where">Water · Waterfalls tab</div><p>How fast the falling water moves.</p><dl><dt>Range / default</dt><dd>0 – 12</dd><dt>Property</dt><dd><code>fall_speed</code></dd></dl></div>
+<div class="control"><h4>Streaks/m</h4><div class="where">Water · Waterfalls tab</div><p>Density of streaks in the fall.</p><dl><dt>Range / default</dt><dd>0.1 – 16</dd><dt>Property</dt><dd><code>streak_density</code></dd></dl></div>
+<div class="control"><h4>Streak Len.</h4><div class="where">Water · Waterfalls tab</div><p>Length of each streak.</p><dl><dt>Range / default</dt><dd>0.05 – 4</dd><dt>Property</dt><dd><code>streak_length</code></dd></dl></div>
+<div class="control"><h4>Base Foam</h4><div class="where">Water · Waterfalls tab</div><p>Foam at the bottom of the fall.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>base_foam</code></dd></dl></div>
+<div class="control"><h4>Spray Rate</h4><div class="where">Water · Waterfalls tab</div><p>How much spray the fall throws.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>spray_rate</code></dd></dl></div>
+<div class="control"><h4>Spray Rise</h4><div class="where">Water · Waterfalls tab</div><p>How high the spray rises.</p><dl><dt>Range / default</dt><dd>0 – 6</dd><dt>Property</dt><dd><code>spray_rise</code></dd></dl></div>
+<div class="control"><h4>Fall Water / Fall Streak / Fall Foam</h4><div class="where">Water · Waterfalls tab</div><p>Colours of the waterfall body, its streaks and its foam.</p><dl><dt>Range / default</dt><dd>colours</dd></dl></div>
+</div>
+  <div class="callout warn"><span class="label">Waterfalls need hex or triangle terrain</span><p>The Waterfalls tab shows on any water, but raised pools and spilling waterfalls only form on <b>hex</b> or <b>triangle</b> terrains. The tutorial island is a square-grid terrain, so nothing spills here. Open <code>demo/triangle_island.tscn</code> or <code>demo/hex_island.tscn</code> to see them.</p></div>
+
+  <h3 id="fireflies">Fireflies — <code>PixelFireflies</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">One strip</span></div>
+  <p>A blinking, wandering swarm that fades in at night. <b>Add it:</b> Pixel World → <span class="ui">Fireflies</span>. <b>To see it:</b> set Day / Night <span class="ui">Time</span> to about <code>0.9</code>. At noon they're invisible — that's <span class="ui">Night Only</span> doing its job.</p>
+  <figure class="shot"><img src="media/08-atmosphere-effects/80-fireflies-strip.png" alt="The Fireflies strip: Count, Area, Seed, Color, Size, Wander, Blink, Glow, Night Only."><figcaption>The Fireflies strip: Count, Area, Seed, Color, Size, Wander, Blink, Glow, Night Only.</figcaption></figure>
+  <figure class="clip"><video src="media/08-atmosphere-effects/46-fireflies.mp4" poster="media/08-atmosphere-effects/46-fireflies.png" data-autoplay></video><figcaption>Fireflies at night (Time 0.9): glowing specks blink and wander over the island.</figcaption></figure>
+  <input class="filter-box" data-target="#ff-ref" placeholder="Filter Fireflies settings…">
+<div id="ff-ref" class="cards">
+<div class="control"><h4>Count</h4><div class="where">Fireflies strip</div><p>How many fireflies.</p><dl><dt>Range / default</dt><dd>0 – 4096 · default 100</dd><dt>Property</dt><dd><code>count</code></dd></dl></div>
+<div class="control"><h4>Area X / Y / Z</h4><div class="where">Fireflies strip</div><p>The box the swarm wanders in.</p><dl><dt>Range / default</dt><dd>X and Z 0.1 – 500, Y 0.1 – 100</dd><dt>Property</dt><dd><code>extents</code></dd></dl></div>
+<div class="control"><h4>Seed</h4><div class="where">Fireflies strip</div><p>Random seed — change it for a different arrangement.</p><dl><dt>Range / default</dt><dd>0 – 99999</dd><dt>Property</dt><dd><code>seed</code></dd></dl></div>
+<div class="control"><h4>Color</h4><div class="where">Fireflies strip</div><p>Glow colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>tint</code></dd></dl></div>
+<div class="control"><h4>Size</h4><div class="where">Fireflies strip</div><p>Size of each firefly.</p><dl><dt>Range / default</dt><dd>0.01 – 2</dd><dt>Property</dt><dd><code>size</code></dd></dl></div>
+<div class="control"><h4>Wander</h4><div class="where">Fireflies strip</div><p>How much they wander about.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>wander</code></dd></dl></div>
+<div class="control"><h4>Blink</h4><div class="where">Fireflies strip</div><p>Blink speed.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>blink_speed</code></dd></dl></div>
+<div class="control"><h4>Glow</h4><div class="where">Fireflies strip</div><p>Glow brightness.</p><dl><dt>Range / default</dt><dd>0 – 8 · default 2</dd><dt>Property</dt><dd><code>energy</code></dd></dl></div>
+<div class="control"><h4>Night Only</h4><div class="where">Fireflies strip</div><p>Fades the swarm in as night falls. At 1 they are invisible at noon — that's expected.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 1</dd><dt>Property</dt><dd><code>night_only</code></dd></dl></div>
+</div>
+
+  <h3 id="particles">Particle Field — <code>PixelParticleField</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene (as "Dust")</span><span class="pill">Tabs: Field · Layers · Flipbook · Look</span></div>
+  <p>A pre-rendered, looping flipbook of pixel particles on layers anchored to the world: dust motes in sunbeams, rain, snow, embers or leaves. Because the layers are anchored, the field stays put when the camera moves. <b>Add it:</b> Pixel World → <span class="ui">Particle Field</span>. <b>Headline knob:</b> <span class="ui">Preset</span>.</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/51-particle-dust.mp4" poster="media/08-atmosphere-effects/51-particle-dust.png" data-autoplay></video><figcaption>Dust motes up close with <span class="ui">Beam</span> 0 and <span class="ui">Density</span> 1.0: pale one-pixel motes drift across the grass all around the ruin.</figcaption></figure>
+  <div class="callout tip"><span class="label">“Dust looks like nothing”</span><p>The default field is <b>deliberately faint</b>: it draws one-pixel motes at <span class="ui">Density</span> 0.2, and <span class="ui">Look ▸ Beam</span> 1 shows them only inside the god-ray shafts. To see motes everywhere, set <span class="ui">Look ▸ Beam</span> to <b>0</b> and <span class="ui">Field ▸ Density</span> to <b>1.0</b>, then get close to the ground — at island distance the motes are a pixel each.</p></div>
+  <div class="tabs">
+<div class="panel" data-tab="Field"><figure class="shot"><img src="media/08-atmosphere-effects/60-particle-field.png" alt="Particle Field strip, Field tab: Preset, Emitting, Density, Weather."><figcaption>Particle Field strip, Field tab: Preset, Emitting, Density, Weather.</figcaption></figure></div>
+<div class="panel" data-tab="Layers"><figure class="shot"><img src="media/08-atmosphere-effects/61-particle-layers.png" alt="Particle Field strip, Layers tab: the tab row (Field, Layers, Flipbook, Look) with Layers selected, then Projection, Layers, Spacing, Texel, Extent, Height, Band, Fall, Wind X and Wind Y."><figcaption>Particle Field strip, Layers tab: the tab row at the top, then Projection, Layers, Spacing, Texel, Extent, Height, Band, Fall, Wind X / Y.</figcaption></figure></div>
+<div class="panel" data-tab="Flipbook"><figure class="shot"><img src="media/08-atmosphere-effects/62-particle-flipbook.png" alt="Particle Field strip, Flipbook tab: the tab row with Flipbook selected, Tile 128, then Frames, Count, Lifetime, Velocity X/Y, Drift, Sway, Fade, Streak, Seed and FPS."><figcaption>Particle Field strip, Flipbook tab: the baked particle animation, with the tab row and <span class="ui">Tile</span> included.</figcaption></figure></div>
+<div class="panel" data-tab="Look"><figure class="shot"><img src="media/08-atmosphere-effects/63-particle-look.png" alt="Particle Field strip, Look tab: colours and lighting response."><figcaption>Particle Field strip, Look tab: colours and lighting response.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#pf-ref" placeholder="Filter Particle Field settings…">
+<div id="pf-ref" class="cards">
+<div class="control"><h4>Preset</h4><div class="where">Particle Field · Field tab</div><p>What kind of particles the field shows.</p><dl><dt>Range / default</dt><dd>Dust Motes · Rain · Snow · Embers · Leaves</dd><dt>Property</dt><dd><code>preset</code></dd></dl></div>
+<div class="control"><h4>Emitting</h4><div class="where">Particle Field · Field tab</div><p>Turns the field on or off.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>emitting</code></dd></dl></div>
+<div class="control"><h4>Density</h4><div class="where">Particle Field · Field tab</div><p>How many particles.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>density</code></dd></dl></div>
+<div class="control"><h4>Weather</h4><div class="where">Particle Field · Field tab</div><p>Ties the field to the weather — e.g. only show in fair weather.</p><dl><dt>Range / default</dt><dd>Always · Fair Weather · Rain · Snow</dd><dt>Property</dt><dd><code>weather_response</code></dd></dl></div>
+<div class="control"><h4>Projection</h4><div class="where">Particle Field · Layers tab</div><p>Whether the sheets lie flat or stand up.</p><dl><dt>Range / default</dt><dd>Ground / Upright</dd><dt>Property</dt><dd><code>projection</code></dd></dl></div>
+<div class="control"><h4>Layers</h4><div class="where">Particle Field · Layers tab</div><p>Number of world-anchored sheets in the stack.</p><dl><dt>Range / default</dt><dd>1 – 64</dd><dt>Property</dt><dd><code>layers</code></dd></dl></div>
+<div class="control"><h4>Spacing</h4><div class="where">Particle Field · Layers tab</div><p>Gap between layers.</p><dl><dt>Range / default</dt><dd>0.05 – 20</dd><dt>Property</dt><dd><code>spacing</code></dd></dl></div>
+<div class="control"><h4>Texel</h4><div class="where">Particle Field · Layers tab</div><p>Art-pixel size.</p><dl><dt>Range / default</dt><dd>0.01 – 1</dd><dt>Property</dt><dd><code>texel_size</code></dd></dl></div>
+<div class="control"><h4>Extent</h4><div class="where">Particle Field · Layers tab</div><p>How far the field reaches.</p><dl><dt>Range / default</dt><dd>0 – 500</dd><dt>Property</dt><dd><code>extent</code></dd></dl></div>
+<div class="control"><h4>Height</h4><div class="where">Particle Field · Layers tab</div><p>Height of the field.</p><dl><dt>Range / default</dt><dd>0.5 – 200</dd><dt>Property</dt><dd><code>stature</code></dd></dl></div>
+<div class="control"><h4>Band</h4><div class="where">Particle Field · Layers tab</div><p>Band setting for the layer stack.</p><dl><dt>Range / default</dt><dd>0 – 50</dd><dt>Property</dt><dd><code>band</code></dd></dl></div>
+<div class="control"><h4>Fall</h4><div class="where">Particle Field · Layers tab</div><p>Fall speed.</p><dl><dt>Range / default</dt><dd>−10 – 30</dd><dt>Property</dt><dd><code>fall_speed</code></dd></dl></div>
+<div class="control"><h4>Wind X / Y</h4><div class="where">Particle Field · Layers tab</div><p>Wind drift.</p><dl><dt>Range / default</dt><dd>−20 – 20</dd><dt>Property</dt><dd><code>wind</code></dd></dl></div>
+<div class="control"><h4>Tile</h4><div class="where">Particle Field · Flipbook tab</div><p>Flipbook tile size.</p><dl><dt>Range / default</dt><dd>16 – 256</dd><dt>Property</dt><dd><code>tile_size</code></dd></dl></div>
+<div class="control"><h4>Frames</h4><div class="where">Particle Field · Flipbook tab</div><p>Number of frames in the baked loop.</p><dl><dt>Range / default</dt><dd>4 – 128</dd><dt>Property</dt><dd><code>frame_count</code></dd></dl></div>
+<div class="control"><h4>Count</h4><div class="where">Particle Field · Flipbook tab</div><p>Particles per tile.</p><dl><dt>Range / default</dt><dd>1 – 2000</dd><dt>Property</dt><dd><code>particle_count</code></dd></dl></div>
+<div class="control"><h4>Lifetime</h4><div class="where">Particle Field · Flipbook tab</div><p>How long each particle lives.</p><dl><dt>Range / default</dt><dd>1 – 128</dd><dt>Property</dt><dd><code>lifetime</code></dd></dl></div>
+<div class="control"><h4>Velocity X / Y</h4><div class="where">Particle Field · Flipbook tab</div><p>Particle velocity.</p><dl><dt>Range / default</dt><dd>−16 – 16</dd><dt>Property</dt><dd><code>velocity</code></dd></dl></div>
+<div class="control"><h4>Drift</h4><div class="where">Particle Field · Flipbook tab</div><p>Random drift.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>drift</code></dd></dl></div>
+<div class="control"><h4>Sway</h4><div class="where">Particle Field · Flipbook tab</div><p>Side-to-side sway.</p><dl><dt>Range / default</dt><dd>0 – 8</dd><dt>Property</dt><dd><code>sway</code></dd></dl></div>
+<div class="control"><h4>Fade</h4><div class="where">Particle Field · Flipbook tab</div><p>Fade in/out.</p><dl><dt>Range / default</dt><dd>0 – 64</dd><dt>Property</dt><dd><code>fade_frames</code></dd></dl></div>
+<div class="control"><h4>Streak</h4><div class="where">Particle Field · Flipbook tab</div><p>Streak length (for rain-like presets).</p><dl><dt>Range / default</dt><dd>0 – 12</dd><dt>Property</dt><dd><code>streak_length</code></dd></dl></div>
+<div class="control"><h4>Seed</h4><div class="where">Particle Field · Flipbook tab</div><p>Random seed.</p><dl><dt>Range / default</dt><dd>0 – 99999</dd><dt>Property</dt><dd><code>seed</code></dd></dl></div>
+<div class="control"><h4>FPS</h4><div class="where">Particle Field · Flipbook tab</div><p>Flipbook playback speed.</p><dl><dt>Range / default</dt><dd>0 – 60</dd><dt>Property</dt><dd><code>fps</code></dd></dl></div>
+<div class="control"><h4>Color</h4><div class="where">Particle Field · Look tab</div><p>Main particle colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>tint</code></dd></dl></div>
+<div class="control"><h4>Color B</h4><div class="where">Particle Field · Look tab</div><p>Second particle colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>color_b</code></dd></dl></div>
+<div class="control"><h4>Brightness</h4><div class="where">Particle Field · Look tab</div><p>Overall brightness.</p><dl><dt>Range / default</dt><dd>0 – 8</dd><dt>Property</dt><dd><code>brightness</code></dd></dl></div>
+<div class="control"><h4>Sunlit</h4><div class="where">Particle Field · Look tab</div><p>Extra brightness where the sun hits.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>sunlit</code></dd></dl></div>
+<div class="control"><h4>Beam</h4><div class="where">Particle Field · Look tab</div><p>Brightness inside light beams (motes in sunbeams).</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>beam</code></dd></dl></div>
+<div class="control"><h4>Shade</h4><div class="where">Particle Field · Look tab</div><p>Brightness in shade.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>shade</code></dd></dl></div>
+<div class="control"><h4>Night</h4><div class="where">Particle Field · Look tab</div><p>Brightness at night.</p><dl><dt>Range / default</dt><dd>−1 – 1</dd><dt>Property</dt><dd><code>night</code></dd></dl></div>
+</div>
+
+  <h3 id="birds">Birds — <code>PixelBirds</code></h3>
+  <div class="node-head"><span class="pill">In the tutorial scene</span><span class="pill">Tabs: Flock · Steering · Landing · Look</span></div>
+  <p>A flock of two-frame flapping pixel birds that circle, land on high ground, and scatter when the camera comes near (a "boids" flock — each bird follows simple rules about its neighbours). <b>Add it:</b> Pixel World → <span class="ui">Birds</span>.</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/45-birds.mp4" poster="media/08-atmosphere-effects/45-birds.png" data-autoplay></video><figcaption>The white flock flying and circling over the island (Animate on, zoomed in so the birds read against the grass).</figcaption></figure>
+  <div class="callout tip"><span class="label">Seeing birds in the editor</span><p>Keep <span class="ui">In Editor</span> ticked (Look tab). In the editor the birds draw as <b>small white birds at minimum size</b> — there's no game camera to scale them up — and they <b>fly only with Animate on</b> (frozen otherwise). Press Play to see them full-size.</p></div>
+  <div class="tabs">
+<div class="panel" data-tab="Flock"><figure class="shot"><img src="media/08-atmosphere-effects/70-birds-flock.png" alt="Birds strip, Flock tab: Count, Radius, Altitude, Speed."><figcaption>Birds strip, Flock tab: Count, Radius, Altitude, Speed.</figcaption></figure></div>
+<div class="panel" data-tab="Steering"><figure class="shot"><img src="media/08-atmosphere-effects/71-birds-steering.png" alt="Birds strip, Steering tab: the boids rules plus flaps and size."><figcaption>Birds strip, Steering tab: the boids rules plus flaps and size.</figcaption></figure></div>
+<div class="panel" data-tab="Landing"><figure class="shot"><img src="media/08-atmosphere-effects/72-birds-landing.png" alt="Birds strip, Landing tab: Land Every, Perch, Scare Dist., Landing."><figcaption>Birds strip, Landing tab: Land Every, Perch, Scare Dist., Landing.</figcaption></figure></div>
+<div class="panel" data-tab="Look"><figure class="shot"><img src="media/08-atmosphere-effects/73-birds-look.png" alt="Birds strip, Look tab: Outline, In Editor, Color."><figcaption>Birds strip, Look tab: Outline, In Editor, Color.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#birds-ref" placeholder="Filter Birds settings…">
+<div id="birds-ref" class="cards">
+<div class="control"><h4>Count</h4><div class="where">Birds · Flock tab</div><p>How many birds.</p><dl><dt>Range / default</dt><dd>1 – 256 · default 7</dd><dt>Property</dt><dd><code>count</code></dd></dl></div>
+<div class="control"><h4>Radius</h4><div class="where">Birds · Flock tab</div><p>How wide the flock circles.</p><dl><dt>Range / default</dt><dd>1 – 200</dd><dt>Property</dt><dd><code>radius</code></dd></dl></div>
+<div class="control"><h4>Altitude</h4><div class="where">Birds · Flock tab</div><p>How high they fly.</p><dl><dt>Range / default</dt><dd>0 – 100</dd><dt>Property</dt><dd><code>altitude</code></dd></dl></div>
+<div class="control"><h4>Speed</h4><div class="where">Birds · Flock tab</div><p>Flying speed.</p><dl><dt>Range / default</dt><dd>0.1 – 30</dd><dt>Property</dt><dd><code>speed</code></dd></dl></div>
+<div class="control"><h4>Neighbours</h4><div class="where">Birds · Steering tab</div><p>How many neighbours each bird pays attention to (boids).</p><dl><dt>Range / default</dt><dd>0.1 – 20</dd><dt>Property</dt><dd><code>neighbor_distance</code></dd></dl></div>
+<div class="control"><h4>Separation</h4><div class="where">Birds · Steering tab</div><p>Urge to keep apart.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>separation</code></dd></dl></div>
+<div class="control"><h4>Alignment</h4><div class="where">Birds · Steering tab</div><p>Urge to fly the same direction as neighbours.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>alignment</code></dd></dl></div>
+<div class="control"><h4>Cohesion</h4><div class="where">Birds · Steering tab</div><p>Urge to stay together.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>cohesion</code></dd></dl></div>
+<div class="control"><h4>Steer</h4><div class="where">Birds · Steering tab</div><p>How sharply birds can turn.</p><dl><dt>Range / default</dt><dd>0.1 – 10</dd><dt>Property</dt><dd><code>steer_rate</code></dd></dl></div>
+<div class="control"><h4>Flaps/s</h4><div class="where">Birds · Steering tab</div><p>Wing flaps per second (2-frame flap).</p><dl><dt>Range / default</dt><dd>0 – 20</dd><dt>Property</dt><dd><code>flap_speed</code></dd></dl></div>
+<div class="control"><h4>Size</h4><div class="where">Birds · Steering tab</div><p>Bird size.</p><dl><dt>Range / default</dt><dd>0.05 – 4</dd><dt>Property</dt><dd><code>size</code></dd></dl></div>
+<div class="control"><h4>Land Every</h4><div class="where">Birds · Landing tab</div><p>How often the flock lands on high ground.</p><dl><dt>Range / default</dt><dd>1 – 600</dd><dt>Property</dt><dd><code>land_interval</code></dd></dl></div>
+<div class="control"><h4>Perch</h4><div class="where">Birds · Landing tab</div><p>How long they stay perched.</p><dl><dt>Range / default</dt><dd>0.5 – 600</dd><dt>Property</dt><dd><code>perch_seconds</code></dd></dl></div>
+<div class="control"><h4>Scare Dist.</h4><div class="where">Birds · Landing tab</div><p>Birds scatter when the camera comes within this distance.</p><dl><dt>Range / default</dt><dd>0 – 100</dd><dt>Property</dt><dd><code>scare_distance</code></dd></dl></div>
+<div class="control"><h4>Landing</h4><div class="where">Birds · Landing tab</div><p>Whether birds land at all.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>landing</code></dd></dl></div>
+<div class="control"><h4>Outline</h4><div class="where">Birds · Look tab</div><p>Draws a pixel outline around each bird.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>outline</code></dd></dl></div>
+<div class="control"><h4>In Editor</h4><div class="where">Birds · Look tab</div><p>Must be on for birds to draw in the editor (they draw small and white; they fly with Animate on).</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>preview_in_editor</code></dd></dl></div>
+<div class="control"><h4>Color</h4><div class="where">Birds · Look tab</div><p>Bird colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>tint</code></dd></dl></div>
+</div>
+
+  <h3 id="smoke">Smoke &amp; Fire — <code>PixelSmoke</code></h3>
+  <div class="node-head"><span class="pill">Add it yourself</span><span class="pill">Tabs: Emission · Fire Light · Options · Colors</span></div>
+  <p>Tumbling outlined puffs that drift with the sky wind, with optional flames and a flickering light at the base. Great for chimneys, campfires and burning wrecks. <b>Add it:</b> Pixel World → <span class="ui">Smoke &amp; Fire</span> → <span class="ui">+ Add</span>; a <b>Smoke</b> node appears. Move it onto your object (Inspector → Position), then tick <span class="ui">Fire</span> on the <span class="ui">Colors</span> tab if you want flames. (In code, <code>burst(position, count)</code> makes a one-off puff for builds and explosions.)</p>
+  <figure class="clip"><video src="media/08-atmosphere-effects/47-smoke-fire.mp4" poster="media/08-atmosphere-effects/47-smoke-fire.png" data-autoplay></video><figcaption>A smoke plume rising from the island and drifting with the wind (Animate on).</figcaption></figure>
+  <div class="tabs">
+<div class="panel" data-tab="Emission"><figure class="shot"><img src="media/08-atmosphere-effects/100-smoke-emission.png" alt="Smoke &amp; Fire strip, Emission tab: rate, lifetime, rise, sizes, wind, max puffs."><figcaption>Smoke &amp; Fire strip, Emission tab: rate, lifetime, rise, sizes, wind, max puffs.</figcaption></figure></div>
+<div class="panel" data-tab="Fire Light"><figure class="shot"><img src="media/08-atmosphere-effects/101-smoke-firelight.png" alt="Smoke &amp; Fire strip, Fire Light tab: Detail, Light, Light Range, Flicker."><figcaption>Smoke &amp; Fire strip, Fire Light tab: Detail, Light, Light Range, Flicker.</figcaption></figure></div>
+<div class="panel" data-tab="Options"><figure class="shot"><img src="media/08-atmosphere-effects/102-smoke-options.png" alt="Smoke &amp; Fire strip, Options tab: Emitting, Sky Wind, Outline."><figcaption>Smoke &amp; Fire strip, Options tab: Emitting, Sky Wind, Outline.</figcaption></figure></div>
+<div class="panel" data-tab="Colors"><figure class="shot"><img src="media/08-atmosphere-effects/103-smoke-colors.png" alt="Smoke &amp; Fire strip, Colors tab: the Fire checkbox, then the Smoke, Soot and Flame colour buttons."><figcaption>Smoke &amp; Fire strip, Colors tab: the <span class="ui">Fire</span> checkbox (flames on/off) and the Smoke, Soot and Flame colours.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#smoke-ref" placeholder="Filter Smoke &amp; Fire settings…">
+<div id="smoke-ref" class="cards">
+<div class="control"><h4>Rate</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>Puffs spawned per second.</p><dl><dt>Range / default</dt><dd>0 – 30</dd><dt>Property</dt><dd><code>rate</code></dd></dl></div>
+<div class="control"><h4>Lifetime</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>How long each puff lives.</p><dl><dt>Range / default</dt><dd>0.2 – 30</dd><dt>Property</dt><dd><code>lifetime</code></dd></dl></div>
+<div class="control"><h4>Rise</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>How fast puffs rise.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>rise_speed</code></dd></dl></div>
+<div class="control"><h4>Spread</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>How widely puffs spread.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>spread</code></dd></dl></div>
+<div class="control"><h4>Start Size</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>Puff size when born.</p><dl><dt>Range / default</dt><dd>0.02 – 4</dd><dt>Property</dt><dd><code>start_size</code></dd></dl></div>
+<div class="control"><h4>End Size</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>Puff size when it fades.</p><dl><dt>Range / default</dt><dd>0.02 – 8</dd><dt>Property</dt><dd><code>end_size</code></dd></dl></div>
+<div class="control"><h4>Wind</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>How strongly wind pushes the plume.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>wind_strength</code></dd></dl></div>
+<div class="control"><h4>Max Puffs</h4><div class="where">Smoke &amp; Fire · Emission tab</div><p>Most puffs alive at once.</p><dl><dt>Range / default</dt><dd>1 – 1024</dd><dt>Property</dt><dd><code>max_puffs</code></dd></dl></div>
+<div class="control"><h4>Detail</h4><div class="where">Smoke &amp; Fire · Fire Light tab</div><p>Flame detail.</p><dl><dt>Range / default</dt><dd>4 – 16</dd><dt>Property</dt><dd><code>detail</code></dd></dl></div>
+<div class="control"><h4>Light</h4><div class="where">Smoke &amp; Fire · Fire Light tab</div><p>Brightness of the fire's flickering light.</p><dl><dt>Range / default</dt><dd>0 – 16</dd><dt>Property</dt><dd><code>light_energy</code></dd></dl></div>
+<div class="control"><h4>Light Range</h4><div class="where">Smoke &amp; Fire · Fire Light tab</div><p>How far the fire light reaches.</p><dl><dt>Range / default</dt><dd>0.1 – 50</dd><dt>Property</dt><dd><code>light_range</code></dd></dl></div>
+<div class="control"><h4>Flicker</h4><div class="where">Smoke &amp; Fire · Fire Light tab</div><p>How much the light flickers.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>flicker</code></dd></dl></div>
+<div class="control"><h4>Emitting</h4><div class="where">Smoke &amp; Fire · Options tab</div><p>Turns smoke on or off.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>emitting</code></dd></dl></div>
+<div class="control"><h4>Sky Wind</h4><div class="where">Smoke &amp; Fire · Options tab</div><p>Drift with the PixelSky wind.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>use_sky_wind</code></dd></dl></div>
+<div class="control"><h4>Outline</h4><div class="where">Smoke &amp; Fire · Options tab</div><p>Outlined, tumbling puffs.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>outline</code></dd></dl></div>
+<div class="control"><h4>Fire</h4><div class="where">Smoke &amp; Fire · Colors tab</div><p>Adds flames at the base and a flickering light.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>fire</code></dd></dl></div>
+<div class="control"><h4>Smoke</h4><div class="where">Smoke &amp; Fire · Colors tab</div><p>Smoke colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>fumes_tint</code></dd></dl></div>
+<div class="control"><h4>Soot</h4><div class="where">Smoke &amp; Fire · Colors tab</div><p>Soot (dark smoke) colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>ash_tint</code></dd></dl></div>
+<div class="control"><h4>Flame</h4><div class="where">Smoke &amp; Fire · Colors tab</div><p>Flame colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>fire_tint</code></dd></dl></div>
+</div>
+
+  <h3 id="lightvolume">Light Volumes — <code>PixelLightVolume</code></h3>
+  <div class="node-head"><span class="pill">Add it yourself</span><span class="pill">One strip</span></div>
+  <p>A stepped point light with a dithered pool of light on the ground and a small glowing orb — a lantern, torch or window glow. <b>Add it:</b> Pixel World → <span class="ui">Light Volume</span> → <span class="ui">+ Add</span>, then move it onto your lamp post. With several, select the one to edit; otherwise the first in the scene is used.</p>
+  <div class="two-up">
+    <figure class="shot"><img src="media/08-atmosphere-effects/121-lightvolume-night.png" alt="A Light Volume at night (Energy 20, Radius 14), framed close: a warm golden dithered pool of lamp light glowing on the dark grass, brightest at its centre and stepping out in bands."><figcaption>A Light Volume at night (Energy 20, Radius 14, Time 0.95), framed close: the warm dithered pool of lamplight on the dark grass. The pool reads best at night and up close.</figcaption></figure>
+    <figure class="clip"><video src="media/08-atmosphere-effects/52-lightvolume-night.mp4" poster="media/08-atmosphere-effects/52-lightvolume-night.png" data-autoplay></video><figcaption>The lantern pool flickering at night (Flicker 0.6, Animate on), framed close on the pool.</figcaption></figure>
+  </div>
+  <div class="callout tip"><span class="label">Subtle by design</span><p>Two settings keep it quiet at defaults: <span class="ui">Energy</span> starts low (≈ 0.15), and <span class="ui">Night Boost</span> dims the pool to about 35 % in daylight. To see a clear lantern, set Day / Night <span class="ui">Time</span> to ≈ 0.9–0.95 and raise Energy / Pool Energy. The shots above used Energy ≈ 20, Pool Energy ≈ 2.5, Radius ≈ 14. It's brighter still at runtime.</p></div>
+  <figure class="shot"><img src="media/08-atmosphere-effects/120-lightvolume-strip.png" alt="The Light Volumes strip: Radius, Color, Energy, Flicker, Shadows, Glow, Pool and Glow settings, Night Boost."><figcaption>The Light Volumes strip: Radius, Color, Energy, Flicker, Shadows, Glow, Pool and Glow settings, Night Boost.</figcaption></figure>
+  <input class="filter-box" data-target="#lv-ref" placeholder="Filter Light Volumes settings…">
+<div id="lv-ref" class="cards">
+<div class="control"><h4>Radius</h4><div class="where">Light Volumes strip</div><p>How far the light reaches.</p><dl><dt>Range / default</dt><dd>0.1 – 100 · default 3</dd><dt>Property</dt><dd><code>radius</code></dd></dl></div>
+<div class="control"><h4>Color</h4><div class="where">Light Volumes strip</div><p>Lamp colour.</p><dl><dt>Range / default</dt><dd>colour · warm (≈ 1.0, 0.72, 0.40)</dd><dt>Property</dt><dd><code>lamp_tint</code></dd></dl></div>
+<div class="control"><h4>Energy</h4><div class="where">Light Volumes strip</div><p>Light brightness. Low by default, so the pool is subtle — raise it.</p><dl><dt>Range / default</dt><dd>0 – 16 · default ≈ 0.15 (low)</dd><dt>Property</dt><dd><code>energy</code></dd></dl></div>
+<div class="control"><h4>Flicker</h4><div class="where">Light Volumes strip</div><p>Candle-like flicker (visible with Animate on).</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>flicker</code></dd></dl></div>
+<div class="control"><h4>Shadows</h4><div class="where">Light Volumes strip</div><p>Whether the light casts shadows.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>shadows</code></dd></dl></div>
+<div class="control"><h4>Glow</h4><div class="where">Light Volumes strip</div><p>Draws the small source orb glow.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>glow_enabled</code></dd></dl></div>
+<div class="control"><h4>Pool Scale</h4><div class="where">Light Volumes strip</div><p>Size of the dithered light pool on the ground.</p><dl><dt>Range / default</dt><dd>0.05 – 2 · default 1.2</dd><dt>Property</dt><dd><code>pool_scale</code></dd></dl></div>
+<div class="control"><h4>Pool Energy</h4><div class="where">Light Volumes strip</div><p>Brightness of the light pool.</p><dl><dt>Range / default</dt><dd>0 – 4 · default 0.45</dd><dt>Property</dt><dd><code>pool_energy</code></dd></dl></div>
+<div class="control"><h4>Glow Radius</h4><div class="where">Light Volumes strip</div><p>Size of the orb glow.</p><dl><dt>Range / default</dt><dd>0 – 4 · default 0.48</dd><dt>Property</dt><dd><code>glow_radius</code></dd></dl></div>
+<div class="control"><h4>Glow Energy</h4><div class="where">Light Volumes strip</div><p>Brightness of the orb glow.</p><dl><dt>Range / default</dt><dd>0 – 4 · default 0.52</dd><dt>Property</dt><dd><code>glow_energy</code></dd></dl></div>
+<div class="control"><h4>Glow Steps</h4><div class="where">Light Volumes strip</div><p>Number of stepped rings in the glow.</p><dl><dt>Range / default</dt><dd>1 – 8 · default 4</dd><dt>Property</dt><dd><code>glow_steps</code></dd></dl></div>
+<div class="control"><h4>Night Boost</h4><div class="where">Light Volumes strip</div><p>Scales the pool down in daylight (≈35 % strength) and up to full at night.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 1</dd><dt>Property</dt><dd><code>night_boost</code></dd></dl></div>
+</div>
+
+  <h3 id="sunshafts">Sun Shafts — <code>PixelSunShafts</code></h3>
+  <div class="node-head"><span class="pill">Add it yourself</span><span class="pill">One strip</span></div>
+  <p>A stack of light sheets lit along the sun, for visible shafts of light through gaps in the scene. It's a separate node from the renderer's <b>God Rays</b> (<a href="07-pixelizer.html">page 7</a>) — you can use either or both. <b>Add it:</b> Pixel World → <span class="ui">Sun Shafts</span> → <span class="ui">+ Add</span>.</p>
+  <figure class="shot"><img src="media/08-atmosphere-effects/131-sunshafts-raised.png" alt="Sun Shafts at dusk (Time 0.78) with Alpha raised to 1.0: a bright beam streams from the low sun across the water."><figcaption>Sun Shafts at dusk (Time 0.78) with Alpha raised to 1.0: a bright beam streams from the low sun across the water.</figcaption></figure>
+  <div class="callout tip"><span class="label">Subtle by design</span><p>The default <span class="ui">Alpha</span> is only <code>0.0105</code> — barely visible. Raise it (0.2–0.3 already reads; 1.0 is bold) and use a <b>low sun</b>: Time ≈ 0.25 (dawn) or ≈ 0.75 (dusk), with the sun roughly toward the camera.</p></div>
+  <figure class="shot"><img src="media/08-atmosphere-effects/130-sunshafts-strip.png" alt="The Sun Shafts strip: Sheets, Depth, Size, Follow Cam, Tint, Alpha, Start Depth, Shaft Steps, Dither, Edge Fade, Fade Height, Surface Fade."><figcaption>The Sun Shafts strip: Sheets, Depth, Size, Follow Cam, Tint, Alpha, Start Depth, Shaft Steps, Dither, Edge Fade, Fade Height, Surface Fade.</figcaption></figure>
+  <input class="filter-box" data-target="#shafts-ref" placeholder="Filter Sun Shafts settings…">
+<div id="shafts-ref" class="cards">
+<div class="control"><h4>Sheets</h4><div class="where">Sun Shafts strip</div><p>Number of light sheets in the stack.</p><dl><dt>Range / default</dt><dd>1 – 16 · default 12</dd><dt>Property</dt><dd><code>count</code></dd></dl></div>
+<div class="control"><h4>Depth</h4><div class="where">Sun Shafts strip</div><p>How deep the sheet stack goes.</p><dl><dt>Range / default</dt><dd>0 – 200 · default 18</dd><dt>Property</dt><dd><code>depth</code></dd></dl></div>
+<div class="control"><h4>Size</h4><div class="where">Sun Shafts strip</div><p>Size of each sheet.</p><dl><dt>Range / default</dt><dd>1 – 1000 · default 200</dd><dt>Property</dt><dd><code>size</code></dd></dl></div>
+<div class="control"><h4>Follow Cam</h4><div class="where">Sun Shafts strip</div><p>Keeps the stack around the camera.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>follow_camera</code></dd></dl></div>
+<div class="control"><h4>Tint</h4><div class="where">Sun Shafts strip</div><p>Beam colour.</p><dl><dt>Range / default</dt><dd>colour · yellow</dd><dt>Property</dt><dd><code>beam_tint</code></dd></dl></div>
+<div class="control"><h4>Alpha</h4><div class="where">Sun Shafts strip</div><p>Beam strength. Default is barely visible — 0.2–0.3 already reads, 1.0 is a bold beam.</p><dl><dt>Range / default</dt><dd>0 – 1 · default 0.0105 (the strip rounds it to 0.011)</dd><dt>Property</dt><dd><code>alpha</code></dd></dl></div>
+<div class="control"><h4>Start Depth</h4><div class="where">Sun Shafts strip</div><p>How far from the camera the sheets start.</p><dl><dt>Range / default</dt><dd>0 – 100 · default 14</dd><dt>Property</dt><dd><code>start_depth</code></dd></dl></div>
+<div class="control"><h4>Shaft Steps</h4><div class="where">Sun Shafts strip</div><p>Number of stepped brightness levels in a shaft.</p><dl><dt>Range / default</dt><dd>0 – 8 · default 3</dd><dt>Property</dt><dd><code>shaft_steps</code></dd></dl></div>
+<div class="control"><h4>Dither</h4><div class="where">Sun Shafts strip</div><p>Dithered edge width.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>dither_width</code></dd></dl></div>
+<div class="control"><h4>Edge Fade</h4><div class="where">Sun Shafts strip</div><p>Fade at the sheet edges.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>edge_fade</code></dd></dl></div>
+<div class="control"><h4>Fade Height</h4><div class="where">Sun Shafts strip</div><p>Height over which shafts fade.</p><dl><dt>Range / default</dt><dd>0 – 100</dd><dt>Property</dt><dd><code>fade_height</code></dd></dl></div>
+<div class="control"><h4>Surface Fade</h4><div class="where">Sun Shafts strip</div><p>Fade where shafts meet surfaces.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>surface_fade</code></dd></dl></div>
+</div>
+
+  <h3 id="grassfire">Grass Fire — <code>PixelFireSystem</code></h3>
+  <div class="node-head"><span class="pill">Add it yourself (under the terrain)</span><span class="pill">Tabs: Fire · Spread · Wind &amp; Rain · Regrowth · Look</span></div>
+  <p>Fire that spreads through the terrain's grass with the wind, chars the ground and shrinks the blades. Rain puts it out with steam, and burnt grass grows back. <b>Add it:</b> scroll the Pixel World panel to <span class="ui">Grass Fire</span> → <span class="ui">+ Add</span>. A <b>FireSystem</b> node is added under the terrain.</p>
+  <ol class="steps" data-id="grass-fire">
+    <li>Select FireSystem → <span class="ui">Fire</span> tab → tick <span class="ui">Ignite Tool</span>.</li>
+    <li>Click the island grass in the 3D view to start a fire. <kbd>Shift</kbd>+click puts it out. (While the tool is on, the coloured move arrows — the "gizmo" — stay out of the way so your clicks land on the grass.) Or just press <span class="ui">Ignite Here</span>.</li>
+    <li>Turn <span class="ui">Animate</span> on and watch it spread and char the grass.</li>
+    <li>Press <span class="ui">Put Out</span> to stop it, or <span class="ui">Reset</span> to clear the burn.</li>
+  </ol>
+  <figure class="clip"><video src="media/08-atmosphere-effects/48-grass-fire.mp4" poster="media/08-atmosphere-effects/48-grass-fire.png" data-autoplay></video><figcaption>The grass fire spreading across the island, charring the ground (Animate on).</figcaption></figure>
+  <div class="tabs">
+<div class="panel" data-tab="Fire"><figure class="shot"><img src="media/08-atmosphere-effects/110-fire-fire.png" alt="Grass Fire strip, Fire tab: Ignite Tool, Ignite Radius, the Ignite Here / Put Out / Reset buttons."><figcaption>Grass Fire strip, Fire tab: Ignite Tool, Ignite Radius, the Ignite Here / Put Out / Reset buttons.</figcaption></figure></div>
+<div class="panel" data-tab="Spread"><figure class="shot"><img src="media/08-atmosphere-effects/111-fire-spread.png" alt="Grass Fire strip, Spread tab: spread rate, burn time, embers."><figcaption>Grass Fire strip, Spread tab: spread rate, burn time, embers.</figcaption></figure></div>
+<div class="panel" data-tab="Wind & Rain"><figure class="shot"><img src="media/08-atmosphere-effects/112-fire-windrain.png" alt="Grass Fire strip, Wind &amp; Rain tab: wind and rain dousing."><figcaption>Grass Fire strip, Wind &amp; Rain tab: wind and rain dousing.</figcaption></figure></div>
+<div class="panel" data-tab="Regrowth"><figure class="shot"><img src="media/08-atmosphere-effects/113-fire-regrowth.png" alt="Grass Fire strip, Regrowth tab: regrow delay, time, wet boost."><figcaption>Grass Fire strip, Regrowth tab: regrow delay, time, wet boost.</figcaption></figure></div>
+<div class="panel" data-tab="Look"><figure class="shot"><img src="media/08-atmosphere-effects/114-fire-look.png" alt="Grass Fire strip, Look tab: the tab row (Fire, Spread, Wind &amp; Rain, Regrowth, Look) with Look selected, Flames 2.5, then Flame Size, Smoke, Steam, Lights, Light, Glow and the Core, Flame, Rim, Smoke Col. and Steam Col. colour buttons."><figcaption>Grass Fire strip, Look tab: the tab row and <span class="ui">Flames</span> at the top, then flame size, smoke, steam, lights and colours.</figcaption></figure></div>
+</div>
+  <input class="filter-box" data-target="#fire-ref" placeholder="Filter Grass Fire settings…">
+<div id="fire-ref" class="cards">
+<div class="control"><h4>Ignite Tool</h4><div class="where">Grass Fire · Fire tab</div><p>Turn on, then click the terrain grass in the 3D view to start a fire. <kbd>Shift</kbd>+click puts it out. While it's on, the move arrows (gizmo) stay out of the way of your clicks.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>ignite_tool</code></dd></dl></div>
+<div class="control"><h4>Ignite Radius</h4><div class="where">Grass Fire · Fire tab</div><p>Size of the fire each click starts.</p><dl><dt>Range / default</dt><dd>0.1 – 20 · default 0.8</dd><dt>Property</dt><dd><code>ignite_radius</code></dd></dl></div>
+<div class="control"><h4>Ignite Here</h4><div class="where">Grass Fire · Fire tab</div><p>Starts a fire at a default spot — no clicking in the viewport.</p><dl><dt>Range / default</dt><dd>button</dd><dt>Property</dt><dd><code>ignite_here</code></dd></dl></div>
+<div class="control"><h4>Put Out</h4><div class="where">Grass Fire · Fire tab</div><p>Puts out every fire.</p><dl><dt>Range / default</dt><dd>button</dd><dt>Property</dt><dd><code>extinguish_all</code></dd></dl></div>
+<div class="control"><h4>Reset</h4><div class="where">Grass Fire · Fire tab</div><p>Resets the fire simulation (burnt state).</p><dl><dt>Range / default</dt><dd>button</dd><dt>Property</dt><dd><code>reset_fire</code></dd></dl></div>
+<div class="control"><h4>Simulate</h4><div class="where">Grass Fire · Fire tab</div><p>Runs the spread simulation.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>simulate</code></dd></dl></div>
+<div class="control"><h4>In Editor</h4><div class="where">Grass Fire · Fire tab</div><p>Shows the fire in the editor.</p><dl><dt>Range / default</dt><dd>on / off · default on</dd><dt>Property</dt><dd><code>preview_in_editor</code></dd></dl></div>
+<div class="control"><h4>Cell Size</h4><div class="where">Grass Fire · Fire tab</div><p>Size of each fire cell.</p><dl><dt>Range / default</dt><dd>0.1 – 4</dd><dt>Property</dt><dd><code>texel_size</code></dd></dl></div>
+<div class="control"><h4>Seed</h4><div class="where">Grass Fire · Fire tab</div><p>Random seed.</p><dl><dt>Range / default</dt><dd>any whole number</dd><dt>Property</dt><dd><code>seed</code></dd></dl></div>
+<div class="control"><h4>Spread</h4><div class="where">Grass Fire · Spread tab</div><p>How fast fire spreads through grass.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>spread_rate</code></dd></dl></div>
+<div class="control"><h4>Burn Time</h4><div class="where">Grass Fire · Spread tab</div><p>How long a cell burns.</p><dl><dt>Range / default</dt><dd>0.1 – 60</dd><dt>Property</dt><dd><code>burn_time</code></dd></dl></div>
+<div class="control"><h4>Embers</h4><div class="where">Grass Fire · Spread tab</div><p>How often embers jump.</p><dl><dt>Range / default</dt><dd>0 – 1</dd><dt>Property</dt><dd><code>ember_rate</code></dd></dl></div>
+<div class="control"><h4>Ember Dist.</h4><div class="where">Grass Fire · Spread tab</div><p>How far embers jump.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>ember_distance</code></dd></dl></div>
+<div class="control"><h4>Max Step</h4><div class="where">Grass Fire · Spread tab</div><p>Cap on spread per step.</p><dl><dt>Range / default</dt><dd>0 – 20</dd><dt>Property</dt><dd><code>max_step</code></dd></dl></div>
+<div class="control"><h4>Sky Wind</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>Use the PixelSky wind to push the fire.</p><dl><dt>Range / default</dt><dd>on / off</dd><dt>Property</dt><dd><code>use_sky_wind</code></dd></dl></div>
+<div class="control"><h4>Wind Str.</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>Wind strength on the fire.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>wind_strength</code></dd></dl></div>
+<div class="control"><h4>Wind Skew</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>How much the wind skews the spread direction.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>wind_influence</code></dd></dl></div>
+<div class="control"><h4>Rain</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>Forces a rain amount for dousing (−1 = follow the weather).</p><dl><dt>Range / default</dt><dd>−1 – 1</dd><dt>Property</dt><dd><code>rain_override</code></dd></dl></div>
+<div class="control"><h4>Douse</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>How fast rain puts fire out (with steam).</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>douse_rate</code></dd></dl></div>
+<div class="control"><h4>Wet Rate</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>How fast grass gets wet.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>wet_rate</code></dd></dl></div>
+<div class="control"><h4>Wet Block</h4><div class="where">Grass Fire · Wind &amp; Rain tab</div><p>How much wetness blocks fire.</p><dl><dt>Range / default</dt><dd>0.01 – 1</dd><dt>Property</dt><dd><code>wet_block</code></dd></dl></div>
+<div class="control"><h4>Regrow After</h4><div class="where">Grass Fire · Regrowth tab</div><p>Delay before burnt grass starts to regrow.</p><dl><dt>Range / default</dt><dd>0 – 600</dd><dt>Property</dt><dd><code>regrow_delay</code></dd></dl></div>
+<div class="control"><h4>Regrow Time</h4><div class="where">Grass Fire · Regrowth tab</div><p>How long regrowth takes.</p><dl><dt>Range / default</dt><dd>0.1 – 600</dd><dt>Property</dt><dd><code>regrow_time</code></dd></dl></div>
+<div class="control"><h4>Wet Boost</h4><div class="where">Grass Fire · Regrowth tab</div><p>Faster regrowth when wet.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>wet_regrow_boost</code></dd></dl></div>
+<div class="control"><h4>Flames</h4><div class="where">Grass Fire · Look tab</div><p>Flame particles per second.</p><dl><dt>Range / default</dt><dd>0 – 40</dd><dt>Property</dt><dd><code>flame_rate</code></dd></dl></div>
+<div class="control"><h4>Flame Size</h4><div class="where">Grass Fire · Look tab</div><p>Flame size.</p><dl><dt>Range / default</dt><dd>0.02 – 4</dd><dt>Property</dt><dd><code>flame_size</code></dd></dl></div>
+<div class="control"><h4>Smoke</h4><div class="where">Grass Fire · Look tab</div><p>Smoke amount.</p><dl><dt>Range / default</dt><dd>0 – 10</dd><dt>Property</dt><dd><code>smoke_rate</code></dd></dl></div>
+<div class="control"><h4>Steam</h4><div class="where">Grass Fire · Look tab</div><p>Steam amount (when doused).</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>steam_amount</code></dd></dl></div>
+<div class="control"><h4>Lights</h4><div class="where">Grass Fire · Look tab</div><p>Number of flickering fire lights.</p><dl><dt>Range / default</dt><dd>0 – 8</dd><dt>Property</dt><dd><code>max_lights</code></dd></dl></div>
+<div class="control"><h4>Light</h4><div class="where">Grass Fire · Look tab</div><p>Fire light brightness.</p><dl><dt>Range / default</dt><dd>0 – 16</dd><dt>Property</dt><dd><code>light_energy</code></dd></dl></div>
+<div class="control"><h4>Glow</h4><div class="where">Grass Fire · Look tab</div><p>Glow intensity.</p><dl><dt>Range / default</dt><dd>0 – 4</dd><dt>Property</dt><dd><code>glow_intensity</code></dd></dl></div>
+<div class="control"><h4>Core</h4><div class="where">Grass Fire · Look tab</div><p>Flame core colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>inner_tint</code></dd></dl></div>
+<div class="control"><h4>Flame</h4><div class="where">Grass Fire · Look tab</div><p>Flame colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>fire_tint</code></dd></dl></div>
+<div class="control"><h4>Rim</h4><div class="where">Grass Fire · Look tab</div><p>Flame rim colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>brim_tint</code></dd></dl></div>
+<div class="control"><h4>Smoke Col.</h4><div class="where">Grass Fire · Look tab</div><p>Smoke colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>fumes_tint</code></dd></dl></div>
+<div class="control"><h4>Steam Col.</h4><div class="where">Grass Fire · Look tab</div><p>Steam colour.</p><dl><dt>Range / default</dt><dd>colour</dd><dt>Property</dt><dd><code>vapor_tint</code></dd></dl></div>
+</div>
+
+  </div><!-- /all-settings -->
+
+  <h2 id="recipes">Recipes</h2>
+  <p>Each recipe starts from a Lighting Preset and then tunes individual nodes. Tick steps off as you go — your progress is remembered.</p>
+  <div class="tabs">
+    <div class="panel" data-tab="⛈ Stormy night">
+      <div class="two-up"><figure class="shot"><img src="media/08-atmosphere-effects/141-preset-storm.png" alt="The Storm preset: thick mauve fog hides the lagoon and the island is a dark silhouette."><figcaption>Start: the Storm preset.</figcaption></figure><figure class="shot"><img src="media/08-atmosphere-effects/121-lightvolume-night.png" alt="A warm golden dithered pool of lamp light on the dark island grass at night."><figcaption>Finish with a lantern in the dark.</figcaption></figure></div>
+      <ol class="steps" data-id="recipe-storm-night">
+        <li>Pixel World → Lighting Preset → <b>Storm</b> (Storm weather, 0.85 coverage, grey deck, fog).</li>
+        <li>Select <b>PixelDayNight</b> → Time tab → <span class="ui">Time</span> <code>0.95</code> (night).</li>
+        <li>Sun &amp; Fog tab → make sure <span class="ui">Fog</span> is on; raise <span class="ui">Fog Night</span> above the preset's <code>0.0165</code> (try <code>0.025</code>) for a heavier murk.</li>
+        <li>Select <b>PixelWeather</b> → Lightning tab → <span class="ui">Lightning</span> on; raise <span class="ui">Flash</span> for brighter strikes. Colors tab → pick a cold <span class="ui">Bolt</span> colour.</li>
+        <li>Pixel World → <span class="ui">Light Volume</span> → <span class="ui">+ Add</span>. Move it onto the hut, set <span class="ui">Energy</span> ≈ 20, <span class="ui">Pool Energy</span> ≈ 2.5, <span class="ui">Radius</span> ≈ 14, <span class="ui">Flicker</span> ≈ 0.6.</li>
+        <li>Turn <span class="ui">Animate</span> on: rain falls, lightning flashes, the lantern flickers.</li>
+      </ol>
+      <figure class="clip"><video src="media/08-atmosphere-effects/44-storm.mp4" poster="media/08-atmosphere-effects/44-storm.png" data-autoplay></video><figcaption>What you're aiming for: a dark downpour lit by lightning.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="🌅 Misty dawn">
+      <div class="two-up"><figure class="shot"><img src="media/08-atmosphere-effects/141-preset-dawn.png" alt="The Dawn preset: pink-gold morning light with a golden streak across the water."><figcaption>Start: the Dawn preset.</figcaption></figure><figure class="shot"><img src="media/08-atmosphere-effects/131-sunshafts-raised.png" alt="A bright sun shaft streaming across the water from a low sun."><figcaption>Add sun shafts while the sun is low.</figcaption></figure></div>
+      <ol class="steps" data-id="recipe-misty-dawn">
+        <li>Pixel World → Lighting Preset → <b>Dawn</b> (time 0.27, light fog, peach deck, warm god rays).</li>
+        <li>Select <b>PixelWeather</b> → Weather → <b>Foggy</b>. If it's too thick, lower <span class="ui">Strength</span> to about <code>0.5</code>.</li>
+        <li>Pixel World → <span class="ui">Sun Shafts</span> → <span class="ui">+ Add</span>. Raise <span class="ui">Alpha</span> to <code>0.25</code>; orbit the view so the low sun is roughly toward the camera.</li>
+        <li>Select <b>Dust</b> (Particle Field) → Field tab → <span class="ui">Preset</span> <b>Dust Motes</b>, <span class="ui">Emitting</span> on, <span class="ui">Density</span> 1.0; Look tab → <span class="ui">Beam</span> 0 for motes everywhere (Beam 1 keeps them only in the shafts).</li>
+        <li>Select <b>Birds</b> → Flock tab → <span class="ui">Count</span> ≈ 12, a low <span class="ui">Altitude</span> for birds skimming the mist.</li>
+        <li>Animate on to watch motes drift and birds circle.</li>
+      </ol>
+      <figure class="clip"><video src="media/08-atmosphere-effects/51-particle-dust.mp4" poster="media/08-atmosphere-effects/51-particle-dust.png" data-autoplay></video><figcaption>Dust motes drifting across the grass with Beam 0 and Density 1.0 — enough to sell a hazy morning.</figcaption></figure>
+    </div>
+    <div class="panel" data-tab="🏝 Sunny lagoon">
+      <div class="two-up"><figure class="shot"><img src="media/08-atmosphere-effects/141-preset-noon.png" alt="The Noon preset: a bright turquoise lagoon and sunlit green island."><figcaption>Start: the Noon preset.</figcaption></figure><figure class="shot"><img src="media/08-atmosphere-effects/45-birds.png" alt="A close, sunlit view of the island where the flock circles."><figcaption>Add a flock for life (the small white birds are easiest to spot in the Birds clip above).</figcaption></figure></div>
+      <ol class="steps" data-id="recipe-sunny-lagoon">
+        <li>Pixel World → Lighting Preset → <b>Noon</b> (time 0.5, Clear, bright god rays).</li>
+        <li>Select <b>PixelSky</b> → lower <span class="ui">Coverage</span> to about <code>0.25</code> for just a few cloud shadows; keep <span class="ui">Shadow</span> around <code>0.45</code>.</li>
+        <li>Select <b>PixelWater</b> → Light tab → raise <span class="ui">Sparkle</span> (up to 2); Caustics tab → raise <span class="ui">Caustics</span> so the shallow floor dances.</li>
+        <li>Foam tab → widen <span class="ui">Foam Width</span> a touch for a brighter surf ring; Colors tab → nudge <span class="ui">Turquoise</span> and <span class="ui">Shallow</span> to taste.</li>
+        <li>Select <b>Dust</b> → Field tab → <span class="ui">Weather</span> <b>Fair Weather</b>, so motes only show in good weather.</li>
+        <li>Select <b>Birds</b> → keep <span class="ui">In Editor</span> on; Animate on to watch them circle.</li>
+      </ol>
+      <figure class="clip"><video src="media/08-atmosphere-effects/41-water-waves.mp4" poster="media/08-atmosphere-effects/41-water-waves.png" data-autoplay></video><figcaption>The goal: swell, foam surge and sparkle round a sunny shore.</figcaption></figure>
+    </div>
+  </div>
+
+  <h2 id="roblox">Coming from Roblox: bridges</h2>
+  <div class="tabs">
+    <div class="panel" data-tab="Lighting service">
+      <div class="callout roblox"><span class="label">Lighting → Day / Night + presets</span><p>In Studio you set <code>Lighting.ClockTime</code> (0–24) and tweak Brightness, Ambient and OutdoorAmbient. Here <b>Day / Night → Time</b> does the same job on a 0–1 scale (multiply by 24: 0.5 = ClockTime 12, 0.75 = 18). <span class="ui">Sun Energy</span> and <span class="ui">Ambient</span> are your Brightness and Ambient. The <b>Lighting Presets</b> are like Studio's lighting presets, but one click sets time, sun, clouds, fog and god rays together — and it's undoable with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p></div>
+    </div>
+    <div class="panel" data-tab="Atmosphere">
+      <div class="callout roblox"><span class="label">Atmosphere → Fog &amp; Foggy weather</span><p>Roblox's <code>Atmosphere</code> object adds Density and Haze. Here, haze comes from Day / Night's <span class="ui">Fog</span>, <span class="ui">Fog Day</span> and <span class="ui">Fog Night</span>, and the <b>Foggy</b>, <b>Storm</b> and <b>Snow</b> weathers add their own. For god rays (Roblox's <code>SunRaysEffect</code>) see the renderer's God Rays on <a href="07-pixelizer.html">page 7</a>, or add a <b>Sun Shafts</b> node.</p></div>
+    </div>
+    <div class="panel" data-tab="Clouds">
+      <div class="callout roblox"><span class="label">Clouds → Sky &amp; Clouds</span><p>Roblox's <code>Clouds</code> object (inside Terrain) has Cover, Density and Color. <b>Sky &amp; Clouds</b> maps neatly: <span class="ui">Coverage</span> ≈ Cover, <span class="ui">Opacity</span> ≈ Density, <span class="ui">Color</span> / <span class="ui">Shade</span> ≈ Color. Unlike Roblox, the clouds also cast moving <b>shadows</b> on the ground and you control the wind direction (<span class="ui">Wind X / Y</span>).</p></div>
+    </div>
+    <div class="panel" data-tab="Terrain water">
+      <div class="callout roblox"><span class="label">Terrain water → PixelWater</span><p>Studio's Terrain water is painted voxels with WaterColor, WaterTransparency, WaterWaveSize and WaterWaveSpeed on the Terrain object. <b>PixelWater</b> is a separate node — a stylised surface plane — so you don't paint it; you size it. <span class="ui">Shallow</span>/<span class="ui">Deep</span> colours ≈ WaterColor, <span class="ui">Swell H.</span>/<span class="ui">Swell Speed</span> ≈ WaveSize/WaveSpeed, plus extras Roblox doesn't have: depth bands, foam surges and caustics.</p></div>
+    </div>
+    <div class="panel" data-tab="ParticleEmitter">
+      <div class="callout roblox"><span class="label">ParticleEmitter / Beam → Fireflies, Birds, Smoke, Particle Field</span><p>In Roblox you'd build fireflies or smoke from a <code>ParticleEmitter</code>, picking Texture, Rate, Lifetime and Speed. Here each effect is a ready-made, pixel-art styled node — you tune counts, colours and behaviour (Wander, Blink, Night Only) rather than emitter textures. <b>Particle Field</b> is closest to a world-anchored emitter with presets (dust, rain, snow, embers, leaves).</p></div>
+    </div>
+    <div class="panel" data-tab="Other">
+      <div class="callout roblox"><span class="label">Weather, + Add, Grass Fire, Undo</span><p><b>Weather</b> has no Studio built-in — it's one dial for rain, snow, fog, wet ground and lightning, instead of hand-building a ParticleEmitter + Atmosphere combo. <b>+ Add</b> is like Insert Object, but each entry is a whole effect and it auto-wires the sun and camera. The <b>Grass Fire ignite tool</b> has no Studio equivalent — click the viewport to start a spreading simulation. And <b>Undo</b> is the same <kbd>Ctrl</kbd>+<kbd>Z</kbd>: every strip, panel or preset change is one history step.</p></div>
+    </div>
+  </div>
+
+  <h2 id="tips">Tips &amp; gotchas</h2>
+  <ul>
+    <li><b>Nothing moving?</b> Turn <span class="ui">Animate</span> on. Edits show without it; motion doesn't.</li>
+    <li><b>Can't see birds, a lantern or sun shafts?</b> They're subtle by design in the editor: birds are small and white, Light Volumes need night and more Energy, Sun Shafts need a higher Alpha and a low sun. All three look stronger when you press Play.</li>
+    <li><b>Fireflies missing at noon?</b> That's <span class="ui">Night Only</span> = 1. Set Time to night, or lower Night Only.</li>
+    <li><b>No waterfall?</b> Waterfalls only form on hex or triangle terrains.</li>
+    <li><b>Can't click a + Add or preset button?</b> Scroll the Pixel World panel so it's actually in view.</li>
+    <li><b>New effect floating in mid-air?</b> Set its Position in the Inspector.</li>
+    <li><b>Slider jumped to a crazy value?</b> Drag slowly, or click the number and type it.</li>
+    <li>A small node icon (and a magenta box) at the scene origin shows whenever a point-like effect is selected. It's harmless — it won't appear in the game.</li>
+  </ul>
+
+  <h2 id="check">Check yourself</h2>
+  <details class="check"><summary>You change Day / Night → Time with Animate off. Does the viewport update?</summary><p>Yes — any field edit refreshes the picture immediately. Animate only controls whether things <i>move on their own</i> (the clock running, clouds drifting, rain falling).</p></details>
+  <details class="check"><summary>What Time value gives you noon? And dusk?</summary><p>0.5 is noon; about 0.75 is dusk (0 is midnight, 0.25 dawn).</p></details>
+  <details class="check"><summary>You applied the Storm preset and hate it. How do you get back?</summary><p>Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> once — a preset is a single undo step, even though it changes many fields.</p></details>
+  <details class="check"><summary>Your Sun Shafts node is invisible. What two things do you change?</summary><p>Raise <span class="ui">Alpha</span> (default 0.0105 is barely visible — try 0.25) and set Time to a low sun, around 0.25 or 0.75.</p></details>
+
+  <h2 id="related">Related pages</h2>
+  <ul>
+    <li><a href="07-pixelizer.html">7 · The pixelizer</a> — pixel size, outlines, palette, God Rays, Animate, the Pixel World panel and Wire Sun / Env Refs.</li>
+    <li><a href="05-foliage-grass.html">5 · Foliage, grass &amp; flowers</a> — the grass that Grass Fire burns.</li>
+    <li><a href="03-terrain-sculpting.html">3 · Sculpting terrain</a> — shape the island and lagoon floor the water sits on.</li>
+    <li><a href="13-playtest-export.html">13 · Playtesting &amp; exporting</a> — press Play to see every effect at full strength.</li>
+  </ul>
+</div></main>
+<script>
+// Lighting-preset picker: thumbnail strip + big view + the values each preset sets.
+document.addEventListener("DOMContentLoaded", function () {
+  var root = document.getElementById("mood-picker");
+  if (!root) return;
+  var P = [
+    ["Dawn", "dawn", "0.27", "Clear", "0.35, peach deck", "on, warm, alpha 0.5", "Soft pink-gold morning, light fog. Good start for misty-morning scenes."],
+    ["Noon", "noon", "0.50", "Clear", "0.42, no deck", "on, bright, alpha 1.0, day cycle", "Bright midday. The cleanest base for a sunny lagoon."],
+    ["Dusk", "dusk", "0.73", "Clear", "0.45, orange deck", "on, orange, alpha 0.5", "Warm golden-orange evening with long shadows."],
+    ["Night", "night", "0.95", "Clear", "0.30, blue deck", "off", "Cool blue night. Fireflies and lanterns shine here."],
+    ["Storm", "storm", "0.45", "Storm", "0.85, grey deck, fog", "off", "Dark, foggy downpour with lightning (Animate on to see it fall and flash)."],
+    ["Snow", "snow", "0.42", "Snow", "0.62, white deck, fog", "off", "Pale, cold whiteout; flakes fall with Animate on."]
+  ];
+  var strip = root.querySelector(".mood-strip"), img = root.querySelector(".mood-view img"), dl = root.querySelector(".mood-view dl");
+  function src(k) { return "media/08-atmosphere-effects/141-preset-" + k + ".png"; }
+  function show(i) {
+    var p = P[i];
+    img.src = src(p[1]); img.alt = "The island with the " + p[0] + " lighting preset applied.";
+    dl.innerHTML = "<dt>Preset</dt><dd>" + p[0] + "</dd><dt>Time</dt><dd>" + p[2] + "</dd><dt>Weather</dt><dd>" + p[3] +
+      "</dd><dt>Clouds</dt><dd>" + p[4] + "</dd><dt>God rays</dt><dd>" + p[5] + "</dd><dt>Mood</dt><dd>" + p[6] + "</dd>";
+    [].forEach.call(strip.children, function (b, j) { b.classList.toggle("on", i === j); b.setAttribute("aria-pressed", i === j); });
+  }
+  P.forEach(function (p, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = '<img src="' + src(p[1]) + '" alt=""><span>' + p[0] + "</span>";
+    b.onclick = function () { show(i); };
+    strip.appendChild(b);
+  });
+  show(2);
+});
+</script>
+</body>
+</html>

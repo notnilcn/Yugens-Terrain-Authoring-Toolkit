@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting &amp; FAQ – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .chips button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 99px; padding: 3px 12px; font: inherit; font-size: .88rem; cursor: pointer; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .countline { font-size: .88rem; color: var(--ink-2); margin: 4px 0 0; }
+  .fixes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .fixes .control { margin: 0; }
+  .fixes .control dl { grid-template-columns: 3.6em 1fr; }
+  .fixes .control dt { font-weight: 700; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
+  .pair figure { margin-top: 0; }
+  details.older { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 10px 16px; margin: 1em 0; }
+  details.older > summary { font-weight: 600; cursor: pointer; }
+  .faq details { margin: 6px 0; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Troubleshooting &amp; FAQ</h1>
+<p class="lede">Something isn't doing what you expected? Find the symptom below. Each card says what's going on, how to fix it, and which chapter explains it in full.</p>
+<div class="meta-row"><span class="pill">Reference</span><span class="pill">Symptom → cause → fix</span><span class="pill">Godot 4.7</span></div>
+
+<h2 id="learn">How to use this page</h2>
+<ul>
+  <li>Type a word from what you see, such as <code>dark</code>, <code>falls</code>, <code>grey</code>, <code>wheel</code> or <code>template</code>, or pick an area chip.</li>
+  <li>Each card shows <b>Why</b> (the cause) and <b>Fix</b> (what to do), plus a link to the page that covers it.</li>
+  <li>Most mistakes undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>: every stroke, chunk, stamp, preset or boolean is one step.</li>
+  <li>The <a href="#faq">FAQ</a> at the bottom answers the bigger "can I…?" questions.</li>
+</ul>
+
+<div class="callout tip"><span class="label">The five most common first-day problems</span><p>1) A new terrain has <b>no chunks</b>, so there's nothing to sculpt. 2) A new scene is <b>dark</b> until you add a sun. 3) <b>Number keys</b> switch terrain tools while the terrain is selected. 4) Shortcuts only work with the <b>mouse over the 3D view</b>. 5) A player you add <b>falls through</b> the ground if you don't move it up first.</p></div>
+
+<div class="pair">
+  <figure class="shot"><img src="media/02-first-world/42-chunks-strip.png" alt="The Chunk Manager strip with a Chunk dropdown, the chunk count, Remove Chunk, Merge Mode and Vertex Handles."><figcaption>No chunks yet? The Chunks tool (<kbd>8</kbd>) adds them: click the green + markers.</figcaption></figure>
+  <figure class="shot"><img src="media/13-playtest-export/59c-move-or-not-compare.png" alt="Two game screenshots side by side: on the left the player stands on the terrain; on the right only sky and dark sea are visible because the player fell through."><figcaption>Player moved above the ground (left) vs left at the origin, inside the hill (right).</figcaption></figure>
+</div>
+
+<h2 id="fixes">Symptom → cause → fix</h2>
+<input class="filter-box" id="fix-filter" data-target="#fix-list" placeholder="Describe the problem… (e.g. dark, falls, wheel, grey, export)">
+<div class="chips" id="fix-chips">
+  <button type="button" class="on" data-chip="">All</button>
+  <button type="button" data-chip="editor">Editor &amp; basics</button>
+  <button type="button" data-chip="sculpt">Sculpting</button>
+  <button type="button" data-chip="paint">Paint &amp; foliage</button>
+  <button type="button" data-chip="chunks">Chunks &amp; saving</button>
+  <button type="button" data-chip="pixel">Pixel look &amp; effects</button>
+  <button type="button" data-chip="builder">Builder</button>
+  <button type="button" data-chip="models">Models</button>
+  <button type="button" data-chip="play">Playtest &amp; export</button>
+</div>
+<p class="countline" id="fix-count"></p>
+
+<div id="fix-list">
+
+<section data-group="editor">
+<h3 id="t-editor">Editor &amp; basics</h3>
+<div class="fixes">
+  <div class="control" data-area="editor"><h4>I added a terrain and nothing shows up / I can't sculpt</h4><div class="where">Editor &amp; basics · ⚠ on the terrain node</div><dl><dt>Why</dt><dd>A new <b>MarchingSquaresTerrain</b> starts with <b>0 chunks</b>. There's no ground yet, and the node shows a ⚠ warning.</dd><dt>Fix</dt><dd>Choose <b>Chunks</b> (<kbd>8</kbd>), look from above (<kbd>Kp 7</kbd>) and click a green <b>+</b> marker. Each one adds a 64 m tile.</dd><dt>Page</dt><dd><a href="02-first-world.html#gotchas">2</a> · <a href="06-chunks-settings.html#chunks-tool">6</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>The scene is dark and I can't see what I'm sculpting</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>A brand-new scene has no Sun or sky, so nothing is lit.</dd><dt>Fix</dt><dd><span class="ui">Pixel World → Sky &amp; Clouds</span> (adds a Sun + WorldEnvironment), or apply a <b>Lighting Preset</b>. Do it early, before sculpting.</dd><dt>Page</dt><dd><a href="02-first-world.html#gotchas">2</a></dd></dl></div>
+  <div class="control" data-area="editor sculpt"><h4>The terrain toolbar disappeared</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>The terrain tools only appear while a terrain node is selected.</dd><dt>Fix</dt><dd>Click <b>MarchingSquaresTerrain</b> in the Scene dock.</dd><dt>Page</dt><dd><a href="04-terrain-painting.html#surfaces">4</a> · <a href="06-chunks-settings.html">6</a></dd></dl></div>
+  <div class="control" data-area="editor sculpt"><h4>A number key switched terrain tool instead of doing the editor shortcut</h4><div class="where">Editor &amp; basics · e.g. <kbd>Ctrl</kbd>+<kbd>1</kbd></div><dl><dt>Why</dt><dd>While the terrain is selected, <kbd>1</kbd>–<kbd>9</kbd> pick terrain tools and don't reach editor shortcuts.</dd><dt>Fix</dt><dd>Click a non-terrain node (e.g. the scene root) first, then press the shortcut.</dd><dt>Page</dt><dd><a href="02-first-world.html#gotchas">2</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>The 3D view is split into four</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>A multi-viewport layout was switched on (<kbd>Ctrl</kbd>+<kbd>2</kbd>…<kbd>4</kbd> or the View menu).</dd><dt>Fix</dt><dd>Select a non-terrain node, then <kbd>Ctrl</kbd>+<kbd>1</kbd> (or <span class="ui">View → 1 Viewport</span>).</dd><dt>Page</dt><dd><a href="02-first-world.html#trouble">2</a> · <a href="01-godot-for-roblox.html#tips">1</a></dd></dl></div>
+  <div class="control" data-area="editor builder"><h4>A keyboard shortcut does nothing</h4><div class="where">Editor &amp; basics · builder too</div><dl><dt>Why</dt><dd>Godot sends keys to the panel under the mouse. 3D shortcuts need the pointer over the 3D view. In the builder, an open popup (Part ▾, Material, Color) also swallows clicks and keys.</dd><dt>Fix</dt><dd>Move the mouse into the 3D view before pressing the key. For <kbd>[</kbd> / <kbd>]</kbd>, click a part first. Close any open popup.</dd><dt>Page</dt><dd><a href="10-builder-modeller.html#shortcuts">10</a> · <a href="14-shortcuts-glossary.html#rules">14</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>Everything looks flat after I clicked the axis cube</h4><div class="where">Editor &amp; basics · label says "… Orthogonal"</div><dl><dt>Why</dt><dd>Snapping to a side view switches to an Orthogonal (no-depth) view.</dd><dt>Fix</dt><dd>Press <kbd>Kp 5</kbd>, or pick <span class="ui">Perspective</span> in the Perspective menu.</dd><dt>Page</dt><dd><a href="01-godot-for-roblox.html#camera">1</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>I'm lost in the void / the camera isn't where I left it</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>Reopening a scene doesn't restore the editor camera position, and it's easy to fly off.</dd><dt>Fix</dt><dd>Select the terrain (or any node) in the Scene dock, hover the 3D view and press <kbd>F</kbd>. Scroll to zoom.</dd><dt>Page</dt><dd><a href="01-godot-for-roblox.html#tips">1</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>The eye icon doesn't hide the terrain</h4><div class="where">Editor &amp; basics · Scene dock</div><dl><dt>Why</dt><dd>The pixel renderer draws the terrain surface through its own pipeline, so the terrain's eye doesn't visibly remove it. Expected.</dd><dt>Fix</dt><dd>Nothing to fix. The eye works as expected on other nodes, such as the Sun.</dd><dt>Page</dt><dd><a href="01-godot-for-roblox.html#nodes">1</a></dd></dl></div>
+  <div class="control" data-area="editor"><h4>Project Settings → Plugins is empty. Is the add-on off?</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>MST is a <b>GDExtension</b>, not a classic plugin. It's always on.</dd><dt>Fix</dt><dd>Look under the <span class="ui">GDExtension</span> tab instead.</dd><dt>Page</dt><dd><a href="01-godot-for-roblox.html#addon">1</a></dd></dl></div>
+  <div class="control" data-area="editor chunks"><h4>I can't see where my map ends</h4><div class="where">Editor &amp; basics</div><dl><dt>Why</dt><dd>In the editor, the terrain blends into endless procedural land (the "Surroundings" feature).</dd><dt>Fix</dt><dd>Run the scene (<kbd>F6</kbd>), where the island's real edge shows. Or switch on chunk borders: Settings (<kbd>9</kbd>) → Display.</dd><dt>Page</dt><dd><a href="02-first-world.html">2</a> · <a href="06-chunks-settings.html#display-visuals">6</a></dd></dl></div>
+  <div class="control" data-area="editor pixel"><h4>Water, Birds or another effect shows a ⚠ warning</h4><div class="where">Editor &amp; basics · Scene dock</div><dl><dt>Why</dt><dd>The effect wants references to the scene's Sun / WorldEnvironment.</dd><dt>Fix</dt><dd><span class="ui">Pixel World → Wire Sun / Env Refs</span>. The scene runs either way.</dd><dt>Page</dt><dd><a href="02-first-world.html">2</a> · <a href="07-pixelizer.html#panel">7</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="sculpt">
+<h3 id="t-sculpt">Sculpting</h3>
+<div class="fixes">
+  <div class="control" data-area="sculpt paint"><h4><kbd>Ctrl</kbd>+wheel zooms instead of changing Strength</h4><div class="where">Sculpting · Level, Paint, Foliage, Tint</div><dl><dt>Why</dt><dd><kbd>Ctrl</kbd>+wheel only changes <b>Strength</b> on Brush (Raise / Lower), Smooth and Gradient, and <b>Height</b> on Stamp. Level, Paint, Foliage and Tint have no Strength, so there it zooms the camera.</dd><dt>Fix</dt><dd>Read the hint bar: if it doesn't end with "Ctrl+wheel: strength", the tool has no Strength. Use <kbd>Shift</kbd>+wheel for size.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#strength">3</a> · <a href="04-terrain-painting.html#wheel">4</a></dd></dl></div>
+  <div class="control" data-area="sculpt paint"><h4>Tint and Grid buttons are missing from the toolbar</h4><div class="where">Sculpting · left toolbar</div><dl><dt>Why</dt><dd>On a short editor window the toolbar is taller than the 3D view, so the last buttons sit behind a scrollbar or the Output panel.</dd><dt>Fix</dt><dd>Scroll the toolbar, click <b>Collapse</b> for an icons-only bar, or close the Output panel.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#toolbar-tour">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>My Drag-mode selection won't go away</h4><div class="where">Sculpting · Brush · Drag</div><dl><dt>Why</dt><dd>The white cells stay selected until you clear them.</dd><dt>Fix</dt><dd>Right-click (RMB). <kbd>Esc</kbd> also clears, but RMB is the reliable one.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#tools">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Moving a Drag selection jumps in steps</h4><div class="where">Sculpting · Brush · Drag</div><dl><dt>Why</dt><dd>On Terraces / HexPrism looks it snaps to the terrace step.</dd><dt>Fix</dt><dd>Hold <kbd>Ctrl</kbd> while dragging to move freely.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#tools">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Grid Aligned is greyed out</h4><div class="where">Sculpting · strip</div><dl><dt>Why</dt><dd>It needs a Triangle, Hexagon or Hex Rings grid with Falloff off. It's not available on a Square grid.</dd><dt>Fix</dt><dd>Use a non-square terrain (e.g. <code>demo/hex_island.tscn</code>) and untick Falloff.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#grid-aligned">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Smooth's Terraced and Sloped look the same</h4><div class="where">Sculpting · Smooth</div><dl><dt>Why</dt><dd>On a Square grid they're identical by design. The difference shows on hex / triangle grids.</dd><dt>Fix</dt><dd>Try it on <code>demo/hex_island.tscn</code>.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#grids">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Peak doesn't seem to do anything</h4><div class="where">Sculpting · strip</div><dl><dt>Why</dt><dd>Its pointy-vs-flat effect is subtle on a single stroke.</dd><dt>Fix</dt><dd>Stack several strokes to see it. It only works while Falloff is on.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#falloff">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>The strip's controls jumped sideways</h4><div class="where">Sculpting · strip</div><dl><dt>Why</dt><dd>The strip reflows when a value's text gets wider or narrower (e.g. "0.010" → "-1.000"). Not a bug.</dd><dt>Fix</dt><dd>Look again before clicking the next control.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#reference">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Erode does nothing / the Erosion node has a ⚠</h4><div class="where">Sculpting · Erosion node</div><dl><dt>Why</dt><dd>The <b>Terrain</b> field is empty: "Assign the Terrain to erode: without one, Erode does nothing."</dd><dt>Fix</dt><dd>Inspector → Terrain → <span class="ui">Assign…</span> → pick the parent MarchingSquaresTerrain.</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#erosion">3</a></dd></dl></div>
+  <div class="control" data-area="sculpt"><h4>Hills look flat when I look at them</h4><div class="where">Sculpting</div><dl><dt>Why</dt><dd>Straight from above, even big hills read flat.</dd><dt>Fix</dt><dd>View from a low, three-quarter angle, zoomed in (RMB + WASD to fly).</dd><dt>Page</dt><dd><a href="03-terrain-sculpting.html#playground">3</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="paint">
+<h3 id="t-paint">Paint &amp; foliage</h3>
+<div class="fixes">
+  <div class="control" data-area="paint"><h4>Clicking paints nothing ("no sample")</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>You clicked a gap or water, not an actual terrain cell.</dd><dt>Fix</dt><dd>Click on ground that belongs to a chunk.</dd><dt>Page</dt><dd><a href="04-terrain-painting.html">4</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>There's a pink ring and highlighted cells under my mouse</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>That's the brush footprint preview, not paint. It only shows while the mouse is over the 3D view.</dd><dt>Fix</dt><dd>Move the mouse off the view for a clean look or screenshot.</dd><dt>Page</dt><dd><a href="04-terrain-painting.html#brush">4</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>I painted Grass but no blades grow</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>Blades grow only on texture slots with <b>Has grass</b> ticked, and only while the terrain's Grass setting is on.</dd><dt>Fix</dt><dd>Textures panel → tick the slot's grass toggle; check Settings (<kbd>9</kbd>) → Grass.</dd><dt>Page</dt><dd><a href="04-terrain-painting.html#slots">4</a> · <a href="05-foliage-grass.html#grass-onoff">5</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>From the top view there's no grass</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>Grass sprites are hidden at that far, straight-down distance. Your data is fine.</dd><dt>Fix</dt><dd>Nothing. It's actually handy for seeing exactly what you painted. Tilt the view to see grass again.</dd><dt>Page</dt><dd><a href="04-terrain-painting.html">4</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>Erasing props made the grass turn to dirt for a second</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>On slow or software-rendered machines the edited patch can flash bare for 1–3 s before the view redraws.</dd><dt>Fix</dt><dd>Wait, or move the mouse. The grass is still there.</dd><dt>Page</dt><dd><a href="05-foliage-grass.html#erase">5</a></dd></dl></div>
+  <div class="control" data-area="paint models"><h4>Foliage entries / props are plain grey shapes</h4><div class="where">Paint &amp; foliage · e.g. hex_island's items</div><dl><dt>Why</dt><dd>Not a bug: the entry's <b>Form</b> is left at its default and no model is set, so it shows a grey placeholder. The built-in <b>+</b> presets paint in colour.</dd><dt>Fix</dt><dd>Give the entry a model (Add Mesh / Scene, or its Scene slot) or a Form, or use the + presets.</dd><dt>Page</dt><dd><a href="12-using-models.html#grey">12</a> · <a href="05-foliage-grass.html#scatter-item">5</a></dd></dl></div>
+  <div class="control" data-area="paint models"><h4>My model won't paint on hillsides</h4><div class="where">Paint &amp; foliage · custom foliage</div><dl><dt>Why</dt><dd>A freshly added model has <b>Slope Max 35°</b>, so it skips steeper ground.</dd><dt>Fix</dt><dd>Raise the entry's Slope Max (Edit ▸ Filters) or the strip's Slope Max.</dd><dt>Page</dt><dd><a href="12-using-models.html#filters">12</a></dd></dl></div>
+  <div class="control" data-area="paint models"><h4>A big model only lands a few copies per stroke</h4><div class="where">Paint &amp; foliage · custom foliage</div><dl><dt>Why</dt><dd>Spacing follows each model's footprint × scale, so large models are spaced widely.</dd><dt>Fix</dt><dd>Paint several overlapping strokes, or lower Scale Min / Max.</dd><dt>Page</dt><dd><a href="12-using-models.html#painting">12</a></dd></dl></div>
+  <div class="control" data-area="paint models"><h4>Fill Terrain is much sparser than hand painting</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>Fill Terrain uses each entry's <b>own</b> Density, not the strip's.</dd><dt>Fix</dt><dd>Raise the entry's Placement ▸ Density, then Fill again (<kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes a Fill).</dd><dt>Page</dt><dd><a href="05-foliage-grass.html#fill">5</a> · <a href="12-using-models.html#fill">12</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>Palette entries moved around</h4><div class="where">Paint &amp; foliage · Foliage palette</div><dl><dt>Why</dt><dd>Positions shift as entries are added or removed (Wild Flowers adds several).</dd><dt>Fix</dt><dd>Find entries by name, not position.</dd><dt>Page</dt><dd><a href="05-foliage-grass.html#palette">5</a></dd></dl></div>
+  <div class="control" data-area="paint"><h4>Erasing left some props behind</h4><div class="where">Paint &amp; foliage</div><dl><dt>Why</dt><dd>Erase removes only the selected kinds.</dd><dt>Fix</dt><dd>Select those kinds too, or tick <b>Erase All</b>.</dd><dt>Page</dt><dd><a href="05-foliage-grass.html#erase">5</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="chunks">
+<h3 id="t-chunks">Chunks &amp; saving</h3>
+<div class="fixes">
+  <div class="control" data-area="chunks"><h4>A chunk disappeared when I clicked it</h4><div class="where">Chunks &amp; saving · Chunks tool</div><dl><dt>Why</dt><dd>A plain left-click on an existing chunk <b>removes</b> it.</dd><dt>Fix</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> brings it back. Hold <kbd>Ctrl</kbd> while clicking to select a chunk.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#chunks-tool">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>Changing Chunk Size does nothing / Ring Radius is greyed out</h4><div class="where">Chunks &amp; saving · Settings → Grid</div><dl><dt>Why</dt><dd>By design these lock once chunks exist ("chunk_size is fixed once chunks exist…").</dd><dt>Fix</dt><dd>Set them on an empty terrain, or clear the data / switch grid type first.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#locks">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>Vertex handles are a dense cluster I can't grab</h4><div class="where">Chunks &amp; saving · Vertex Handles</div><dl><dt>Why</dt><dd>A 32-cell chunk has about 1089 handles.</dd><dt>Fix</dt><dd>Zoom right in, or use a smaller Chunk Size. Each drag is one undo step.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#chunks-tool">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>The "N chunks" count is wrong after an undo</h4><div class="where">Chunks &amp; saving · strip</div><dl><dt>Why</dt><dd>The label can lag until the strip rebuilds. The chunk data is correct.</dd><dt>Fix</dt><dd>Switch tool and back.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#chunks-tool">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>I copied my scene and the terrain came out empty</h4><div class="where">Chunks &amp; saving</div><dl><dt>Why</dt><dd>The terrain's data can live in a separate <code>.res</code> file next to the scene (or per-chunk files in a Data Directory).</dd><dt>Fix</dt><dd>Copy the data file (shown in the Inspector's <span class="ui">Contents</span>) along with the <code>.tscn</code>.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#on-disk">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>The editor grid overlay is hard to see</h4><div class="where">Chunks &amp; saving · Display</div><dl><dt>Why</dt><dd>Cell lines are subtle on the busy pixel textures at small cell sizes.</dd><dt>Fix</dt><dd>Zoom in close, or use Chunk Borders, which are clearer.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#grid-overlay">6</a></dd></dl></div>
+  <div class="control" data-area="chunks"><h4>Edge Style options all look the same</h4><div class="where">Chunks &amp; saving · Settings</div><dl><dt>Why</dt><dd>The difference shows on steep cliffs with separate height levels, not on gentle terrain.</dd><dt>Fix</dt><dd>Compare them on a cliff.</dd><dt>Page</dt><dd><a href="06-chunks-settings.html#edge-style">6</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="pixel">
+<h3 id="t-pixel">Pixel look &amp; effects</h3>
+<div class="fixes">
+  <div class="control" data-area="pixel"><h4>The scene opens already pixelated, and my first click on Pixel Preview turns it off</h4><div class="where">Pixel look &amp; effects</div><dl><dt>Why</dt><dd>Some scenes (e.g. <code>03_pixel_look.tscn</code>) save Pixel Preview as on.</dd><dt>Fix</dt><dd>Nothing to fix: click once more to turn it back on.</dd><dt>Page</dt><dd><a href="07-pixelizer.html#menu-bar">7</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>Clouds, water, rain and birds don't move in the editor</h4><div class="where">Pixel look &amp; effects</div><dl><dt>Why</dt><dd><b>Animate</b> is off (a fresh editor starts with it off to keep things light).</dd><dt>Fix</dt><dd>Turn on <b>Animate</b> in the 3D view menu bar to watch motion. Field edits show immediately either way, and the running game always animates.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#animate">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>A newly added effect is floating in mid-air</h4><div class="where">Pixel look &amp; effects · Smoke, Light Volume…</div><dl><dt>Why</dt><dd>New effect nodes spawn at the editor camera's focus point.</dd><dt>Fix</dt><dd>Inspector → Transform → Position: move it onto whatever should emit.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#tips">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>I can't find the Lighting Preset buttons / "+ Add" did nothing</h4><div class="where">Pixel look &amp; effects · Pixel World panel</div><dl><dt>Why</dt><dd>The panel scrolls. Lower rows and the presets are below the fold, and a half-hidden button may not respond.</dd><dt>Fix</dt><dd>Scroll the panel with the mouse wheel until the row is fully visible, then click.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#tips">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>My water has no waterfalls</h4><div class="where">Pixel look &amp; effects · Water</div><dl><dt>Why</dt><dd>Raised pools and spilling waterfalls only form on hex / triangle terrains.</dd><dt>Fix</dt><dd>Try <code>demo/hex_island.tscn</code> or <code>demo/triangle_island.tscn</code>.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#water">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>Light Volume or Sun Shafts are barely visible</h4><div class="where">Pixel look &amp; effects</div><dl><dt>Why</dt><dd>Low defaults: Light Volume Energy is about 0.15 and glows fully only at night; Sun Shafts Alpha is about 0.011 and the shafts follow the sun.</dd><dt>Fix</dt><dd>Light Volume: set night and raise Energy. Sun Shafts: raise Alpha and use a low sun (dawn / dusk). Both are stronger in the running game.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#lightvolume">8</a> · <a href="08-atmosphere-effects.html#sunshafts">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>The birds are tiny</h4><div class="where">Pixel look &amp; effects · Birds</div><dl><dt>Why</dt><dd>The editor draws them at minimum size; they fly only with Animate on.</dd><dt>Fix</dt><dd>Turn Animate on, or press <kbd>F6</kbd> to see them at full size.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#birds">8</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>I applied a preset and hate it</h4><div class="where">Pixel look &amp; effects · Lighting Preset</div><dl><dt>Why</dt><dd>A preset changes many fields at once…</dd><dt>Fix</dt><dd>…but it's one undo step: press <kbd>Ctrl</kbd>+<kbd>Z</kbd> once.</dd><dt>Page</dt><dd><a href="08-atmosphere-effects.html#preset-undo">8</a></dd></dl></div>
+  <div class="control" data-area="pixel builder"><h4>Clicking a prop opens the builder instead of its pixel settings</h4><div class="where">Pixel look &amp; effects · PixelObject</div><dl><dt>Why</dt><dd>You selected the builder mesh inside the PixelObject.</dd><dt>Fix</dt><dd>Select the PixelObject <b>parent</b> in the Scene dock for the Pixel Object section.</dd><dt>Page</dt><dd><a href="07-pixelizer.html#ref-object">7</a></dd></dl></div>
+  <div class="control" data-area="pixel"><h4>I turned on the editor grid (Grid / Fog) but can't see it</h4><div class="where">Pixel look &amp; effects</div><dl><dt>Why</dt><dd>It barely shows in the pixel preview, even with a bright colour.</dd><dt>Fix</dt><dd>Use the terrain toolbar's <b>Grid</b> button or chunk borders instead.</dd><dt>Page</dt><dd><a href="07-pixelizer.html#ref-gridfog">7</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="builder">
+<h3 id="t-builder">Builder</h3>
+<div class="fixes">
+  <div class="control" data-area="builder"><h4>I want every new part to use a certain material</h4><div class="where">Builder · Roblox UI</div><dl><dt>Why</dt><dd>New parts come in Medium Stone Grey, like Studio. Picking a material with a part selected only paints that part.</dd><dt>Fix</dt><dd>Deselect everything (click the sky), open <span class="ui">Material</span> and click one (e.g. Built-in › Grid). That's the default for new parts for the rest of the session.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#appearance">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>Painting one face recoloured the whole part</h4><div class="where">Builder · Paint (<kbd>B</kbd>)</div><dl><dt>Why</dt><dd>A fresh part has <b>0 material slots</b>, so its colour is per mesh.</dd><dt>Fix</dt><dd>Add a slot first (MST / Modeler → Materials → <span class="ui">+ Slot</span> or <span class="ui">+ Preset</span>), then paint faces.</dd><dt>Page</dt><dd><a href="10-builder-modeller.html#paint-tool">10</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>Ribbon buttons are greyed out</h4><div class="where">Builder</div><dl><dt>Why</dt><dd>A button only lights up when the selection can use it: Union needs two or more parts, Extrude needs Face or Edge mode, and so on.</dd><dt>Fix</dt><dd>Hover the button; the tooltip says what it needs (e.g. "Use face selection mode").</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#ribbon">9</a> · <a href="10-builder-modeller.html#edit-tab">10</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>The ribbon buttons have no labels</h4><div class="where">Builder · Roblox UI</div><dl><dt>Why</dt><dd>At the default editor scale the ribbon is icons-only.</dd><dt>Fix</dt><dd>Hover for names, or raise the editor's display scale to see labels.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#ribbon">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>I can't click a negated part</h4><div class="where">Builder · Solid modeling</div><dl><dt>Why</dt><dd>Negated parts are ghosts and can't be picked in the 3D view.</dd><dt>Fix</dt><dd>Select it in the Scene dock (<kbd>Shift</kbd>/<kbd>Ctrl</kbd>+click for several), then Union.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#solid">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>Dragging a rotate ring deselected my part</h4><div class="where">Builder · Rotate</div><dl><dt>Why</dt><dd>The rings are thin; a drag that starts off a handle counts as an empty click.</dd><dt>Fix</dt><dd>Re-click the part and start the drag right on the ring.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#tools">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>All my new parts are stacked in one spot</h4><div class="where">Builder · Insert</div><dl><dt>Why</dt><dd>Insert Part drops at the view centre, on top of whatever is there.</dd><dt>Fix</dt><dd>Move each part after inserting it (or aim the view somewhere else first).</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#insert">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>"Cannot save file" from Save Branch as Scene</h4><div class="where">Builder · Scene dock</div><dl><dt>Why</dt><dd>The dialog can't create folders that don't exist yet.</dd><dt>Fix</dt><dd>FileSystem dock → right-click → <span class="ui">New Folder…</span>, then save.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#tower">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>Clicking the ground opened the Pixel World workspace and locked the camera</h4><div class="where">Builder</div><dl><dt>Why</dt><dd>The click grabbed the PixelWater node.</dd><dt>Fix</dt><dd>Deselect by clicking the <b>sky</b>, then re-select a builder part.</dd><dt>Page</dt><dd><a href="09-builder-greybox.html#select-many">9</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4><kbd>F</kbd> zoomed instead of filling the hole</h4><div class="where">Builder · Roblox layout</div><dl><dt>Why</dt><dd>In the Roblox layout <kbd>F</kbd> is zoom-to; Fill moved to <kbd>Alt</kbd>+<kbd>F</kbd>. (In MST / Modeler, <kbd>F</kbd> fills.)</dd><dt>Fix</dt><dd>Press <kbd>Alt</kbd>+<kbd>F</kbd>.</dd><dt>Page</dt><dd><a href="10-builder-modeller.html#shortcuts">10</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>Changing Size wiped my extrudes and bevels</h4><div class="where">Builder · Part inspector</div><dl><dt>Why</dt><dd>Changing W / H / D rebuilds the mesh and replaces element edits.</dd><dt>Fix</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd>. Set the size first, then edit faces.</dd><dt>Page</dt><dd><a href="10-builder-modeller.html#inspector">10</a></dd></dl></div>
+  <div class="control" data-area="builder"><h4>My part looks pale or washed out on the island</h4><div class="where">Builder</div><dl><dt>Why</dt><dd>Contrast: a bright sky and bloom wash out a plain part, and a selected mesh gets a translucent blue overlay.</dd><dt>Fix</dt><dd>Give it a colour or material, deselect it, or model it in an empty scene and place it afterwards.</dd><dt>Page</dt><dd><a href="10-builder-modeller.html#paint">10</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="models">
+<h3 id="t-models">Importing &amp; using models</h3>
+<div class="fixes">
+  <div class="control" data-area="models"><h4>My model is far too big or too small</h4><div class="where">Models · Import dock</div><dl><dt>Why</dt><dd>Different tools use different units, and the add-on's demo worlds use very large world units, so a real-size model looks tiny.</dd><dt>Fix</dt><dd>Select the file → Import dock → <b>Root Scale</b> (glTF) or <b>Scale Mesh</b> (OBJ) → <span class="ui">Reimport</span>. Every instance updates. Or scale one instance with <kbd>R</kbd>.</dd><dt>Page</dt><dd><a href="11-importing-models.html#troubleshooting">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>Missing textures: the model is white or flat</h4><div class="where">Models · FileSystem</div><dl><dt>Why</dt><dd>Textures must sit next to the model file (or be embedded in the glTF). For OBJ, the <code>.mtl</code> must sit beside the <code>.obj</code>.</dd><dt>Fix</dt><dd>Copy the textures / <code>.mtl</code> into the same folder as the model.</dd><dt>Page</dt><dd><a href="11-importing-models.html#troubleshooting">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>The model renders dark or inside-out</h4><div class="where">Models</div><dl><dt>Why</dt><dd>Faces with reversed normals shade black.</dd><dt>Fix</dt><dd>Re-export with consistent normals, or convert it to a builder mesh and use Flip normals / Conform normals.</dd><dt>Page</dt><dd><a href="11-importing-models.html#troubleshooting">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>The model lies on its side</h4><div class="where">Models</div><dl><dt>Why</dt><dd>glTF is Y-up; models from Z-up tools can arrive rotated.</dd><dt>Fix</dt><dd>Rotate the instance −90° on X, or use your exporter's "Y-up" option.</dd><dt>Page</dt><dd><a href="11-importing-models.html#troubleshooting">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>FBX or .blend files won't import</h4><div class="where">Models · Editor Settings</div><dl><dt>Why</dt><dd>FBX needs FBX2glTF configured; .blend needs the Blender path set.</dd><dt>Fix</dt><dd>Easiest: export glTF from your 3D app instead.</dd><dt>Page</dt><dd><a href="11-importing-models.html#formats">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>The player walks through my imported prop</h4><div class="where">Models</div><dl><dt>Why</dt><dd>Imported meshes have no collision by default.</dd><dt>Fix</dt><dd>Advanced Import → select the mesh → tick <b>Generate ▸ Physics</b>, pick a Shape Type → Reimport. (Or add StaticBody3D + CollisionShape3D.)</dd><dt>Page</dt><dd><a href="11-importing-models.html#advanced">11</a> · <a href="12-using-models.html#p-collision">12</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>Recolouring changed only part of the model</h4><div class="where">Models · Inspector</div><dl><dt>Why</dt><dd>glTF models are split into several mesh parts; a material override hits one.</dd><dt>Fix</dt><dd>Override each part, or convert to a builder mesh and paint it.</dd><dt>Page</dt><dd><a href="11-importing-models.html#we">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>"Ambient light … ignored in PBR" warning</h4><div class="where">Models · Output panel</div><dl><dt>Why</dt><dd>The OBJ's <code>.mtl</code> ambient colour is dropped. Godot uses the diffuse colour.</dd><dt>Fix</dt><dd>Nothing. It's harmless.</dd><dt>Page</dt><dd><a href="11-importing-models.html#troubleshooting">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>The Import dock looks different for my .obj</h4><div class="where">Models · Import dock</div><dl><dt>Why</dt><dd>OBJ imports as a <b>Mesh</b> (Scale / Offset Mesh); glTF imports as a <b>Scene</b> (with an Advanced… window).</dd><dt>Fix</dt><dd>Nothing. Dragging either into the scene works.</dd><dt>Page</dt><dd><a href="11-importing-models.html#import-dock">11</a></dd></dl></div>
+  <div class="control" data-area="models"><h4>I want to use my model as a terrain tile</h4><div class="where">Models</div><dl><dt>Why</dt><dd>There's no such feature: the terrain is sculpted heights on a grid, not swappable tiles.</dd><dt>Fix</dt><dd>Use the model as foliage or a placed prop, or an image as a <b>Stamp</b>.</dd><dt>Page</dt><dd><a href="12-using-models.html#tiles">12</a></dd></dl></div>
+</div>
+</section>
+
+<section data-group="play">
+<h3 id="t-play">Playtest &amp; export</h3>
+<div class="fixes">
+  <div class="control" data-area="play"><h4>After <kbd>F6</kbd> I only see sky and sea: the player fell through</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>A freshly instanced player sits at (0, 0, 0), usually <b>inside</b> your hill, so it drops straight through. Not a bug.</dd><dt>Fix</dt><dd><kbd>F8</kbd>, select <b>PlayerRig</b>, Inspector → Transform → Position Y above your highest ground (e.g. 5, 8, 4), save, <kbd>F6</kbd>.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#tutorial">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4><kbd>F5</kbd> opens the demo island, not my world</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd><kbd>F5</kbd> runs the project's <b>Main Scene</b>, which is <code>res://demo/hex_island.tscn</code>.</dd><dt>Fix</dt><dd>Press <kbd>F6</kbd> to play the scene you're editing, or change Project Settings → Application → Run → Main Scene.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#main-scene">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4>My change doesn't show in the game</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd><kbd>F6</kbd> runs the <b>saved</b> file.</dd><dt>Fix</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd> first. Check you pressed F6, not F5.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#recipes">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4><kbd>F3</kbd> does nothing in my world</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>The Pixel tuner needs a PixelDiagnostics node; only the demo island has one.</dd><dt>Fix</dt><dd>Add one with Pixel World → Diagnostics, or try F3 on the demo island.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#f3">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4><kbd>Esc</kbd> doesn't quit the game</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>The demo doesn't capture the mouse, so Esc has nothing to do.</dd><dt>Fix</dt><dd><kbd>F8</kbd> in the editor, or close the game window.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#controls">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4>"Game embedding not available in single window mode"</h4><div class="where">Playtest &amp; export · Game tab</div><dl><dt>Why</dt><dd>The editor is running in single-window mode.</dd><dt>Fix</dt><dd>Nothing needed: the game opens in its own window. A normal editor can show it inside the Game tab.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#run-bar">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4>Export Project… is greyed out: "No export template found"</h4><div class="where">Playtest &amp; export · Project → Export…</div><dl><dt>Why</dt><dd>Godot's export templates aren't installed.</dd><dt>Fix</dt><dd>Click <span class="ui">Manage Export Templates</span> → download and install them (once per Godot version). Then Export Project… works.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#templates">13</a></dd></dl></div>
+  <div class="control" data-area="play"><h4>There's only a Linux export preset</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>The project ships one preset: Linux (Runnable).</dd><dt>Fix</dt><dd>Export dialog → <span class="ui">Add…</span> → pick Windows / macOS.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#build">13</a></dd></dl></div>
+  <div class="control" data-area="play chunks"><h4>Export GLB asks "Export Anyway / Cancel"</h4><div class="where">Playtest &amp; export · Settings → Storage</div><dl><dt>Why</dt><dd>A crash guard: exporting a GLB with two or more textures <b>into the project folder</b>, with the Compatibility renderer and multi-threaded import, can crash the editor when it re-imports the file.</dd><dt>Fix</dt><dd>Press Cancel and set the terrain's <b>Export Path</b> to a folder <b>outside</b> the project (or one with a <code>.gdignore</code>). Or turn off Use Multiple Threads import, or use Forward+ / Mobile.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#glb">13</a> · <a href="06-chunks-settings.html#storage">6</a></dd></dl></div>
+  <div class="control" data-area="play chunks"><h4>The editor froze while exporting the GLB</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>It bakes chunk by chunk, then pauses for a few seconds to write the file.</dd><dt>Fix</dt><dd>Wait for the "Baking…" bar to finish, or press Cancel.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#glb">13</a></dd></dl></div>
+  <div class="control" data-area="play pixel"><h4>Resizing the game window changes how big the pixels are</h4><div class="where">Playtest &amp; export</div><dl><dt>Why</dt><dd>By design: the renderer works out its low-res image from the window size, so a bigger window shows more, finer pixels with the same framing.</dd><dt>Fix</dt><dd>Nothing. For chunkier pixels, raise Pixel Size or use a smaller window.</dd><dt>Page</dt><dd><a href="13-playtest-export.html#window">13</a></dd></dl></div>
+</div>
+</section>
+
+</div><!-- /fix-list -->
+
+<figure class="clip"><video src="media/13-playtest-export/59-forget-to-move.mp4" poster="media/13-playtest-export/59-forget-to-move.png" data-autoplay></video><figcaption>The #1 playtest mistake: the player was left at (0, 0, 0) inside the hill and falls through. Move it up before pressing F6.</figcaption></figure>
+
+<div class="pair">
+  <figure class="shot"><img src="media/13-playtest-export/38-export-templates-missing.png" alt="The Export dialog with a red message saying no export template was found, and the Export Project button greyed out."><figcaption>No export templates yet: install them from Manage Export Templates.</figcaption></figure>
+  <figure class="shot"><img src="media/13-playtest-export/36-glb-export-progress.png" alt="The Storage settings strip showing a Baking progress bar with a Cancel button while exporting a GLB."><figcaption>Export GLB pauses the editor while it bakes and writes the file.</figcaption></figure>
+</div>
+
+<details class="older" id="older">
+<summary>On an older build of the add-on? Problems that are already fixed</summary>
+<p>These bugs were fixed while this guide was being written. You won't see them on the current build, and some older clips in the guide still show them. If you do see one, update the add-on to the latest build.</p>
+<ul>
+  <li><b><kbd>Shift</kbd>+wheel or <kbd>Alt</kbd>+wheel zoomed the camera</b> while resizing or rotating a terrain brush. Now only the brush changes.</li>
+  <li><b><kbd>Ctrl</kbd>+wheel hints were wrong.</b> Strength didn't respond on Smooth / Raise-Lower / Gradient, and Level's hint claimed a Ctrl+wheel it doesn't have. Both are fixed.</li>
+  <li><b>New builder parts looked dark and see-through</b> until given a material. They now arrive as solid Medium Stone Grey, the same grey as a new Part in Roblox Studio, and no longer copy the mesh you have selected. The current clips on <a href="09-builder-greybox.html">page 9</a> show the fixed look.</li>
+  <li><b>Insert Part gave an error after switching scene tabs.</b></li>
+  <li><b>Lighting presets left fog on</b> after cycling through them (a washed-out mint-green look).</li>
+  <li><b>Changing Weather with Animate off froze half-blended.</b> It now applies instantly.</li>
+  <li><b>Scenes opened with the editor camera about 400 m away</b> from the terrain.</li>
+</ul>
+</details>
+
+<!-- ============================================================ FAQ -->
+<h2 id="faq">FAQ</h2>
+<div class="faq">
+<details class="check"><summary>Do I need to write code?</summary><p>No. Everything in this guide (terrain, the pixel look, effects, modelling, the playable demo character) is done with tools, menus and the Inspector.</p></details>
+<details class="check"><summary>Do I need to install or enable the add-on?</summary><p>No. It's already in this project at <code>res://addons/MarchingSquaresTerrain/</code> and, being a GDExtension, it's always on. You need Godot 4.7 or newer.</p></details>
+<details class="check"><summary>Can I undo anything?</summary><p>Yes. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes. A brush stroke, stamp, paste, erosion, chunk add / remove, lighting preset, slider drag or boolean is one step each. The History dock lists them.</p></details>
+<details class="check"><summary>Where is my terrain saved?</summary><p>In a terrain data resource (the Inspector's <span class="ui">Contents</span>). It's either stored inside the <code>.tscn</code> or kept as a <code>.res</code> file beside it; in Baked / Runtime storage it's one file per chunk in a Data Directory. <kbd>Ctrl</kbd>+<kbd>S</kbd> saves the scene and its data together. See <a href="06-chunks-settings.html#storage">page 6</a>.</p></details>
+<details class="check"><summary>Does the Roblox UI switch change the terrain tools?</summary><p>No. It only switches the <b>builder</b> into the Studio-style Model / Edit ribbon. Terrain tools, the Foliage palette and the Chunks / Settings strips look the same either way.</p></details>
+<details class="check"><summary>Is the terrain infinite like Roblox's?</summary><p>No. It's made of chunks you add one by one. The endless land you see in the editor is just "Surroundings" decoration; the game shows your real island.</p></details>
+<details class="check"><summary>Square, hexagon or triangle grid: which should I use?</summary><p>Square is the simplest and what the tutorials use. Hex and triangle grids unlock terraced smoothing, Grid Aligned brushes and water pools with waterfalls. Look at <code>demo/hex_island.tscn</code> to see one. Choose before you add chunks; some grid settings lock afterwards.</p></details>
+<details class="check"><summary>Can I get my terrain into Roblox Studio or Blender?</summary><p>Yes: Settings (<kbd>9</kbd>) → Storage → <b>Export GLB</b> bakes it into one mesh with a texture atlas. Import that in Studio's 3D Importer (it arrives as a MeshPart) or Blender's glTF importer. Save it outside the project folder. Builder props export too (right-click → Export ▸).</p></details>
+<details class="check"><summary>Can I bring my Roblox builds into Godot?</summary><p>Yes: in Studio use Export Selection to get an <code>.obj</code> + <code>.mtl</code>, and drop both into your project (e.g. <code>res://models/</code>). See <a href="11-importing-models.html">page 11</a>.</p></details>
+<details class="check"><summary>Which 3D formats work best?</summary><p><b>glTF / GLB</b>, which imports as a scene with materials and textures. OBJ works too, as a mesh. FBX and .blend need extra setup in Editor Settings.</p></details>
+<details class="check"><summary>How do I make the game start in my world?</summary><p>Project → Project Settings… → Application → Run → <b>Main Scene</b> → pick your scene. Then <kbd>F5</kbd> and exported builds start there.</p></details>
+<details class="check"><summary>How do I send my game to a friend?</summary><p>Install export templates once, then Project → Export… → choose or add a platform preset → Export Project…, and zip the output folder. See <a href="13-playtest-export.html#export">page 13</a>.</p></details>
+<details class="check"><summary>The editor feels slow. What helps?</summary><p>Turn <b>Animate</b> off when you aren't watching effects move, so the editor only redraws when something changes.</p></details>
+<details class="check"><summary>Why do some clips in the guide look different from my screen?</summary><p>A few were recorded before small fixes (see <a href="#older">older builds</a>). Panel positions also shift with window size and editor scale; look for controls by name.</p></details>
+</div>
+
+<h2 id="related">Related pages</h2>
+<div class="cards">
+  <a class="card" href="14-shortcuts-glossary.html"><img src="media/01-godot-for-roblox/47-toolbar-transform.png" alt="The 3D view toolbar."><div><b>14 · Shortcuts &amp; glossary</b><span>Every key, and what each word means.</span></div></a>
+  <a class="card" href="02-first-world.html"><img src="media/02-first-world/11-run-game.png" alt="The first world running as a game: a flat green island on the sea."><div><b>2 · Your first world</b><span>The quick start, with its own "if something goes wrong" list.</span></div></a>
+  <a class="card" href="13-playtest-export.html"><img src="media/13-playtest-export/54-player-landing.png" alt="The knight standing on the terrain."><div><b>13 · Playtesting &amp; exporting</b><span>Running, walking around and exporting, step by step.</span></div></a>
+</div>
+
+</div></main>
+<script>
+(function () {
+  var chips = document.querySelectorAll('#fix-chips button');
+  var box = document.getElementById('fix-filter');
+  var cards = document.querySelectorAll('#fix-list .control');
+  var sections = document.querySelectorAll('#fix-list section');
+  var count = document.getElementById('fix-count');
+  var area = '';
+  function apply() {
+    var q = (box.value || '').toLowerCase(), n = 0;
+    cards.forEach(function (c) {
+      var areas = (c.getAttribute('data-area') || '').split(' ');
+      var ok = (!q || c.textContent.toLowerCase().indexOf(q) >= 0) && (!area || areas.indexOf(area) >= 0);
+      c.style.display = ok ? '' : 'none'; if (ok) n++;
+    });
+    sections.forEach(function (s) {
+      var any = [].some.call(s.querySelectorAll('.control'), function (c) { return c.style.display !== 'none'; });
+      s.style.display = any ? '' : 'none';
+    });
+    count.textContent = n + ' of ' + cards.length + ' problems shown';
+  }
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      area = c.dataset.chip; chips.forEach(function (x) { x.classList.toggle('on', x === c); }); apply();
+    });
+  });
+  box.addEventListener('input', function () { setTimeout(apply, 0); });
+  apply();
+})();
+</script>
+</body>
+</html>

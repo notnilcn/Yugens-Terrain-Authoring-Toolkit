@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playtesting &amp; exporting – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .keygrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 1em 0; }
+  .keygrid .k { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel, transparent); }
+  .keygrid .k b { display: block; font-size: .95rem; }
+  .keygrid .k span { font-size: .85rem; opacity: .8; }
+  .big-warn { border-width: 2px; }
+  .big-warn p:first-of-type { font-size: 1.05rem; }
+  .decide { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 1em 0; }
+  .decide > div { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .decide h4 { margin: 0 0 .3em; color: var(--accent); }
+  .decide p { margin: .2em 0; font-size: .93rem; }
+</style>
+</head>
+<body>
+<main><div class="content">
+  <h1>Playtesting &amp; exporting</h1>
+  <p class="lede">Press play, walk your own world with a little Knight (or Fox), see the real pixel look at runtime — then get your world out as a 3D model for Blender or Roblox, or as a game anyone can run.</p>
+  <div class="meta-row"><span class="pill">⏱ 30 min</span><span class="pill">Beginner</span><span class="pill">Follow-along scene: <code>res://tutorial/guide/first_world_player.tscn</code></span></div>
+
+  <figure class="clip"><video src="media/13-playtest-export/23-pixel-world-alive.mp4" poster="media/13-playtest-export/23-pixel-world-alive.png" data-autoplay></video><figcaption>The demo island running as a game: clouds drift, grass sways, the sea foams and birds fly. This is what "playtesting" gets you — your world, alive, with the full pixel look.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>The <a href="#run-bar">Run bar</a>: <kbd>F5</kbd> / <kbd>F6</kbd> / <kbd>F7</kbd> / <kbd>F8</kbd> and how they map to Roblox's <b>Play</b>, <b>Play Here</b>, <b>Run</b> and <b>Stop</b>.</li>
+  <li>The <a href="#main-scene">Main Scene</a> setting — why <kbd>F5</kbd> may not run the world you're looking at.</li>
+  <li>Every <a href="#controls">demo player control</a> (move, walk, jump, orbit, zoom, <kbd>F1</kbd>, <kbd>F3</kbd>), each with a clip.</li>
+  <li><a href="#tutorial">Adding the demo player to <i>your</i> scene</a> — and the one mistake that makes it fall into the void.</li>
+  <li>The <a href="#fox">Fox</a> variant, the <a href="#f3">F3 Pixel tuner</a>, and <a href="#game-tab">the Game tab</a>.</li>
+  <li><a href="#pixel-look">Editor Pixel Preview vs the real game</a>, and how <a href="#window">window size</a> changes the pixels.</li>
+  <li>Getting your world out: <a href="#glb">Export GLB</a>, <a href="#bake">Bake Meshes</a>, <a href="#build">a playable build</a>, and <a href="#screenshots">screenshots</a>.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<table class="ref">
+  <thead><tr><th>Word</th><th>What it means</th><th>Roblox-ish equivalent</th></tr></thead>
+  <tbody>
+    <tr><td><b>Scene</b> (<code>.tscn</code>)</td><td>A saved tree of nodes — your world is one scene; the Knight is another scene.</td><td>A place file / a Model saved to your Toolbox</td></tr>
+    <tr><td><b>Node</b></td><td>One object in the scene tree (terrain, camera, sun, player…).</td><td>An Instance in the Explorer</td></tr>
+    <tr><td><b>Instance a scene</b></td><td>Drop a copy of one saved scene inside another. Edits to the original flow into every copy.</td><td>Inserting a package from the Toolbox</td></tr>
+    <tr><td><b>Main Scene</b></td><td>The scene the game starts in (<kbd>F5</kbd> runs it).</td><td>The place that opens when you hit Play</td></tr>
+    <tr><td><code>res://</code></td><td>"Inside this project folder." <code>res://demo/player.tscn</code> is <code>demo/player.tscn</code> in your project.</td><td>—</td></tr>
+    <tr><td><b>Inspector</b></td><td>The dock that shows the selected node's properties.</td><td>The Properties window</td></tr>
+    <tr><td><b>Export</b></td><td>Turn the project into a standalone program (Windows/Linux/macOS…).</td><td>Publish (but you get files, not a cloud place)</td></tr>
+    <tr><td><b>GLB</b> (<code>.glb</code>)</td><td>A single-file 3D model format (glTF 2.0). Blender and Roblox Studio both import it.</td><td>A mesh you bring in with the 3D Importer</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================================================== RUN BAR -->
+<h2 id="run-bar">Running the game: the Run bar</h2>
+<p>Top-right of the editor sits a row of small buttons — the <b>Run bar</b>. Hover any of them to see its tooltip. Click a numbered dot to learn each one:</p>
+<div class="hotspots"><img src="media/13-playtest-export/01-run-bar.png" alt="The editor's Run bar: a play triangle (outlined in red), pause, stop, a play-scene clapperboard, a custom-scene clapperboard and a movie-reel button.">
+  <button class="spot" style="left:14%;top:50%" data-title="Run Project — F5" data-text="&quot;Run the project's main scene.&quot; Always runs the Main Scene from Project Settings, not necessarily the tab you're editing.">1</button>
+  <button class="spot" style="left:28%;top:50%" data-title="Pause — F7" data-text="&quot;Pause the running project's execution for debugging.&quot; Only active while a game is running.">2</button>
+  <button class="spot" style="left:42%;top:50%" data-title="Stop — F8" data-text="&quot;Stop the currently running project.&quot; Closes the game window. Only active while running.">3</button>
+  <button class="spot" style="left:60%;top:50%" data-title="Play Scene — F6" data-text="&quot;Play the currently edited scene.&quot; Runs the tab you have open — this is how you test YOUR world.">4</button>
+  <button class="spot" style="left:75%;top:50%" data-title="Play Custom Scene — Ctrl+Shift+F5" data-text="&quot;Play a custom scene.&quot; Opens a picker so you can run any scene file.">5</button>
+  <button class="spot" style="left:90%;top:50%" data-title="Movie Maker" data-text="Runs the project at a stable FPS and records picture and sound to a video file. For making videos, not normal play.">6</button>
+</div>
+
+<input class="filter-box" data-target="#run-ref" placeholder="Filter Run bar buttons…">
+<div id="run-ref">
+  <div class="control"><h4>Run Project ▶</h4><div class="where">Run bar · 1st button</div>
+    <p>Tooltip: <i>"Run the project's main scene."</i> Launches the scene set as <a href="#main-scene">Main Scene</a>. In this project that's <code>res://demo/hex_island.tscn</code> — <b>not</b> your own world — unless you change it.</p><dl><dt>Shortcut</dt><dd><kbd>F5</kbd></dd></dl></div>
+  <div class="control"><h4>Pause ⏸</h4><div class="where">Run bar · 2nd button</div>
+    <p>Tooltip: <i>"Pause the running project's execution for debugging."</i> Freezes the running game. Greyed out until something is running.</p><dl><dt>Shortcut</dt><dd><kbd>F7</kbd></dd></dl></div>
+  <div class="control"><h4>Stop ⏹</h4><div class="where">Run bar · 3rd button</div>
+    <p>Tooltip: <i>"Stop the currently running project."</i> Closes the game. The usual way to quit a playtest (the demo has no Esc-to-quit).</p><dl><dt>Shortcut</dt><dd><kbd>F8</kbd></dd></dl></div>
+  <div class="control"><h4>Remote Deploy ▾</h4><div class="where">Run bar · small dropdown</div>
+    <p>Tooltip: <i>"Remote Deploy"</i>. One-click deploy to connected devices (phones etc.). Not used in this guide.</p></div>
+  <div class="control"><h4>Play Scene ▶ (clapperboard)</h4><div class="where">Run bar · 4th button</div>
+    <p>Tooltip: <i>"Play the currently edited scene."</i> Runs whatever scene tab is active, <b>without</b> changing the Main Scene. Your go-to button for testing your own world. It runs the <b>saved</b> file, so save first.</p><dl><dt>Shortcut</dt><dd><kbd>F6</kbd></dd></dl></div>
+  <div class="control"><h4>Play Custom Scene</h4><div class="where">Run bar · 5th button</div>
+    <p>Tooltip: <i>"Play a custom scene."</i> Opens a picker to run any scene file in the project.</p><dl><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F5</kbd></dd></dl></div>
+  <div class="control"><h4>Movie Maker ▾</h4><div class="where">Run bar · last button</div>
+    <p>Tooltip: <i>"Enable Movie Maker mode. The project will run at stable FPS and the visual and audio output is recorded to a video file."</i> Use it to record a trailer of your world.</p></div>
+</div>
+
+<div class="compare" data-before="Not running" data-after="Running"><img src="media/13-playtest-export/01-run-bar.png" alt="Run bar with the Play triangle outlined in red; Pause and Stop greyed out."><img src="media/13-playtest-export/07-run-bar-running.png" alt="Run bar while a game runs: Play has become a blue circular arrow, and Pause and Stop (outlined in red) are active."></div>
+<p>While a game runs, ▶ turns into a blue circular arrow (click it to restart the game) and ⏸ / ⏹ light up. The <span class="ui">Scene</span> dock also gains a <span class="ui">Remote</span> / <span class="ui">Local</span> switch: <b>Remote</b> shows the live tree of the running game, <b>Local</b> the scene as saved.</p>
+
+<figure class="shot"><img src="media/13-playtest-export/06-editor-while-running.png" alt="The Godot editor with a separate game window open on top of it, showing the pixel-art island and Knight."><figcaption><kbd>F5</kbd> in action: the game opens in its own window over the editor. (In a normal editor it can appear inside the <a href="#game-tab">Game tab</a> instead.)</figcaption></figure>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span>
+<table class="ref">
+  <thead><tr><th>Roblox Studio</th><th>Godot</th><th>Difference</th></tr></thead>
+  <tbody>
+    <tr><td><b>Play</b> (<kbd>F5</kbd>) — your avatar spawns at a SpawnLocation</td><td><kbd>F5</kbd> Run Project / <kbd>F6</kbd> Play Scene</td><td>There's no built-in avatar. Whatever the scene contains is what spawns — here, the <a href="#tutorial">demo player you add</a>.</td></tr>
+    <tr><td><b>Play Here</b> — spawn at the camera</td><td>— (no direct equivalent)</td><td>Move the player node where you want to start instead (Inspector → Position).</td></tr>
+    <tr><td><b>Run</b> (<kbd>F8</kbd>) — simulate with no character</td><td><kbd>F6</kbd> on a scene <i>without</i> a player</td><td>A scene with only a Camera just shows that camera's view.</td></tr>
+    <tr><td><b>Stop</b> (<kbd>Shift</kbd>+<kbd>F5</kbd>)</td><td><b>Stop</b> <kbd>F8</kbd></td><td>Careful: <kbd>F8</kbd> means <i>Run</i> in Roblox but <i>Stop</i> in Godot!</td></tr>
+    <tr><td>Pause (in Run mode)</td><td>Pause <kbd>F7</kbd></td><td>Same idea.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="main-scene">Which scene does F5 run? The Main Scene setting</h3>
+<p><kbd>F5</kbd> always runs the <b>Main Scene</b>. To see or change it: <span class="ui">Project</span> menu → <span class="ui">Project Settings…</span> → <span class="ui">General</span> tab → <span class="ui">Application</span> → <span class="ui">Run</span> → <span class="ui">Main Scene</span>.</p>
+<div class="gallery">
+  <figure class="shot"><img src="media/13-playtest-export/30-project-menu.png" alt="The Project menu open: Project Settings…, Find in Files…, Version Control, Export…, Pack Project as ZIP…, Install Android Build Template…, Open User Data Folder, Tools, Reload Current Project, Quit to Project List."><figcaption>The <span class="ui">Project</span> menu — <span class="ui">Project Settings…</span> at the top, <span class="ui">Export…</span> further down.</figcaption></figure>
+  <figure class="shot"><img src="media/13-playtest-export/31-main-scene-setting.png" alt="Project Settings, General tab, Application > Run selected; the Main Scene row reads res://demo/hex_island.tscn, outlined in red."><figcaption>Application → Run → <b>Main Scene</b> = <code>res://demo/hex_island.tscn</code> in this project. The file button at the far right of the row picks a different scene.</figcaption></figure>
+</div>
+<div class="decide">
+  <div><h4>Use F6 (recommended)</h4><p>Open your world's tab, save, press <kbd>F6</kbd>. Nothing in the project changes. Perfect for trying things.</p></div>
+  <div><h4>Change the Main Scene</h4><p>Point Main Scene at your world when it's "the game". Then <kbd>F5</kbd> — and any <a href="#build">exported build</a> — starts there.</p></div>
+  <div><h4>Ctrl+Shift+F5</h4><p>Run some other scene once, from a picker, without opening it.</p></div>
+</div>
+
+<h3 id="game-tab">The Game tab (play inside the editor)</h3>
+<p>The main-view switcher at the top centre reads <span class="ui">2D | 3D | Script | Game | Asset Store</span>. The <b>Game</b> tab is where Godot can show the running game <i>inside</i> the editor, with a toolbar for poking at it live.</p>
+<figure class="shot"><img src="media/13-playtest-export/02-main-tabs.png" alt="The main-view tabs: 2D, 3D, Script, Game, Asset Store."><figcaption>The main-view tabs. <span class="ui">Game</span> is the fourth.</figcaption></figure>
+<div class="hotspots"><img src="media/13-playtest-export/03-game-tab-toolbar.png" alt="The Game tab toolbar: pause, next frame, 1.0x speed, reset, Input, 2D, 3D, select tools, visibility eye, a menu, mute speaker, camera override and options menu.">
+  <button class="spot" style="left:3%;top:50%" data-title="Pause (SceneTree)" data-text="Pause the embedded game.">1</button>
+  <button class="spot" style="left:8%;top:50%" data-title="Next frame" data-text="Step the paused game forward one frame.">2</button>
+  <button class="spot" style="left:15%;top:50%" data-title="Speed 1.0× + reset" data-text="Run the game slower or faster; the circular arrow resets to 1.0×.">3</button>
+  <button class="spot" style="left:32%;top:50%" data-title="Input" data-text="Let your keyboard and mouse control the game.">4</button>
+  <button class="spot" style="left:43%;top:50%" data-title="2D / 3D" data-text="Suspend game input and instead pick / inspect live nodes, or move the live camera.">5</button>
+  <button class="spot" style="left:63%;top:50%" data-title="Selection tools" data-text="Select live nodes, list selectable nodes, toggle selection visibility.">6</button>
+  <button class="spot" style="left:83%;top:50%" data-title="Mute game audio" data-text="Silence the running game.">7</button>
+  <button class="spot" style="left:91%;top:50%" data-title="Override in-game camera" data-text="Look around with an editor camera instead of the game's own.">8</button>
+  <button class="spot" style="left:96%;top:50%" data-title="Game Window Options" data-text="Options for the embedded game window.">9</button>
+</div>
+<figure class="shot"><img src="media/13-playtest-export/04-game-embed-message.png" alt="The Game tab showing the message: Game embedding not available in single window mode."><figcaption>"Game embedding not available in single window mode." The screenshots for this guide were taken in <b>single-window mode</b>, so the game opened as its own window instead.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>If you see this message, embedding is switched off by <span class="ui">Editor Settings → Interface → Editor → Single Window Mode</span>. Turn it <b>off</b> (the default) and the game renders inside the Game tab. Either way works for playtesting — it's just where the window appears.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>The Game tab is like Studio's play mode where you can still click things in the Explorer while the game runs. Its <span class="ui">2D</span>/<span class="ui">3D</span> toggles let you select live nodes; the Scene dock's <span class="ui">Remote</span> view is the live Explorer.</p></div>
+
+<!-- ===================================================== CONTROLS -->
+<h2 id="controls">Demo player controls</h2>
+<p>The project ships a ready-made character: <code>res://demo/player.tscn</code> (the <b>Knight</b>). When a game starts, a hint line appears at the bottom of the screen and fades after about 10 seconds:</p>
+<figure class="shot"><img src="media/13-playtest-export/18-hint-text.png" alt="Hint text: WASD move · Shift walk · Space jump · drag / arrows orbit · wheel zoom · F3 tuner · F1 help."><figcaption>The on-screen hint, word for word: <i>WASD move · Shift walk · Space jump · drag / arrows orbit · wheel zoom · F3 tuner · F1 help</i>.</figcaption></figure>
+<figure class="shot"><img src="media/13-playtest-export/05-game-running-hint.png" alt="The running game: the Knight on a grassy pixel-art island by the sea, with the hint line along the bottom."><figcaption>The demo island running, Knight in the middle, hint along the bottom.</figcaption></figure>
+
+<div class="keygrid">
+  <div class="k"><b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></b><span>Move (run)</span></div>
+  <div class="k"><b><kbd>Shift</kbd></b><span>Hold to walk</span></div>
+  <div class="k"><b><kbd>Space</kbd></b><span>Jump</span></div>
+  <div class="k"><b>Drag / <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></b><span>Orbit camera</span></div>
+  <div class="k"><b>Wheel</b><span>Zoom</span></div>
+  <div class="k"><b><kbd>F1</kbd></b><span>Show hint again</span></div>
+  <div class="k"><b><kbd>F3</kbd></b><span>Pixel tuner (if present)</span></div>
+  <div class="k"><b><kbd>F8</kbd> (editor)</b><span>Stop playing</span></div>
+</div>
+
+<input class="filter-box" data-target="#controls-ref" placeholder="Filter controls… (e.g. jump, camera, F3)">
+<div id="controls-ref">
+  <div class="control"><h4>Move</h4><div class="where">Keyboard · W A S D</div>
+    <p>Runs forward / back / left / right relative to the camera. The character turns to face the way it's moving. Keys are by <i>position</i>, so they work on AZERTY keyboards too.</p>
+    <figure class="clip"><video src="media/13-playtest-export/10-move-forward.mp4" poster="media/13-playtest-export/10-move-forward.png" data-autoplay></video><figcaption>Holding <kbd>W</kbd>: the Knight runs forward and the camera follows.</figcaption></figure>
+    <figure class="clip"><video src="media/13-playtest-export/11-move-turn.mp4" poster="media/13-playtest-export/11-move-turn.png" data-autoplay></video><figcaption><kbd>A</kbd> then <kbd>D</kbd>: the character turns to face each direction.</figcaption></figure>
+    <dl><dt>Keys</dt><dd><kbd>W</kbd> forward · <kbd>S</kbd> back · <kbd>A</kbd> left · <kbd>D</kbd> right</dd></dl></div>
+  <div class="control"><h4>Walk (slow)</h4><div class="where">Keyboard · Shift held</div>
+    <p>Hold <kbd>Shift</kbd> while moving for a slower walk instead of a run — handy for lining up a screenshot.</p>
+    <figure class="clip"><video src="media/13-playtest-export/12-shift-walk.mp4" poster="media/13-playtest-export/12-shift-walk.png" data-autoplay></video><figcaption>Run, then hold <kbd>Shift</kbd> to walk.</figcaption></figure></div>
+  <div class="control"><h4>Jump</h4><div class="where">Keyboard · Space</div>
+    <p>A modest hop of about 1 m. The camera keeps the character centred, so it's the <i>background</i> you'll see bob.</p>
+    <figure class="clip"><video src="media/13-playtest-export/13-jump.mp4" poster="media/13-playtest-export/13-jump.png" data-autoplay></video><figcaption>Running jumps with <kbd>Space</kbd>.</figcaption></figure></div>
+  <div class="control"><h4>Orbit camera (mouse)</h4><div class="where">Mouse · drag with left, middle or right button</div>
+    <p>Spins the camera around the character, left/right and up/down — from eye level to looking straight down.</p>
+    <figure class="clip"><video src="media/13-playtest-export/14-camera-orbit-drag.mp4" poster="media/13-playtest-export/14-camera-orbit-drag.png" data-autoplay></video><figcaption>Orbiting by dragging the mouse.</figcaption></figure></div>
+  <div class="control"><h4>Orbit camera (keys)</h4><div class="where">Keyboard · arrow keys</div>
+    <p>Same orbit, using <kbd>←</kbd> <kbd>→</kbd> (spin) and <kbd>↑</kbd> <kbd>↓</kbd> (tilt). Useful on a laptop trackpad.</p>
+    <figure class="clip"><video src="media/13-playtest-export/15-camera-orbit-keys.mp4" poster="media/13-playtest-export/15-camera-orbit-keys.png" data-autoplay></video><figcaption>Orbiting with the arrow keys.</figcaption></figure></div>
+  <div class="control"><h4>Zoom</h4><div class="where">Mouse · wheel</div>
+    <p>Moves the camera closer or further away. It stops at a minimum and maximum distance.</p>
+    <figure class="clip"><video src="media/13-playtest-export/16-camera-zoom.mp4" poster="media/13-playtest-export/16-camera-zoom.png" data-autoplay></video><figcaption>Wheel out, then back in.</figcaption></figure></div>
+  <div class="control"><h4>Help (F1)</h4><div class="where">Keyboard · F1</div>
+    <p>Shows the hint line again after it fades.</p>
+    <figure class="clip"><video src="media/13-playtest-export/17-f1-hint.mp4" poster="media/13-playtest-export/17-f1-hint.png" data-autoplay></video><figcaption><kbd>F1</kbd> brings the hint line back.</figcaption></figure></div>
+  <div class="control"><h4>Pixel tuner (F3)</h4><div class="where">Keyboard · F3 · only in scenes with a PixelDiagnostics node</div>
+    <p>Toggles a developer overlay for inspecting and tweaking the pixel look live. See <a href="#f3">the F3 Pixel tuner</a> below. <b>Does nothing in a scene without a <code>PixelDiagnostics</code> node</b> — including your own <code>first_world</code>.</p>
+    <figure class="clip"><video src="media/13-playtest-export/19-f3-diagnostics.mp4" poster="media/13-playtest-export/19-f3-diagnostics.png" data-autoplay></video><figcaption><kbd>F3</kbd> toggles the Pixel tuner overlay on the demo island.</figcaption></figure></div>
+  <div class="control"><h4>Esc</h4><div class="where">Keyboard</div>
+    <p><b>Does nothing</b> in the demo. The mouse isn't captured, so there's nothing to release. Quit with <span class="ui">Stop</span> / <kbd>F8</kbd> in the editor, or the game window's close box.</p></div>
+</div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>These are the Roblox defaults you already know: WASD to move, Space to jump, drag to orbit, wheel to zoom — a classic over-the-shoulder follow camera. One difference: Shift <i>slows you down</i> here (walk), it isn't a sprint or shift-lock.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>The game may look slow or choppy in these clips because they were recorded on a slow computer. On your machine it will run at normal speed.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Tutorial: put the player in <i>your</i> world</h2>
+<p>You'll take the world from <a href="02-first-world.html">Your first world</a> (<code>res://tutorial/guide/first_world.tscn</code>), add the Knight, and walk around in it. The finished result is in the project as <code>res://tutorial/guide/first_world_player.tscn</code> — open it to compare, or just press <kbd>F6</kbd> on it to skip ahead.</p>
+
+<div class="callout warn big-warn"><span class="label">The #1 first-timer mistake — read this first</span>
+<p><b>Move the PlayerRig <i>above</i> the ground before you press F6.</b></p>
+<p>A freshly added player appears at the world origin <b>(0, 0, 0)</b>, which is usually <b>inside your hill</b>. A character that starts buried in the terrain falls straight through on the first frame — the camera falls with it and all you see is sky and sea. It is <b>not</b> a bug: terrain collision works fine. Set its Position to something like <b>y = 8</b> (higher than your tallest ground) and it lands normally.</p>
+</div>
+
+<div class="compare" data-before="Left at 0,0,0 — falls" data-after="Moved to y = 8 — lands"><img src="media/13-playtest-export/59-forget-to-move.png" alt="Runtime view showing only sky and dark sea — the player fell through the terrain."><img src="media/13-playtest-export/54-player-landing.png" alt="Runtime view of the Knight on a sandy path in a forest clearing, partly behind a tree, with the sea behind."></div>
+<p>Drag the slider: left = forgot to move the player, right = moved it up.</p>
+
+<ol class="steps" data-id="playtest-add-player">
+  <li><b>Open your world.</b> In the <span class="ui">FileSystem</span> dock double-click <code>res://tutorial/guide/first_world.tscn</code> (your scene from page 02). In the <span class="ui">Scene</span> dock click the <b>World</b> root node to select it — the new player will be added under whatever is selected.</li>
+  <li><b>Instantiate the player.</b> Click <span class="ui">Instantiate Child Scene</span> — the <b>chain-link icon</b> at the top of the Scene dock, next to <span class="ui">+</span> (tooltip <i>"Instantiate a scene file as a Node…"</i>). The <span class="ui">Select Scene</span> picker opens.
+    <figure class="clip"><video src="media/13-playtest-export/52-instantiate-player.mp4" poster="media/13-playtest-export/52-instantiate-player.png" data-autoplay></video><figcaption>Select World → Instantiate Child Scene → pick <code>player.tscn</code> → a PlayerRig node appears.</figcaption></figure></li>
+  <li><b>Pick <code>res://demo/player.tscn</code>.</b> It's at the top of the list, or type <i>player</i> to filter. (<code>fox_player.tscn</code> is the <a href="#fox">Fox</a>.) Click <span class="ui">Open</span>.
+    <figure class="shot"><img src="media/13-playtest-export/50-select-scene-player.png" alt="The Select Scene picker with player.tscn typed in the search box; player.tscn (res://demo) is highlighted, with fox_player.tscn and two tutorial scenes below."><figcaption>The Select Scene picker: <code>player.tscn</code> (the Knight) at the top, <code>fox_player.tscn</code> just below.</figcaption></figure></li>
+  <li><b>Check it was added.</b> A <b>PlayerRig</b> node now sits under World, after Birds. The clapperboard icon next to it means "this is an instanced scene".
+    <figure class="shot"><img src="media/13-playtest-export/51-scene-tree-player-added.png" alt="Scene dock: World with MarchingSquaresTerrain, Camera, PixelRenderer, Sun, WorldEnvironment, DayNight, Water, Birds and a new PlayerRig outlined in red."><figcaption>PlayerRig added under World. It is sitting at (0, 0, 0) right now.</figcaption></figure></li>
+  <li><b>Move it above the ground — don't skip this.</b> With PlayerRig selected, in the <span class="ui">Inspector</span> expand <span class="ui">Transform</span> → <span class="ui">Position</span> and type <b>x 5, y 8, z 4</b> (press <kbd>Enter</kbd> after each). The hill in <code>first_world</code> peaks at about 5.3 units near (5, 4), so y = 8 drops the character a short, safe distance onto the ground. You can also drag the <b>green (Y) arrow</b> of the move gizmo in the 3D view.
+    <div class="compare" data-before="Before: 0, 0, 0" data-after="After: 5, 8, 4"><img src="media/13-playtest-export/53a-position-before.png" alt="Inspector for PlayerRig: Transform Position x 0, y 0, z 0."><img src="media/13-playtest-export/53b-position-after.png" alt="Inspector for PlayerRig: Transform Position x 5.0 m, y 8.0 m, z 4.0 m; Rotation 0, Scale 1."></div>
+    <figure class="shot"><img src="media/13-playtest-export/53-set-position-compare.png" alt="Labelled side-by-side of the Inspector: Position 0, 0, 0 (inside the hill) and Position 5, 8, 4 (above the ground)."><figcaption>Before and after, labelled: (0, 0, 0) is inside the hill; (5, 8, 4) is above it.</figcaption></figure></li>
+  <li><b>Save.</b> Press <kbd>Ctrl</kbd>+<kbd>S</kbd>. <kbd>F6</kbd> runs the <i>saved</i> file, so unsaved changes won't show up. (Want to keep your original untouched? Use <span class="ui">Scene → Save Scene As…</span> and give it a new name, like we did with <code>first_world_player.tscn</code>.)</li>
+  <li><b>Press <kbd>F6</kbd></b> ("Play the currently edited scene"). The Knight drops onto the terrain in the forest clearing.
+    <figure class="shot"><img src="media/13-playtest-export/54-player-landing.png" alt="The Knight standing on a sandy path in a forest clearing, fully visible, with low-poly trees around and the sea behind."><figcaption>Landed. The Knight stands on the sandy path in the clearing, trees around, the sea behind.</figcaption></figure></li>
+  <li><b>Walk around.</b> Try every control from the <a href="#controls">table above</a>.
+    <figure class="clip"><video src="media/13-playtest-export/55-walk-wasd.mp4" poster="media/13-playtest-export/55-walk-wasd.png" data-autoplay></video><figcaption>Walking through the trees with W/A/S/D.</figcaption></figure>
+    <figure class="clip"><video src="media/13-playtest-export/56-camera-orbit.mp4" poster="media/13-playtest-export/56-camera-orbit.png"></video><figcaption>Orbiting by dragging — from eye level to top-down.</figcaption></figure>
+    <figure class="clip"><video src="media/13-playtest-export/57-camera-zoom.mp4" poster="media/13-playtest-export/57-camera-zoom.png"></video><figcaption>Mouse-wheel zoom in, then out.</figcaption></figure>
+    <figure class="shot"><img src="media/13-playtest-export/58-world-overview.png" alt="Low runtime view looking up at the wooded hilltop, trees against a blue sky, the sea at the edges."><figcaption>The camera tilted down to near eye level: the wooded hilltop you built, with the sea behind.</figcaption></figure></li>
+  <li><b>Stop.</b> Press <kbd>F8</kbd> (or close the game window). Edit, save, <kbd>F6</kbd> again — that's the playtest loop.</li>
+</ol>
+
+<h3 id="trap">What "forgot to move it" looks like</h3>
+<div class="callout warn"><span class="label">Watch out</span><p>If all you see after <kbd>F6</kbd> is sky over dark water and no ground at all, the player fell through. Stop (<kbd>F8</kbd>), select PlayerRig, raise its Position Y above your highest ground, save, and play again. That is always the fix.</p></div>
+<figure class="clip"><video src="media/13-playtest-export/59-forget-to-move.mp4" poster="media/13-playtest-export/59-forget-to-move.png"></video><figcaption>PlayerRig left at (0, 0, 0): it starts inside the hill, falls through, and the camera follows it down. Only sky and sea.</figcaption></figure>
+<figure class="shot"><img src="media/13-playtest-export/59c-move-or-not-compare.png" alt="Side by side. Left, labelled 'Moved above the ground (y = 8): lands': the Knight in a forest clearing. Right, labelled 'Left at the origin (0,0,0): falls through': only sky and sea."><figcaption>Moved vs not moved — the same scene, one number different.</figcaption></figure>
+
+<div class="callout tip"><span class="label">Tip</span><p><kbd>F3</kbd> does nothing in <code>first_world</code> — that overlay needs a <code>PixelDiagnostics</code> node, which only the demo island has. <kbd>F1</kbd> and all movement and camera controls work exactly as on the demo island.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox a <b>SpawnLocation</b> decides where you appear. Here the player node <i>is</i> the spawn point: wherever its Position is when the game starts is where it starts. Put it a little above the ground, the way you'd raise a SpawnLocation so avatars don't spawn inside terrain.</p></div>
+
+<h3 id="fox">The Fox variant</h3>
+<p><code>res://demo/fox_player.tscn</code> is the same character rig with a Fox model instead of the Knight. Same script, same controls, same rule: move it above the ground. Add it the same way (pick <code>fox_player.tscn</code> in step 3). To swap an existing Knight, delete PlayerRig and instance the Fox instead.</p>
+<div class="gallery">
+  <figure class="shot"><img src="media/13-playtest-export/64-fox-variant.png" alt="An orange pixel-art Fox on the sandy path in a forest clearing, fully visible among the trees."><figcaption>The Fox, landed on the terrain.</figcaption></figure>
+  <figure class="clip"><video src="media/13-playtest-export/65-fox-walk.mp4" poster="media/13-playtest-export/65-fox-walk.png"></video><figcaption>The Fox walking through the trees.</figcaption></figure>
+</div>
+
+<!-- ===================================================== F3 -->
+<h2 id="f3">The F3 Pixel tuner (developer overlay)</h2>
+<p>In the demo island (<code>res://demo/hex_island.tscn</code>) press <kbd>F3</kbd> while playing to open the Pixel tuner. It comes from a <code>PixelDiagnostics</code> node in that scene. <b>Everything you change here is live-only and not saved</b> — a safe playground for seeing what each effect does.</p>
+<figure class="shot"><img src="media/13-playtest-export/20-f3-tuner-full.png" alt="The running game with the F3 overlay: a status readout top-left, an object inspector on the left and the Pixel tuner panel on the right."><figcaption>The full overlay: status readout (top-left), object inspector (left), Pixel tuner panel (right).</figcaption></figure>
+<figure class="shot"><img src="media/13-playtest-export/21-f3-status.png" alt="Status readout: draws, prims, F3 hides; pixel 3px, low-res 430x242, texel 0.024 m, cam persp, outlines on, ids 0-255, palette on, rays on; weather Clear (wet 0.00, snow 0.00), time 13:32, features 14/14."><figcaption>The status readout. (Ignore the 2 fps reading: these pictures were taken on a very slow computer. Your game will run much faster.)</figcaption></figure>
+<input class="filter-box" data-target="#f3-ref" placeholder="Filter Pixel tuner parts…">
+<div id="f3-ref">
+  <div class="control"><h4>Status line 1</h4><div class="where">Top-left</div><p><code>fps | draws | prims | F3 hides</code> — frame rate, draw calls, triangles drawn (in thousands), and a reminder that F3 hides the overlay.</p></div>
+  <div class="control"><h4>Status line 2</h4><div class="where">Top-left</div><p><code>pixel &lt;N&gt;px | low-res W×H | texel &lt;m&gt; | cam persp | outlines on | ids 0-255 | palette on | rays on</code> — how big each game pixel is on screen, the size of the low-res image the game draws, how many metres one pixel covers, the camera type, and which pixel features are active.</p></div>
+  <div class="control"><h4>Status line 3</h4><div class="where">Top-left</div><p><code>weather &lt;type&gt; (wet, snow) | time HH:MM | features used/total</code> — current weather and wetness/snow, the day-night clock, and how many features are on.</p></div>
+  <div class="control"><h4>Select Object / Clear</h4><div class="where">Left · object inspector</div><p>Click <span class="ui">Select Object</span>, then click a mesh in the game to inspect and tune how that object is pixelized. <span class="ui">Clear</span> deselects.</p></div>
+  <div class="control"><h4>Rescan</h4><div class="where">Pixel tuner panel · top-right</div><p>Re-finds the effects in the scene.</p></div>
+  <div class="control"><h4>Debug view</h4><div class="where">Pixel tuner panel · dropdown</div><p>Shows one internal layer of the renderer instead of the final picture. Default <b>Final</b> (the normal look). See <a href="07-pixelizer.html">The pixelizer</a> for what the debug views mean.</p></div>
+  <div class="control"><h4>Effects / Render / Scene tabs</h4><div class="where">Pixel tuner panel</div><p>Three pages of live settings. <b>Effects</b> is shown below.</p></div>
+  <div class="control"><h4>Features (this session)</h4><div class="where">Effects tab</div><p>Checkboxes to switch effects on/off: Clouds, God Rays, Outlines, Outline Ids, Water, Weather, Birds, Fireflies, Smoke, Fire, Particle Fields, Light Volumes, Sun Shafts, Grass. <span class="ui">All on</span> ticks everything; <span class="ui">Defaults</span> restores the starting set.</p></div>
+  <div class="control"><h4>PixelWeather section</h4><div class="where">Effects tab · per-effect section</div><p>Quick buttons <span class="ui">Clear · Cloudy · Foggy · Rain · Snow · Storm</span>; <span class="ui">Instant</span>, <span class="ui">Snow overlay</span>, <span class="ui">Lightning</span>; plus <span class="ui">Weather</span> dropdown, <span class="ui">Transition Seconds</span> (6.0), <span class="ui">Ground Seconds</span> (15.0) and <span class="ui">Strength</span> (1.0). See <a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a>.</p></div>
+</div>
+<div class="hotspots"><img src="media/13-playtest-export/22-f3-tuner-panel.png" alt="The Pixel tuner panel: Rescan, Debug view Final, tabs Effects/Render/Scene, Features checkboxes all ticked, All on/Defaults, and a PixelWeather section with weather buttons and number fields.">
+  <button class="spot" style="left:92%;top:2%" data-title="Rescan" data-text="Re-find effects in the scene.">1</button>
+  <button class="spot" style="left:80%;top:7%" data-title="Debug view" data-text="Final = the normal picture. Other choices show internal layers.">2</button>
+  <button class="spot" style="left:22%;top:12%" data-title="Effects / Render / Scene" data-text="Three tabs of live settings.">3</button>
+  <button class="spot" style="left:50%;top:35%" data-title="Features (this session)" data-text="Switch each effect on/off for this run only.">4</button>
+  <button class="spot" style="left:12%;top:55%" data-title="All on / Defaults" data-text="Tick everything, or go back to the starting set.">5</button>
+  <button class="spot" style="left:50%;top:69%" data-title="Weather quick buttons" data-text="Clear, Cloudy, Foggy, Rain, Snow, Storm; plus Instant, Snow overlay, Lightning.">6</button>
+  <button class="spot" style="left:60%;top:88%" data-title="Transition / Ground / Strength" data-text="How fast weather changes, how long the ground takes to get wet or snowy, and how strong it is.">7</button>
+</div>
+<div class="callout try"><span class="label">Try it</span><p>Run the demo island (<kbd>F5</kbd> in this project), press <kbd>F3</kbd>, click <span class="ui">Storm</span>, then untick <span class="ui">Outlines</span>. Watch the world change. Stop and run again — everything is back to normal, because the tuner never saves.</p></div>
+
+<!-- ===================================================== PIXEL LOOK -->
+<h2 id="pixel-look">The pixel look: editor preview vs the real game</h2>
+<p>In the editor, the 3D view normally shows your world as smooth, high-resolution 3D with a grid and gizmos. The <span class="ui">Pixel Preview</span> toggle in the 3D-view toolbar switches it to the game's own pixel renderer, so you can see what players will see without pressing play.</p>
+<div class="compare" data-before="Pixel Preview OFF" data-after="Pixel Preview ON"><img src="media/13-playtest-export/61-pixel-preview-off.png" alt="Editor 3D view of first_world from a close camera, Pixel Preview off: a smooth grassy hill with a wooded clearing on top, seen from above."><img src="media/13-playtest-export/62-pixel-preview-on.png" alt="The same close view with Pixel Preview on: the hill drawn as chunky green pixels over a pixelated sea."></div>
+<figure class="shot"><img src="media/13-playtest-export/63-pixel-preview-compare.png" alt="Labelled side-by-side of first_world in the editor: Pixel Preview OFF (raw 3D) and Pixel Preview ON (pixel art), both framed close to the hill."><figcaption>The same comparison as one labelled picture, framed close to the hill so the pixel treatment is easy to see.</figcaption></figure>
+<table class="ref">
+  <thead><tr><th></th><th>Editor, Pixel Preview OFF</th><th>Editor, Pixel Preview ON</th><th>Running game (F5/F6)</th></tr></thead>
+  <tbody>
+    <tr><td>Renderer</td><td>Raw 3D</td><td>The game's PixelRenderer</td><td>The game's PixelRenderer</td></tr>
+    <tr><td>Grid, axes, gizmos</td><td>Yes</td><td>Grid hidden by the pixel image</td><td>None</td></tr>
+    <tr><td>Character, movement</td><td>No</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Use it for</td><td>Precise sculpting / placing</td><td>Judging the final look while editing</td><td>Testing how it feels</td></tr>
+  </tbody>
+</table>
+<p>Pixel Preview ON matches the runtime look, minus the editor clutter. More on the renderer in <a href="07-pixelizer.html">The pixelizer</a>.</p>
+
+<h3 id="window">Window size and scaling</h3>
+<p>This one surprises people. The project's <span class="ui">Stretch Mode</span> is <b>disabled</b>, so the game does <i>not</i> take a fixed small image and blow it up. Instead the pixel renderer works out its low-res image from the <b>current window size</b>, keeping the same camera framing:</p>
+<ul>
+  <li><b>Bigger window → more, finer pixels</b> (more detail).</li>
+  <li><b>Smaller window → fewer, chunkier pixels</b> (more retro).</li>
+</ul>
+<div class="scrubber" data-label="Window size" data-start="1"
+  data-frames='[{"v":"640×360","src":"media/13-playtest-export/41-window-640x360.png","note":"Small window: chunky pixels, same framing."},{"v":"1280×720","src":"media/13-playtest-export/40-window-1280x720.png","note":"The project default (Viewport Width/Height)."},{"v":"1920×1080","src":"media/13-playtest-export/42-window-1920x1080.png","note":"Full HD: finer pixels, same framing."}]'></div>
+<figure class="shot"><img src="media/13-playtest-export/43-pixel-scale-compare.png" alt="Three crops of the Knight in front of a cliff at 640x360, 1280x720 and 1920x1080, each at native pixels; the pixels get finer left to right."><figcaption>The same spot at native size: 640×360, 1280×720, 1920×1080. The pixels get finer as resolution rises.</figcaption></figure>
+<figure class="clip"><video src="media/13-playtest-export/44-window-resize.mp4" poster="media/13-playtest-export/44-window-resize.png"></video><figcaption>Resizing the game window live: the pixel grid re-adjusts to the new size.</figcaption></figure>
+
+<p>The settings live in <span class="ui">Project Settings → General → Display → Window</span>:</p>
+<div class="gallery">
+  <figure class="shot"><img src="media/13-playtest-export/32-window-stretch-settings.png" alt="Project Settings, Display > Window, Size section: Viewport Width 1280, Viewport Height 720, Mode Windowed, Resizable on."><figcaption><b>Size</b>: Viewport 1280×720, Mode Windowed, Resizable on.</figcaption></figure>
+  <figure class="shot"><img src="media/13-playtest-export/33-stretch-settings.png" alt="Project Settings, Display > Window, Stretch section: Mode disabled, Aspect keep, Scale 1.0."><figcaption><b>Stretch</b>: Mode disabled, Aspect keep, Scale 1.0.</figcaption></figure>
+</div>
+<input class="filter-box" data-target="#window-ref" placeholder="Filter window settings…">
+<div id="window-ref">
+  <div class="control"><h4>Viewport Width / Height</h4><div class="where">Display → Window → Size</div><p>The size the game window opens at.</p><dl><dt>This project</dt><dd>1280 × 720</dd></dl></div>
+  <div class="control"><h4>Mode</h4><div class="where">Display → Window → Size</div><p>Windowed, fullscreen, etc. at startup.</p><dl><dt>This project</dt><dd>Windowed</dd></dl></div>
+  <div class="control"><h4>Resizable</h4><div class="where">Display → Window → Size</div><p>Whether players can drag the window edges. On here — and resizing changes pixel fineness, as shown above.</p><dl><dt>This project</dt><dd>On</dd></dl></div>
+  <div class="control"><h4>Stretch Mode</h4><div class="where">Display → Window → Stretch</div><p>How Godot scales the picture to the window. <b>disabled</b> here, because the pixel renderer handles resolution itself.</p><dl><dt>This project</dt><dd>disabled</dd></dl></div>
+  <div class="control"><h4>Stretch Aspect</h4><div class="where">Display → Window → Stretch</div><p>How the aspect ratio is kept when stretching.</p><dl><dt>This project</dt><dd>keep</dd></dl></div>
+  <div class="control"><h4>Stretch Scale</h4><div class="where">Display → Window → Stretch</div><p>Extra scale factor.</p><dl><dt>This project</dt><dd>1.0</dd></dl></div>
+</div>
+<div class="callout tip"><span class="label">Tip</span><p>Want the same chunky look no matter the window? Adjust the pixel size on the renderer instead of the window settings — see <a href="07-pixelizer.html">The pixelizer</a>.</p></div>
+
+<!-- ===================================================== EXPORT -->
+<h2 id="export">Getting your world out</h2>
+<p>There are three different "exports". Pick the one that matches what you want:</p>
+<div class="decide">
+  <div><h4>Export GLB</h4><p><b>The terrain as a 3D model file.</b></p><p>For Blender, or bringing your terrain into Roblox Studio as a MeshPart.</p><p><a href="#glb">Jump ↓</a></p></div>
+  <div><h4>Bake Meshes</h4><p><b>A frozen static copy inside the scene.</b></p><p>Plain meshes you can keep, tweak or export with the rest of the scene.</p><p><a href="#bake">Jump ↓</a></p></div>
+  <div><h4>Project → Export…</h4><p><b>A playable game program.</b></p><p>Something friends can download and run without Godot.</p><p><a href="#build">Jump ↓</a></p></div>
+</div>
+
+<h3 id="glb">Export GLB (terrain → Blender / Roblox)</h3>
+<p>These buttons are on the terrain's Settings tool, <span class="ui">Storage</span> page (full details on <a href="06-chunks-settings.html">Chunks, settings &amp; saving</a>).</p>
+<ol class="steps" data-id="playtest-export-glb">
+  <li>Select the terrain node (<b>MarchingSquaresTerrain</b>) in the Scene dock.</li>
+  <li>Open the <b>Terrain Settings</b> tool: the left toolbar, or press <kbd>9</kbd>.
+    <figure class="shot"><img src="media/13-playtest-export/35-settings-pages-tabs.png" alt="Settings page tabs: Grid, New Chunks, Grass, Display, LOD &amp; Nature, Storage."><figcaption>The six Settings pages. Click <span class="ui">Storage</span>.</figcaption></figure></li>
+  <li>Click the <span class="ui">Storage</span> tab.</li>
+  <li>(Optional) Check the terrain's <b>Export Path</b> property in the Inspector. Default: <code>res://terrain_export.glb</code>. Safer: a folder <b>outside</b> your project (see the warning below).</li>
+  <li>Click <span class="ui">Export</span> next to <span class="ui">Export GLB:</span>. The terrain bakes chunk by chunk, then the file is written. The editor pauses for several seconds — that's normal.
+    <figure class="shot"><img src="media/13-playtest-export/36-glb-export-progress.png" alt="The Export GLB row during an export: a progress bar at 11%, the text Baking; the editor will pause to write the file, and a Cancel button."><figcaption>The inline progress bar. <span class="ui">Cancel</span> stops the export.</figcaption></figure></li>
+  <li>Import the <code>.glb</code> into Blender (<span class="ui">File → Import → glTF 2.0</span>) or Roblox Studio (<span class="ui">3D Importer</span> → pick the .glb).</li>
+</ol>
+<div class="hotspots"><img src="media/13-playtest-export/34-storage-page-strip.png" alt="The Storage settings page: Storage Mode Resource, Import MST with an Import… button, Bake Meshes with a Bake button, Export GLB with an Export button outlined in red.">
+  <button class="spot" style="left:30%;top:13%" data-title="Page tabs" data-text="Grid · New Chunks · Grass · Display · LOD &amp; Nature · Storage.">1</button>
+  <button class="spot" style="left:40%;top:45%" data-title="Storage Mode" data-text="Resource / Baked / Runtime — where terrain data is kept. See page 06.">2</button>
+  <button class="spot" style="left:45%;top:77%" data-title="Import MST: Import…" data-text="Re-import a saved .mst / data file from the original MarchingSquaresTerrain addon.">3</button>
+  <button class="spot" style="left:86%;top:45%" data-title="Bake Meshes: Bake" data-text="Freeze the live terrain into plain static meshes in the scene.">4</button>
+  <button class="spot" style="left:87%;top:77%" data-title="Export GLB: Export" data-text="Write the whole terrain to Export Path as one .glb with a baked texture atlas.">5</button>
+</div>
+
+<p><b>What you get</b> (verified on the demo island): a valid glTF 2.0 file containing <b>one mesh</b> called <code>Terrain</code> under a node <code>MarchingSquaresTerrainExport</code>, <b>one material</b> and <b>one baked texture atlas</b> — your ground textures, the blending between them and the walls are all painted into that one image. The demo island's file was about 39 MB because the atlas is high resolution.</p>
+
+<div class="callout warn"><span class="label">Watch out — the crash-risk guard</span><p>If all of these are true: the Export Path is <b>inside the project folder</b>, the renderer is <b>Compatibility</b> (the renderer name sits in the editor's top-right corner), <b>Use Multiple Threads</b> import is on (Project Settings → Editor → Import, with Advanced Settings switched on), and the atlas has <b>two or more textures</b> — the addon stops and asks you to confirm (<i>"…the Godot editor can crash while importing a GLB that holds two or more textures…"</i>, <span class="ui">Export Anyway</span> / <span class="ui">Cancel</span>). That's because Godot immediately tries to import the new GLB, and that import can crash.</p>
+<p>To avoid it: export to a folder <b>outside</b> the project (or one containing a <code>.gdignore</code> file), or turn off multi-threaded import, or use the Forward+ / Mobile renderer. When in doubt, press <span class="ui">Cancel</span> and change the Export Path.</p></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Export GLB is your bridge <b>back into Roblox</b>. In Studio open the <b>3D Importer</b>, pick the <code>.glb</code>, and the terrain arrives as a <b>MeshPart</b> with the baked texture. Note it's a mesh, not Roblox Terrain — you can't sculpt it with Studio's Terrain Editor afterwards. Make shape changes here and re-export.</p></div>
+
+<h3 id="bake">Bake Meshes</h3>
+<p>The <span class="ui">Bake</span> button next to <span class="ui">Bake Meshes:</span> (same Storage page) turns the live terrain into ordinary static mesh nodes (<code>MeshInstance3D</code>) in your scene — a frozen copy that no longer depends on the terrain tool. It's undoable. Full details of what it creates are on <a href="06-chunks-settings.html#storage">page 06 → Storage</a>.</p>
+<div class="callout tip"><span class="label">Tip</span><p>Bake Meshes keeps things <i>inside</i> Godot; Export GLB writes a <i>file</i> for other programs. If you only want the world in your game, you don't need either — the terrain runs as-is.</p></div>
+
+<h3 id="build">Exporting a playable build (Project → Export…)</h3>
+<p>To give someone a game they can run without Godot, you <b>export</b> the project.</p>
+<ol class="steps" data-id="playtest-export-build">
+  <li>Make sure the <a href="#main-scene">Main Scene</a> is the scene you want the game to start in.</li>
+  <li>Open <span class="ui">Project → Export…</span>. The Export dialog lists <b>presets</b> — one per platform.</li>
+  <li>This project already has one: <b>Linux (Runnable)</b>, exporting to <code>build/linux/marching-squares-terrain.x86_64</code>. For Windows or macOS click <span class="ui">Add…</span> and choose the platform.</li>
+  <li>If the dialog shows red <i>"No export template found…"</i> lines, click <span class="ui">Manage Export Templates</span> and install them (next section).</li>
+  <li>Click <span class="ui">Export Project…</span>, pick a folder, and Godot writes the game.</li>
+</ol>
+<figure class="shot"><img src="media/13-playtest-export/37-export-dialog.png" alt="The Export dialog: Presets with Linux (Runnable), Name Linux, Export Path build/linux/marching-squares-terrain.x86_64, the Options tab selected, Export Console Wrapper Debug Only, Embed PCK off, Architecture x86_64."><figcaption>The Export dialog with the project's Linux preset and its Options tab.</figcaption></figure>
+<input class="filter-box" data-target="#export-ref" placeholder="Filter Export dialog parts…">
+<div id="export-ref">
+  <div class="control"><h4>Presets list · Add… / duplicate / delete</h4><div class="where">Left column</div><p>One preset per target platform. <span class="ui">Add…</span> creates one (Windows, macOS, Linux, Android, Web…). The icons duplicate or delete the selected preset.</p></div>
+  <div class="control"><h4>Name</h4><div class="where">Top</div><p>The preset's name (here "Linux").</p></div>
+  <div class="control"><h4>Runnable</h4><div class="where">Top-right toggle</div><p>Marks this preset as the one used for one-click deploy. On here.</p></div>
+  <div class="control"><h4>Advanced Options</h4><div class="where">Top toggle</div><p>Shows extra settings. Off by default.</p></div>
+  <div class="control"><h4>Export Path</h4><div class="where">Top · with folder button</div><p>Where the game file is written.</p><dl><dt>This project</dt><dd><code>build/linux/marching-squares-terrain.x86_64</code></dd></dl></div>
+  <div class="control"><h4>Options · Resources · Patching · Features · Encryption · Scripts</h4><div class="where">Tabs</div><p>Detailed export settings. Defaults are fine for a first build.</p></div>
+  <div class="control"><h4>Export Console Wrapper</h4><div class="where">Options · Debug</div><p>Whether a console window comes along to show log messages.</p><dl><dt>This project</dt><dd>Debug Only</dd></dl></div>
+  <div class="control"><h4>Embed PCK</h4><div class="where">Options · Binary Format</div><p>Packs the game data inside the program file (one file) instead of beside it (a <code>.pck</code> next to it).</p><dl><dt>This project</dt><dd>Off</dd></dl></div>
+  <div class="control"><h4>Architecture</h4><div class="where">Options · Binary Format</div><p>The CPU type to build for.</p><dl><dt>This project</dt><dd>x86_64</dd></dl></div>
+  <div class="control"><h4>Manage Export Templates</h4><div class="where">Bottom-left link</div><p>Opens the Export Template Manager.</p></div>
+  <div class="control"><h4>Export PCK/ZIP…</h4><div class="where">Bottom button</div><p>Exports only the game data package, without the runnable program. Works without templates.</p></div>
+  <div class="control"><h4>Export Project…</h4><div class="where">Bottom button</div><p>Builds the runnable game. <b>Greyed out until export templates are installed.</b></p></div>
+  <div class="control"><h4>Export All…</h4><div class="where">Bottom button</div><p>Exports every preset in one go. Also needs templates.</p></div>
+</div>
+
+<h3 id="templates">Export templates (install once)</h3>
+<p><b>Export templates</b> are the pre-built "game player" programs Godot combines with your project. They're a separate download, one set per Godot version (this project: <b>4.7.2.stable</b>). Without them, the dialog shows red <i>"No export template found at the expected path"</i> errors for <code>linux_debug.x86_64</code> and <code>linux_release.x86_64</code>, and <span class="ui">Export Project…</span> stays greyed out.</p>
+<figure class="shot"><img src="media/13-playtest-export/38-export-templates-missing.png" alt="Close-up of the Export dialog footer: Manage Export Templates outlined in red, Export PCK/ZIP… enabled, and Export Project… and Export All… greyed out."><figcaption>Templates missing: Export Project… and Export All… are greyed out. The fix is the <span class="ui">Manage Export Templates</span> link.</figcaption></figure>
+<figure class="shot"><img src="media/13-playtest-export/39-export-template-manager.png" alt="Export Template Manager: Godot Version 4.7.2.stable, Available Templates tree (Desktop: Windows x86_32/x86_64/arm64, Linux x86_32/x86_64/arm32/arm64, macOS), Install All Templates button, Installed Templates: No templates installed; Offline mode, Go Online."><figcaption>The Export Template Manager: choose a mirror in <span class="ui">Download from</span>, then <span class="ui">Install All Templates</span> (or tick just the platforms you need). Shown offline here — click <span class="ui">Go Online</span> first.</figcaption></figure>
+<p>You can also open it from <span class="ui">Editor → Manage Export Templates…</span>. Once installed, <span class="ui">Export Project…</span> becomes clickable.</p>
+<div class="callout warn"><span class="label">Not shown in this guide</span><p>This guide doesn't show a finished build, because export templates weren't installed on the computer used to make it. The steps above are the standard Godot flow; the template download is large (hundreds of MB).</p></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox <b>Publishes</b> your place to Roblox's servers, and players reach it through the Roblox app. Godot <b>Exports</b> a standalone program that runs on its own — no launcher, no cloud host. You own the files and share them however you like (zip, itch.io, Steam…). There's no "Publish to Roblox" button; the bridge to Roblox is the <a href="#glb">GLB export</a>.</p></div>
+
+<!-- ===================================================== SCREENSHOTS -->
+<h2 id="screenshots">Sharing screenshots and video</h2>
+<ul>
+  <li><b>Editor screenshot:</b> <span class="ui">Editor → Take Screenshot</span>. The image is saved to the editor data folder — open it with <span class="ui">Editor → Open Editor Data Folder</span>.</li>
+  <li><b>In-game screenshot:</b> the demo has <b>no</b> screenshot key (the hint lists none). Use your operating system's screenshot tool on the game window.</li>
+  <li><b>Video:</b> turn on <b>Movie Maker</b> in the <a href="#run-bar">Run bar</a>, then play. The game runs at a steady frame rate and records picture and sound to a video file.</li>
+</ul>
+<figure class="shot"><img src="media/13-playtest-export/60-editor-take-screenshot.png" alt="The Editor menu: Editor Settings…, Command Palette…, Editor Docks, Editor Layout, Take Screenshot, Toggle Fullscreen, Open Editor Data Folder (outlined in red), Open Editor Settings Folder, Manage Editor Features…, Manage Export Templates…, Configure FBX Importer…."><figcaption>The <span class="ui">Editor</span> menu: <span class="ui">Take Screenshot</span>, and <span class="ui">Open Editor Data Folder</span> (outlined) to find the saved images. <span class="ui">Manage Export Templates…</span> is here too.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox has a screenshot button in the in-game menu. Here the editor has one (Editor → Take Screenshot), but the running demo doesn't — use your OS tool, or record with Movie Maker.</p></div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<input class="filter-box" data-target="#recipes-ref" placeholder="Filter recipes…">
+<div id="recipes-ref">
+  <div class="control"><h4>Quick playtest loop</h4><div class="where">Any scene</div><p>Edit → <kbd>Ctrl</kbd>+<kbd>S</kbd> → <kbd>F6</kbd> → walk → <kbd>F8</kbd>. Repeat. Keep the scene tab you want active before pressing <kbd>F6</kbd>.</p></div>
+  <div class="control"><h4>Make your world the game's start</h4><div class="where">Project Settings</div><p>Project → Project Settings… → Application → Run → Main Scene → file button at the right of the row → pick your scene (e.g. <code>res://tutorial/guide/first_world_player.tscn</code>). Now <kbd>F5</kbd> and exports start there.</p></div>
+  <div class="control"><h4>Start the player somewhere else</h4><div class="where">Inspector</div><p>Select PlayerRig → Transform → Position. Keep Y above the ground at that spot. Like moving a SpawnLocation.</p></div>
+  <div class="control"><h4>Player falls into the void</h4><div class="where">Troubleshooting</div><p>Only sky and sea after <kbd>F6</kbd>? Raise PlayerRig's Position Y above your highest ground, save, play again. See <a href="#trap">the trap</a>.</p></div>
+  <div class="control"><h4>My change doesn't show in the game</h4><div class="where">Troubleshooting</div><p>Save first — <kbd>F6</kbd> runs the saved file. And check you pressed <kbd>F6</kbd>, not <kbd>F5</kbd> (which runs the Main Scene).</p></div>
+  <div class="control"><h4>Play as the Fox</h4><div class="where">Scene dock</div><p>Instance <code>res://demo/fox_player.tscn</code> instead of <code>player.tscn</code>, move it above the ground, save, <kbd>F6</kbd>.</p></div>
+  <div class="control"><h4>Chunkier pixels for a screenshot</h4><div class="where">Game window</div><p>Make the game window smaller before taking the shot — fewer, bigger pixels. Bigger window = finer pixels.</p></div>
+  <div class="control"><h4>Take your terrain into Roblox</h4><div class="where">Storage page → Studio</div><p>Set Export Path outside the project → <span class="ui">Export GLB</span> → Roblox Studio → 3D Importer → pick the .glb → a MeshPart with the baked texture.</p></div>
+  <div class="control"><h4>Take your terrain into Blender</h4><div class="where">Storage page → Blender</div><p><span class="ui">Export GLB</span> → Blender → File → Import → glTF 2.0. One mesh, one material, one atlas texture.</p></div>
+  <div class="control"><h4>Send a friend the game</h4><div class="where">Project → Export</div><p>Install export templates once → Project → Export… → pick/add your platform preset → Export Project… → zip the output folder.</p></div>
+  <div class="control"><h4>Record a trailer</h4><div class="where">Run bar</div><p>Enable Movie Maker, play, walk your route, stop. The video file is written for you.</p></div>
+  <div class="control"><h4>Try weather without editing anything</h4><div class="where">Demo island · F3</div><p>Run the demo island, <kbd>F3</kbd>, click Rain / Snow / Storm. Nothing is saved.</p></div>
+</div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You're editing your own world and press F5, but the demo island opens. Why, and what should you press instead?</summary><p><kbd>F5</kbd> runs the project's <b>Main Scene</b>, which here is <code>res://demo/hex_island.tscn</code>. Press <kbd>F6</kbd> to play the scene you're editing (or change the Main Scene in Project Settings → Application → Run).</p></details>
+<details class="check"><summary>You added the player, pressed F6, and see only sky and sea. What happened?</summary><p>The PlayerRig was left at (0, 0, 0), inside the hill, so it fell straight through. Select it, set Transform → Position Y above your ground (e.g. 5, 8, 4), save, and press <kbd>F6</kbd> again. Not a bug.</p></details>
+<details class="check"><summary>F3 does nothing in your first_world. Is it broken?</summary><p>No. The F3 Pixel tuner needs a <code>PixelDiagnostics</code> node in the scene; only the demo island has one.</p></details>
+<details class="check"><summary>Export Project… is greyed out. What's missing?</summary><p>Export templates. Click <span class="ui">Manage Export Templates</span> (or Editor → Manage Export Templates…), go online, and install them for your Godot version.</p></details>
+<details class="check"><summary>Which export gets your terrain into Roblox Studio, and where's the safest place to save it?</summary><p><span class="ui">Export GLB</span> on the Storage settings page, then Studio's 3D Importer. Save it to a folder <b>outside</b> the project to avoid the re-import crash risk.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="02-first-world.html">Your first world (quick start)</a> — builds <code>first_world.tscn</code>, the scene the tutorial adds a player to.</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — the Storage page in full: Storage Mode, Bake Meshes, Import MST, Export GLB.</li>
+  <li><a href="07-pixelizer.html">The pixelizer</a> — pixel size, outlines, debug views.</li>
+  <li><a href="08-atmosphere-effects.html">Sky, weather, water &amp; effects</a> — the effects you can toggle in the F3 tuner.</li>
+  <li><a href="11-importing-models.html">Importing models</a> — bring a GLB back into Godot.</li>
+  <li><a href="14-shortcuts-glossary.html">Shortcuts &amp; Roblox→Godot glossary</a>.</li>
+  <li><a href="15-troubleshooting.html">Troubleshooting &amp; FAQ</a>.</li>
+</ul>
+<p>Follow-along scene: <code>res://tutorial/guide/first_world_player.tscn</code> (in the repo at <code>tutorial/guide/first_world_player.tscn</code>) — <code>first_world.tscn</code> plus a PlayerRig at (5, 8, 4).</p>
+
+</div></main>
+</body>
+</html>

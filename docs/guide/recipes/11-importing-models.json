@@ -1,0 +1,2211 @@
+{
+  "page": "11-importing-models",
+  "media_dir": "docs/guide/media/11-importing-models",
+  "session": {
+    "scene": "res://tutorial/guide/imported_models.tscn",
+    "width": 1920,
+    "height": 1080
+  },
+  "setup": [
+    {
+      "shell": "rm -rf \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions/recap-11-importing-models/project/qa_tmp\"; true"
+    },
+    {
+      "wait": 2
+    }
+  ],
+  "items": [
+    {
+      "id": "01-hero",
+      "kind": "still",
+      "outputs": [
+        "01-imported-models-hero.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "fox"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "450",
+            "down",
+            "--times",
+            "3",
+            "--delay",
+            "0.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "700",
+            "360",
+            "--button",
+            "middle",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "700",
+            "456",
+            "--button",
+            "middle",
+            "--duration",
+            "0.8"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "450",
+            "up",
+            "--times",
+            "4",
+            "--delay",
+            "0.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "400",
+            "800",
+            "400",
+            "--button",
+            "middle",
+            "--duration",
+            "0.8"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "450",
+            "down",
+            "--times",
+            "1",
+            "--delay",
+            "0.2"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "650",
+            "620"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "01-imported-models-hero.png",
+            "crop": [
+              287,
+              132,
+              1346,
+              671
+            ]
+          }
+        }
+      ],
+      "check": "The finish scene: the round GLB tree with the textured fox beside it, both fully visible, no selection gizmo.",
+      "notes": "Pixel Preview must be OFF for this shot (it hides the editor grid and the editor preview sun); the recipe toggles it first. F on the fox, three wheel steps out, then a level orbit (middle-drag up ~140 px), a small wheel-in and a slight azimuth turn reproduce the low horizon of the media; the final click on empty ground clears the selection box."
+    },
+    {
+      "id": "02-04-filesystem",
+      "kind": "still",
+      "outputs": [
+        "02-filesystem-assets.png",
+        "03-create-folder-menu.png",
+        "04-create-folder-dialog.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "02-filesystem-assets.png",
+            "crop": [
+              10,
+              560,
+              268,
+              300
+            ]
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "60",
+            "702"
+          ]
+        },
+        {
+          "drive": [
+            "button",
+            "right",
+            "click"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "100",
+            "714"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "03-create-folder-menu.png",
+            "crop": [
+              50,
+              685,
+              470,
+              215
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/03-create-folder-menu.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/03-create-folder-menu.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "430",
+            "715"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "04-create-folder-dialog.png",
+            "crop": [
+              710,
+              400,
+              500,
+              245
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/04-create-folder-dialog.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/04-create-folder-dialog.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "02: FileSystem at assets/courtyard listing fountain/pillar/round_tree/stone_ring .glb. 03: full right-click Create New submenu. 04: the Create Folder dialog with Base path and Name.",
+      "notes": "The res:// tree row is at y=702 in the 1920x1080 editor; the Create New submenu opens at (60,702). Crop 03 is upscaled 2x with NEAREST."
+    },
+    {
+      "id": "05-models",
+      "kind": "still",
+      "outputs": [
+        "05-models-folder-imported.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open imported_models"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-control.py --class LineEdit --path-contains FileSystem --index 0 --type \"res://models/\" --enter"
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--class-name",
+              "LineEdit",
+              "--filter",
+              "FileSystem"
+            ],
+            "contains": "res://models/"
+          }
+        },
+        {
+          "shot": {
+            "out": "05-models-folder-imported.png",
+            "crop": [
+              8,
+              770,
+              268,
+              82
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/05-models-folder-imported.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/05-models-folder-imported.png')\""
+        }
+      ],
+      "check": "FileSystem showing res://models with exported_tree.glb (scene icon) and roblox_house.obj (mesh icon) and no qa_tmp folder.",
+      "notes": "Writes the res://models fixture, then reloads the project (Project > Reload Current Project) because this headless session does not rescan copied files on its own; prepare-models.py also moves the re-created editor window back to 0,0. The FileSystem path field is a Control, so it is driven by class rather than a fixed click. The media crop is 268x72 at (8,770), upscaled 2x."
+    },
+    {
+      "id": "09-13-import-dock",
+      "kind": "still",
+      "outputs": [
+        "09-scene-import-tabs.png",
+        "10-import-dock-nodes.png",
+        "11-import-dock-meshes.png",
+        "12-import-dock-materials-gltf.png",
+        "13-import-dock-reimport-buttons.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "click",
+            "130",
+            "876"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "116",
+            "55"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "09-scene-import-tabs.png",
+            "crop": [
+              0,
+              40,
+              285,
+              35
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/09-scene-import-tabs.png'); im.resize((im.width*3,im.height*3), Image.NEAREST).save('$OUT/09-scene-import-tabs.png')\""
+        },
+        {
+          "drive": [
+            "move",
+            "150",
+            "400"
+          ]
+        },
+        {
+          "shot": {
+            "out": "10-import-dock-nodes.png",
+            "crop": [
+              0,
+              112,
+              285,
+              450
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/10-import-dock-nodes.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/10-import-dock-nodes.png')\""
+        },
+        {
+          "drive": [
+            "wheel",
+            "150",
+            "400",
+            "down",
+            "--times",
+            "4",
+            "--delay",
+            "0.1"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "13-import-dock-reimport-buttons.png",
+            "crop": [
+              0,
+              112,
+              285,
+              450
+            ]
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "150",
+            "400",
+            "down",
+            "--times",
+            "2",
+            "--delay",
+            "0.1"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "11-import-dock-meshes.png",
+            "crop": [
+              0,
+              112,
+              285,
+              412
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/11-import-dock-meshes.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/11-import-dock-meshes.png')\""
+        },
+        {
+          "drive": [
+            "wheel",
+            "150",
+            "400",
+            "down",
+            "--times",
+            "6",
+            "--delay",
+            "0.1"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "12-import-dock-materials-gltf.png",
+            "crop": [
+              0,
+              112,
+              285,
+              412
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/12-import-dock-materials-gltf.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/12-import-dock-materials-gltf.png')\""
+        }
+      ],
+      "check": "09: Scene/Import tabs with Import active. 10-12: the Import dock scrolled through Nodes, Meshes and Materials/glTF. 13: Advanced… and Reimport at the dock's bottom.",
+      "notes": "The media crops are the Import dock only: 09 is [0,40,285,35] at 3x; 10-13 are [0,112,285,450] (the file-name header at the top of the dock is excluded), with 10-12 upscaled 2x and 13 left at 1x. 13 is shot between 10 and 11 because it needs a lower scroll than 11."
+    },
+    {
+      "id": "20-28-advanced",
+      "kind": "still",
+      "outputs": [
+        "20-advanced-import-scene.png",
+        "21-advanced-import-preview.mp4",
+        "21-advanced-import-preview.png",
+        "22-advanced-per-mesh.png",
+        "23-advanced-node-generate.png",
+        "24-advanced-physics-collision.png",
+        "25-advanced-materials-list.png",
+        "26-advanced-material-external.png",
+        "27-advanced-actions-menu.png",
+        "28-material-preview-sphere.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "130",
+            "876"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "116",
+            "55"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Advanced"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "window-resize",
+            "1560",
+            "864",
+            "--title",
+            "Advanced Import Settings for Scene 'round_tree.glb'"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "20-advanced-import-scene.png",
+            "crop": [
+              192,
+              80,
+              1560,
+              900
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "21-advanced-import-preview.mp4",
+            "rect": [
+              512,
+              168,
+              912,
+              760
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "1050",
+            "450",
+            "1250",
+            "450",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "1250",
+            "450",
+            "1050",
+            "450",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "21-advanced-import-preview.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "21-advanced-import-preview.mp4",
+            "out": "21-advanced-import-preview.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "304",
+            "173"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "480",
+            "314"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "22-advanced-per-mesh.png",
+            "crop": [
+              1443,
+              143,
+              315,
+              770
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/22-advanced-per-mesh.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/22-advanced-per-mesh.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "247",
+            "173"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "480",
+            "266"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "23-advanced-node-generate.png",
+            "crop": [
+              1443,
+              143,
+              315,
+              770
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/23-advanced-node-generate.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/23-advanced-node-generate.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "1622",
+            "299"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "24-advanced-physics-collision.png",
+            "crop": [
+              1443,
+              143,
+              315,
+              770
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/24-advanced-physics-collision.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/24-advanced-physics-collision.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "389",
+            "173"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "25-advanced-materials-list.png",
+            "crop": [
+              200,
+              144,
+              310,
+              770
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/25-advanced-materials-list.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/25-advanced-materials-list.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "480",
+            "204"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "26-advanced-material-external.png",
+            "crop": [
+              1443,
+              143,
+              315,
+              770
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/26-advanced-material-external.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/26-advanced-material-external.png')\""
+        },
+        {
+          "shot": {
+            "out": "28-material-preview-sphere.png",
+            "crop": [
+              512,
+              168,
+              912,
+              760
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "237",
+            "133"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "27-advanced-actions-menu.png",
+            "crop": [
+              180,
+              108,
+              730,
+              360
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "20: the Advanced Import Settings window (tree + 3D preview + inspector). 21: orbit clip. 22-28: Meshes tab, Scene node, Physics, Materials list and Use External, Actions menu, sphere preview.",
+      "notes": "The Advanced Import Settings window is resized to 1560x864 client (900 px tall including its title bar) so the whole window fits the media crop [192,80,1560,900]; window-resize finds it by its full title. The tree/inspector clicks are window-local positions measured at this size: tabs at y=173 (Scene 247, Meshes 304, Materials 389); the Scene-tree rows Scene 243 / Tree 266, the Meshes row round_tree_Cylinder 314, the Materials rows Leaves 204 / Wood 223; the Generate>Physics checkbox at 1622,299. Selecting the Leaves material turns the preview into a sphere (28) and shows Use External (26). Crops 22-24/26 are 315x770 at (1443,143), 25 is 310x770 at (200,144); all are upscaled 2x. The window is closed with Esc (changes not applied)."
+    },
+    {
+      "id": "30-drag-into-viewport",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "30-drag-into-viewport.mp4",
+        "30-drag-into-viewport.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "drive": [
+            "move",
+            "130",
+            "876"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "30-drag-into-viewport.mp4",
+            "rect": [
+              0,
+              42,
+              1640,
+              1000
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "130",
+            "876",
+            "1000",
+            "500",
+            "--duration",
+            "2"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_stop": {
+            "out": "30-drag-into-viewport.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "30-drag-into-viewport.mp4",
+            "out": "30-drag-into-viewport.png",
+            "at": 2.6
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "Dragging round_tree.glb from FileSystem into the 3D view, with the Instantiating readout; the Output panel stays empty.",
+      "notes": "The Output panel is cleared by the session start; no harness log lines are printed by current sessions."
+    },
+    {
+      "id": "40-41-43-scene-menu",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "40-scene-menu.png",
+        "41-create-root-node.png",
+        "43-instanced-tree.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "open-scene",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/round_tree.glb"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-window-button.py \"Please Confirm\" \"Open Anyway\" --optional"
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "31",
+            "11"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shot": {
+            "out": "40-scene-menu.png",
+            "crop": [
+              0,
+              28,
+              358,
+              494
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/40-scene-menu.png'); im.resize((int(im.width*1.7),int(im.height*1.7)), Image.NEAREST).save('$OUT/40-scene-menu.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "drive": [
+            "click-text",
+            "Add a new scene."
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "41-create-root-node.png",
+            "crop": [
+              0,
+              82,
+              290,
+              214
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/41-create-root-node.png'); im.resize((im.width*2,im.height*2), Image.NEAREST).save('$OUT/41-create-root-node.png')\""
+        },
+        {
+          "drive": [
+            "open-scene",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/round_tree.glb"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-window-button.py \"Please Confirm\" \"Open Anyway\" --optional"
+        },
+        {
+          "wait": 2
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "round_tree/Tree"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "450",
+            "down",
+            "--times",
+            "5",
+            "--delay",
+            "0.2"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "500",
+            "700",
+            "360",
+            "--button",
+            "middle",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "650",
+            "620"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shot": {
+            "out": "43-instanced-tree.png",
+            "crop": [
+              287,
+              132,
+              1346,
+              671
+            ]
+          }
+        }
+      ],
+      "check": "40: Scene menu with Export As…. 41: this build's Create Root Node chooser, shown inline in the Scene dock. 43: the round tree in the clean glb scene with the editor grid.",
+      "notes": "The read-only glb prompt is accepted with click-window-button.py (the dialog reports its buttons relative to the dialog window). 41 is re-shot to match this editor build, where New Scene shows the root chooser inline in the Scene dock instead of the centred dialog of the old media. The new scene is created with the tab bar's 'Add a new scene.' button (found by tooltip), and 43 returns to the round_tree tab by clicking that tab's text."
+    },
+    {
+      "id": "42-drag-into-tree",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "42-drag-into-tree.mp4",
+        "42-drag-into-tree.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_start": {
+            "out": "42-drag-into-tree.mp4",
+            "rect": [
+              0,
+              42,
+              1640,
+              1000
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "130",
+            "876",
+            "84",
+            "144",
+            "--duration",
+            "2"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "42-drag-into-tree.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "42-drag-into-tree.mp4",
+            "out": "42-drag-into-tree.png",
+            "at": 2.6
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "Dragging round_tree.glb onto the round_tree node in the Scene tree; a child round_tree.glb row appears under it.",
+      "notes": "Drop on the Scene dock node at (84,144) to add it as a child at that node's origin."
+    },
+    {
+      "id": "44-scale-gizmo",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "44-scale-gizmo.mp4",
+        "44-scale-gizmo.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "PixelPreviewButton"
+            ],
+            "contains": "\"toggled\": false"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "wait": 0.3
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "round_tree/Tree"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target 0 1 0 --dist 17 --elev 4"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "r"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "record_start": {
+            "out": "44-scale-gizmo.mp4",
+            "rect": [
+              370,
+              132,
+              760,
+              660
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/gizmo-y-drag.py --path round_tree/Tree --dy -175"
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_stop": {
+            "out": "44-scale-gizmo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "44-scale-gizmo.mp4",
+            "out": "44-scale-gizmo.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "The green Y scale handle dragged up: the tree grows taller (scale Y 1.0 to about 2.2).",
+      "notes": "Pixel Preview is turned off and asserted. 09-frame.py puts the tree origin at a known screen point (735,470 target) at distance 17 and elevation 4. gizmo-y-drag.py projects the node origin, screenshots the editor and finds the green +Y handle square, then drags it up 175 px (scale Y ~2.3) - no fixed handle coordinate. Record rect is centred on the tree (370,132,760,660)."
+    },
+    {
+      "id": "50-export-settings",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "50-gltf-export-settings.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "open-scene",
+            "res://addons/MarchingSquaresTerrain/assets/courtyard/round_tree.glb"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "click-text",
+            "Open Anyway"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "31",
+            "11"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "key",
+            "e"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "right"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "440",
+            "353"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "50-gltf-export-settings.png",
+            "crop": [
+              770,
+              325,
+              382,
+              398
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/50-gltf-export-settings.png'); im.resize((int(im.width*1.6),int(im.height*1.6)), Image.NEAREST).save('$OUT/50-gltf-export-settings.png')\""
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        }
+      ],
+      "check": "The glTF Export Settings dialog with Copyright (placeholder), Bake FPS 30, Image Format PNG, Root Node Mode Single Root, and Cancel/OK both fully visible.",
+      "notes": "Export As is opened by typing 'e' in the Scene menu, then Right for the submenu, then the glTF 2.0 Scene item at (440,353). The file dialog is cancelled with Esc, so nothing is written."
+    },
+    {
+      "id": "51-obj-import-dock",
+      "kind": "still",
+      "outputs": [
+        "51-obj-import-dock.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open res://tutorial/guide/imported_models.tscn"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --index 2 --click"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "116",
+            "55"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "roblox_house.obj"
+            ],
+            "contains": "\"class\": \"Label\""
+          }
+        },
+        {
+          "shot": {
+            "out": "51-obj-import-dock.png",
+            "crop": [
+              4,
+              78,
+              300,
+              500
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/51-obj-import-dock.png'); im.resize((int(im.width*1.9),int(im.height*1.9)), Image.NEAREST).save('$OUT/51-obj-import-dock.png')\""
+        }
+      ],
+      "check": "The Import dock for roblox_house.obj: Import As OBJ as Mesh, Generate Tangents/LODs/Shadow/Lightmap UV2, Scale Mesh, Offset Mesh, Reimport.",
+      "notes": "Fixture + reload via prepare-models.py. open-scene on the .obj selects the file in the FileSystem dock and fills the Import dock (accepting the read-only confirmation with click-window-button.py); the item asserts the dock's Import As section before shooting. Crop 300x500 at (4,78), upscaled 1.9x.",
+      "fresh_session": true
+    },
+    {
+      "id": "52-obj-instance",
+      "kind": "clip",
+      "outputs": [
+        "52-obj-instance.mp4",
+        "52-obj-instance.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open res://tutorial/guide/imported_models.tscn"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "52-obj-instance.mp4",
+            "rect": [
+              0,
+              42,
+              1640,
+              1000
+            ],
+            "fps": 12,
+            "max": 18
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --index 2 --to 700,380"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "record_stop": {
+            "out": "52-obj-instance.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "52-obj-instance.mp4",
+            "out": "52-obj-instance.png",
+            "at": 9.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "Dragging roblox_house.obj from FileSystem into the 3D view; the Dropping a Mesh file tooltip and the new RobloxHouse node.",
+      "notes": "Fixture + reload via prepare-models.py. drag-model.py switches the FileSystem dock to split view, points it at res://models/ and drags the second file row (roblox_house.obj) from the live FileSystemList rect, so the drag source follows the dock instead of a fixed tree row. Pixel Preview stays ON (the media is pixelated).",
+      "fresh_session": true
+    },
+    {
+      "id": "53-obj-house-and-tree",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "53-obj-house-and-tree.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open res://tutorial/guide/imported_models.tscn"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --index 2 --to 900,500"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Pixel Preview"
+          ]
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "PixelPreviewButton"
+            ],
+            "contains": "\"toggled\": false"
+          }
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target 0 1 1 --dist 22 --elev 12"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "650",
+            "650"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "53-obj-house-and-tree.png",
+            "crop": [
+              385,
+              260,
+              700,
+              400
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "The small RobloxHouse OBJ sitting beside the GLB round tree in the 3D scene.",
+      "notes": "Fixture + reload via prepare-models.py; drag-model.py drops the OBJ via the split view. Pixel Preview is turned off for the smooth media look, F frames the new RobloxHouse and the 700x400 crop is centred on the viewport. Undo at the end; the scene is never saved."
+    },
+    {
+      "id": "54-reimport-root-scale",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "54-reimport-root-scale.mp4",
+        "54-reimport-root-scale.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "116",
+            "55"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --folder res://addons/MarchingSquaresTerrain/assets/courtyard/ --index 3 --click"
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "expect": {
+            "drive": [
+              "ui",
+              "--root",
+              "all",
+              "--filter",
+              "round_tree.glb"
+            ],
+            "contains": "\"class\": \"Label\""
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "round_tree"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target 0 2 0 --dist 22 --elev 12"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_start": {
+            "out": "54-reimport-root-scale.mp4",
+            "rect": [
+              0,
+              42,
+              1630,
+              720
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/set-import-float.py --index 0 --value 2.0"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click-text",
+            "Reimport"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "record_stop": {
+            "out": "54-reimport-root-scale.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "54-reimport-root-scale.mp4",
+            "out": "54-reimport-root-scale.png",
+            "at": 3
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/set-import-float.py --index 0 --value 1.0"
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click-text",
+            "Reimport"
+          ]
+        }
+      ],
+      "check": "The tree instance doubles in size after Root Scale 1.0 to 2.0 and Reimport.",
+      "notes": "The Import dock is activated first, then drag-model.py --click selects round_tree.glb from the courtyard folder in the split FileSystem list (row 3 after '..': fountain, pillar, round_tree, stone_ring). The active imported_models scene stays as it is, so changing Root Scale to 2.0 and clicking Reimport doubles the instance live (the media's effect). set-import-float.py finds the EditorPropertyFloat rows in the dock at run time."
+    },
+    {
+      "id": "55-instance-reimported-glb",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "55-instance-reimported-glb.mp4",
+        "55-instance-reimported-glb.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open res://tutorial/guide/imported_models.tscn"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "55-instance-reimported-glb.mp4",
+            "rect": [
+              0,
+              42,
+              1640,
+              1000
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --index 1 --to 700,380"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "55-instance-reimported-glb.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "55-instance-reimported-glb.mp4",
+            "out": "55-instance-reimported-glb.png",
+            "at": 9.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "Dragging the Godot-exported exported_tree.glb from FileSystem into the 3D view; the Instantiating readout and the new tree node.",
+      "notes": "Fixture + reload via prepare-models.py. drag-model.py drags the first file row of the split view (exported_tree.glb) into the view for the export/import round-trip."
+    },
+    {
+      "id": "60-61-convert",
+      "kind": "clip",
+      "outputs": [
+        "60-convert-to-builder-dialog.png",
+        "61-convert-to-builder.mp4",
+        "61-convert-to-builder.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/prepare-models.py --session recap-11-importing-models --open res://tutorial/guide/imported_models.tscn"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/drag-model.py --index 2 --to 800,450"
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "RobloxHouse"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/click-control.py --class Button --path-suffix /Convert --path-contains PixelBuilderToolbar"
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shot": {
+            "out": "60-convert-to-builder-dialog.png",
+            "crop": [
+              650,
+              330,
+              620,
+              380
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "61-convert-to-builder.mp4",
+            "rect": [
+              287,
+              132,
+              1346,
+              671
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "record_stop": {
+            "out": "61-convert-to-builder.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "61-convert-to-builder.mp4",
+            "out": "61-convert-to-builder.png",
+            "at": 2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        }
+      ],
+      "check": "The Convert to builder mesh dialog (Merge triangles into, Keep materials, Keep smoothing) and the OBJ becoming an editable PixelBuilderMesh.",
+      "notes": "Fixture + reload via prepare-models.py; drag-model.py drags the OBJ from the split view into the scene, then Convert is clicked in the Pixel Builder column.",
+      "fresh_session": true
+    },
+    {
+      "id": "70-72-material",
+      "kind": "clip",
+      "outputs": [
+        "70-standardmaterial3d-inspector.png",
+        "71-material-albedo.mp4",
+        "71-material-albedo.png",
+        "72-albedo-color-changed.png"
+      ],
+      "steps": [
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "round_tree/Tree/Leaves"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/make-material.py"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shot": {
+            "out": "70-standardmaterial3d-inspector.png",
+            "crop": [
+              1640,
+              80,
+              280,
+              744
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/70-standardmaterial3d-inspector.png'); im.resize((int(im.width*1.642),int(im.height*1.642)), Image.NEAREST).save('$OUT/70-standardmaterial3d-inspector.png')\""
+        },
+        {
+          "shell": "python3 docs/guide/recipes/09-frame.py --target 0 2 0 --dist 22 --elev 15"
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "71-material-albedo.mp4",
+            "rect": [
+              287,
+              132,
+              1633,
+              680
+            ],
+            "fps": 12,
+            "max": 14
+          }
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/expand-albedo.py"
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 docs/guide/recipes/_helpers/set-color-hex.py e07a2d"
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "71-material-albedo.mp4"
+          }
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "poster": {
+            "video": "71-material-albedo.mp4",
+            "out": "71-material-albedo.png",
+            "at": 2
+          }
+        },
+        {
+          "shot": {
+            "out": "72-albedo-color-changed.png",
+            "crop": [
+              1640,
+              410,
+              280,
+              670
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/72-albedo-color-changed.png'); im.resize((int(im.width*1.642),int(im.height*1.642)), Image.NEAREST).save('$OUT/72-albedo-color-changed.png')\""
+        }
+      ],
+      "check": "The StandardMaterial3D inspector for the leaf mesh with the material expanded inline, then the orange Albedo colour set through the colour picker's hex field.",
+      "notes": "make-material.py finds the Surface Material Override picker at run time, opens its popup, clicks the StandardMaterial3D row from the popup's own item metrics and then clicks the picker's pencil to expand it inline (media 70). The inspector is at its top scroll position, so the Albedo section is the fourth indented material section; expand-albedo.py clicks it and the Color property, then set-color-hex.py types e07a2d into the untitled ColorPicker window. 71 frames the whole tree with 09-frame.py; 72 crops the slot + material from y=410.",
+      "fresh_session": true
+    },
+    {
+      "id": "80-82-fox",
+      "kind": "clip",
+      "fresh_session": true,
+      "outputs": [
+        "80-textures-next-to-model.png",
+        "81-fox-textured.png",
+        "82-scene-orbit.mp4",
+        "82-scene-orbit.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "res://addons/MarchingSquaresTerrain/assets/characters/fox/"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.5
+        },
+        {
+          "shot": {
+            "out": "80-textures-next-to-model.png",
+            "crop": [
+              8,
+              660,
+              280,
+              280
+            ]
+          }
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "fox"
+          ]
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "400",
+            "up",
+            "--times",
+            "3",
+            "--delay",
+            "0.2"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "700",
+            "700"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "shot": {
+            "out": "81-fox-textured.png",
+            "crop": [
+              640,
+              120,
+              760,
+              560
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "82-scene-orbit.mp4",
+            "rect": [
+              287,
+              132,
+              1346,
+              670
+            ],
+            "fps": 12,
+            "max": 16
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "900",
+            "450",
+            "1100",
+            "480",
+            "--button",
+            "middle",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "drive": [
+            "drag",
+            "1100",
+            "480",
+            "900",
+            "450",
+            "--button",
+            "middle",
+            "--duration",
+            "2.5"
+          ]
+        },
+        {
+          "record_stop": {
+            "out": "82-scene-orbit.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "82-scene-orbit.mp4",
+            "out": "82-scene-orbit.png",
+            "at": 2
+          }
+        }
+      ],
+      "check": "80: fox.glb with its textures beside it. 81: the fox character large and clear of the tree. 82: orbiting the textured fox and the round tree.",
+      "notes": "The fox is at (2.6, 0, 1.6) in imported_models.tscn; F frames it, wheel zoom brings it close, and the orbit uses middle-drag so the tree stays at the edge."
+    }
+  ]
+}

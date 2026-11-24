@@ -1,0 +1,3133 @@
+{
+  "page": "01-godot-for-roblox",
+  "media_dir": "docs/guide/media/01-godot-for-roblox",
+  "session": {
+    "scene": "res://tutorial/01_flat_playground.tscn",
+    "width": 1600,
+    "height": 900
+  },
+  "setup": [
+    {
+      "shell": "cat > /tmp/opencode/ds_mst_ui.py <<'PYEOF'\nimport json, os, subprocess, sys, tempfile, time\n\nDRIVE = [\"python3\", \"qa/drive.py\", \"--port\", os.environ.get(\"PORT\") or os.environ.get(\"MST_QA_PORT\", \"8879\"),\n         \"--display\", os.environ.get(\"DISPLAY\", \":79\")]\n\n\ndef run(*a):\n    return subprocess.run(DRIVE + [str(x) for x in a], cwd=os.environ.get(\"ROOT\", \".\"),\n                          capture_output=True, text=True)\n\n\ndef dump():\n    p = tempfile.mktemp(suffix=\".json\")\n    r = run(\"ui\", \"--filter\", \"\", \"--save\", p)\n    if r.returncode:\n        sys.exit(\"ui failed: \" + r.stderr[-300:])\n    d = json.load(open(p)); os.unlink(p)\n    return [c for c in d[\"controls\"] if c.get(\"rect\") and c[\"rect\"][2] > 0 and c[\"rect\"][3] > 0 and c.get(\"visible\")]\n\n\ndef find(name, classes=None):\n    cs = dump()\n    if classes:\n        cs = [c for c in cs if c.get(\"class\") in classes]\n    hits = [c for c in cs if c.get(\"name\") == name] or [c for c in cs if c.get(\"text\") == name]\n    if not hits:\n        sys.exit(\"control not found: \" + name)\n    return hits[0]\n\n\ndef center(c):\n    x, y, w, h = c[\"rect\"]\n    return int(x + w / 2), int(y + h / 2)\n\n\ndef path(p):\n    return p if os.path.isabs(p) else os.path.join(os.environ.get(\"OUT\", \".\"), p)\n\n\ndef project(pt):\n    o = run(\"project\", \"--point\", json.dumps(pt)).stdout\n    try:\n        d = json.loads(o)\n    except Exception:\n        sys.exit(\"project failed: \" + o[-200:])\n    pts = d.get(\"points\") or []\n    if not pts:\n        sys.exit(\"project: no point\")\n    return pts[0][\"window\"]\n\n\ncmd = sys.argv[1]\nif cmd == \"crop\":\n    from PIL import Image\n    out, name = path(sys.argv[2]), sys.argv[3]\n    pads = [int(v) for v in sys.argv[4:8]]\n    c = find(name); x, y, w, h = c[\"rect\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pads[0]), max(0, y - pads[2]), min(img.width, x + w + pads[1]), min(img.height, y + h + pads[3]))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"croppopup\":\n    from PIL import Image\n    out = path(sys.argv[2]); pad = int(sys.argv[3]) if len(sys.argv) > 3 else 12\n    pp = run(\"popups\"); pop = json.loads(pp.stdout)[\"popups\"][0]\n    x, y = pop[\"pos\"]; w, h = pop[\"size\"]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    rect = (max(0, x - pad), max(0, y - pad), min(img.width, x + w + pad), min(img.height, y + h + pad))\n    img.crop(rect).save(out); os.unlink(tmp); print(out, rect)\nelif cmd == \"cropwin\":\n    from PIL import Image\n    out = path(sys.argv[2]); x, y, w, h = [int(v) for v in sys.argv[3:7]]\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    Image.open(tmp).crop((x, y, x + w, y + h)).save(out); os.unlink(tmp); print(out)\nelif cmd == \"cropat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    x, y = project(pt)\n    tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    img = Image.open(tmp)\n    left = int(max(0, min(img.width - w, x - w / 2)))\n    top = int(max(0, min(img.height - h, y - h / 2)))\n    img.crop((left, top, left + w, top + h)).save(out); os.unlink(tmp); print(out, (left, top, w, h))\nelif cmd == \"full\":\n    out = path(sys.argv[2]); tmp = tempfile.mktemp(suffix=\".png\"); run(\"capture\", tmp)\n    os.replace(tmp, out); print(out)\nelif cmd == \"clickpoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    args = [\"click\", int(x), int(y)]\n    rest = sys.argv[5:]\n    print(run(*(args + rest)).stdout[-100:])\nelif cmd == \"topview\":\n    cs = dump()\n    cand = [c for c in cs if c.get(\"class\") == \"MenuButton\" and 165 <= c[\"rect\"][1] <= 215\n            and c[\"rect\"][2] >= 100 and 380 <= c[\"rect\"][0] <= 700]\n    if not cand:\n        sys.exit(\"topview: no view menu\")\n    c = min(cand, key=lambda c: c[\"rect\"][1])\n    x, y = center(c)\n    pops = []\n    for _ in range(4):\n        run(\"click\", x, y); time.sleep(1.0)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if pops:\n            break\n        time.sleep(0.8)\n    if not pops:\n        sys.exit(\"topview: no popup\")\n    pop = pops[0]\n    for k, it in enumerate(pop[\"items\"]):\n        if it.get(\"text\") == \"Top View\":\n            px, py = pop[\"pos\"]\n            ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n            run(\"click\", px + 40, int(py + ih * (k + 0.5))); time.sleep(0.8)\n            print(\"topview ok\")\n            break\n    else:\n        sys.exit(\"topview: item not found\")\nelif cmd == \"menupick\":\n    x, y, text = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"menupick: no popup\")\n    for it in pops[0][\"items\"]:\n        if it.get(\"text\") == text:\n            ix, iy, iw, ih = it[\"rect\"]\n            run(\"click\", int(ix + iw / 2), int(iy + ih / 2)); time.sleep(0.6)\n            print(\"menupick\", text)\n            break\n    else:\n        sys.exit(\"menupick: item not found \" + text)\nelif cmd == \"recat\":\n    from PIL import Image\n    out = path(sys.argv[2]); pt = [float(v) for v in sys.argv[3:6]]\n    w, h = int(sys.argv[6]), int(sys.argv[7])\n    fps = sys.argv[8] if len(sys.argv) > 8 else \"12\"\n    mx = sys.argv[9] if len(sys.argv) > 9 else \"20\"\n    x, y = project(pt)\n    left = int(max(0, min(1920 - w, x - w / 2)))\n    top = int(max(0, min(1080 - h, y - h / 2)))\n    r = subprocess.run([\"qa/record.sh\", \"start\", out, \"--display\", os.environ.get(\"DISPLAY\", \":79\"),\n                        \"--rect\", f\"{left},{top},{w},{h}\", \"--fps\", fps, \"--max\", mx],\n                       cwd=os.environ.get(\"ROOT\", \".\"), capture_output=True, text=True)\n    print(\"recat\", left, top, w, h, r.returncode, r.stderr[-120:])\nelif cmd == \"movepoint\":\n    pt = [float(v) for v in sys.argv[2:5]]\n    x, y = project(pt)\n    print(run(\"move\", int(x), int(y)).stdout[-80:])\nelif cmd == \"find\":\n    c = find(sys.argv[2]); print(json.dumps(c, indent=1))\nelif cmd == \"popick\":\n    x, y, idx = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])\n    run(\"click\", x, y); time.sleep(0.8)\n    p = run(\"popups\")\n    pops = json.loads(p.stdout).get(\"popups\", [])\n    if not pops:\n        sys.exit(\"popick: no popup\")\n    pop = pops[0]; px, py = pop[\"pos\"]\n    ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n    run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n    print(\"popick\", idx)\nelif cmd == \"setat\":\n    x, y, val = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]\n    run(\"click\", x, y); time.sleep(0.4)\n    run(\"key\", \"a\", \"--ctrl\"); run(\"type\", val); run(\"key\", \"enter\"); time.sleep(0.5)\n    print(\"setat\", x, y, val)\nelse:\n    name = sys.argv[2]\n    cls = {\"option\": (\"OptionButton\",), \"slider\": (\"HSlider\",), \"spin\": (\"EditorSpinSlider\",),\n           \"check\": (\"CheckBox\",)}.get(cmd)\n    c = find(name, cls)\n    if cmd == \"click\":\n        print(run(\"click\", *center(c)).stdout[-100:])\n    elif cmd == \"check\":\n        want = sys.argv[3].lower() in (\"1\", \"on\", \"true\", \"yes\")\n        if bool(c.get(\"toggled\")) != want:\n            run(\"click\", *center(c)); time.sleep(0.3)\n        print(name, \"->\", want)\n    elif cmd == \"spin\":\n        x, y = center(c)\n        run(\"click\", x, y); time.sleep(0.4)\n        run(\"key\", \"a\", \"--ctrl\"); run(\"type\", sys.argv[3]); run(\"key\", \"enter\"); time.sleep(0.4)\n        print(name, \":=\", sys.argv[3])\n    elif cmd == \"slider\":\n        frac = max(0.0, min(1.0, float(sys.argv[3]))); x, y, w, h = c[\"rect\"]\n        tx = int(x + 2 + frac * (w - 4)); yy = int(y + h / 2)\n        run(\"drag\", tx - 1, yy, tx + 1, yy, \"--duration\", \"0.2\"); time.sleep(0.4)\n        print(name, \"->\", frac)\n    elif cmd == \"option\":\n        idx = int(sys.argv[3]); run(\"click\", *center(c)); time.sleep(0.8)\n        p = run(\"popups\")\n        pops = json.loads(p.stdout).get(\"popups\", [])\n        if not pops:\n            sys.exit(\"option: no popup opened for \" + name)\n        pop = pops[0]; px, py = pop[\"pos\"]\n        ih = pop[\"size\"][1] / max(len(pop[\"items\"]), 1)\n        run(\"click\", px + 30, int(py + ih * (idx + 0.5))); time.sleep(0.5)\n        print(name, \"->\", idx)\n\nPYEOF"
+    },
+    {
+      "wait": 2
+    },
+    {
+      "drive": [
+        "click",
+        "307",
+        "839"
+      ]
+    },
+    {
+      "wait": 0.6
+    },
+    {
+      "shell": "rmdir \"${MST_QA_STATE:-/tmp/opencode/qa}/project_base/qa_tmp\" 2>/dev/null; find \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions\" -maxdepth 3 -name qa_tmp -type d -empty -delete 2>/dev/null; true"
+    }
+  ],
+  "items": [
+    {
+      "id": "01-editor-clean",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "01-editor-clean.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "390",
+            "down",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "300",
+            "800",
+            "460",
+            "--button",
+            "middle",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "430",
+            "800",
+            "360",
+            "--button",
+            "middle",
+            "--mod",
+            "shift",
+            "--duration",
+            "1.0"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "140",
+            "410"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "390",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/01-editor-clean.png\""
+        }
+      ],
+      "check": "Clean full 1600x900 editor: default layout, nothing selected (empty Inspector, no terrain toolbar), Output panel empty, no qa_tmp folder in the FileSystem dock, the flat-playground pixel island framed in the 3D view.",
+      "notes": "This is the hotspot-tour base. The 3D framing is done with XTEST middle-drag orbit/pan + wheel, which is approximate under llvmpipe; the exact camera may drift a little but the editor chrome (the hotspot targets) is fixed. The deselect click 140,410 lands in the empty area of the Scene dock below the tree."
+    },
+    {
+      "id": "00-orientation",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "00-orientation.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "390",
+            "down",
+            "--times",
+            "5"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "300",
+            "800",
+            "460",
+            "--button",
+            "middle",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "430",
+            "800",
+            "360",
+            "--button",
+            "middle",
+            "--mod",
+            "shift",
+            "--duration",
+            "1.0"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "140",
+            "410"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "390",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/00-orientation.png\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image,ImageDraw; im=Image.open('$OUT/00-orientation.png').convert('RGB'); d=ImageDraw.Draw(im); red=(255,59,48); boxes=[(583,4,1016,40),(1394,4,1594,40),(2,44,283,470),(2,478,283,896),(1320,44,1598,896),(287,165,1313,623),(287,628,1313,896),(287,80,992,158)]; [d.rectangle([b[0]+w,b[1]+w,b[2]-w,b[3]-w],outline=red) for b in boxes for w in range(3)]; im.save('$OUT/00-orientation.png')\""
+        }
+      ],
+      "check": "Same clean full editor as 01-editor-clean, with eight 3px red (#ff3b30) boxes drawn around the main-screen buttons, play buttons, Scene dock, FileSystem dock, Inspector, 3D viewport, Output panel and the two viewport-toolbar rows. No harness line, no qa_tmp.",
+      "notes": "Same framing as 01-editor-clean; the red boxes are drawn in PIL at fixed panel rects (the panels do not move)."
+    },
+    {
+      "id": "16-view-menu",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "16-view-menu.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"View\""
+        },
+        {
+          "wait": 1
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Viewport"
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/16-view-menu.png\" --crop 290,82,1046,348"
+        }
+      ],
+      "check": "The toolbar View menu fully open and not cut off at the right edge: the 1/2/3/4-Viewport items with their 'Ctrl+N - Physical' shortcut column complete, plus Gizmos, View Origin, View Grid, Preview Translation, Settings. The 'View' toolbar button is highlighted.",
+      "notes": "957,96 is the 'View' MenuButton at the end of viewport toolbar row 1 (the ui dump does not expose these custom menu buttons, so a pixel click is used; the expect on popups containing 'Viewport' fails loudly if it drifts)."
+    },
+    {
+      "id": "17-perspective-menu",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "17-perspective-menu.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Perspective\""
+        },
+        {
+          "wait": 1
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Top View"
+          }
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/17-perspective-menu.png\" --crop 296,97,423,802"
+        }
+      ],
+      "check": "The Perspective (view-mode) menu fully open: Top/Bottom/Left/Right/Front/Rear View, Switch Perspective/Orthogonal, Perspective (dot), Orthogonal, Auto Orthogonal, Lock View Rotation, Display Normal/Wireframe/Overdraw/Lighting/Unshaded, Display Advanced, View Environment/Gizmos/Transform Gizmo/Grid/Information/Frame Time, Half Resolution, Audio Listener, Enable Doppler, Cinematic Preview, Focus Origin, Focus Selection, Align Transform/Rotation with View. Not the View menu, not cut off.",
+      "notes": "354,191 is the 'Perspective' MenuButton at the top-left of the 3D view (shows the current view name). The expect on popups containing 'Top View' distinguishes it from the View menu and catches drift."
+    },
+    {
+      "id": "18-add-node",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "18-add-node.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Create New Node"
+          }
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/18-add-node.png\" --crop 2,72,1260,732"
+        }
+      ],
+      "check": "The Create New Node dialog open with 'Camera3D' typed in Search, the Camera3D entry highlighted under Node3D (XRCamera3D / PhantomCamera3D / PhantomCameraNoiseEmitter3D below it), the Camera3D description and a Create button. The Scene dock with the '+' button shows on the left; the Output panel behind is empty (no harness line).",
+      "notes": "24,96 is the Scene dock 'Add Child Node' (+) button. A 2s wait after the click is required before typing so the dialog's Search LineEdit has focus (typing too early leaks to the editor as shortcuts). The expect on windows containing 'Create New Node' guards the click."
+    },
+    {
+      "id": "44-output-panel",
+      "kind": "still",
+      "fresh_session": true,
+      "outputs": [
+        "44-output-panel.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "1263",
+            "200"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "390",
+            "down",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "key",
+            "7"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "350"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "780",
+            "360"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "780",
+            "360"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "380"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "380"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "move",
+            "820",
+            "400"
+          ]
+        },
+        {
+          "drive": [
+            "click",
+            "820",
+            "400"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shell": "grep -qE \"smooth (true|false)\" \"${MST_QA_STATE:-/tmp/opencode/qa}/sessions/recap-01-godot-for-roblox/editor.log\""
+        },
+        {
+          "shell": "python3 qa/drive.py --port \"$PORT\" --display \"$DISPLAY\" capture \"$OUT/44-output-panel.png\" --crop 289,633,1025,263"
+        }
+      ],
+      "check": "The bottom Output panel showing a few genuine Inspect-tool messages ('Marching Squares Terrain: ... height ..., floor 1 'Grass', wall 1 'Grass', grass 255, smooth false'), the Filter Messages row and the Output/Debugger/Audio/Animation/Shader-Editor tab bar. No harness 'listening' line.",
+      "notes": "The crop shows ONLY the Output panel, so the 3D framing just has to put grass under the clicks. 1263,200 snaps the nav-cube to Top Orthogonal, key f frames the all-grass flat-playground terrain, and the three centre clicks with the Inspect tool (key 7) each print a cell's data. 307,839 is the Output panel's Clear button (anchored to the window bottom, same position with the Debug-Brush strip present). The grep on editor.log fails the item if every click hit water ('no sample') instead of grass."
+    },
+    {
+      "id": "10-orbit",
+      "kind": "clip",
+      "outputs": [
+        "10-orbit.mp4",
+        "10-orbit.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "10-orbit.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "800",
+            "300",
+            "980",
+            "380",
+            "--button",
+            "middle",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "10-orbit.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "10-orbit.mp4",
+            "out": "10-orbit.png",
+            "at": 1.6
+          }
+        }
+      ],
+      "check": "Middle-drag orbits the editor camera around the island.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "11-pan",
+      "kind": "clip",
+      "outputs": [
+        "11-pan.mp4",
+        "11-pan.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "11-pan.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "330",
+            "900",
+            "390",
+            "--button",
+            "middle",
+            "--mod",
+            "shift",
+            "--duration",
+            "2.0"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "11-pan.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "11-pan.mp4",
+            "out": "11-pan.png",
+            "at": 1.6
+          }
+        }
+      ],
+      "check": "Shift+middle-drag pans the view sideways.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "12-zoom",
+      "kind": "clip",
+      "outputs": [
+        "12-zoom.mp4",
+        "12-zoom.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "12-zoom.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "up",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "record_stop": {
+            "out": "12-zoom.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "12-zoom.mp4",
+            "out": "12-zoom.png",
+            "at": 1.4
+          }
+        }
+      ],
+      "check": "Mouse wheel zooms the camera in and out; the distance ruler flashes.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "13-fly",
+      "kind": "clip",
+      "outputs": [
+        "13-fly.mp4",
+        "13-fly.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "13-fly.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "drag",
+            "700",
+            "340",
+            "860",
+            "330",
+            "--button",
+            "right",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "drag",
+            "860",
+            "330",
+            "740",
+            "360",
+            "--button",
+            "right",
+            "--duration",
+            "1.6"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_stop": {
+            "out": "13-fly.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "13-fly.mp4",
+            "out": "13-fly.png",
+            "at": 1.6
+          }
+        }
+      ],
+      "check": "Right-mouse look-around (the fly camera); hold RMB and move to look, WASD to fly.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "14-focus-f",
+      "kind": "clip",
+      "outputs": [
+        "14-focus-f.mp4",
+        "14-focus-f.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "14-focus-f.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "14-focus-f.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "14-focus-f.mp4",
+            "out": "14-focus-f.png",
+            "at": 1.6
+          }
+        }
+      ],
+      "check": "F focuses the selected terrain: the camera snaps to frame the island.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "15-viewgizmo",
+      "kind": "clip",
+      "outputs": [
+        "15-viewgizmo.mp4",
+        "15-viewgizmo.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "15-viewgizmo.mp4",
+            "rect": [
+              287,
+              115,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "1263",
+            "169"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "click",
+            "1296",
+            "211"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "drive": [
+            "click",
+            "1263",
+            "196"
+          ]
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "record_stop": {
+            "out": "15-viewgizmo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "15-viewgizmo.mp4",
+            "out": "15-viewgizmo.png",
+            "at": 1.8
+          }
+        }
+      ],
+      "check": "Clicking the navigation-cube axes snaps the view to Top/Front/Right (and the view label changes).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "16-view-menu-clip",
+      "kind": "clip",
+      "outputs": [
+        "16-view-menu.mp4"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "16-view-menu.mp4",
+            "rect": [
+              287,
+              80,
+              1046,
+              348
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"View\""
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Viewport"
+          }
+        },
+        {
+          "record_stop": {
+            "out": "16-view-menu.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "16-view-menu.mp4",
+            "out": "16-view-menu-clip.png",
+            "at": 1.0
+          }
+        }
+      ],
+      "check": "The View toolbar menu opened over the viewport: 1/2/2-alt/3/3-alt/4 Viewports, Gizmos, View Origin, View Grid, Preview Translation, Settings.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "17-perspective-menu-clip",
+      "kind": "clip",
+      "outputs": [
+        "17-perspective-menu.mp4"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "17-perspective-menu.mp4",
+            "rect": [
+              287,
+              80,
+              423,
+              802
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Perspective\""
+        },
+        {
+          "wait": 1.6
+        },
+        {
+          "expect": {
+            "drive": [
+              "popups"
+            ],
+            "contains": "Top View"
+          }
+        },
+        {
+          "record_stop": {
+            "out": "17-perspective-menu.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "17-perspective-menu.mp4",
+            "out": "17-perspective-menu-clip.png",
+            "at": 1.0
+          }
+        }
+      ],
+      "check": "The Perspective (view-mode) menu opened.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "18-add-node-clip",
+      "kind": "clip",
+      "outputs": [
+        "18-add-node.mp4"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "record_start": {
+            "out": "18-add-node.mp4",
+            "rect": [
+              2,
+              72,
+              1260,
+              700
+            ],
+            "fps": 12,
+            "max": 40
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Create New Node"
+          }
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "18-add-node.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "18-add-node.mp4",
+            "out": "18-add-node-clip.png",
+            "at": 3.0
+          }
+        }
+      ],
+      "check": "The + button opens Create New Node, Camera3D is searched and created under the terrain.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "19-rename-node",
+      "kind": "clip",
+      "outputs": [
+        "19-rename-node.mp4",
+        "19-rename-node.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "19-rename-node.mp4",
+            "rect": [
+              0,
+              44,
+              300,
+              260
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F2"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "PlayerCamera"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "record_stop": {
+            "out": "19-rename-node.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "19-rename-node.mp4",
+            "out": "19-rename-node.png",
+            "at": 1.2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "F2 renames the Camera3D node to PlayerCamera in the Scene dock.",
+      "notes": "The Camera3D is created with a call (the add-node gesture is item 18) so this clip can focus on the rename.",
+      "fresh_session": true
+    },
+    {
+      "id": "20-reparent",
+      "kind": "clip",
+      "outputs": [
+        "20-reparent.mp4",
+        "20-reparent.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "20-reparent.mp4",
+            "rect": [
+              0,
+              44,
+              300,
+              260
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "call",
+            "reparent",
+            "\"PixelWater\"",
+            "true",
+            "--type",
+            "Node",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "record_stop": {
+            "out": "20-reparent.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "20-reparent.mp4",
+            "out": "20-reparent.png",
+            "at": 1.2
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.8
+        }
+      ],
+      "check": "A Camera3D is reparented under PixelWater, indenting it in the Scene dock.",
+      "notes": "The reparent is performed with Node.reparent after the same tree change a drag makes; the 3D-view drag was not reliable for the dock row target.",
+      "fresh_session": true
+    },
+    {
+      "id": "21-eye-toggle",
+      "kind": "clip",
+      "outputs": [
+        "21-eye-toggle.mp4",
+        "21-eye-toggle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "21-eye-toggle.mp4",
+            "rect": [
+              287,
+              80,
+              1312,
+              502
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "270",
+            "140"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "click",
+            "270",
+            "140"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "21-eye-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "21-eye-toggle.mp4",
+            "out": "21-eye-toggle.png",
+            "at": 1.2
+          }
+        }
+      ],
+      "check": "Clicking the Sun's eye icon in the Scene dock darkens the island, clicking again lights it.",
+      "notes": "270,140 is the Sun row's eye (the row is selected first).",
+      "fresh_session": true
+    },
+    {
+      "id": "22-lock-node",
+      "kind": "clip",
+      "outputs": [
+        "22-lock-node.mp4",
+        "22-lock-node.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "22-lock-node.mp4",
+            "rect": [
+              0,
+              44,
+              540,
+              300
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "l",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "l",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "22-lock-node.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "22-lock-node.mp4",
+            "out": "22-lock-node.png",
+            "at": 1.0
+          }
+        }
+      ],
+      "check": "Ctrl+L locks the selected Camera3D (padlock badge), Ctrl+Shift+L unlocks it.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "23-scene-tabs",
+      "kind": "clip",
+      "outputs": [
+        "23-scene-tabs.mp4",
+        "23-scene-tabs.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "23-scene-tabs.mp4",
+            "rect": [
+              287,
+              44,
+              1026,
+              576
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "347",
+            "64"
+          ]
+        },
+        {
+          "wait": 3.0
+        },
+        {
+          "drive": [
+            "click",
+            "466",
+            "64"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "23-scene-tabs.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "23-scene-tabs.mp4",
+            "out": "23-scene-tabs.png",
+            "at": 1.4
+          }
+        }
+      ],
+      "check": "Clicking the hex_island tab switches scenes, then the flat-playground tab returns.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "24-gizmo-move",
+      "kind": "clip",
+      "outputs": [
+        "24-gizmo-move.mp4",
+        "24-gizmo-move.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "24-gizmo-move.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "w"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--path','Camera3D','--limit','1'],capture_output=True,text=True).stdout)['points'][0]['window']\nsubprocess.run(['python3','qa/drive.py','drag',str(int(p[0]+30)),str(int(p[1])),str(int(p[0]+40)),str(int(p[1]+0)),'--duration','1.5'],capture_output=True)\nPY"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "24-gizmo-move.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "24-gizmo-move.mp4",
+            "out": "24-gizmo-move.png",
+            "at": 1.6
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "W shows the Move gizmo (red/green/blue arrows); dragging the red X arrow moves the camera node.",
+      "notes": "The Camera3D is added with a call (item 18 covers the dialog) so the gizmo can be shown on a movable node.",
+      "fresh_session": true
+    },
+    {
+      "id": "25-gizmo-rotate",
+      "kind": "clip",
+      "outputs": [
+        "25-gizmo-rotate.mp4",
+        "25-gizmo-rotate.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "25-gizmo-rotate.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "e"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--path','Camera3D','--limit','1'],capture_output=True,text=True).stdout)['points'][0]['window']\nsubprocess.run(['python3','qa/drive.py','drag',str(int(p[0]+30)),str(int(p[1])),str(int(p[0]+0)),str(int(p[1]+30)),'--duration','1.5'],capture_output=True)\nPY"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "25-gizmo-rotate.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "25-gizmo-rotate.mp4",
+            "out": "25-gizmo-rotate.png",
+            "at": 1.6
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "E shows the Rotate gizmo (coloured rings); dragging a ring rotates the node.",
+      "notes": "The Camera3D is added with a call (item 18 covers the dialog) so the gizmo can be shown on a movable node.",
+      "fresh_session": true
+    },
+    {
+      "id": "26-gizmo-scale",
+      "kind": "clip",
+      "outputs": [
+        "26-gizmo-scale.mp4",
+        "26-gizmo-scale.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "26-gizmo-scale.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "r"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--path','Camera3D','--limit','1'],capture_output=True,text=True).stdout)['points'][0]['window']\nsubprocess.run(['python3','qa/drive.py','drag',str(int(p[0]+30)),str(int(p[1])),str(int(p[0]+30)),str(int(p[1]+0)),'--duration','1.5'],capture_output=True)\nPY"
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "26-gizmo-scale.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "26-gizmo-scale.mp4",
+            "out": "26-gizmo-scale.png",
+            "at": 1.6
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "R shows the Scale gizmo (box-ended handles); dragging a handle scales the node.",
+      "notes": "The Camera3D is added with a call (item 18 covers the dialog) so the gizmo can be shown on a movable node.",
+      "fresh_session": true
+    },
+    {
+      "id": "27-undo-redo",
+      "kind": "clip",
+      "outputs": [
+        "27-undo-redo.mp4",
+        "27-undo-redo.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "type",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera3D"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "move",
+            "800",
+            "340"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "wheel",
+            "800",
+            "340",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "27-undo-redo.mp4",
+            "rect": [
+              287,
+              165,
+              1026,
+              458
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "shell": "python3 - <<PY\nimport json,subprocess\np=json.loads(subprocess.run(['python3','qa/drive.py','project','--path','Camera3D','--limit','1'],capture_output=True,text=True).stdout)['points'][0]['window']\nsubprocess.run(['python3','qa/drive.py','drag',str(int(p[0]+30)),str(int(p[1])),str(int(p[0]+90)),str(int(p[1])),'--duration','1.4'],capture_output=True)\nPY"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "key",
+            "z",
+            "--ctrl",
+            "--shift"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "record_stop": {
+            "out": "27-undo-redo.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "27-undo-redo.mp4",
+            "out": "27-undo-redo.png",
+            "at": 1.8
+          }
+        }
+      ],
+      "check": "A move is undone with Ctrl+Z and redone with Ctrl+Shift+Z (the History trail grows).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "28-run-game",
+      "kind": "clip",
+      "outputs": [
+        "28-run-game.mp4",
+        "28-run-game.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "F6"
+          ]
+        },
+        {
+          "wait": 24
+        },
+        {
+          "record_start": {
+            "out": "28-run-game.mp4",
+            "rect": [
+              320,
+              180,
+              1280,
+              720
+            ],
+            "fps": 12,
+            "max": 12
+          }
+        },
+        {
+          "wait": 5
+        },
+        {
+          "record_stop": {
+            "out": "28-run-game.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "28-run-game.mp4",
+            "out": "28-run-game.png",
+            "at": 2.5
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "F8"
+          ]
+        },
+        {
+          "wait": 1.0
+        }
+      ],
+      "check": "F6 runs the flat-playground scene; the game window shows the pixel-art island in the sea.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "29-robloxui-toggle",
+      "kind": "clip",
+      "outputs": [
+        "29-robloxui-toggle.mp4",
+        "29-robloxui-toggle.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "click",
+            "307",
+            "839"
+          ]
+        },
+        {
+          "wait": 0.4
+        },
+        {
+          "record_start": {
+            "out": "29-robloxui-toggle.mp4",
+            "rect": [
+              287,
+              80,
+              930,
+              210
+            ],
+            "fps": 12,
+            "max": 24
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Roblox UI\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Roblox UI\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "29-robloxui-toggle.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "29-robloxui-toggle.mp4",
+            "out": "29-robloxui-toggle.png",
+            "at": 1.2
+          }
+        }
+      ],
+      "check": "The Roblox UI button switches the builder ribbon on and off.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "30-create-node-dialog",
+      "kind": "still",
+      "outputs": [
+        "30-create-node-dialog.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "drive": [
+            "click",
+            "24",
+            "96"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "Create New Node"
+          }
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 30-create-node-dialog.png 250 70 904 740"
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 0.6
+        }
+      ],
+      "check": "The Create New Node dialog with the node tree and description panel.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "40-scene-dock",
+      "kind": "still",
+      "outputs": [
+        "40-scene-dock.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.6
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 40-scene-dock.png 0 44 282 428"
+        }
+      ],
+      "check": "The Scene dock (scene tree) with Playground and its children, including the terrain.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "41-inspector-empty",
+      "kind": "still",
+      "outputs": [
+        "41-inspector-empty.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "click",
+            "140",
+            "410"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 41-inspector-empty.png 1320 80 282 260"
+        }
+      ],
+      "check": "The Inspector with nothing selected (empty property list).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "42-inspector-mst",
+      "kind": "still",
+      "outputs": [
+        "42-inspector-mst.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 42-inspector-mst.png 1320 80 282 520"
+        }
+      ],
+      "check": "The Inspector showing MarchingSquaresTerrain properties: Contents, Grid Type, Chunk Size, Cell Size, Tex Assign, Grid/Look.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "42b-inspector-camera",
+      "kind": "still",
+      "outputs": [
+        "42b-inspector-camera.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 42b-inspector-camera.png 1320 80 282 710"
+        }
+      ],
+      "check": "The Inspector showing the scene Camera3D, including the Camera Preview panel.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "43-filesystem",
+      "kind": "still",
+      "outputs": [
+        "43-filesystem.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 43-filesystem.png 0 509 282 420"
+        }
+      ],
+      "check": "The FileSystem dock at res:// (project folders and files).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "45-main-buttons",
+      "kind": "still",
+      "outputs": [
+        "45-main-buttons.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 45-main-buttons.png 580 0 900 44"
+        }
+      ],
+      "check": "The main-screen buttons: 2D, 3D, Script, Game, Asset Store.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "46-play-buttons",
+      "kind": "still",
+      "outputs": [
+        "46-play-buttons.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 46-play-buttons.png 1176 0 424 44"
+        }
+      ],
+      "check": "The run bar: Play, Pause, Stop, Run Current Scene and the movie button.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "47-toolbar-transform",
+      "kind": "still",
+      "outputs": [
+        "47-toolbar-transform.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 47-toolbar-transform.png 287 80 1300 44"
+        }
+      ],
+      "check": "Viewport toolbar row 1: transform-gizmo buttons, selection helpers, snap and the Transform/View menus.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "48-toolbar-pixelrow",
+      "kind": "still",
+      "outputs": [
+        "48-toolbar-pixelrow.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 48-toolbar-pixelrow.png 287 115 864 44"
+        }
+      ],
+      "check": "Viewport toolbar row 2: Pixel Preview, Animate, Pixel World, Roblox UI.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "49-addon-filesystem",
+      "kind": "still",
+      "outputs": [
+        "49-addon-filesystem.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 49-addon-filesystem.png 0 509 282 420"
+        }
+      ],
+      "check": "The FileSystem dock at res:// with the addons folder (MarchingSquaresTerrain beside phantom_camera_rust).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "50-project-settings-plugins",
+      "kind": "still",
+      "outputs": [
+        "50-project-settings-plugins.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 - <<'PY'\nimport subprocess, json, time\npops=[]\nfor _ in range(4):\n    subprocess.run([\"python3\",\"qa/drive.py\",\"click\",\"75\",\"12\"],capture_output=True); time.sleep(0.8)\n    p=subprocess.run([\"python3\",\"qa/drive.py\",\"popups\"],capture_output=True,text=True).stdout\n    pops=json.loads(p).get(\"popups\",[])\n    if pops: break\n    time.sleep(0.6)\nif not pops: raise SystemExit(\"no Project popup\")\npop=pops[0]; px,py=pop[\"pos\"]; ih=pop[\"size\"][1]/max(len(pop[\"items\"]),1)\nfor k,it in enumerate(pop[\"items\"]):\n    if it.get(\"text\",\"\").startswith(\"Project Settings\"):\n        subprocess.run([\"python3\",\"qa/drive.py\",\"click\",str(px+40),str(int(py+ih*(k+0.5)))],capture_output=True); break\nPY"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "542",
+            "122"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 50-project-settings-plugins.png 200 72 1200 420"
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "770"
+          ]
+        }
+      ],
+      "check": "Project Settings dialog on the Plugins tab (empty list - the addon is a GDExtension, not a plugin).",
+      "notes": "It is cancelled by closing the dialog after the crop; the Project menu item is selected by text from the popup.",
+      "fresh_session": true
+    },
+    {
+      "id": "50b-gdextension",
+      "kind": "still",
+      "outputs": [
+        "50b-gdextension.png"
+      ],
+      "steps": [
+        {
+          "shell": "python3 - <<'PY'\nimport subprocess, json, time\npops=[]\nfor _ in range(4):\n    subprocess.run([\"python3\",\"qa/drive.py\",\"click\",\"75\",\"12\"],capture_output=True); time.sleep(0.8)\n    p=subprocess.run([\"python3\",\"qa/drive.py\",\"popups\"],capture_output=True,text=True).stdout\n    pops=json.loads(p).get(\"popups\",[])\n    if pops: break\n    time.sleep(0.6)\nif not pops: raise SystemExit(\"no Project popup\")\npop=pops[0]; px,py=pop[\"pos\"]; ih=pop[\"size\"][1]/max(len(pop[\"items\"]),1)\nfor k,it in enumerate(pop[\"items\"]):\n    if it.get(\"text\",\"\").startswith(\"Project Settings\"):\n        subprocess.run([\"python3\",\"qa/drive.py\",\"click\",str(px+40),str(int(py+ih*(k+0.5)))],capture_output=True); break\nPY"
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "wait": 1.4
+        },
+        {
+          "drive": [
+            "click",
+            "639",
+            "122"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 50b-gdextension.png 200 72 1200 320"
+        },
+        {
+          "drive": [
+            "click",
+            "800",
+            "770"
+          ]
+        }
+      ],
+      "check": "Project Settings on the GDExtension tab: marching_squares_terrain.gdextension and phantom_camera_rust.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "51-history-dock",
+      "kind": "still",
+      "outputs": [
+        "51-history-dock.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "270",
+            "140"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "click",
+            "140",
+            "525"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 51-history-dock.png 0 509 282 420"
+        }
+      ],
+      "check": "The History dock with a real action trail (Toggle Visible, etc.).",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "52-transform-fields",
+      "kind": "still",
+      "outputs": [
+        "52-transform-fields.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--path",
+            "Camera"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 52-transform-fields.png 1320 80 282 340"
+        }
+      ],
+      "check": "The Inspector Transform section: Position, Rotation, Scale x/y/z and Rotation Edit Mode/Order.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "54-hex-island-scene",
+      "kind": "still",
+      "outputs": [
+        "54-hex-island-scene.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "open-scene",
+            "res://demo/hex_island.tscn"
+          ]
+        },
+        {
+          "wait": 8
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 54-hex-island-scene.png 420 165 900 476"
+        }
+      ],
+      "check": "The rich hex_island scene (village, cliffs, water) in the Perspective view.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "55-roblox-ui-ribbon",
+      "kind": "still",
+      "outputs": [
+        "55-roblox-ui-ribbon.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Roblox UI\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 55-roblox-ui-ribbon.png 287 80 930 150"
+        }
+      ],
+      "check": "The Roblox-style Model/Edit ribbon with Select, Move, Scale, Rotate, Geometric move/rotate snap fields and the snap/duplicate/mirror/anchor icons.",
+      "notes": "",
+      "fresh_session": true
+    },
+    {
+      "id": "56-57-robloxui-pair",
+      "kind": "series",
+      "outputs": [
+        "56-robloxui-off.png",
+        "57-robloxui-on.png"
+      ],
+      "steps": [
+        {
+          "drive": [
+            "select",
+            "--class",
+            "MarchingSquaresTerrain"
+          ]
+        },
+        {
+          "wait": 0.9
+        },
+        {
+          "drive": [
+            "move",
+            "1250",
+            "250"
+          ]
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 56-robloxui-off.png 287 80 930 205"
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py click \"Roblox UI\""
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "shell": "python3 /tmp/opencode/ds_mst_ui.py cropwin 57-robloxui-on.png 287 80 930 205"
+        }
+      ],
+      "check": "Before/after of the toolbar area without the Roblox UI ribbon, then with it.",
+      "notes": "",
+      "fresh_session": true
+    }
+  ]
+}

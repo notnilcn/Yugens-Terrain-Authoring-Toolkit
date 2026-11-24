@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://drro2gv83ia0f"]
+
+[ext_resource type="PackedScene" uid="uid://b4fn0utiv4x0l" path="res://addons/MarchingSquaresTerrain/assets/courtyard/round_tree.glb" id="1_wnucr"]
+[ext_resource type="PackedScene" uid="uid://l5irbtxoivke" path="res://addons/MarchingSquaresTerrain/assets/characters/fox/fox.glb" id="2_bupgq"]
+
+[node name="ImportedModels" type="Node3D" unique_id=1461249098]
+
+[node name="round_tree" parent="." unique_id=405510977 instance=ExtResource("1_wnucr")]
+
+[node name="fox" parent="." unique_id=633599476 instance=ExtResource("2_bupgq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0, 1.6)

@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painting, Textures &amp; Tint – MST Guide</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/search-index.js" defer></script>
+<script src="assets/app.js" defer></script>
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+  .tall-tour { max-width: 360px; }
+  .narrow-shot img { max-height: 520px; width: auto; max-width: 100%; display: block; margin: 0 auto; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: .95em; }
+  table.ref th, table.ref td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.ref td:first-child { white-space: nowrap; font-weight: 600; }
+  .hint { font-family: ui-monospace, monospace; font-size: .88em; background: var(--line); padding: 2px 6px; border-radius: 4px; }
+  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+  .slot { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .92em; }
+  .slot b { color: var(--accent); margin-right: 4px; }
+  .slot .g { font-size: .8em; opacity: .75; display: block; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .sw { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 4px; font-size: .9em; }
+  .sw i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 1px solid var(--line); }
+  .slope-demo { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 14px 0; }
+  .slope-demo label { display: inline-flex; gap: 6px; align-items: center; margin-right: 18px; font-size: .95em; }
+  .slope-demo input[type=range] { width: 160px; }
+  .slope-bars { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .slope-bars div { flex: 1 1 60px; min-width: 60px; text-align: center; font-size: .8em; border-radius: 6px; padding: 8px 2px; border: 1px solid var(--line); transition: background .2s, color .2s; }
+  .slope-bars div.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .slope-out { margin-top: 8px; font-size: .92em; }
+  .center { text-align: center; margin-top: 4px; }
+</style>
+</head>
+<body>
+<main><div class="content">
+
+<h1>Painting, textures &amp; tint</h1>
+<p class="lede">Colour your terrain the way you'd use Roblox's Terrain Editor <b>Paint</b> — but with 16 fully editable texture slots you can swap for your own images, slope-limited and cliff-wall painting, one-click texture presets, and a Tint layer for biome and territory colours.</p>
+<div class="meta-row"><span class="pill">⏱ 35 min</span><span class="pill">Beginner</span><span class="pill">Scene: demo/hex_island.tscn</span><span class="pill">Tools: Paint [6] · Tint</span></div>
+
+<figure class="shot"><img src="media/04-terrain-painting/06-paint-stroke-after.png" alt="Top-down view of a hex-grid island: green grass, pale sand beaches, blue water and a brown path. A fresh band of tan sand has been painted across the grass on the left."><figcaption>What you'll be doing: dragging a brush over the ground to change which texture each cell shows. Here a stroke of <b>Sand</b> has been painted over grass.</figcaption></figure>
+
+<h2 id="learn">What you'll learn</h2>
+<ul>
+  <li>Where the <a href="#surfaces">Paint tool and its three panels</a> live, and how they map to <a href="#roblox-map">Roblox's Terrain Editor Paint</a>.</li>
+  <li>How to <a href="#tutorial">paint your first patch</a>, resize the brush, pick with the <a href="#eyedropper">eyedropper</a> and undo.</li>
+  <li>The <a href="#slots">16 texture slots</a>: rename them, re-colour them, change their pattern and scale, and decide which ones grow grass.</li>
+  <li><a href="#own-image">Swap in your own image</a> as a ground texture.</li>
+  <li><a href="#presets">Texture presets</a>: apply a whole palette in one click, and export your own.</li>
+  <li><a href="#walls">Paint Walls</a> for cliff faces and <a href="#slope">Slope Min / Max</a> for "rock only on steep ground".</li>
+  <li>The <a href="#tint">Tint tool</a>: wash colour over cells for biomes, territories and paths.</li>
+  <li>A <a href="#reference">filterable reference</a> of every control, plus <a href="#recipes">recipes</a>.</li>
+</ul>
+
+<h2 id="words">A few Godot words first</h2>
+<dl>
+  <dt><b>Node</b></dt><dd>One object in your scene — like an Instance in Roblox. The terrain is a node called <code>MarchingSquaresTerrain</code>.</dd>
+  <dt><b>Scene dock</b></dt><dd>The tree of nodes at the top left; Godot's version of Roblox's <b>Explorer</b>. A <b>dock</b> is any movable editor panel.</dd>
+  <dt><b>FileSystem dock</b></dt><dd>The panel at the bottom left listing your project's files and folders — a bit like Roblox's Asset Manager, but it shows real files on disk.</dd>
+  <dt><b>Inspector</b></dt><dd>The panel on the far right listing the selected node's properties — Roblox's <b>Properties</b> window.</dd>
+  <dt><b>3D view (viewport)</b></dt><dd>The big picture of your world in the middle of the editor. You paint directly in it.</dd>
+  <dt><b>Resource / <code>.tres</code></b></dt><dd>A reusable data file (a texture, a material, a preset). <code>.tres</code> is Godot's text resource file. A texture preset is one of these.</dd>
+  <dt><b><code>res://</code></b></dt><dd>"The project folder". <code>res://addons/MarchingSquaresTerrain/texture_presets/</code> is a folder inside your project.</dd>
+  <dt><b>Texture2D / PNG</b></dt><dd>An image file used as a texture. Any PNG in your project can become a ground texture.</dd>
+  <dt><b>Cell</b></dt><dd>The terrain is a grid of cells (squares or hexes). Paint changes which texture each cell shows; it never changes height.</dd>
+  <dt><b>LMB / RMB</b></dt><dd>Left / right mouse button. "Wheel" is the scroll wheel.</dd>
+</dl>
+
+<!-- ===================================================== SURFACES -->
+<h2 id="surfaces">Where the Paint tool lives</h2>
+<p>The terrain tools only appear while a <code>MarchingSquaresTerrain</code> node is selected in the Scene dock. Click it, then click <span class="ui">Paint</span> in the tool column on the left of the 3D view (or press <kbd>6</kbd>). Three things appear. Click the numbered dots to tour them.</p>
+
+<div class="hotspots"><img src="media/04-terrain-painting/01-paint-tool-location.png" alt="The whole Godot editor with the terrain selected. A red box marks the Paint button in the tool column at the left of the 3D view. Under the 3D view is the Vertex Painting strip; to the right of the view is the Textures panel showing slot 1 Grass; the Inspector is on the far right.">
+  <button class="spot" style="left:9%;top:22%" data-title="Scene dock" data-text="Select MarchingSquaresTerrain here first. Without it selected, the terrain tools are hidden.">1</button>
+  <button class="spot" style="left:21%;top:44%" data-title="Paint button · key 6" data-text="The tool column inside the 3D view. Paint is tool 6. The pressed (blue) button is the active tool.">2</button>
+  <button class="spot" style="left:40%;top:45.5%" data-title="Hint line" data-text="LMB-drag: paint the Material · Ctrl+LMB: pick the material under the cursor · Shift+wheel: size.">3</button>
+  <button class="spot" style="left:40%;top:63%" data-title="Vertex Painting strip" data-text="The bottom attribute strip: every setting of the Paint tool (brush, Material, presets, walls, slope).">4</button>
+  <button class="spot" style="left:73%;top:35%" data-title="Textures panel" data-text="Appears only for Paint and Foliage. Lists the 16 texture slots with editable fields. Sits between the 3D view and the Inspector.">5</button>
+  <button class="spot" style="left:88%;top:43%" data-title="Inspector" data-text="The terrain's properties, including Tex Assign (the texture set the 16 slots live in).">6</button>
+</div>
+
+<ol>
+  <li><b>Left tool column</b> — Brush, Level, Smooth, Bridge, Foliage, <b>Paint</b>, Inspect, Chunks, Settings, then Stamp, Gradient, Select, Tint, Grid. Paint is number <kbd>6</kbd>. Tint has <b>no</b> number key.</li>
+  <li><b>Bottom strip</b> titled <span class="ui">Vertex Painting</span> — the Paint tool's settings. ("Vertex Paint" is the tool's internal name; the button just says Paint.)</li>
+  <li><b>Right "Textures" panel</b> — the 16 texture slots. It only shows for Paint and Foliage.</li>
+</ol>
+
+<div class="pair">
+  <figure class="shot narrow-shot"><img src="media/04-terrain-painting/04-toolbar-tools.png" alt="The terrain tool column: Brush 1, Level 2, Smooth 3, Bridge 4, Foliage 5, Paint 6 (highlighted), Inspect 7, Chunks 8, Settings 9, Stamp, Gradient, Select."><figcaption>The tool column with <b>Paint (6)</b> pressed.</figcaption></figure>
+  <div>
+    <p>Hover the Paint icon and its tooltip sums the tool up:</p>
+    <blockquote><p><i>"Used to paint textures onto the terrain. There are 16 available textures. Every texture can have grass ('Has grass' in the right panel). 16 is a void material making terrain invisible. Texture presets can be used to quickly swap between texture palettes; they can be exported via the right-hand panel at the bottom. 'Quick Paints' are a way to quickly set textures while modelling the terrain. Ctrl+LMB: Pick the material under the cursor."</i></p></blockquote>
+    <p>While Paint is active, the hint line at the bottom of the 3D view reads:</p>
+    <p><span class="hint">LMB-drag: paint the Material · Ctrl+LMB: pick the material under the cursor · Shift+wheel: size</span></p>
+  </div>
+</div>
+
+<div class="callout warn"><span class="label">Can't see Tint?</span><p>The <span class="ui">Tint</span> and <span class="ui">Grid</span> buttons sit at the very bottom of the tool column and can be hidden behind the <span class="ui">Output</span> panel. Click the <span class="ui">Output</span> tab at the bottom of the editor to collapse it, or press <span class="ui">Collapse</span> at the top of the column to shrink the toolbar to icons. It's a layout quirk, not a bug.</p></div>
+
+<h3 id="roblox-map">Roblox Terrain Editor → MST, at a glance</h3>
+<table class="ref">
+  <tr><th>In Roblox Studio</th><th>In MST</th></tr>
+  <tr><td>Terrain Editor → Paint</td><td>The <b>Paint</b> tool (<kbd>6</kbd>), strip "Vertex Painting".</td></tr>
+  <tr><td>Material picker (Grass, Rock, Sand…)</td><td>The <span class="ui">Material</span> dropdown or the slot buttons in the <b>Textures</b> panel — 16 slots, each editable.</td></tr>
+  <tr><td>Material colours (Terrain → MaterialColors)</td><td>Each slot's <span class="ui">Color</span> field, plus the <b>Tint</b> tool for per-cell colour.</td></tr>
+  <tr><td>Custom MaterialVariant</td><td>Swap a slot's <span class="ui">Texture</span> for your own PNG.</td></tr>
+  <tr><td>Eyedropper / sampling a material</td><td><kbd>Ctrl</kbd>+LMB on the terrain.</td></tr>
+  <tr><td>"Grass" material's grass blades</td><td>The <span class="ui">Grass</span> tick on any slot (see <a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a>).</td></tr>
+  <tr><td>Brush Size</td><td><span class="ui">Size</span> or <kbd>Shift</kbd>+wheel.</td></tr>
+  <tr><td>Brush Strength</td><td><b>None</b> — Paint always fully replaces the texture. (Tint has Opacity.)</td></tr>
+  <tr><td>No equivalent</td><td>Texture presets, Paint Walls, Slope Min/Max, Tint.</td></tr>
+</table>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox gives you a <b>fixed</b> material list — Grass is always Roblox's grass. Here there are <b>16 slots</b> and every one is yours to change: its image, its procedural pattern, its colour, its tiling scale and whether grass grows on it. Think of the slots as a 16-colour paint palette you mix yourself. The default slot names (Grass, Cliff, Dark Rock, Sand…) are there so Roblox habits still work: "Grassy" ≈ slot 1, "Rock" ≈ 6 Cliff or 7 Dark Rock, and so on.</p></div>
+
+<!-- ===================================================== TUTORIAL -->
+<h2 id="tutorial">Tutorial: paint your first patch</h2>
+<p>Open <code>res://demo/hex_island.tscn</code> (FileSystem dock → <code>demo</code> → double-click). It's a dense hex island, so almost every click lands on a real cell. For a clean top-down view, open the 3D view's <span class="ui">View</span> menu (or the <span class="ui">Perspective</span> button in the top-left of the view) and choose <span class="ui">Top View</span>.</p>
+
+<ol class="steps" data-id="paint-first-patch">
+  <li>Click <code>MarchingSquaresTerrain</code> in the Scene dock. The tool column appears in the 3D view.</li>
+  <li>Click <span class="ui">Paint</span> (or press <kbd>6</kbd>). The Textures panel and the Vertex Painting strip appear.</li>
+  <li>In the strip open <span class="ui">Material</span> and choose <b>4. Sand</b>. (Clicking the <span class="ui">Texture 4</span> button in the right panel does the same.)</li>
+  <li>Move the mouse over the terrain. A pink ring with highlighted cells shows the brush footprint — that's a preview, not paint.</li>
+  <li><b>LMB-drag</b> across some grass. Every cell under the brush turns to sand.</li>
+  <li>Hold <kbd>Shift</kbd> and roll the wheel to resize the brush, then paint again.</li>
+  <li>Hold <kbd>Ctrl</kbd> and click a grass cell: the Material jumps back to <b>1. Grass</b> (the eyedropper).</li>
+  <li>Press <kbd>Ctrl</kbd>+<kbd>Z</kbd>. The whole last stroke disappears in one step.</li>
+</ol>
+
+<figure class="shot narrow-shot"><img src="media/04-terrain-painting/05-material-dropdown.png" alt="The Material dropdown open, listing 1. Grass (selected), 2. Meadow, 3. Forest Floor, 4. Sand, 5. Dirt, 6. Cliff, 7. Dark Rock, 8. Snow, 9. Gravel, 10. Clay, 11. Moss, 12. Path, 13. Stone Tiles, 14. Ash, 15. Ice, 16. Void."><figcaption>The <span class="ui">Material</span> dropdown lists all 16 slots by name. This is your palette.</figcaption></figure>
+
+<figure class="clip"><video src="media/04-terrain-painting/06-paint-stroke.mp4" poster="media/04-terrain-painting/06-paint-stroke-poster.png" data-autoplay></video><figcaption>A slow LMB-drag paints a band of Sand across the grass.</figcaption></figure>
+
+<div class="compare" data-before="Before" data-after="After"><img src="media/04-terrain-painting/06-paint-stroke-before.png" alt="The island before painting: green grass on the left half."><img src="media/04-terrain-painting/06-paint-stroke-after.png" alt="The same view after painting: a tan sand band across the grass on the left."></div>
+<p class="center"><small>Drag the divider to compare before and after the stroke.</small></p>
+
+<div class="callout tip"><span class="label">Tip</span><p><b>Top-down view shows the textures without grass.</b> From the straight-down Top view, grass blades are culled, so you see exactly which texture each cell has. In a normal angled view, grass covers the grass-enabled slots (1 Grass, 2 Meadow, 3 Forest Floor, 11 Moss by default). Use Top view to paint, angled view to admire.</p></div>
+
+<div class="callout warn"><span class="label">Watch out</span><p><b>Click on real terrain.</b> On sparse scenes like <code>tutorial/02_island.tscn</code>, a click over a gap or water prints <code>no sample</code> to the Output panel and paints nothing. Move onto solid ground. Also: the pink ring is only the brush preview — move the mouse off the 3D view before taking a clean screenshot.</p></div>
+
+<!-- ===================================================== BRUSH -->
+<h2 id="brush">The brush: shape, size, aspect, rotation</h2>
+<p>Paint uses the same brush as the sculpting tools (see <a href="03-terrain-sculpting.html">Sculpting terrain</a>). The first four controls in the strip set its footprint.</p>
+
+<div class="pair">
+  <figure class="shot"><img src="media/04-terrain-painting/14-brush-type-dropdown.png" alt="The Brush Type dropdown open: Round (selected), Square, Hexagon, Hexagon30, Triangle, Triangle180."><figcaption><span class="ui">Brush Type</span>: Round, Square, Hexagon, Hexagon30, Triangle, Triangle180.</figcaption></figure>
+  <figure class="clip"><video src="media/04-terrain-painting/12-size-change.mp4" poster="media/04-terrain-painting/12-size-change-poster.png" data-autoplay></video><figcaption><kbd>Shift</kbd>+wheel grows the brush. Watch the <span class="ui">Size</span> value in the strip and the ring in the view.</figcaption></figure>
+</div>
+
+<div class="scrubber" data-label="Brush Size" data-start="1"
+  data-frames='[{"v":"≈1","src":"media/04-terrain-painting/13-size-series-1.png","note":"Minimum: a single cell or two. For detail work, edges of paths."},{"v":"≈12","src":"media/04-terrain-painting/13-size-series-2.png","note":"A handful of cells — good for paths and small patches."},{"v":"≈25","src":"media/04-terrain-painting/13-size-series-3.png","note":"A wide disc — beaches, clearings."},{"v":"≈45","src":"media/04-terrain-painting/13-size-series-4.png","note":"Near the maximum of 50: whole regions in one stroke."}]'></div>
+
+<h3 id="wheel">Mouse-wheel shortcuts while Paint is active</h3>
+<table class="ref">
+  <tr><th>Gesture (over the 3D view)</th><th>Does</th></tr>
+  <tr><td><kbd>Shift</kbd>+wheel</td><td>Brush <b>Size</b>. Does not zoom the camera.</td></tr>
+  <tr><td><kbd>Alt</kbd>+wheel</td><td>Brush <b>Rotation</b> (only matters for non-round brushes). Does not zoom the camera.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+wheel</td><td><b>Zooms the camera.</b> Paint has no Strength, so Ctrl+wheel is free.</td></tr>
+  <tr><td>Plain wheel</td><td>Zooms the camera (normal Godot navigation).</td></tr>
+</table>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>On the height tools (Smooth, Raise/Lower, Gradient), <kbd>Ctrl</kbd>+wheel changes <b>Strength</b>. Paint and Tint don't have a Strength slider, so there <kbd>Ctrl</kbd>+wheel just zooms. <kbd>Shift</kbd>+wheel and <kbd>Alt</kbd>+wheel never zoom the camera on terrain tools — they only change the brush.</p></div>
+
+<!-- ===================================================== EYEDROPPER -->
+<h2 id="eyedropper">The eyedropper: Ctrl+LMB</h2>
+<p>Hold <kbd>Ctrl</kbd> and left-click any terrain cell. The texture under the cursor becomes the active slot: the <span class="ui">Material</span> dropdown and the slot button in the Textures panel both update. Then just let go of <kbd>Ctrl</kbd> and paint.</p>
+<figure class="clip"><video src="media/04-terrain-painting/07-ctrl-pick.mp4" poster="media/04-terrain-painting/07-ctrl-pick-poster.png" data-autoplay></video><figcaption><kbd>Ctrl</kbd>+LMB on a sand cell: the strip's Material changes from Meadow to <b>4. Sand</b>.</figcaption></figure>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>This is the material eyedropper you know from Roblox's Terrain Editor. Use it when you want to "continue" a texture that's already in the world without hunting for its slot name.</p></div>
+
+<!-- ===================================================== UNDO -->
+<h2 id="undo">Undo and redo</h2>
+<p>Every paint stroke — from mouse-down to mouse-up — is <b>one</b> undo step, named <code>terrain vertex paint</code> in Godot's <span class="ui">History</span> dock. Tint strokes are named <code>terrain tint paint</code>. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes one stroke; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. Undo restores the terrain exactly as it was.</p>
+<figure class="clip"><video src="media/04-terrain-painting/16-undo.mp4" poster="media/04-terrain-painting/16-undo-poster.png" data-autoplay></video><figcaption>Paint a stroke, then <kbd>Ctrl</kbd>+<kbd>Z</kbd>: it's gone in one step.</figcaption></figure>
+<div class="callout tip"><span class="label">Tip</span><p>Occasionally, right after an undo, the grass on top can look slow to redraw for a moment. The data has already reverted; give the view a second or nudge the mouse.</p></div>
+
+<!-- ===================================================== SLOTS -->
+<h2 id="slots">The 16 texture slots</h2>
+<p>The <b>Textures</b> panel (right of the 3D view) shows the terrain's texture set: 16 slots, each a little card of settings. Its tooltip: <i>"Texture slots of this terrain's texture set. Click a slot to paint with it (same as the Material dropdown)."</i> Tour slot 1:</p>
+
+<div class="hotspots tall-tour"><img src="media/04-terrain-painting/03-textures-panel.png" alt="The Textures panel showing slot 1: a green preview swatch, the Texture 1 button, name Grass, a Texture picker with a white-ish grass image, Pattern Grass, Scale 1.0, a green Color bar, Grass ticked with a cream grass colour, and a Sprite picker showing a white leaf sprite. Slot 2 Meadow starts below.">
+  <button class="spot" style="left:9%;top:13%" data-title="Preview swatch" data-text="Live 36×36 preview of the slot — its texture or pattern, already tinted by Color.">1</button>
+  <button class="spot" style="left:36%;top:10%" data-title="Texture N button" data-text="Click to paint with this slot (same as choosing it in the Material dropdown). Pressed = the active slot.">2</button>
+  <button class="spot" style="left:33%;top:18%" data-title="Name field" data-text="The slot's display name — what the Material dropdown shows.">3</button>
+  <button class="spot" style="left:66%;top:29%" data-title="Texture" data-text="The slot's image (a Texture2D). This is where you swap in your own PNG. Empty = use the procedural Pattern instead.">4</button>
+  <button class="spot" style="left:62%;top:40%" data-title="Pattern" data-text="One of 13 built-in ground patterns. Picks the bundled texture for that pattern; with no Texture it's generated procedurally.">5</button>
+  <button class="spot" style="left:57%;top:48%" data-title="Scale" data-text="Tiling scale of the texture or pattern, 0.1–40.">6</button>
+  <button class="spot" style="left:64%;top:55%" data-title="Color" data-text="Multiplies the texture or pattern — the ground tint. No alpha.">7</button>
+  <button class="spot" style="left:40%;top:63%" data-title="Grass" data-text="Tick to grow grass on this texture; the colour button beside it sets the grass colour.">8</button>
+  <button class="spot" style="left:66%;top:74%" data-title="Sprite" data-text="The grass sprite for this texture (white leaves on transparency, coloured by Grass). Empty = the terrain's default grass.">9</button>
+  <button class="spot" style="left:32%;top:91%" data-title="Next slot" data-text="Slot 2 (Meadow) starts here. Scroll for all 16, then Auto Rules and the Export Texture Preset button.">10</button>
+</div>
+
+<h3 id="slot-fields">Slot fields</h3>
+<table class="ref">
+  <tr><th>Field</th><th>Type</th><th>What it does</th></tr>
+  <tr><td>Preview swatch</td><td>36×36 image</td><td>Live preview of the slot (texture or pattern, tinted by Color).</td></tr>
+  <tr><td>Texture N</td><td>toggle button</td><td>Select this slot to paint. Same as the Material dropdown.</td></tr>
+  <tr><td>Name</td><td>text field</td><td>Display name, shown in the Material dropdown.</td></tr>
+  <tr><td>Texture</td><td>resource picker (Texture2D)</td><td>The slot's image, ideally white-ish pixel art so Color can tint it. Empty = procedural Pattern.</td></tr>
+  <tr><td>Pattern</td><td>dropdown (13)</td><td>Grass, Meadow, Forest, Sand, Dirt, Cliff, Dark Rock, Snow, Gravel, Clay, Moss, Path, Plain. Picks the bundled ground texture of that pattern (<code>textures/ground/</code>); without a texture it's generated procedurally. Hidden on slot 16.</td></tr>
+  <tr><td>Scale</td><td>slider 0.1 – 40</td><td>Texture / pattern scale.</td></tr>
+  <tr><td>Color</td><td>colour button</td><td>Multiplies the texture or pattern.</td></tr>
+  <tr><td>Grass</td><td>checkbox + colour</td><td>Grow grass on this texture, and in which colour.</td></tr>
+  <tr><td>Sprite</td><td>resource picker (Texture2D)</td><td>Grass sprite for this texture. Empty = the terrain's grass texture.</td></tr>
+</table>
+
+<div class="pair">
+  <figure class="shot narrow-shot"><img src="media/04-terrain-painting/10-slot-detail-cliff.png" alt="Slot 6 Cliff: a brown preview, a grey-white rock Texture, Pattern Cliff, Scale 1.0, a tan Color, Grass unticked, Sprite empty."><figcaption>Slot 6 <b>Cliff</b>, a non-grass slot: <span class="ui">Grass</span> unticked, <span class="ui">Sprite</span> &lt;empty&gt;. Note the Texture is grey-white: its brown comes from <span class="ui">Color</span>.</figcaption></figure>
+  <div>
+    <h3 id="defaults">The default slots</h3>
+    <div class="slots">
+      <div class="slot"><b>1</b>Grass<span class="g">🌱 grass</span></div>
+      <div class="slot"><b>2</b>Meadow<span class="g">🌱 grass</span></div>
+      <div class="slot"><b>3</b>Forest Floor<span class="g">🌱 grass</span></div>
+      <div class="slot"><b>4</b>Sand</div>
+      <div class="slot"><b>5</b>Dirt</div>
+      <div class="slot"><b>6</b>Cliff</div>
+      <div class="slot"><b>7</b>Dark Rock</div>
+      <div class="slot"><b>8</b>Snow</div>
+      <div class="slot"><b>9</b>Gravel</div>
+      <div class="slot"><b>10</b>Clay</div>
+      <div class="slot"><b>11</b>Moss<span class="g">🌱 grass</span></div>
+      <div class="slot"><b>12</b>Path</div>
+      <div class="slot"><b>13</b>Stone Tiles</div>
+      <div class="slot"><b>14</b>Ash</div>
+      <div class="slot"><b>15</b>Ice</div>
+      <div class="slot"><b>16</b>Void<span class="g">invisible</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="callout tip"><span class="label">Slot 16 is Void</span><p>Painting slot <b>16 Void</b> makes those cells <b>invisible</b>. Use it to punch holes for caves, cut the edge of an island, or hide ground under a building. It has no Pattern field.</p></div>
+
+<h3 id="rename">Renaming a slot</h3>
+<p>Two ways: type in the slot's name field in the Textures panel, or select the slot as Material and type in the strip's <span class="ui">Texture Name</span> box (placeholder "New name here…") and press <kbd>Enter</kbd>. The new name appears in the Material dropdown. Good names ("Volcanic Ash", "Desert Path") make big palettes easy to use.</p>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox has nothing like the per-slot <span class="ui">Grass</span> tick or the procedural <span class="ui">Pattern</span>. In Roblox, only the Grass material grows grass; here <b>any</b> slot can — tick it on "Snow" and you get grass on snow. Grass itself (how tall, how chunky, where it's allowed) is covered on <a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a>.</p></div>
+
+<!-- ===================================================== OWN IMAGE -->
+<h2 id="own-image">Use your own image as a texture</h2>
+<p>This is the artist's favourite: any PNG in your project can become a ground texture. The <span class="ui">Texture</span> field is a Godot <b>resource picker</b> — a box that holds a file, with a small ▾ menu to load, clear or edit what's in it.</p>
+
+<ol class="steps" data-id="paint-own-image">
+  <li>Put your PNG in the project folder (drag it into the FileSystem dock, or copy it into the folder with your file manager). Tip: <b>white-ish, light pixel art</b> works best, because the slot's <span class="ui">Color</span> multiplies it.</li>
+  <li>In the Textures panel, scroll to the slot you want to replace (e.g. <b>Texture 10 · Clay</b>).</li>
+  <li>Click the small <b>▾</b> at the right of its <span class="ui">Texture</span> field.</li>
+  <li>Choose <span class="ui">Quick Load…</span> (a searchable list of every image in the project) or <span class="ui">Load…</span> (a normal file browser).</li>
+  <li>Pick your PNG. The slot's preview swatch and the picker thumbnail update.</li>
+  <li>Select that slot as the Material (click its <span class="ui">Texture 10</span> button) and paint. The ground now shows your image.</li>
+  <li>Adjust <span class="ui">Scale</span> to change how often it repeats, and <span class="ui">Color</span> to tint it. Set Color to white to see the image's own colours.</li>
+</ol>
+
+<div class="pair">
+  <figure class="shot"><img src="media/04-terrain-painting/22-swap-texture-dialog.png" alt="The Select Texture2D quick-load dialog: a search box and a row of colourful PNG thumbnails from the project, with a path at the bottom and Fuzzy Search turned on."><figcaption><span class="ui">Quick Load…</span> opens "Select Texture2D": type to search, click a thumbnail.</figcaption></figure>
+  <figure class="shot narrow-shot"><img src="media/04-terrain-painting/22-swap-texture-slot.png" alt="Slot 10 Clay after the swap: its Texture picker now shows a colourful patchwork PNG; Pattern Clay, Scale 1.0, an orange-brown Color, Grass unticked."><figcaption>Slot 10 after the swap: the picker shows the new image.</figcaption></figure>
+</div>
+<figure class="clip"><video src="media/04-terrain-painting/23-swap-texture-paint.mp4" poster="media/04-terrain-painting/23-swap-texture-paint-poster.png" data-autoplay></video><figcaption>Painting with the swapped slot (here a bright multi-coloured PNG from the project, chosen because it is easy to spot): the coloured patch under the brush is that image on the ground, tile by tile.</figcaption></figure>
+
+<div class="callout tip"><span class="label">Tip</span><p>To go back to the built-in look, open the ▾ menu and choose <span class="ui">Clear</span>. With <span class="ui">Texture</span> empty, the slot uses its procedural <span class="ui">Pattern</span> again.</p></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>In Roblox you'd create a <b>MaterialVariant</b> in MaterialService and point it at uploaded images. Here it's one field per slot, and the image stays a normal file in your project.</p></div>
+
+<!-- ===================================================== PRESETS -->
+<h2 id="presets">Texture presets</h2>
+<p>A <b>texture preset</b> is a saved set of all 16 slots (names, textures, patterns, colours, grass settings) as a <code>.tres</code> resource file. Apply one and the whole palette swaps; export one to reuse your palette on another terrain.</p>
+
+<h3 id="preset-apply">Apply a preset</h3>
+<ol class="steps" data-id="paint-preset-apply">
+  <li>With Paint active, open the strip's <span class="ui">Texture Preset</span> dropdown.</li>
+  <li>Choose <b>MST Classic</b> (the bundled preset). All 16 slots rebuild and the whole terrain repaints with the new palette — cells keep their slot numbers, only the look of each slot changes.</li>
+  <li>Choose <b>None</b> (the first entry) to clear the assignment back to the default.</li>
+</ol>
+<div class="pair">
+  <figure class="shot"><img src="media/04-terrain-painting/08-texture-preset-dropdown.png" alt="The Texture Preset dropdown open with two entries: None (selected) and MST Classic."><figcaption>The dropdown lists <b>None</b> + every <code>.tres</code> in <code>res://addons/MarchingSquaresTerrain/texture_presets/</code>. Presets you export show up here too.</figcaption></figure>
+  <figure class="clip"><video src="media/04-terrain-painting/09-preset-apply.mp4" poster="media/04-terrain-painting/09-preset-apply-poster.png" data-autoplay></video><figcaption>Choosing MST Classic: the whole island changes palette at once.</figcaption></figure>
+</div>
+<div class="compare" data-before="Default" data-after="MST Classic"><img src="media/04-terrain-painting/09-preset-before.png" alt="The island with the default palette: bright light-green grass and pale sand."><img src="media/04-terrain-painting/09-preset-after.png" alt="The same island with MST Classic: dark forest-green ground speckled with rocks and tan patches."></div>
+<p class="center"><small>Same cells, same slot numbers — only the palette changed.</small></p>
+
+<h3 id="preset-export">Export your own preset</h3>
+<ol class="steps" data-id="paint-preset-export">
+  <li>Set up your 16 slots the way you like them.</li>
+  <li>Scroll the Textures panel to the very bottom (past the <b>Auto Rules</b> section) and click <span class="ui">Export Texture Preset</span>.</li>
+  <li>The <b>Save Preset</b> dialog asks for a name ("Preset name (saved to res://addons/MarchingSquaresTerrain/texture_presets/):"), prefilled with <code>new_texture_preset</code> or the current preset's name.</li>
+  <li>Type a name and click <span class="ui">OK</span>. It's saved as <code>snake_case(name).tres</code> in that folder.</li>
+  <li>If the name already exists, a second box asks "<i>&lt;path&gt;</i> already exists. Overwrite it?"</li>
+  <li>Your preset now appears in every terrain's <span class="ui">Texture Preset</span> dropdown.</li>
+</ol>
+<figure class="shot"><img src="media/04-terrain-painting/11-export-preset-dialog.png" alt="The Save Preset dialog: a label saying the preset is saved to res://addons/MarchingSquaresTerrain/texture_presets/, a name field containing new_texture_preset, and an OK button."><figcaption>The Save Preset dialog opened by <span class="ui">Export Texture Preset</span>.</figcaption></figure>
+
+<h3 id="tex-assign">Where the texture set lives: Tex Assign</h3>
+<p>The 16 slots belong to a <code>MarchingSquaresTexturePreset</code> resource assigned to the terrain. You can see it in the Inspector as <span class="ui">Tex Assign</span>. Choosing a preset in the strip replaces it.</p>
+<div class="pair">
+  <figure class="shot narrow-shot"><img src="media/04-terrain-painting/24-inspector-tex-assign.png" alt="The terrain's Inspector: Contents, Grid Type Hex Rings, Cell Size 2.0 by 2.0, Tex Assign set to Textures, then groups Grid, Look with Terrain and Grass sub-groups, Turf Stuff, Grass Pixel Size 1, Grass Outline, Ledge Cutoff."><figcaption>The terrain's Inspector. <span class="ui">Tex Assign</span> reads "Textures" on hex_island.</figcaption></figure>
+  <div>
+    <p>Top to bottom, the painting-related Inspector fields are:</p>
+    <ul>
+      <li><b>Contents</b> — the terrain's data resource.</li>
+      <li><b>Grid Type</b> (Square / Hex Rings / …), <b>Chunk Size</b>, <b>Cell Size</b> — the grid your paint lands on.</li>
+      <li><b>Tex Assign</b> — the live texture set the 16 slots edit.</li>
+      <li><b>Look → Terrain</b> and <b>Look → Grass</b> — the terrain shader that draws painted textures and tints.</li>
+      <li><b>Turf Stuff, Grass Pixel Size, Grass Outline, Ledge Cutoff, Min Height</b> — how grass on grass-ticked slots renders (see <a href="05-foliage-grass.html#grass-look">grass look</a>).</li>
+    </ul>
+    <p>A grey "(N changes)" tag on a group means it differs from the resource's defaults.</p>
+  </div>
+</div>
+<div class="callout tip"><span class="label">Blend Mode</span><p>How neighbouring textures blend at their borders is set by <span class="ui">Blend Mode</span> on the <b>Settings</b> tool (<kbd>9</kbd>) → <b>Grid</b> tab, not in the Paint strip. See <a href="06-chunks-settings.html#settings">Chunks, settings &amp; saving</a>.</p></div>
+<div class="callout warn"><span class="label">Advanced</span><p>Below the 16 slots, the panel has an <b>Auto Rules</b> section for procedural auto-texturing. It's an advanced feature and isn't covered in this guide.</p></div>
+
+<!-- ===================================================== WALLS -->
+<h2 id="walls">Paint Walls: texturing cliff faces</h2>
+<p>Each cell has a <b>floor</b> texture (its top) and a <b>wall</b> texture (the cliff faces where it drops to a lower neighbour). Normally Paint changes floors. Tick <span class="ui">Paint Walls</span> and the brush changes the <b>wall</b> texture instead — the flat top is left alone.</p>
+<ol class="steps" data-id="paint-walls">
+  <li>Angle the camera so you can see a cliff face (Top view, then middle-drag to tilt; or any perspective view).</li>
+  <li>Tick <span class="ui">Paint Walls</span> in the strip.</li>
+  <li>Choose a Material, e.g. <b>8. Snow</b>.</li>
+  <li>LMB-drag across the cliff. The cliff faces turn white; the grass on top stays green.</li>
+  <li>Untick <span class="ui">Paint Walls</span> to go back to painting floors.</li>
+</ol>
+<figure class="clip"><video src="media/04-terrain-painting/20-paint-walls.mp4" poster="media/04-terrain-painting/20-paint-walls-poster.png" data-autoplay></video><figcaption>Paint Walls on, Material Snow: only the brown cliff faces change.</figcaption></figure>
+<div class="compare" data-before="Brown walls" data-after="Snow walls"><img src="media/04-terrain-painting/20-paint-walls-before.png" alt="An angled view of a hex cliff with brown rocky walls under green grass tops."><img src="media/04-terrain-painting/20-paint-walls-after.png" alt="The same cliff after painting walls with Snow: the walls are white, the grass tops are unchanged."></div>
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox terrain decides cliff materials for you (or you repaint the whole voxel). Here the floor and wall of one cell can be completely different textures: grass on top, snowy rock on the side.</p></div>
+
+<!-- ===================================================== SLOPE -->
+<h2 id="slope">Slope Min &amp; Slope Max: paint only steep (or flat) ground</h2>
+<p><span class="ui">Slope Min</span> and <span class="ui">Slope Max</span> (0–90°) filter the brush by how steep the ground is. A cell only takes the paint if its slope is <b>at least</b> Slope Min and <b>at most</b> Slope Max. The defaults, 0 and 90, mean "no filter" — paint everything.</p>
+<ul>
+  <li><b>Slope Min ≈ 45</b> with Cliff or Dark Rock: rock on slopes, flat grass untouched.</li>
+  <li><b>Slope Min near 90</b>: only near-vertical cliffs.</li>
+  <li><b>Slope Max ≈ 20</b>: only near-flat ground (e.g. paths and snow caps that shouldn't creep down cliffs).</li>
+</ul>
+
+<div class="slope-demo" id="slope-try">
+  <b>Try the filter</b> — which of these slopes would take the paint?
+  <div style="margin-top:8px">
+    <label>Slope Min <input type="range" id="smin" min="0" max="90" step="5" value="0"> <output id="sminv">0</output>°</label>
+    <label>Slope Max <input type="range" id="smax" min="0" max="90" step="5" value="90"> <output id="smaxv">90</output>°</label>
+  </div>
+  <div class="slope-bars" id="sbars"></div>
+  <div class="slope-out" id="sout"></div>
+</div>
+
+<div class="scrubber" data-label="Slope Min" data-start="0"
+  data-frames='[{"v":"0°","src":"media/04-terrain-painting/25-slope-series-1.png","note":"No filter: the stroke paints a solid band everywhere."},{"v":"45°","src":"media/04-terrain-painting/25-slope-series-2.png","note":"Only slopes take the paint; flat cells are spared."},{"v":"80°","src":"media/04-terrain-painting/25-slope-series-3.png","note":"Only near-vertical cliffs — on this beach almost nothing is painted."}]'></div>
+
+<figure class="clip"><video src="media/04-terrain-painting/21-slope-limited.mp4" poster="media/04-terrain-painting/21-slope-limited-poster.png" data-autoplay></video><figcaption>Slope Min = 50: a wide stroke only lands on the steep cliff cells; the flat grass around them is spared.</figcaption></figure>
+<div class="compare" data-before="Before" data-after="Slope Min 50"><img src="media/04-terrain-painting/21-slope-limited-before.png" alt="A hex cliff before the slope-limited stroke; its walls are already white from the Paint Walls demo."><img src="media/04-terrain-painting/21-slope-limited-after.png" alt="The same view after a slope-limited stroke: steep cells are painted white while flat grass is unchanged."></div>
+<div class="callout tip"><span class="label">Tip</span><p>Combine with <b>Paint Walls</b>: Walls decides <i>which face</i> (floor or wall) changes; Slope decides <i>which cells</i> are allowed. Remember to reset Slope Min to 0 afterwards, or your next stroke will "mysteriously" miss flat ground.</p></div>
+
+<!-- ===================================================== TINT -->
+<h2 id="tint">The Tint tool: colour washes for biomes, territory and paths</h2>
+<p><b>Tint</b> paints a colour <i>over</i> whole cells, on top of whatever texture they have. Use it for biome hints (a reddish desert edge), territory colours in a strategy map, paths, or decal-like marks. Tints are saved with the terrain and drawn by the terrain shader in the editor <b>and in the game</b> — under fog of war and under any runtime <code>set_cell_tint()</code> tints a programmer adds.</p>
+
+<p>Tint is in the lower "extra tools" group of the column (below Select). It has <b>no</b> number shortcut — click its icon. It has no right panel. Hint line: <span class="hint">LMB-drag: paint the tint · RMB: erase · Shift+wheel: size</span>.</p>
+
+<div class="hotspots"><img src="media/04-terrain-painting/17-tint-strip.png" alt="The Tint strip: Brush Type Round, Size 12.5, Aspect 0.806, Rotation 0, Tint Red, Opacity 0.505, Grid Aligned unticked, Grid Size 1. Above it the hint reads LMB-drag: paint the tint, RMB: erase, Shift+wheel: size.">
+  <button class="spot" style="left:30%;top:27%" data-title="Hint line" data-text="LMB-drag: paint the tint · RMB: erase · Shift+wheel: size.">1</button>
+  <button class="spot" style="left:5%;top:46%" data-title="Tint (strip title)" data-text="The active tool's name.">2</button>
+  <button class="spot" style="left:33%;top:46%" data-title="Brush Type" data-text="Round, Square, Hexagon, Hexagon30, Triangle, Triangle180.">3</button>
+  <button class="spot" style="left:72%;top:46%" data-title="Size" data-text="Brush diameter, 1–50 (default 15). Shift+wheel.">4</button>
+  <button class="spot" style="left:19%;top:67%" data-title="Aspect" data-text="Z radius / X radius, 0.20–5.0 (default 1.0).">5</button>
+  <button class="spot" style="left:52%;top:67%" data-title="Rotation" data-text="Brush rotation, −180–180°.">6</button>
+  <button class="spot" style="left:82%;top:67%" data-title="Tint" data-text="The colour LMB paints: Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink, White, Black.">7</button>
+  <button class="spot" style="left:20%;top:87%" data-title="Opacity" data-text="How strong the painted tint is, 0.05–1.0 (default 0.5).">8</button>
+  <button class="spot" style="left:61%;top:87%" data-title="Grid Aligned" data-text="Snap the brush to whole cells.">9</button>
+  <button class="spot" style="left:86%;top:87%" data-title="Grid Size" data-text="Size of the grid-aligned stamp in cells, 0–20 (default 1).">10</button>
+</div>
+
+<p>The ten tint colours:</p>
+<div class="swatches">
+  <span class="sw"><i style="background:#e33"></i>Red</span>
+  <span class="sw"><i style="background:#f80"></i>Orange</span>
+  <span class="sw"><i style="background:#fd2"></i>Yellow</span>
+  <span class="sw"><i style="background:#3b3"></i>Green</span>
+  <span class="sw"><i style="background:#1aa"></i>Teal</span>
+  <span class="sw"><i style="background:#36e"></i>Blue</span>
+  <span class="sw"><i style="background:#93d"></i>Purple</span>
+  <span class="sw"><i style="background:#f6b"></i>Pink</span>
+  <span class="sw"><i style="background:#fff"></i>White</span>
+  <span class="sw"><i style="background:#111"></i>Black</span>
+</div>
+<p><small>(Swatches are approximate; the real colours come from the tool.)</small></p>
+
+<ol class="steps" data-id="paint-tint">
+  <li>Select the terrain, then click <span class="ui">Tint</span> in the tool column (collapse the Output panel if you can't see it).</li>
+  <li>Pick a <span class="ui">Tint</span> colour and set <span class="ui">Opacity</span> (0.5 is a soft wash; 1.0 is solid).</li>
+  <li><b>LMB-drag</b> over the ground to wash colour over it.</li>
+  <li><b>RMB-drag</b> to erase tint (back to none).</li>
+  <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes a whole tint stroke (<code>terrain tint paint</code>).</li>
+</ol>
+
+<div class="pair">
+  <figure class="clip"><video src="media/04-terrain-painting/18-tint-paint.mp4" poster="media/04-terrain-painting/18-tint-paint-poster.png" data-autoplay></video><figcaption>LMB-drag with Tint Red at Opacity 0.5: a warm red-orange wash over the textures.</figcaption></figure>
+  <figure class="clip"><video src="media/04-terrain-painting/19-tint-erase.mp4" poster="media/04-terrain-painting/19-tint-erase-poster.png" data-autoplay></video><figcaption>RMB-drag erases the tint; the textures underneath are untouched.</figcaption></figure>
+</div>
+<div class="compare" data-before="No tint" data-after="Red tint"><img src="media/04-terrain-painting/18-tint-before.png" alt="A top-down patch of green grass, sand and paths with no tint."><img src="media/04-terrain-painting/18-tint-after.png" alt="The same patch with a large red-orange tint wash over the left side."></div>
+
+<div class="callout roblox"><span class="label">Coming from Roblox</span><p>Roblox has no equivalent: terrain colour there is per <i>material</i>, so recolouring one region means recolouring every bit of that material. Tint is a separate colour layer per cell, on top of any texture. Think of it as a translucent paint you can always scrape off with RMB.</p></div>
+<div class="callout tip"><span class="label">Tip</span><p>On Tint, <kbd>Ctrl</kbd>+wheel zooms the camera (Tint has no Strength). <span class="ui">Grid Aligned</span> + a <span class="ui">Grid Size</span> of 1–3 gives crisp, cell-exact territory borders for strategy maps.</p></div>
+
+<!-- ===================================================== REFERENCE -->
+<h2 id="reference">Full reference</h2>
+<p>Every control on the Paint strip, the Textures panel and the Tint strip. Type to filter (try "slope", "grass" or "wheel").</p>
+<input class="filter-box" data-target="#paint-ref" placeholder="Filter controls…">
+<div id="paint-ref">
+  <figure class="shot"><img src="media/04-terrain-painting/02-paint-strip.png" alt="The Vertex Painting strip: Brush Type Round, Size 15.0, Aspect 1.009, Rotation 0, Material 1. Grass, Texture Name with placeholder New name here..., Texture Preset None, Paint Walls unticked, Slope Min 0.0, Slope Max 90.0."><figcaption>The Vertex Painting strip, left to right.</figcaption></figure>
+
+  <div class="control"><h4>Brush Type</h4><div class="where">Vertex Painting strip · Tint strip</div>
+    <p>Shape of the brush footprint. Tooltip: "Brush shape."</p><dl><dt>Options</dt><dd>Round, Square, Hexagon, Hexagon30, Triangle, Triangle180</dd><dt>Default</dt><dd>Round</dd></dl></div>
+  <div class="control"><h4>Size</h4><div class="where">Vertex Painting strip · Tint strip</div>
+    <p>Brush diameter in world units. Tooltip: "Brush diameter in world units (Shift+wheel)."</p><dl><dt>Range</dt><dd>1 – 50</dd><dt>Default</dt><dd>15.0</dd><dt>Shortcut</dt><dd><kbd>Shift</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Aspect</h4><div class="where">Vertex Painting strip · Tint strip</div>
+    <p>Brush Z radius / X radius — stretches the brush into an ellipse or rectangle.</p><dl><dt>Range</dt><dd>0.20 – 5.0</dd><dt>Default</dt><dd>1.0 (displays ≈1.009)</dd></dl></div>
+  <div class="control"><h4>Rotation</h4><div class="where">Vertex Painting strip · Tint strip</div>
+    <p>Brush rotation in degrees; only matters for non-round brushes.</p><dl><dt>Range</dt><dd>−180 – 180°</dd><dt>Default</dt><dd>0</dd><dt>Shortcut</dt><dd><kbd>Alt</kbd>+wheel</dd></dl></div>
+  <div class="control"><h4>Material</h4><div class="where">Vertex Painting strip</div>
+    <p>Which texture slot you paint. Same as clicking a slot's "Texture N" button. Tooltip: "Texture slot to paint."</p><dl><dt>Options</dt><dd>The 16 slots by name ("1. Grass" … "16. Void")</dd><dt>Default</dt><dd>1. Grass</dd><dt>Shortcut</dt><dd><kbd>Ctrl</kbd>+LMB picks from the terrain</dd></dl></div>
+  <div class="control"><h4>Texture Name</h4><div class="where">Vertex Painting strip</div>
+    <p>Renames the selected material. Type and press <kbd>Enter</kbd>.</p><dl><dt>Placeholder</dt><dd>New name here…</dd></dl></div>
+  <div class="control"><h4>Texture Preset</h4><div class="where">Vertex Painting strip</div>
+    <p>Apply a whole texture palette to this terrain; replaces Tex Assign. <a href="#presets">More</a>.</p><dl><dt>Options</dt><dd>None + every <code>.tres</code> in <code>texture_presets/</code> (MST Classic bundled)</dd><dt>Default</dt><dd>None</dd></dl></div>
+  <div class="control"><h4>Paint Walls</h4><div class="where">Vertex Painting strip</div>
+    <p>Paint the wall/cliff texture instead of the floor. <a href="#walls">More</a>.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+  <div class="control"><h4>Slope Min</h4><div class="where">Vertex Painting strip</div>
+    <p>Only affect terrain at least this steep (degrees). <a href="#slope">More</a>.</p><dl><dt>Range</dt><dd>0 – 90°</dd><dt>Default</dt><dd>0.0</dd></dl></div>
+  <div class="control"><h4>Slope Max</h4><div class="where">Vertex Painting strip</div>
+    <p>Only affect terrain at most this steep (degrees). 90 = no upper limit.</p><dl><dt>Range</dt><dd>0 – 90°</dd><dt>Default</dt><dd>90.0</dd></dl></div>
+  <div class="control"><h4>Strength (absent)</h4><div class="where">Paint · Tint</div>
+    <p>Paint has <b>no</b> Strength control; each stroke fully sets the texture. That's why <kbd>Ctrl</kbd>+wheel zooms the camera on Paint and Tint instead of changing Strength.</p></div>
+
+  <div class="control"><h4>Texture N button</h4><div class="where">Textures panel · each slot</div>
+    <p>Paint with this texture (sets Material). Pressed = active slot.</p></div>
+  <div class="control"><h4>Preview swatch</h4><div class="where">Textures panel · each slot</div>
+    <p>36×36 preview of the slot's texture or pattern, tinted.</p></div>
+  <div class="control"><h4>Slot name</h4><div class="where">Textures panel · each slot</div>
+    <p>The name shown in the Material dropdown.</p></div>
+  <div class="control"><h4>Texture (image)</h4><div class="where">Textures panel · each slot</div>
+    <p>The slot's Texture2D. White-ish pixel art, tinted by Color. Empty = procedural Pattern. ▾ → Quick Load… / Load… / Clear. <a href="#own-image">More</a>.</p></div>
+  <div class="control"><h4>Pattern</h4><div class="where">Textures panel · each slot (not 16)</div>
+    <p>Built-in ground pattern; picks the bundled texture in <code>textures/ground/</code>, or generates it procedurally when Texture is empty.</p><dl><dt>Options</dt><dd>Grass, Meadow, Forest, Sand, Dirt, Cliff, Dark Rock, Snow, Gravel, Clay, Moss, Path, Plain</dd></dl></div>
+  <div class="control"><h4>Scale</h4><div class="where">Textures panel · each slot</div>
+    <p>Texture / pattern tiling scale.</p><dl><dt>Range</dt><dd>0.1 – 40</dd><dt>Default</dt><dd>1.0</dd></dl></div>
+  <div class="control"><h4>Color</h4><div class="where">Textures panel · each slot</div>
+    <p>Ground colour; multiplies the texture or pattern. No alpha.</p></div>
+  <div class="control"><h4>Grass (tick + colour)</h4><div class="where">Textures panel · each slot</div>
+    <p>Grow grass on this texture, in this colour. On by default for slots 1, 2, 3 and 11. See <a href="05-foliage-grass.html">grass</a>.</p></div>
+  <div class="control"><h4>Sprite</h4><div class="where">Textures panel · each slot</div>
+    <p>Grass sprite (white leaves on alpha, coloured by Grass). Empty = the terrain's grass texture.</p></div>
+  <div class="control"><h4>Auto Rules</h4><div class="where">Textures panel · below the slots</div>
+    <p>Procedural auto-texturing rules. Advanced; not covered in this guide.</p></div>
+  <div class="control"><h4>Export Texture Preset</h4><div class="where">Textures panel · bottom</div>
+    <p>Save this terrain's texture set as a preset in <code>res://addons/MarchingSquaresTerrain/texture_presets/</code>. <a href="#preset-export">More</a>.</p></div>
+
+  <div class="control"><h4>Tint (colour)</h4><div class="where">Tint strip</div>
+    <p>The colour LMB paints; RMB erases.</p><dl><dt>Options</dt><dd>Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink, White, Black</dd><dt>Default</dt><dd>Red</dd></dl></div>
+  <div class="control"><h4>Opacity</h4><div class="where">Tint strip</div>
+    <p>Strength / alpha of the painted tint.</p><dl><dt>Range</dt><dd>0.05 – 1.0</dd><dt>Default</dt><dd>0.5</dd></dl></div>
+  <div class="control"><h4>Grid Aligned</h4><div class="where">Tint strip</div>
+    <p>Snap the brush to whole cells.</p><dl><dt>Default</dt><dd>off</dd></dl></div>
+  <div class="control"><h4>Grid Size</h4><div class="where">Tint strip</div>
+    <p>Size of the grid-aligned stamp in cells.</p><dl><dt>Range</dt><dd>0 – 20</dd><dt>Default</dt><dd>1</dd></dl></div>
+
+  <div class="control"><h4>LMB-drag</h4><div class="where">3D view · Paint / Tint</div>
+    <p>Paint the Material (Paint) or the Tint colour (Tint). One stroke = one undo step.</p></div>
+  <div class="control"><h4>Ctrl+LMB (eyedropper)</h4><div class="where">3D view · Paint</div>
+    <p>Pick the material under the cursor; Material and slot button update.</p></div>
+  <div class="control"><h4>RMB-drag</h4><div class="where">3D view · Tint</div>
+    <p>Erase tint back to none.</p></div>
+  <div class="control"><h4>Mouse wheel</h4><div class="where">3D view · Paint / Tint</div>
+    <p><kbd>Shift</kbd>+wheel = Size, <kbd>Alt</kbd>+wheel = Rotation (neither zooms). <kbd>Ctrl</kbd>+wheel and plain wheel zoom the camera.</p></div>
+  <div class="control"><h4>Undo / redo</h4><div class="where">Anywhere</div>
+    <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>. History names: <code>terrain vertex paint</code>, <code>terrain tint paint</code>.</p></div>
+  <div class="control"><h4>Tex Assign</h4><div class="where">Inspector · terrain</div>
+    <p>The terrain's <code>MarchingSquaresTexturePreset</code> — the live texture set. Replaced by the Texture Preset dropdown.</p></div>
+</div>
+
+<!-- ===================================================== RECIPES -->
+<h2 id="recipes">Recipes</h2>
+<div class="tabs">
+  <div class="panel" data-tab="Beach">
+    <ol>
+      <li>Material <b>4. Sand</b>, Size ≈ 10, Slope Max ≈ 20.</li>
+      <li>Paint a band along the water's edge. The Slope Max keeps sand off any steep bank.</li>
+      <li>Drop Size to ≈ 3 and dab a few <b>9. Gravel</b> cells into the sand for texture.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Rocky mountain">
+    <ol>
+      <li>Sculpt a mountain first (see <a href="03-terrain-sculpting.html">Sculpting</a>).</li>
+      <li>Material <b>6. Cliff</b>, Slope Min ≈ 45, a big brush. Sweep over the whole mountain: only the steep sides go rocky.</li>
+      <li>Tick <b>Paint Walls</b>, Material <b>7. Dark Rock</b>: sweep again to darken the cliff faces.</li>
+      <li>Untick Paint Walls, Slope Min 0, Slope Max ≈ 15, Material <b>8. Snow</b>: paint the flat peaks.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Dirt path">
+    <ol>
+      <li>Material <b>12. Path</b> (or 5. Dirt), Brush Type <b>Square</b>, Size ≈ 3.</li>
+      <li>Drag one continuous stroke from door to door. One stroke = one undo, so a wobble is easy to retry.</li>
+      <li>Optional: switch to <b>Tint</b>, Yellow, Opacity 0.2, to make the path read from far away.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Custom biome">
+    <ol>
+      <li>Pick a slot you don't use (e.g. 14 Ash). Rename it ("Mushroom Turf").</li>
+      <li><a href="#own-image">Swap its Texture</a> for your own PNG, set Color, tick Grass and pick a grass colour.</li>
+      <li>Paint the biome. When happy, <a href="#preset-export">Export Texture Preset</a> so other terrains can use it.</li>
+    </ol>
+  </div>
+  <div class="panel" data-tab="Territory map">
+    <ol>
+      <li>Tint tool, <b>Grid Aligned</b> on, Grid Size 1, Opacity ≈ 0.4.</li>
+      <li>Blue for player 1, Red for player 2: paint each region cell-exact.</li>
+      <li>RMB-erase to redraw a border. The tints ship with the terrain into the game.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="callout tip"><span class="label">Painting tips</span><p>Use slow, steady drags — a stroke records every cell the brush passes over. Paint from <b>Top view</b> for precision, then tilt to check how grass and walls look. Paint never changes height, so you can repaint as often as you like.</p></div>
+
+<!-- ===================================================== CHECK -->
+<h2 id="check">Check yourself</h2>
+<details class="check"><summary>You want the image <code>lava.png</code> on your ground. Where does it go?</summary><p>In the Textures panel, on a slot's <span class="ui">Texture</span> field: ▾ → <span class="ui">Quick Load…</span> or <span class="ui">Load…</span> → pick the PNG. Then select that slot as the Material and paint. Set Color to white to see its true colours.</p></details>
+<details class="check"><summary>How do you put rock only on the steep parts of a hill?</summary><p>Set <span class="ui">Slope Min</span> to about 45, choose Cliff or Dark Rock, and paint over the whole hill. Flat cells are skipped. Reset Slope Min to 0 afterwards.</p></details>
+<details class="check"><summary>Your cliff faces are brown but you want them white, without touching the grass on top. How?</summary><p>Tick <span class="ui">Paint Walls</span>, choose Snow, and drag over the cliff. Only the wall texture changes.</p></details>
+<details class="check"><summary>Why does Ctrl+wheel zoom the camera on Paint but not on Smooth?</summary><p>Ctrl+wheel adjusts <b>Strength</b> only on Smooth, Raise/Lower and Gradient. Paint (and Tint) have no Strength, so Ctrl+wheel falls through to the camera zoom. Shift+wheel (Size) and Alt+wheel (Rotation) never zoom.</p></details>
+
+<h2 id="related">Related pages</h2>
+<ul>
+  <li><a href="03-terrain-sculpting.html">Sculpting terrain</a> — shape the ground before you paint it; the shared brush controls.</li>
+  <li><a href="05-foliage-grass.html">Foliage, grass &amp; flowers</a> — grass on grass-ticked slots, and scattering props that prefer certain textures.</li>
+  <li><a href="06-chunks-settings.html">Chunks, settings &amp; saving</a> — Blend Mode, terrain-wide settings and saving your work.</li>
+  <li><a href="07-pixelizer.html">The pixelizer</a> — how your textures look through the pixel-art renderer.</li>
+  <li><a href="14-shortcuts-glossary.html">Shortcuts &amp; glossary</a> · <a href="15-troubleshooting.html">Troubleshooting</a></li>
+</ul>
+
+<script>
+(function () {
+  var smin = document.getElementById('smin'), smax = document.getElementById('smax');
+  if (!smin) return;
+  var bars = document.getElementById('sbars'), out = document.getElementById('sout');
+  var cells = [[0, 'flat meadow'], [10, 'gentle rise'], [25, 'hillside'], [45, 'steep slope'], [65, 'cliff'], [85, 'sheer wall']];
+  cells.forEach(function (c) { var d = document.createElement('div'); d.innerHTML = c[0] + '°<br>' + c[1]; bars.appendChild(d); });
+  function upd() {
+    var a = +smin.value, b = +smax.value, n = 0;
+    document.getElementById('sminv').textContent = a; document.getElementById('smaxv').textContent = b;
+    Array.prototype.forEach.call(bars.children, function (d, i) { var on = cells[i][0] >= a && cells[i][0] <= b; d.classList.toggle('on', on); if (on) n++; });
+    out.textContent = a > b ? 'Slope Min is above Slope Max — nothing can be painted.' : (n === cells.length ? 'No filter: every cell takes the paint.' : n + ' of ' + cells.length + ' example cells take the paint (highlighted).');
+  }
+  smin.addEventListener('input', upd); smax.addEventListener('input', upd); upd();
+})();
+</script>
+
+</div></main>
+</body>
+</html>

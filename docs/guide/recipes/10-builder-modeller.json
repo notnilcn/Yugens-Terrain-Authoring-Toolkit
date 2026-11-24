@@ -1,0 +1,2722 @@
+{
+  "page": "10-builder-modeller",
+  "media_dir": "docs/guide/media/10-builder-modeller",
+  "session": {
+    "scene": "res://demo/hex_island.tscn",
+    "width": 1920,
+    "height": 1080
+  },
+  "setup": [],
+  "items": [
+    {
+      "id": "crate-walkthrough-stills",
+      "kind": "series",
+      "outputs": [
+        "10-walk-start.png",
+        "12-extrude-before.png",
+        "12-extrude-after.png",
+        "13-inset-after.png",
+        "14-crate-hollow.png",
+        "15-prop-beveled.png",
+        "16-crate-painted.png",
+        "20-select-loop.png",
+        "21-adjust-bevel.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "n",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "click-text",
+              "Other Node"
+            ],
+            "contains": "Other Node"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "type",
+            "PixelBuilderMesh"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "plugin-call",
+              "fetch_condition",
+              "--class",
+              "PixelBuilderPlugin"
+            ],
+            "contains": "Roblox"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "838",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "887",
+            "495",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "c8743c"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "10-walk-start.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "1",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "936",
+            "472"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "12-extrude-before.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "8",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "9",
+            "1.0",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "shot": {
+            "out": "12-extrude-after.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "9",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "10",
+            "0.2",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "13-inset-after.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "8",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "9",
+            "-0.7",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "shot": {
+            "out": "14-crate-hollow.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "2",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "782",
+            "382"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "445"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "37",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "shot": {
+            "out": "20-select-loop.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "10",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "13",
+            "3",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "11",
+            "0.22",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "shot",
+            "/tmp/recap-bvwin.png"
+          ]
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('/tmp/recap-bvwin.png'); c=im.crop((701,637,1119,803)); c=c.resize((int(c.width*1.9),int(c.height*1.9)), Image.LANCZOS); c.save('$OUT/21-adjust-bevel.png')\""
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "445"
+          ]
+        },
+        {
+          "shot": {
+            "out": "15-prop-beveled.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "0",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "33cc33"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "445"
+          ]
+        },
+        {
+          "shot": {
+            "out": "16-crate-painted.png",
+            "crop": [
+              287,
+              245,
+              900,
+              556
+            ]
+          }
+        }
+      ],
+      "check": "Nine stills that walk one box into a hollow bevelled crate: a terracotta box, the same box with the top face selected, the taller box, the inset lid, the recess, the rounded lip, the green finished crate, and the Adjust Bevel panel with Bevel 0.22 / Segs 3 / Offset 0.220. Every status line is fully inside the crop. The rim-loop still (20-select-loop) is captured from the same camera and is 900x556, wider than the older 680x480 file.",
+      "notes": "Verified 2026-11-24 on :104/8904. The crate is built from an empty scene each run. Colour/Part are pixel clicks into the Roblox ribbon (not Controls); the Adjust panels are driven with debug_adjust_* so the recipe does not depend on the panel's position. 21-adjust-bevel is a 1.9x crop of a full-screen shot taken while the panel is open."
+    },
+    {
+      "id": "crate-clips",
+      "kind": "clip",
+      "outputs": [
+        "clip-24-crate-recess.mp4",
+        "clip-24-crate-recess.png",
+        "clip-25-crate-bevel.mp4",
+        "clip-25-crate-bevel.png",
+        "clip-22-crate-extrude.mp4",
+        "clip-22-crate-extrude.png",
+        "clip-23-crate-inset.mp4",
+        "clip-23-crate-inset.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "n",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click-text",
+            "Other Node"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "type",
+            "PixelBuilderMesh"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "838",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "887",
+            "495",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "c8743c"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "1",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "936",
+            "472"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "8",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "9",
+            "1.0",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "9",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "10",
+            "0.2",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "record_start": {
+            "out": "clip-24-crate-recess.mp4",
+            "rect": [
+              287,
+              245,
+              900,
+              556
+            ],
+            "fps": 12,
+            "max": 25
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "8",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "9",
+            "-0.7",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "clip-24-crate-recess.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "clip-24-crate-recess.mp4",
+            "out": "clip-24-crate-recess.png",
+            "at": 4.5
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "2",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "782",
+            "382"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "445"
+          ]
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "37",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "record_start": {
+            "out": "clip-25-crate-bevel.mp4",
+            "rect": [
+              287,
+              245,
+              900,
+              556
+            ],
+            "fps": 12,
+            "max": 25
+          }
+        },
+        {
+          "wait": 0.8
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "10",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1.2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "13",
+            "3",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1.0
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "11",
+            "0.22",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2.2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2.0
+        },
+        {
+          "record_stop": {
+            "out": "clip-25-crate-bevel.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "clip-25-crate-bevel.mp4",
+            "out": "clip-25-crate-bevel.png",
+            "at": 6.0
+          }
+        }
+      ],
+      "check": "clip-24 shows the inset face sinking into the box with Dist -0.72 in the Adjust Extrude panel (status 10 -> 18 faces); clip-25 shows the top rim loop bevelled with Bevel 0.22 and Segs 3, the status line echoing '3 segments - Profile 0.50 - Offset 0.220'.",
+      "notes": "Verified 2026-11-24. record_start/stop must be adjacent in one run: an agent pause between them stretches the clip past 15 s. clip-22/23 (crate steps 1-2) are the same opening walkthrough as crate-walkthrough-stills, recorded over the same rect; they were not re-recorded this pass, so their outputs here are declared from the 2026-10 pass."
+    },
+    {
+      "id": "panels-and-dialogs",
+      "kind": "still",
+      "outputs": [
+        "11-adjust-extrude.png",
+        "13-adjust-inset.png",
+        "22-loop-cut.png",
+        "30-color-palette.png",
+        "42-export-options.png",
+        "50-preferences.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "n",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "click-text",
+              "Other Node"
+            ],
+            "contains": "Other Node"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "type",
+            "PixelBuilderMesh"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "plugin-call",
+              "fetch_condition",
+              "--class",
+              "PixelBuilderPlugin"
+            ],
+            "contains": "Roblox"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "838",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "887",
+            "495",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "/tmp/panels-color.png",
+            "crop": [
+              932,
+              246,
+              289,
+              381
+            ]
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; Image.open('/tmp/panels-color.png').save('$OUT/30-color-palette.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "c8743c"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "1",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "936",
+            "472"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "8",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "9",
+            "0.99",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 -c \"import json,os,subprocess,sys;from PIL import Image;drive=lambda *a: json.loads(subprocess.run([sys.executable,'qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],*a],capture_output=True,text=True).stdout);d=drive('ui','--root','all','--filter','PixelBuilderAdjust');r=[c for c in d['controls'] if c.get('class')=='PixelBuilderAdjustPanel'][0]['rect'];drive('shot','/tmp/panel.png');im=Image.open('/tmp/panel.png');c=im.crop((int(r[0]),int(r[1]),int(r[0]+r[2]),int(r[1]+r[3])));c=c.resize((c.width*2,c.height*2),Image.LANCZOS);c.save(os.environ['OUT']+'/11-adjust-extrude.png')\""
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "9",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_field",
+            "10",
+            "0.2",
+            "true",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shell": "python3 -c \"import json,os,subprocess,sys;from PIL import Image;drive=lambda *a: json.loads(subprocess.run([sys.executable,'qa/drive.py','--port',os.environ['PORT'],'--display',os.environ['DISPLAY'],*a],capture_output=True,text=True).stdout);d=drive('ui','--root','all','--filter','PixelBuilderAdjust');r=[c for c in d['controls'] if c.get('class')=='PixelBuilderAdjustPanel'][0]['rect'];drive('shot','/tmp/panel.png');im=Image.open('/tmp/panel.png');c=im.crop((int(r[0]),int(r[1]),int(r[0]+r[2]),int(r[1]+r[3])));c=c.resize((c.width*2,c.height*2),Image.LANCZOS);c.save(os.environ['OUT']+'/13-adjust-inset.png')\""
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "2",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action_adjust",
+            "35",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "22-loop-cut.png",
+            "crop": [
+              600,
+              320,
+              680,
+              470
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_adjust_end",
+            "false",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "80",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "42-export-options.png",
+            "crop": [
+              700,
+              368,
+              518,
+              320
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_preferences",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "50-preferences.png",
+            "crop": [
+              728,
+              212,
+              468,
+              656
+            ]
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 1
+        }
+      ],
+      "check": "Six panel stills: Adjust Extrude (Dist 0.99, Extrude: Face normal), Adjust Inset (Inset 0.2, Inset by Fraction, Individual ticked), the Insert edge loop adjust panel over the loop-cut crate, the Roblox colour palette popup, the Builder export options dialog and the Pixel Builder Preferences panel.",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921). Every panel is opened through the plugin's debug API instead of pixel clicks into the custom-drawn ribbon: ModeFace = debug_action 1, Extrude = debug_action_adjust 8, Inset = 9, InsertEdgeLoop = 35, ExportOptions = 80, Preferences = debug_preferences; distance/inset values go through debug_adjust_field (Dist field 9, Inset field 10). Only three pixel clicks remain (Part at 838,182, the colour chip at 956,182, and the top face at 936,472) because those are custom-drawn; the Part click is followed by a nodes-contains-Box expect. The colour popup, export dialog and preferences panel are cropped at the rects they occupy on the 1920x1080 session (crop values in the steps); the two Adjust panels are cropped at the panel rect and 2x upscaled. Nothing is saved."
+    },
+    {
+      "id": "shortcut-clips",
+      "kind": "clip",
+      "outputs": [
+        "clip-01-modes.mp4",
+        "clip-01-modes.png",
+        "clip-02-mode-cycle-h.mp4",
+        "clip-02-mode-cycle-h.png",
+        "clip-03-select-face.mp4",
+        "clip-03-select-face.png",
+        "clip-04-select-edge.mp4",
+        "clip-04-select-edge.png",
+        "clip-05-select-vertex.mp4",
+        "clip-05-select-vertex.png",
+        "clip-06-move-w.mp4",
+        "clip-06-move-w.png",
+        "clip-07-extrude-e.mp4",
+        "clip-07-extrude-e.png",
+        "clip-08-inset-i.mp4",
+        "clip-08-inset-i.png",
+        "clip-09-bevel.mp4",
+        "clip-09-bevel.png",
+        "clip-10-loopcut.mp4",
+        "clip-10-loopcut.png",
+        "clip-11-triangulate.mp4",
+        "clip-11-triangulate.png",
+        "clip-12-merge.mp4",
+        "clip-12-merge.png",
+        "clip-13-connect.mp4",
+        "clip-13-connect.png",
+        "clip-14-fill.mp4",
+        "clip-14-fill.png",
+        "clip-15-duplicate-delete.mp4",
+        "clip-15-duplicate-delete.png",
+        "clip-16-grow-select.mp4",
+        "clip-16-grow-select.png",
+        "clip-26-edit-tab.mp4",
+        "clip-26-edit-tab.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "shell": "echo 'backfill item: see notes'"
+        }
+      ],
+      "check": "Backfill placeholder - the seventeen short operation clips (3-12 s each, 900x480-ish viewport crops) with their .png posters.",
+      "notes": "NOT GREEN this pass \u2014 the item is still a placeholder. BACKFILL (not re-validated this pass): each clip is a 2.5 m terracotta cube in an empty PixelBuilderMesh scene, the op run once with the key/clipboard shortcut and undone afterwards; recorded with qa/record.sh over the 3D viewport rect (poster = same basename). Needs the dialog/panel pixel positions of the 1920 layout (the ribbon and panels are custom-drawn) or the plugin action ids for this op; see notes/10-builder-modeller.md 'Recipes (2026-11-24)'."
+    },
+    {
+      "id": "uv-editor",
+      "kind": "series",
+      "outputs": [
+        "40-uv-editor.png",
+        "41-uv-before.png",
+        "clip-17-uv-editor.mp4",
+        "clip-17-uv-editor.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "n",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "click-text",
+              "Other Node"
+            ],
+            "contains": "Other Node"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "type",
+            "PixelBuilderMesh"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "plugin-call",
+              "fetch_condition",
+              "--class",
+              "PixelBuilderPlugin"
+            ],
+            "contains": "Roblox"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "838",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "887",
+            "495",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "46",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "windows"
+            ],
+            "contains": "UV Editor"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "580"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "580",
+            "down",
+            "--times",
+            "6"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "40-uv-editor.png",
+            "crop": [
+              550,
+              230,
+              820,
+              620
+            ]
+          }
+        },
+        {
+          "shot": {
+            "out": "41-uv-before.png",
+            "crop": [
+              562,
+              460,
+              805,
+              285
+            ]
+          }
+        },
+        {
+          "record_start": {
+            "out": "clip-17-uv-editor.mp4",
+            "rect": [
+              550,
+              230,
+              820,
+              620
+            ],
+            "fps": 12,
+            "max": 30
+          }
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "700",
+            "242"
+          ]
+        },
+        {
+          "wait": 0.5
+        },
+        {
+          "drive": [
+            "click",
+            "828",
+            "558"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click-text",
+            "Rot 90"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "move",
+            "960",
+            "580"
+          ]
+        },
+        {
+          "drive": [
+            "wheel",
+            "960",
+            "580",
+            "up",
+            "--times",
+            "2"
+          ]
+        },
+        {
+          "wait": 1.5
+        },
+        {
+          "drive": [
+            "drag",
+            "900",
+            "560",
+            "1020",
+            "640",
+            "--button",
+            "middle",
+            "--duration",
+            "1.2"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "record_stop": {
+            "out": "clip-17-uv-editor.mp4"
+          }
+        },
+        {
+          "poster": {
+            "video": "clip-17-uv-editor.mp4",
+            "out": "clip-17-uv-editor.png",
+            "at": 4
+          }
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 1
+        }
+      ],
+      "check": "The Pixel Builder - UV Editor window (Faces/Verts, projection buttons, Rot 90, the canvas with the box's UV islands, the status line and the on-canvas gesture legend), a canvas-only crop of the same, and a clip that pans/zooms/rotates the island.",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921). The window is opened with the plugin's UvEditor action (debug_action 46, the same code as the U button); it is a Window, so `windows` reports it at (550,230) size 820x620 on the 1920x1080 session - 40-uv-editor is that rect and 41-uv-before is the canvas band (562,436,805,290). Object mode is left as-is so the canvas shows the whole mesh (10 faces); the older still had a 34-face crate. The clip clicks Rot 90, Fits, wheel-zooms the canvas and middle-drag pans before Frame. The clip first clicks the window title bar (700,242) to focus it - an unfocused UV Window ignores every click/wheel - then selects the square island (828,558), presses Rot 90, zooms and middle-drag pans. Esc closes the window. Nothing is saved."
+    },
+    {
+      "id": "painting",
+      "kind": "series",
+      "outputs": [
+        "clip-18-material-preset.mp4",
+        "clip-18-material-preset.png",
+        "clip-19-paint-face.mp4",
+        "clip-19-paint-face.png",
+        "clip-20-vertex-paint.mp4",
+        "clip-20-vertex-paint.png",
+        "clip-21-smooth-faceted.mp4",
+        "clip-21-smooth-faceted.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "shell": "echo 'backfill item: see notes'"
+        }
+      ],
+      "check": "Backfill placeholder - the four painting/smoothing clips in the MST layout.",
+      "notes": "NOT GREEN 2026-11-24 (v1012, :121/8921). The three 31-paint-* stills were split into the `painting-stills` item (green). The four clips remain open: each needs the MST layout's Materials panel (1367,128..1625,660 at 1920x1080) plus the + Preset popup (a PopupMenu item, so its rows must be clicked by rect from `drive.py popups`), and clip-19 additionally needs two per-face paint clicks on the mesh after a preset slot exists. Each was measured one probe at a time in an interactive session, which did not fit this pass; the media itself is valid and unchanged. Recipe for the stills: `painting-stills`."
+    },
+    {
+      "id": "mst-layout",
+      "kind": "series",
+      "outputs": [
+        "60-mst-layout.png",
+        "61-mst-materials-panel.png",
+        "62-mst-left-toolbar.png",
+        "63-mst-preset-menu.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "open-scene",
+              "res://tutorial/guide/modelled_prop.tscn"
+            ],
+            "contains": "ok"
+          }
+        },
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_set_layout",
+            "0",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "move",
+            "900",
+            "450"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "900",
+            "450",
+            "down",
+            "--times",
+            "4"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "_mst_full.png"
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_mst_full.png'); im.crop((0,80,1920,950)).resize((1500,680), Image.LANCZOS).save('$OUT/60-mst-layout.png')\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_mst_full.png'); c=im.crop((1366,128,1624,656)); c.resize((c.width*2,c.height*2), Image.LANCZOS).save('$OUT/61-mst-materials-panel.png')\""
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_mst_full.png'); c=im.crop((310,160,358,840)); c.resize((c.width*2,c.height*2), Image.LANCZOS).save('$OUT/62-mst-left-toolbar.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "1438",
+            "198"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "_preset.png"
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_preset.png'); c=im.crop((1360,183,1724,505)); c.save('$OUT/63-mst-preset-menu.png')\""
+        }
+      ],
+      "check": "The MST layout on a builder mesh: whole layout (Scene dock + left toolbar + view + Materials panel + strip), the Materials/Smoothing/Face-UV panel, the left toolbar, and the + Preset menu (Grid/Checker/No Draw/Collider/Trigger).",
+      "notes": "Recipe rebuilt 2026-11-24 on :118/8918. Uses tutorial/guide/modelled_prop.tscn selected Box; debug_set_layout 0 puts the builder in MST. Crops measured on the 1920x1080 window: 60 = (0,0,1920,870) resized to 1500x680; 61/62 are 2x crops of the right panel and left toolbar; 63 is a crop taken after clicking +Preset at (1402,221).",
+      "scene": "res://tutorial/guide/modelled_prop.tscn"
+    },
+    {
+      "id": "modeler-layout",
+      "kind": "series",
+      "outputs": [
+        "70-modeler-toolbar.png",
+        "71-modeler-add-mesh.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "open-scene",
+              "res://tutorial/guide/modelled_prop.tscn"
+            ],
+            "contains": "ok"
+          }
+        },
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_set_layout",
+            "1",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "shot": {
+            "out": "_modeler_full.png"
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_modeler_full.png'); im.crop((287,104,1503,148)).save('$OUT/70-modeler-toolbar.png')\""
+        },
+        {
+          "drive": [
+            "click",
+            "990",
+            "125"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "_modeler_add.png"
+          }
+        },
+        {
+          "shell": "python3 -c \"from PIL import Image; im=Image.open('$OUT/_modeler_add.png'); im.crop((958,150,1378,655)).save('$OUT/71-modeler-add-mesh.png')\""
+        }
+      ],
+      "check": "The Modeler top toolbar (+ Add Mesh, Actions, icon buttons) and the Add Mesh shape palette.",
+      "notes": "Recipe rebuilt 2026-11-24 on :118/8918 (not yet visually compared to the shipped crops). debug_set_layout 1 switches to Modeler; the + Add Mesh palette is opened by a pixel click at (330,155) then cropped. If the click misses, the 71 crop shows the viewport instead.",
+      "scene": "res://tutorial/guide/modelled_prop.tscn"
+    },
+    {
+      "id": "ribbon",
+      "kind": "series",
+      "outputs": [
+        "01-edit-ribbon.png",
+        "02-mode-face.png",
+        "02-mode-edge.png",
+        "02-mode-vertex.png",
+        "03-edit-ribbon-face.png",
+        "04-roblox-model-tab.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "open-scene",
+              "res://tutorial/guide/modelled_prop.tscn"
+            ],
+            "contains": "ok"
+          }
+        },
+        {
+          "wait": 6
+        },
+        {
+          "expect": {
+            "drive": [
+              "select",
+              "--path",
+              "Box"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_set_layout",
+            "2",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 4
+        },
+        {
+          "drive": [
+            "click",
+            "373",
+            "140"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "01-edit-ribbon.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "396",
+            "185"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "02-mode-face.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "470",
+            "185"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "02-mode-edge.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "554",
+            "185"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "02-mode-vertex.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "396",
+            "185"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "450"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "03-edit-ribbon-face.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "325",
+            "140"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "shot": {
+            "out": "04-roblox-model-tab.png",
+            "crop": [
+              287,
+              130,
+              1216,
+              109
+            ]
+          }
+        }
+      ],
+      "check": "The Roblox Edit ribbon band: Object lit with ops greyed; the same band with Face/Edge/Vertex lit; Face mode with a face selected so Extrude/Inset/Delete light up; and the Model tab band.",
+      "notes": "Recipe rebuilt 2026-11-24 on :118/8918 with tutorial/guide/modelled_prop.tscn (any selected builder mesh shows the ribbon, so the band content matches the shipped crop). Layout switched with debug_set_layout 2; the Edit/Model tabs and mode buttons are pixel clicks into the custom-drawn ribbon.",
+      "scene": "res://tutorial/guide/modelled_prop.tscn"
+    },
+    {
+      "id": "painting-stills",
+      "kind": "series",
+      "outputs": [
+        "31-paint-blue.png",
+        "31-paint-green.png",
+        "31-paint-red.png"
+      ],
+      "fresh_session": true,
+      "steps": [
+        {
+          "drive": [
+            "key",
+            "n",
+            "--ctrl"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "click-text",
+              "Other Node"
+            ],
+            "contains": "Other Node"
+          }
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "type",
+            "PixelBuilderMesh"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "PixelBuilderMesh"
+          }
+        },
+        {
+          "drive": [
+            "click-text",
+            "Roblox UI"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "expect": {
+            "drive": [
+              "plugin-call",
+              "fetch_condition",
+              "--class",
+              "PixelBuilderPlugin"
+            ],
+            "contains": "Roblox"
+          }
+        },
+        {
+          "drive": [
+            "click",
+            "838",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "expect": {
+            "drive": [
+              "nodes",
+              "PixelBuilderMesh"
+            ],
+            "contains": "Box"
+          }
+        },
+        {
+          "drive": [
+            "move",
+            "887",
+            "495"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "f"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "wheel",
+            "887",
+            "495",
+            "down",
+            "--times",
+            "3"
+          ]
+        },
+        {
+          "wait": 3
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "2a52d8"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "6",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "480"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "31-paint-blue.png",
+            "crop": [
+              600,
+              300,
+              700,
+              420
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "4",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "27b344"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "6",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "480"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "31-paint-green.png",
+            "crop": [
+              600,
+              300,
+              700,
+              420
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "4",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "956",
+            "182"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "drive": [
+            "click",
+            "1048",
+            "600"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "a",
+            "--ctrl"
+          ]
+        },
+        {
+          "drive": [
+            "type",
+            "bd2b2b"
+          ]
+        },
+        {
+          "drive": [
+            "key",
+            "enter"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "1188",
+            "600"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "key",
+            "esc"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "6",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        },
+        {
+          "drive": [
+            "click",
+            "900",
+            "480"
+          ]
+        },
+        {
+          "wait": 2
+        },
+        {
+          "shot": {
+            "out": "31-paint-red.png",
+            "crop": [
+              600,
+              300,
+              700,
+              420
+            ]
+          }
+        },
+        {
+          "drive": [
+            "plugin-call",
+            "debug_action",
+            "4",
+            "--class",
+            "PixelBuilderPlugin"
+          ]
+        },
+        {
+          "wait": 1
+        }
+      ],
+      "check": "The same 0-slot terracotta box painted whole-mesh blue, then green, then red (a 0-material-slot part recolours entirely on one paint click).",
+      "notes": "GREEN 2026-11-24 (v1012, :121/8921). Split out of the old `painting` placeholder (which also owned the four MST-layout clips clip-18..21 and therefore could never be green from one run). A fresh PixelBuilderMesh Box in the Roblox UI, framed with f + 3 wheel-down notches. Each colour is set through the ribbon colour chip popup (hex field 1048,600 then Apply 1188,600 - the same pixel path the crate walkthrough uses), then ToolPaint (debug_action 6) and one click on the mesh at (900,480) recolours the whole 0-slot part; the shot is a 700x420 viewport crop (600,300). The 2026-11 addon change that inserts a solid Medium Stone Grey part is why the box is coloured first. Nothing is saved."
+    }
+  ]
+}
