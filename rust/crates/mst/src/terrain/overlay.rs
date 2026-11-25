@@ -205,7 +205,7 @@ impl MarchingSquaresTerrain {
         let mut rs = RenderingServer::singleton();
         let cfg = &self.store.config;
         let cs = cfg.cell_size_safe();
-        let stride = cfg.chunk_stride();
+        let stride = cfg.shader_stride();
         let grid_on = if is_editor() {
             self.show_grid_in_editor
         } else {

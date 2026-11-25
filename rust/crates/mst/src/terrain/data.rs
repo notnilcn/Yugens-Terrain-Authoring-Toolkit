@@ -222,6 +222,11 @@ pub fn layout_vec(grid: GridType, l: [i32; 4]) -> Vector4i {
     } else {
         l[0].clamp(2, 64)
     };
-    let rr = if l[1] < 1 { 4 } else { l[1].clamp(1, 16) };
+    let (radius, split) = pt_core::grid::unpack_ring_layout(l[1]);
+    let rr = if radius < 1 {
+        4
+    } else {
+        pt_core::grid::pack_ring_layout(radius.clamp(1, 16), split)
+    };
     Vector4i::new(cs, rr, l[2].max(0), l[3].max(0))
 }

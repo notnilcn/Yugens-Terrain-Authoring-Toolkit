@@ -52,6 +52,7 @@ impl MarchingSquaresTerrain {
             cfg.grid as u8,
             cfg.chunk_size,
             cfg.ring_radius,
+            cfg.cell_split,
             cfg.wrap.x,
             cfg.wrap.y,
             cfg.wrap_period,
@@ -265,7 +266,12 @@ impl MarchingSquaresTerrain {
         sig: i64,
     ) -> Gd<MarchingSquaresChunkData> {
         let cfg = &self.store.config;
-        let layout = [cfg.chunk_size, cfg.ring_radius, cfg.wrap.x, cfg.wrap.y];
+        let layout = [
+            cfg.chunk_size,
+            pt_core::grid::pack_ring_layout(cfg.ring_radius, cfg.cell_split),
+            cfg.wrap.x,
+            cfg.wrap.y,
+        ];
         let mut res = MarchingSquaresChunkData::from_chunk(c, cfg.grid, layout, data);
         if baked
             && !self.columns_active()
@@ -496,7 +502,7 @@ impl MarchingSquaresTerrain {
                 let mut cfg = self.store.config.clone();
                 cfg.grid = g;
                 cfg.chunk_size = l.x;
-                cfg.ring_radius = l.y;
+                (cfg.ring_radius, cfg.cell_split) = pt_core::grid::unpack_ring_layout(l.y);
                 cfg.wrap = pt_core::math::iv2(l.z, l.w);
                 let mut st = pt_core::terrain_store::TerrainStore::new(cfg);
                 data.bind().load_into(&mut st);

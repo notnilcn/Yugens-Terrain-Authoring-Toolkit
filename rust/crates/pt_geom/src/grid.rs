@@ -36,8 +36,18 @@ pub struct GridConfig {
     pub chunk_size: i32,
     pub cell_size: Vec2,
     pub ring_radius: i32,
+    pub cell_split: i32,
     pub wrap: IVec2,
     pub wrap_period: i32,
+}
+pub const MAX_CELL_SPLIT: i32 = 9;
+pub fn pack_ring_layout(radius: i32, split: i32) -> i32 {
+    let k = split.clamp(1, MAX_CELL_SPLIT);
+    if k == 1 { radius } else { radius | (k << 8) }
+}
+pub fn unpack_ring_layout(packed: i32) -> (i32, i32) {
+    let k = (packed >> 8) & 0xff;
+    (packed & 0xff, if k < 1 { 1 } else { k })
 }
 impl Default for GridConfig {
     fn default() -> Self {
@@ -46,6 +56,7 @@ impl Default for GridConfig {
             chunk_size: 32,
             cell_size: v2(2.0, 2.0),
             ring_radius: 4,
+            cell_split: 1,
             wrap: iv2(0, 0),
             wrap_period: 0,
         }
@@ -84,6 +95,35 @@ impl GridConfig {
     pub fn cell_size_safe(&self) -> Vec2 {
         v2(self.cell_size.x.max(0.0105), self.cell_size.y.max(0.0105))
     }
+    pub fn split(&self) -> i32 {
+        if self.grid != GridType::HexRings {
+            return 1;
+        }
+        let k = self.cell_split.clamp(1, MAX_CELL_SPLIT);
+        if k % 2 == 0 { k - 1 } else { k }
+    }
+    pub fn ring_hex_of(&self, cell: IVec2) -> IVec2 {
+        let k = self.split();
+        if k == 1 {
+            return cell;
+        }
+        iv2(floor_div(cell.x + k / 2, k), floor_div(cell.y + k / 2, k))
+    }
+    fn ring_span(&self) -> i32 {
+        let k = self.split();
+        k * self.ring_radius.max(1) + k / 2
+    }
+    pub fn ring_area(&self) -> i32 {
+        let r = self.ring_radius.max(1);
+        3 * r * (r + 1) + 1
+    }
+    pub fn shader_stride(&self) -> IVec2 {
+        if self.grid == GridType::HexRings {
+            iv2(self.split(), self.split())
+        } else {
+            self.chunk_stride()
+        }
+    }
     pub fn samples_per_chunk(&self) -> IVec2 {
         let n = self.chunk_size.max(1);
         match self.grid {
@@ -91,8 +131,8 @@ impl GridConfig {
             GridType::Hex => iv2(n, n),
             GridType::Triangle => iv2(2 * n, n),
             GridType::HexRings => {
-                let r = self.ring_radius.max(1);
-                iv2(2 * r + 1, 2 * r + 1)
+                let n = 2 * self.ring_span() + 1;
+                iv2(n, n)
             }
         }
     }
@@ -129,16 +169,17 @@ impl GridConfig {
         }
         if self.grid == GridType::HexRings {
             let r = self.ring_radius.max(1);
-            let (dq, dr) = (local.x - r, local.y - r);
-            return dq.abs() <= r && dr.abs() <= r && (dq + dr).abs() <= r;
+            let span = self.ring_span();
+            let h = self.ring_hex_of(iv2(local.x - span, local.y - span));
+            return h.x.abs() <= r && h.y.abs() <= r && (h.x + h.y).abs() <= r;
         }
         true
     }
     pub fn chunk_of(&self, sample: IVec2) -> IVec2 {
         match self.grid {
             GridType::HexRings => {
-                let s = self.wrap_sample(sample);
-                to_lower_res(s.x, s.y, self.ring_radius.max(1))
+                let h = self.ring_hex_of(self.wrap_sample(sample));
+                to_lower_res(h.x, h.y, self.ring_radius.max(1))
             }
             _ => {
                 let s = self.chunk_stride();
@@ -149,11 +190,10 @@ impl GridConfig {
     pub fn local_of(&self, sample: IVec2) -> IVec2 {
         match self.grid {
             GridType::HexRings => {
-                let r = self.ring_radius.max(1);
+                let span = self.ring_span();
                 let s = self.wrap_sample(sample);
-                let chunk = to_lower_res(s.x, s.y, r);
-                let c = chunk_center_hex(chunk.x, chunk.y, r);
-                iv2(s.x - c.x + r, s.y - c.y + r)
+                let c = self.chunk_center_cell(self.chunk_of(s));
+                iv2(s.x - c.x + span, s.y - c.y + span)
             }
             _ => {
                 let s = self.chunk_stride();
@@ -164,9 +204,9 @@ impl GridConfig {
     pub fn global_of(&self, chunk: IVec2, local: IVec2) -> IVec2 {
         match self.grid {
             GridType::HexRings => {
-                let r = self.ring_radius.max(1);
-                let c = chunk_center_hex(chunk.x, chunk.y, r);
-                iv2(c.x + local.x - r, c.y + local.y - r)
+                let span = self.ring_span();
+                let c = self.chunk_center_cell(chunk);
+                iv2(c.x + local.x - span, c.y + local.y - span)
             }
             _ => chunk * self.chunk_stride() + local,
         }
@@ -187,7 +227,7 @@ impl GridConfig {
         match self.grid {
             GridType::HexRings => {
                 let r = self.ring_radius.max(1);
-                chunk_center_hex(chunk.x, chunk.y, r)
+                chunk_center_hex(chunk.x, chunk.y, r) * self.split()
             }
             _ => self.global_of(chunk, self.samples_per_chunk() / 2),
         }
@@ -196,6 +236,14 @@ impl GridConfig {
         if self.grid != GridType::HexRings {
             return sample;
         }
+        let k = self.split();
+        if k == 1 {
+            return self.wrap_ring_hex(sample);
+        }
+        let h = self.ring_hex_of(sample);
+        self.wrap_ring_hex(h) * k + (sample - h * k)
+    }
+    fn wrap_ring_hex(&self, sample: IVec2) -> IVec2 {
         let r = self.ring_radius.max(1);
         if self.wrap_period_valid() {
             let p = self.wrap_period;
@@ -221,10 +269,7 @@ impl GridConfig {
     }
     pub fn chunk_area(&self) -> i32 {
         match self.grid {
-            GridType::HexRings => {
-                let r = self.ring_radius.max(1);
-                3 * r * (r + 1) + 1
-            }
+            GridType::HexRings => self.ring_area() * self.split() * self.split(),
             _ => {
                 let s = self.chunk_stride();
                 s.x * s.y
@@ -234,20 +279,31 @@ impl GridConfig {
     pub fn wrap_period_valid(&self) -> bool {
         self.grid == GridType::HexRings
             && self.wrap_period > 0
-            && self.wrap_period % self.chunk_area() == 0
+            && self.wrap_period % self.ring_area() == 0
     }
     pub fn wrap_chunk(&self, chunk: IVec2) -> IVec2 {
         if self.grid != GridType::HexRings {
             return chunk;
         }
-        self.chunk_of(chunk_center_hex(chunk.x, chunk.y, self.ring_radius.max(1)))
+        self.chunk_of(self.chunk_center_cell(chunk))
     }
     pub fn chunk_cells_spiral(&self, chunk: IVec2) -> Vec<IVec2> {
         if self.grid != GridType::HexRings {
             return self.chunk_cells(chunk);
         }
         let r = self.ring_radius.max(1);
-        spiral(chunk_center_hex(chunk.x, chunk.y, r), r)
+        let k = self.split();
+        let rings = spiral(chunk_center_hex(chunk.x, chunk.y, r), r);
+        if k == 1 {
+            return rings;
+        }
+        let h = k / 2;
+        rings
+            .into_iter()
+            .flat_map(|ring| {
+                (-h..=h).flat_map(move |dq| (-h..=h).map(move |dr| ring * k + iv2(dq, dr)))
+            })
+            .collect()
     }
     pub fn small_hex_pos(&self, s: IVec2) -> Vec2 {
         let k = SMALL_PER_LARGE_AXIS as f32;
@@ -564,8 +620,8 @@ impl GridConfig {
                 }
             }
             GridType::HexRings => {
-                let r = self.ring_radius.max(1);
-                let center = chunk_center_hex(chunk.x, chunk.y, r);
+                let r = self.ring_radius.max(1) * self.split();
+                let center = self.chunk_center_cell(chunk);
                 (0..6)
                     .map(|i| self.sample_pos(center + AXIAL[i] * iv2(r, r)))
                     .collect()
@@ -733,6 +789,62 @@ mod tests {
                 }
             }
         }
+    }
+    fn split_cfg() -> GridConfig {
+        GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_split: 3,
+            cell_size: v2(2.0, 2.0),
+            ..Default::default()
+        }
+    }
+    #[test]
+    fn split_rings_partition_the_cells_into_patches_of_171() {
+        let c = split_cfg();
+        assert_eq!(c.chunk_area(), 171);
+        for y in -40..40 {
+            for x in -40..40 {
+                let s = iv2(x, y);
+                let ch = c.chunk_of(s);
+                let l = c.local_of(s);
+                assert!(c.has_local(l), "{s:?} local {l:?}");
+                assert_eq!(c.global_of(ch, l), s);
+                assert!(c.chunk_cells(ch).contains(&s), "{s:?} not in chunk {ch:?}");
+            }
+        }
+        for ch in [iv2(0, 0), iv2(1, 0), iv2(-2, 3)] {
+            let cells = c.chunk_cells(ch);
+            assert_eq!(cells.len(), 171);
+            let mut spiral = c.chunk_cells_spiral(ch);
+            assert_eq!(spiral.len(), 171);
+            spiral.sort_by_key(|v| (v.y, v.x));
+            let mut sorted = cells.clone();
+            sorted.sort_by_key(|v| (v.y, v.x));
+            assert_eq!(spiral, sorted);
+            assert!(cells.iter().all(|s| c.chunk_of(*s) == ch));
+        }
+    }
+    #[test]
+    fn split_rings_follow_kg_hex_small_ownership() {
+        let c = split_cfg();
+        let big = GridConfig { cell_split: 1, cell_size: v2(6.0, 6.0), ..split_cfg() };
+        for ch in [iv2(0, 0), iv2(1, 0), iv2(3, -1)] {
+            let spiral = c.chunk_cells_spiral(ch);
+            let rings = big.chunk_cells_spiral(ch);
+            for (i, s) in spiral.iter().enumerate() {
+                let ring = rings[i / 9];
+                let block = (i % 9) as i32;
+                assert_eq!(*s, ring * 3 + iv2(block / 3 - 1, block % 3 - 1), "{ch:?} {i}");
+                assert_eq!(c.ring_hex_of(*s), ring);
+                assert_eq!(c.small_hex_owner(*s), c.ring_hex_of(*s));
+            }
+            assert!((c.chunk_center_pos(ch) - big.chunk_center_pos(ch)).magnitude() < 1e-3);
+            assert!((c.sample_pos(c.chunk_center_cell(ch)) - big.sample_pos(big.chunk_center_cell(ch))).magnitude() < 1e-3);
+        }
+        assert_eq!(unpack_ring_layout(pack_ring_layout(2, 3)), (2, 3));
+        assert_eq!(pack_ring_layout(4, 1), 4);
+        assert_eq!(unpack_ring_layout(4), (4, 1));
     }
     #[test]
     fn hex_rings_disk_has_19_cells_for_radius_2() {

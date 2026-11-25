@@ -560,7 +560,7 @@ const fn ts(label: &'static str, prop: &'static str, kind: TKind, tip: &'static 
         tip,
     }
 }
-const TERRAIN_SETTINGS: [TSetting; 40] = [
+const TERRAIN_SETTINGS: [TSetting; 41] = [
     ts(
         "Grid Type",
         "grid_type",
@@ -578,6 +578,12 @@ const TERRAIN_SETTINGS: [TSetting; 40] = [
         "ring_radius",
         TKind::Int(1, 16),
         "Hex Rings: radius of the hex disk each chunk owns.",
+    ),
+    ts(
+        "Cell Split",
+        "cell_split",
+        TKind::Int(1, 9),
+        "Hex Rings: each ring hex is drawn as split x split smaller cells (odd; 1 keeps one cell per ring hex).",
     ),
     ts(
         "Cell Size",
@@ -845,7 +851,8 @@ pub(super) const SETTINGS_PAGES: [(&str, &str); 6] = [
 ];
 fn settings_page_of(t: &TSetting) -> usize {
     match t.prop {
-        "grid_type" | "chunk_size" | "ring_radius" | "cell_size" | "wrap_chunks" | "blend_mode"
+        "grid_type" | "chunk_size" | "ring_radius" | "cell_split" | "cell_size" | "wrap_chunks"
+        | "blend_mode"
         | "default_merge_mode" | "hex_edge_style" | "hex_edge_instanced" | "impact_stratum" => 0,
         "default_floor_slot"
         | "default_wall_slot"
@@ -934,7 +941,7 @@ impl MarchingSquaresTerrainPlugin {
         hb.upcast()
     }
     fn layout_locked(&self, prop: &str) -> bool {
-        matches!(prop, "ring_radius" | "wrap_chunks")
+        matches!(prop, "ring_radius" | "cell_split" | "wrap_chunks")
             && self
                 .terrain
                 .as_ref()
@@ -969,7 +976,7 @@ impl MarchingSquaresTerrainPlugin {
             .filter(|(_, t)| settings_page_of(t) == page)
             .filter(|(_, t)| match t.prop {
                 "chunk_size" => !rings,
-                "ring_radius" | "wrap_chunks" => rings,
+                "ring_radius" | "cell_split" | "wrap_chunks" => rings,
                 "hex_edge_style" => grid != 0,
                 "hex_edge_instanced" => grid >= 2,
                 "bake_grass" | "bake_impact" => storage == 1,
@@ -1354,7 +1361,7 @@ impl MarchingSquaresTerrainPlugin {
         }
         if matches!(
             t.prop,
-            "grid_type" | "chunk_size" | "cell_size" | "ring_radius" | "storage_mode"
+            "grid_type" | "chunk_size" | "cell_size" | "ring_radius" | "cell_split" | "storage_mode"
         ) {
             self.selection.clear();
             self.rebuild_strip_deferred();

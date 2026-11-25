@@ -82,7 +82,11 @@ pub fn edge_distance(grid: GridType, cs: Vec2, p: Vec2) -> f32 {
 }
 pub fn shader_chunk(grid: GridType, stride: IVec2, radius: i32, c: IVec2) -> IVec2 {
     match grid {
-        GridType::HexRings => to_lower_res(c.x, c.y, radius.max(1)),
+        GridType::HexRings => {
+            let k = stride.x.max(1);
+            let h = iv2(div_floor(c.x + k / 2, k), div_floor(c.y + k / 2, k));
+            to_lower_res(h.x, h.y, radius.max(1))
+        }
         _ => iv2(
             div_floor(c.x, stride.x.max(1)),
             div_floor(c.y, stride.y.max(1)),
@@ -174,6 +178,25 @@ mod tests {
         }
     }
     #[test]
+    fn shader_chunk_matches_chunk_of_for_split_rings() {
+        let cfg = GridConfig {
+            grid: GridType::HexRings,
+            ring_radius: 2,
+            cell_split: 3,
+            ..Default::default()
+        };
+        for q in -40..40 {
+            for r in -40..40 {
+                let c = iv2(q, r);
+                assert_eq!(
+                    shader_chunk(cfg.grid, cfg.shader_stride(), cfg.ring_radius, c),
+                    cfg.chunk_of(c),
+                    "{c:?}"
+                );
+            }
+        }
+    }
+    #[test]
     fn shader_chunk_matches_chunk_of() {
         for g in [GridType::Triangle, GridType::Hex, GridType::HexRings] {
             let cfg = GridConfig {
@@ -186,7 +209,7 @@ mod tests {
                 for r in -20..20 {
                     let c = iv2(q, r);
                     assert_eq!(
-                        shader_chunk(g, cfg.chunk_stride(), cfg.ring_radius, c),
+                        shader_chunk(g, cfg.shader_stride(), cfg.ring_radius, c),
                         cfg.chunk_of(c),
                         "{g:?} {c:?}"
                     );

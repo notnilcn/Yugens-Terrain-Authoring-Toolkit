@@ -103,6 +103,9 @@ pub struct MarchingSquaresTerrain {
     #[export(range = (1.0, 16.0, 1.0))]
     #[var(set = set_ring_radius)]
     ring_radius: i32,
+    #[export(range = (1.0, 9.0, 2.0))]
+    #[var(set = set_cell_split)]
+    cell_split: i32,
     #[export]
     #[var(set = set_wrap_chunks)]
     wrap_chunks: Vector2i,
@@ -407,6 +410,7 @@ impl INode3D for MarchingSquaresTerrain {
             chunk_size: 32,
             cell_size: Vector2::new(2.0, 2.0),
             ring_radius: 4,
+            cell_split: 1,
             wrap_chunks: Vector2i::ZERO,
             wrap_period: 0,
             level_height: 0.5,
@@ -595,7 +599,9 @@ impl INode3D for MarchingSquaresTerrain {
                 strip(property, U::EDITOR)
             }
             "chunk_size" if self.grid() == GridType::HexRings => strip(property, U::EDITOR),
-            "ring_radius" | "wrap_chunks" | "wrap_period" if self.grid() != GridType::HexRings => {
+            "ring_radius" | "cell_split" | "wrap_chunks" | "wrap_period"
+                if self.grid() != GridType::HexRings =>
+            {
                 strip(property, U::EDITOR)
             }
             "hex_edge_style" if self.grid() == GridType::Square => strip(property, U::EDITOR),
@@ -679,6 +685,7 @@ impl MarchingSquaresTerrain {
             chunk_size: self.chunk_size.clamp(2, 64),
             cell_size: to_v2(self.cell_size),
             ring_radius: self.ring_radius.clamp(1, 16),
+            cell_split: self.cell_split.clamp(1, pt_core::grid::MAX_CELL_SPLIT),
             wrap: to_iv(self.wrap_chunks),
             wrap_period: self.wrap_period.max(0),
         }
@@ -764,11 +771,14 @@ impl MarchingSquaresTerrain {
             if let Some(l) = data.bind().layout_of(grid)
                 && data.bind().chunk_count(grid) > 0
             {
+                let (radius, split) = pt_core::grid::unpack_ring_layout(l.y);
                 cfg.chunk_size = l.x.clamp(2, 64);
-                cfg.ring_radius = l.y.clamp(1, 16);
+                cfg.ring_radius = radius.clamp(1, 16);
+                cfg.cell_split = split;
                 cfg.wrap = iv2(l.z, l.w);
                 self.chunk_size = cfg.chunk_size;
                 self.ring_radius = cfg.ring_radius;
+                self.cell_split = cfg.cell_split;
                 self.wrap_chunks = Vector2i::new(l.z, l.w);
             }
         }
@@ -1483,7 +1493,12 @@ impl MarchingSquaresTerrain {
             let mut d = data.bind_mut();
             d.write_layout(
                 grid,
-                Vector4i::new(cfg.chunk_size, cfg.ring_radius, cfg.wrap.x, cfg.wrap.y),
+                Vector4i::new(
+                    cfg.chunk_size,
+                    pt_core::grid::pack_ring_layout(cfg.ring_radius, cfg.cell_split),
+                    cfg.wrap.x,
+                    cfg.wrap.y,
+                ),
             );
             for c in coords {
                 d.write_chunk(grid, *c, self.store.chunks.get(c));
@@ -1744,6 +1759,16 @@ impl MarchingSquaresTerrain {
             return;
         }
         self.ring_radius = v.clamp(1, 16);
+        self.need_reload = true;
+    }
+    #[func]
+    fn set_cell_split(&mut self, v: i32) {
+        let v = v.clamp(1, pt_core::grid::MAX_CELL_SPLIT);
+        if self.hex_layout_locked() && v != self.cell_split {
+            godot_warn!("MarchingSquaresTerrain: cell_split is fixed once hex-ring chunks exist.");
+            return;
+        }
+        self.cell_split = v;
         self.need_reload = true;
     }
     #[func]

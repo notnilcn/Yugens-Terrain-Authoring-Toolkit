@@ -106,8 +106,9 @@ float mst_edge_dist(vec2 p, int grid, vec2 cs) {
 ivec2 mst_chunk_of(ivec2 c, int grid, ivec2 stride, int radius) {
 	if (grid == 3) {
 		int r = max(radius, 1);
-		int q = c.x;
-		int rr = c.y;
+		int k = max(stride.x, 1);
+		int q = mst_fdiv(c.x + k / 2, k);
+		int rr = mst_fdiv(c.y + k / 2, k);
 		int s = -q - rr;
 		int area = 3 * r * (r + 1) + 1;
 		int shift = 3 * r + 2;
