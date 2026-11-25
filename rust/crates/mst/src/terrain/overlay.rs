@@ -437,6 +437,44 @@ impl MarchingSquaresTerrain {
 #[godot_api(secondary)]
 impl MarchingSquaresTerrain {
     #[func]
+    pub fn get_chunk_tints_data(&self, chunk: Vector2i) -> PackedByteArray {
+        let c = to_iv(chunk);
+        let config = &self.store.config;
+        let center = config.chunk_center_cell(c);
+        let mut out = PaintedTints::default();
+        for (k, rgba) in &self.overlay.painted.tiles {
+            let cell = pt_core::math::iv2(k.0, k.1);
+            if config.chunk_of(cell) == c {
+                out.tiles.insert((cell.x - center.x, cell.y - center.y), *rgba);
+            }
+        }
+        PackedByteArray::from(out.to_bytes().as_slice())
+    }
+    #[func]
+    pub fn set_chunk_tints_data(&mut self, chunk: Vector2i, bytes: PackedByteArray) {
+        let Some(given) = PaintedTints::from_bytes(bytes.as_slice()) else {
+            godot_error!("MarchingSquaresTerrain.set_chunk_tints_data: not a PTT1 blob");
+            return;
+        };
+        let c = to_iv(chunk);
+        let config = self.store.config.clone();
+        let center = config.chunk_center_cell(c);
+        let mut painted = self.overlay.painted.clone();
+        painted
+            .tiles
+            .retain(|k, _| config.chunk_of(pt_core::math::iv2(k.0, k.1)) != c);
+        for ((x, y), rgba) in given.tiles {
+            let cell = config.wrap_sample(pt_core::math::iv2(x + center.x, y + center.y));
+            if config.chunk_of(cell) == c {
+                painted.tiles.insert((cell.x, cell.y), rgba);
+            }
+        }
+        if painted != self.overlay.painted {
+            self.apply_painted(painted);
+            self.painted_write();
+        }
+    }
+    #[func]
     pub fn assign_pointer(&mut self, world: Vector3, radius: f32, shape: i32, tint: Color) {
         let local = self.global_to_local(world);
         self.update_shader_cursor(Some((local, radius, shape.clamp(0, 5), tint, false)));

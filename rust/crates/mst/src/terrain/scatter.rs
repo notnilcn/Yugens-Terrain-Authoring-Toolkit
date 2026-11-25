@@ -10,6 +10,7 @@
 use super::MarchingSquaresTerrain;
 use crate::editor_detection::is_editor;
 use crate::globals;
+use crate::math_conversions::to_iv;
 use crate::internal_children::{add_internal, free_node};
 use crate::object_flags::object_flags_for;
 use crate::shader_materials::shader_material;
@@ -25,9 +26,11 @@ use godot::prelude::*;
 use pt_core::brush::Brush;
 use pt_core::math::{IVec2, Vec2 as PVec2, Vec3 as PVec3, v2, v3};
 use pt_core::scatter::{
-    PropMesh, PropShape, ScatterRules, ScatterSet, TileSet, instance_transform,
+    PropMesh, PropShape, ScatterInstance, ScatterRules, ScatterSet, TileSet, instance_transform,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+const CHUNK_SCATTER_SNAP: f32 = 256.0;
 pub const SCATTER_PRESET_DIR: &str = "res://addons/MarchingSquaresTerrain/scatter_presets/";
 const FALLBACK_SCATTER_PRESET: &str = "rock";
 pub fn scatter_preset_kinds() -> Vec<(String, i32)> {
@@ -1227,6 +1230,67 @@ impl MarchingSquaresTerrain {
 }
 #[godot_api(secondary)]
 impl MarchingSquaresTerrain {
+    #[func]
+    pub fn get_chunk_scatter_data(&self, chunk: Vector2i) -> PackedByteArray {
+        let c = to_iv(chunk);
+        let config = &self.store().config;
+        let origin = config.sample_pos(config.chunk_center_cell(c));
+        let mut mine: Vec<ScatterInstance> = self
+            .scatter
+            .assign
+            .iter()
+            .filter(|i| config.chunk_at(i.pos) == c)
+            .map(|i| {
+                let mut r = *i;
+                r.pos = v2(
+                    ((i.pos.x - origin.x) * CHUNK_SCATTER_SNAP).round() / CHUNK_SCATTER_SNAP,
+                    ((i.pos.y - origin.y) * CHUNK_SCATTER_SNAP).round() / CHUNK_SCATTER_SNAP,
+                );
+                r
+            })
+            .collect();
+        mine.sort_by(|a, b| {
+            (a.pos.x, a.pos.y, a.item)
+                .partial_cmp(&(b.pos.x, b.pos.y, b.item))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let mut out = ScatterSet::new(self.scatter.assign.patch);
+        for i in mine {
+            out.splice(i);
+        }
+        PackedByteArray::from(out.to_bytes().as_slice())
+    }
+    #[func]
+    pub fn set_chunk_scatter_data(&mut self, chunk: Vector2i, bytes: PackedByteArray) {
+        let Some(given) = ScatterSet::from_bytes(bytes.as_slice()) else {
+            godot_error!("MarchingSquaresTerrain.set_chunk_scatter_data: not a PTSC blob");
+            return;
+        };
+        let c = to_iv(chunk);
+        let config = self.store().config.clone();
+        let origin = config.sample_pos(config.chunk_center_cell(c));
+        let mut touched = TileSet::new();
+        for (t, v) in self.scatter.assign.tiles.iter_mut() {
+            let before = v.len();
+            v.retain(|i| config.chunk_at(i.pos) != c);
+            if v.len() != before {
+                touched.insert(*t);
+            }
+        }
+        self.scatter.assign.tiles.retain(|_, v| !v.is_empty());
+        for i in given.iter() {
+            let mut placed = *i;
+            placed.pos = v2(i.pos.x + origin.x, i.pos.y + origin.y);
+            if config.chunk_at(placed.pos) == c {
+                touched.insert(self.scatter.assign.splice(placed));
+            }
+        }
+        if !touched.is_empty() {
+            self.scatter.mark_tiles(&touched);
+            self.scatter_write();
+            self.update();
+        }
+    }
     #[func]
     pub fn get_scatter_count(&self, item: i64) -> i64 {
         if item < 0 {
