@@ -234,10 +234,25 @@ vec3 world_normal(vec3 n) {
 	return normalize(normalize(cam_right) * n.x + normalize(cam_up) * n.y - normalize(cam_forward) * n.z);
 }
 
-// Screen-space depth slope (m per texel step along off) that a surface with view normal n has
-// (ortho texel size; 0 in perspective).
-float texel_slope(vec3 n, ivec2 off) {
-	vec2 sl = abs(n.xy) / max(n.z, 0.15) * pt_texel_world;
+// Screen-space depth slope (m per texel step along off) that a surface with view normal n at
+// view depth `depth` has. In ortho a texel is pt_texel_world wide everywhere; in perspective it
+// widens with depth (2 tan(fov / 2) / source height per metre). Perspective applies it to
+// floors only (world normal pointing up), which recede by many texel widths per texel at a
+// grazing angle, with a looser normal clamp; walls keep no allowance there, so a wall standing
+// just in front of another still outlines. Without it every row of distant ground stepped past
+// the depth threshold and drew as a silhouette (dashed horizontal lines and dark speckled
+// grass towards the horizon).
+float texel_slope(vec3 n, ivec2 off, float depth) {
+	float texel = pt_texel_world;
+	float facing = max(n.z, 0.15);
+	if (!cam_ortho) {
+		if (world_normal(n).y <= 0.7) {
+			return 0.0;
+		}
+		texel = depth * 2.0 * length(cam_up) / float(max(source_size.y, 1));
+		facing = max(n.z, 0.03);
+	}
+	vec2 sl = abs(n.xy) / facing * texel;
 	return dot(sl, abs(vec2(off)));
 }
 
@@ -261,7 +276,7 @@ bool ledge_step(ivec2 r, ivec2 off, int oid, int size) {
 	resolve(r, a);
 	resolve(r + off, b);
 	return a.obj && b.obj && a.oid == oid && b.oid == oid && a.size == size && b.size == size
-		&& b.depth - a.depth - 1.5 * texel_slope(a.n, off) > depth_threshold;
+		&& b.depth - a.depth - 1.5 * texel_slope(a.n, off, a.depth) > depth_threshold;
 }
 
 // Ledges: a vertical wall seen exactly edge-on (square terrain under an axis-aligned camera)
@@ -356,8 +371,8 @@ int outline_kind(ivec2 s, Meta m0) {
 		float dd = mn.depth - m0.depth;
 		// Surfaces seen at a grazing angle (cliff walls edge-on) change depth quickly
 		// between texels of the same face: allow the slope the texel's own normal
-		// predicts (ortho texel size; 0 in perspective) so they don't self-outline.
-		float step_edge = dd - 1.5 * texel_slope(m0.n, offs[i]);
+		// predicts so they don't self-outline.
+		float step_edge = dd - 1.5 * texel_slope(m0.n, offs[i], m0.depth);
 		if (step_edge > depth_threshold && is_fold(m0, mn, dd)) {
 			step_edge = 0.0;
 			folded = true;
